@@ -53,6 +53,7 @@ export const ROUTES: readonly RouteMeta[] = [
   { id: 'webgpu', label: 'WebGPU', title: 'WebGPU renderer' },
   { id: 'compare', label: 'Compare', title: 'Canvas2D and WebGPU, side by side' },
   { id: 'benchmark', label: 'Benchmark', title: 'WebGPU renderer benchmark' },
+  { id: 'workbench', label: 'Workbench', title: 'Component workbench · every component in its states' },
   { id: 'examples', label: 'Examples', title: 'Examples · small complete apps' },
   { id: 'example-signin', label: 'Sign in', title: 'Example · passcode sign-in, written in JSX', parent: 'examples' },
   { id: 'example-notes', label: 'Notes', title: 'Example · notes with text editing and IME', parent: 'examples' },

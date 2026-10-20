@@ -20,6 +20,7 @@ import { mountTransitionsExampleRoute } from './routes/TransitionsExampleRoute';
 import { mountVideoExampleRoute } from './routes/VideoExampleRoute';
 import { mountTransitionsStandaloneRoute } from './routes/TransitionsStandaloneRoute';
 import { mountWebGPURoute } from './routes/WebGPURoute';
+import { mountWorkbenchRoute } from './routes/WorkbenchRoute';
 import { DEFAULT_ROUTE_ID, findRoute, routeIdFromHash, ROUTES } from './shell/routes';
 
 /** Mounts a route into `host` and returns its teardown. */
@@ -43,6 +44,7 @@ const MOUNTS: Record<string, Mount> = {
   webgpu: mountWebGPURoute,
   compare: mountCompareRoute,
   benchmark: mountBenchmarkRoute,
+  workbench: mountWorkbenchRoute,
   examples: mountExamplesRoute,
   'example-signin': mountSignInExampleRoute,
   'example-notes': mountNotesExampleRoute,
