@@ -105,7 +105,9 @@ export function LazyList(inputs: Inputs<LazyListProps>, ctx: ComponentContext): 
    * roving focus over rows that may not be mounted.
    */
   const choose = (index: number): void => {
-    if (index < 0) {
+    // Past the end too: Home on an empty list asks for row 0, and a
+    // choice of a row that does not exist would be reported as one.
+    if (index < 0 || index >= inputs.count.value) {
       return;
     }
     selected.change(index);

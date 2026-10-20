@@ -169,6 +169,25 @@ describe('LazyList', () => {
     expect(list.properties.get('scrollY')).toBe(scrolled);
   });
 
+  it('chooses nothing on Home in an empty list, where there is no row 0 to report', () => {
+    const chosen: number[] = [];
+    const ui = mount(
+      createComponent(LazyList, {
+        label: 'Files',
+        count: 0,
+        height: 100,
+        onSelect: (index: number) => chosen.push(index),
+        item: (index: number) => Text({ text: `file ${index}` })
+      })
+    );
+    ui.fireEvent.focus(ui.getByRole('list'));
+    for (const key of ['Home', 'End', 'ArrowDown', 'PageDown']) {
+      ui.fireEvent.keyDown(key);
+      ui.frame();
+    }
+    expect(chosen).toEqual([]);
+  });
+
   it("lays each row across the list's whole width, as a row of any column is", () => {
     const ui = mount(
       createComponent(LazyList, {
@@ -246,6 +265,26 @@ describe('DataTable', () => {
     const after = textColours(ui);
     expect(after.get(PEOPLE[0].name)).toBe(hex(darkTheme.colors.selectionForeground));
     expect(after.get(PEOPLE[1].name)).toBe(hex(darkTheme.colors.controlForeground));
+  });
+
+  it('leaves a cell that does not bind its colour in that colour when its row is chosen: nothing is inherited', () => {
+    const ui = mount(
+      Column(
+        { theme: darkTheme, height: 200 },
+        createComponent(DataTable<Person>, {
+          label: 'People',
+          columns: [{ key: 'name', header: 'Name', cell: (person: Person) => Text({ text: person.name }) }],
+          rows: PEOPLE,
+          defaultSelectedRow: 1,
+          height: 200
+        })
+      )
+    );
+    const drawn = textColours(ui);
+    // The chosen row's text is drawn as the others are, which is why
+    // `DataColumn.cell` asks for the colour to be bound.
+    expect(drawn.get(PEOPLE[1].name)).toBe(drawn.get(PEOPLE[0].name));
+    expect(drawn.get(PEOPLE[1].name)).not.toBe(hex(darkTheme.colors.selectionForeground));
   });
 
   it('sizes one set of tracks across the header and every mounted row', () => {
@@ -618,6 +657,98 @@ describe('Tree', () => {
     const ui = tree({ onActivate: (key: string) => activated.push(key) });
     ui.fireEvent.doubleClick(ui.getAllByRole('treeitem')[1]);
     expect(activated).toEqual(['docs']);
+  });
+
+  it('steps over a disabled row, and neither chooses nor activates one', () => {
+    const chosen: (string | null)[] = [];
+    const activated: string[] = [];
+    const nodes: readonly TreeNode[] = [
+      { key: 'a', label: 'a' },
+      { key: 'b', label: 'b', disabled: true },
+      { key: 'c', label: 'c' },
+      { key: 'd', label: 'd', disabled: true }
+    ];
+    const ui = tree({
+      nodes,
+      defaultSelectedKey: 'a',
+      onSelect: (key: string | null) => chosen.push(key),
+      onActivate: (key: string) => activated.push(key)
+    });
+    const press = (key: string) => {
+      ui.fireEvent.keyDown(key);
+      ui.frame();
+    };
+    ui.fireEvent.focus(ui.getByRole('tree'));
+    press('ArrowDown');
+    expect(chosen).toEqual(['c']);
+    // Nothing after c can be chosen, so Down and End stay on it.
+    press('ArrowDown');
+    press('End');
+    press('ArrowUp');
+    press('Enter');
+    // Each move, without the repeats of a key that stayed where it was.
+    const moves = () => chosen.filter((key, i) => key !== chosen[i - 1]);
+    expect(moves()).toEqual(['c', 'a']);
+    expect(activated).toEqual(['a']);
+    ui.fireEvent.click(ui.getByRole('treeitem', { name: 'b' }));
+    ui.frame();
+    expect(moves()).toEqual(['c', 'a']);
+
+    // A selection written from outside can name a disabled row; Enter
+    // on it is still not an activation.
+    const written = tree({ nodes, selectedKey: 'b', onActivate: (key: string) => activated.push(key) });
+    written.fireEvent.focus(written.getByRole('tree'));
+    written.fireEvent.keyDown('Enter');
+    expect(activated).toEqual(['a']);
+  });
+
+  it('keeps the choice on Right in an open folder with nothing in it, rather than moving to the next one', () => {
+    const chosen: (string | null)[] = [];
+    const ui = tree({
+      nodes: [
+        { key: 'empty', label: 'empty', branch: true },
+        { key: 'next', label: 'next' }
+      ],
+      defaultSelectedKey: 'empty',
+      defaultExpanded: ['empty'],
+      onSelect: (key: string | null) => chosen.push(key)
+    });
+    ui.fireEvent.focus(ui.getByRole('tree'));
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.frame();
+    expect(chosen).toEqual([]);
+  });
+
+  it('moves ten rows on Page Down and Page Up, as the other lists do', () => {
+    const chosen: (string | null)[] = [];
+    const ui = tree({
+      nodes: Array.from({ length: 30 }, (_, i) => ({ key: `f${i}`, label: `f${i}` })),
+      defaultSelectedKey: 'f0',
+      onSelect: (key: string | null) => chosen.push(key)
+    });
+    ui.fireEvent.focus(ui.getByRole('tree'));
+    for (const key of ['PageDown', 'PageDown', 'PageDown', 'PageUp']) {
+      ui.fireEvent.keyDown(key);
+      ui.frame();
+    }
+    expect(chosen).toEqual(['f10', 'f20', 'f29', 'f19']);
+  });
+
+  it('opens a tree deeper than the call stack is tall', () => {
+    // Twenty thousand folders, one inside the next, all open.
+    let node: TreeNode = { key: 'leaf', label: 'leaf' };
+    const open: string[] = [];
+    for (let depth = 0; depth < 20000; depth += 1) {
+      node = { key: `d${depth}`, label: `d${depth}`, children: [node] };
+      open.push(node.key);
+    }
+    const chosen: (string | null)[] = [];
+    const ui = tree({ nodes: [node], defaultExpanded: open, onSelect: (key: string | null) => chosen.push(key) });
+    ui.fireEvent.focus(ui.getByRole('tree'));
+    ui.fireEvent.keyDown('End');
+    ui.frame();
+    expect(chosen).toEqual(['leaf']);
+    expect(ui.getSemantics(ui.getByRole('treeitem', { name: 'leaf' })).level).toBe(20001);
   });
 
   it('refuses both a value and a default, naming the component', () => {

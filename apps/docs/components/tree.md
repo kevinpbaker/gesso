@@ -124,18 +124,21 @@ scrolled back in.
 | ------------ | ------------------------------------------------------------------ |
 | Down         | The next row in the open list                                      |
 | Up           | The previous row                                                   |
-| Right        | Opens a closed branch; on an open branch, steps to its first child |
+| Right        | Opens a closed branch; on an open branch, steps to its first child, and an empty one stays put |
 | Left         | Closes an open branch; on a leaf, steps to its parent              |
 | Home         | The first row                                                      |
 | End          | The last row of the open list                                      |
+| Page Down    | Ten rows on                                                        |
+| Page Up      | Ten rows back                                                      |
 | Enter, Space | Calls `onActivate` with the chosen row's key                       |
 
 Right and Left are the ARIA tree keys, and they are the reason a row has
 to know its parent as well as its level. Down and Up move by one row in
 the flattened list, so a leaf is followed by its parent's next sibling.
-There is no Page Up or Page Down here; the arrows and Home and End are
-the whole map. Every key clamps: a step past the end is the end, never
-the start.
+Page Up and Page Down move ten rows, as they do in a data table or a
+lazy list. Every key clamps: a step past the end is the end, never the
+start. And every key steps over a disabled row, landing on the nearest
+row that can be chosen.
 
 A key that is bound is consumed; a key that is not is left for whatever
 is listening above, which is what keeps Tab, and an application's own
@@ -179,11 +182,12 @@ row did nothing at all. That was Canvas2D, which is what a reader sees
 here unless they asked for the other renderer, and Chrome is the extent
 of what any of it has been opened in.
 
-Three limits worth knowing before you build on it. The tree chooses one
-row at a time. The arrow keys step through every visible row, including
-one marked `disabled`: that row refuses a press, but the keyboard will
-land on it. And a disabled row is not drawn any differently, so give it
-something of your own if unavailable should look unavailable.
+Two limits worth knowing before you build on it. The tree chooses one
+row at a time. And a disabled row is not drawn any differently, so give
+it something of your own if unavailable should look unavailable. The
+keys do step over it, as they do in a menu or a select: the arrows,
+Home, End and the page keys never land on a disabled row, and Enter and
+Space never act on one.
 
 ## Next
 

@@ -1,7 +1,7 @@
-import { BehaviorSubject, defer, distinctUntilChanged, map, type Observable } from 'rxjs';
+import { BehaviorSubject, defer, distinctUntilChanged, map, merge, Subject, type Observable } from 'rxjs';
 import { Column, Row, ScrollView, Text, type UiChild } from 'gesso-core';
 
-import { createComponent, each, type ComponentContext, type Inputs } from 'gesso-framework';
+import { createComponent, each, input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Button } from './Button';
 import { Checkbox } from './Checkbox';
 import { LazyList } from './LazyList';
@@ -488,7 +488,7 @@ function element(type: PlainNodeType, node$: BehaviorSubject<PlainNode>, draw: D
       const shown = following(node$, n => as(n, 'checkbox').checked);
       return createComponent(Checkbox, {
         label: field(node$, n => as(n, 'checkbox').label),
-        checked: shown,
+        checked: shown.value,
         onChange: (checked: boolean) => {
           shown.next(checked);
           draw.emit(current('checkbox').action, checked);
@@ -504,7 +504,7 @@ function element(type: PlainNodeType, node$: BehaviorSubject<PlainNode>, draw: D
         ...(as(node$.value, 'select').width === undefined
           ? {}
           : { width: field(node$, n => as(n, 'select').width ?? 160) }),
-        value: shown,
+        value: shown.value,
         onChange: (value: string) => {
           shown.next(value);
           draw.emit(current('select').action, value);
@@ -558,11 +558,19 @@ function element(type: PlainNodeType, node$: BehaviorSubject<PlainNode>, draw: D
   }
 }
 
-/** A value the view shows: the sender's, until the person changes it, and the sender's again when it sends a new one. */
-function following<T>(node$: BehaviorSubject<PlainNode>, of: (node: PlainNode) => T): BehaviorSubject<T> {
-  const shown = new BehaviorSubject(of(node$.value));
-  field(node$, of).subscribe(value => shown.next(value));
-  return shown;
+/**
+ * A value the view shows: the sender's, until the person changes it, and the sender's again when it sends a new one.
+ *
+ * A merge rather than a subject fed from the node: the control that binds it subscribes and unsubscribes it, so it
+ * ends with the control. A subscription made here had no end, and a keyed node that changed shape kept one for every
+ * control it had been.
+ */
+function following<T>(
+  node$: BehaviorSubject<PlainNode>,
+  of: (node: PlainNode) => T
+): { readonly value: Observable<T>; readonly next: (value: T) => void } {
+  const changed = new Subject<T>();
+  return { value: merge(field(node$, of), changed), next: value => changed.next(value) };
 }
 
 export function PlainView(inputs: Inputs<PlainViewProps>, ctx: ComponentContext): UiChild {
@@ -583,5 +591,8 @@ export function PlainView(inputs: Inputs<PlainViewProps>, ctx: ComponentContext)
     root$.next(checked(raw));
   });
   const draw: Draw = { emit: (action, value) => inputs.onAction?.value?.({ action, value }) };
-  return Column({ flexGrow: 1, minHeight: 0, role: 'region', label: inputs.label ?? 'View' }, nodeView(root$, draw));
+  return Column(
+    { flexGrow: 1, minHeight: 0, role: 'region', label: input(inputs.label, 'View') },
+    nodeView(root$, draw)
+  );
 }
