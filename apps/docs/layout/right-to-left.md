@@ -79,6 +79,17 @@ Everything the box model decides:
 | `paddingStart` / `marginStart` | Resolve to the right edge.                                                |
 | A custom layout's `place`      | Its `start` coordinate is measured from the right.                        |
 | An overlay scrollbar           | The vertical bar hangs on the left, and so does the band that reveals it. |
+| A scroll container             | Starts at its right edge, and scrolls left with a negative `scrollX`.     |
+
+A scroll container's offset follows CSS, where `scrollLeft` is never
+positive in a right-to-left box. Its content starts at the right edge
+and overflows to the left, so `scrollX` runs from minus the overflow up
+to `0`: `0` shows the start edge, which is where a container nobody has
+scrolled sits, and `-200` is 200 pixels toward the end. A wheel, a
+swipe, a dragged thumb and a row revealed by the keyboard all move in
+that range, and the horizontal thumb starts at the right end of its
+track. Text fields are the exception: a field scrolls its own text to
+follow the caret, from `0` up, in either direction.
 
 Two things do not, and should not:
 
@@ -89,8 +100,10 @@ Two things do not, and should not:
   it short of the box; the leftover is then at the start edge, which
   moves with the reading.
 
-All twenty of those cases are graded against Chrome, case by case, by
-`packages/core/src/layout/conformance`.
+All twenty of the box-model cases are graded against Chrome, case by
+case, by `packages/core/src/layout/conformance`. Scrolling is not a
+box-model case there; its right-to-left behaviour is pinned by
+`packages/core/src/layout/LayoutEngine.scrollRtl.spec.ts`.
 
 ## What does not mirror yet
 

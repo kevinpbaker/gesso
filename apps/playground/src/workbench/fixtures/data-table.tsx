@@ -282,7 +282,7 @@ export const dataTableFixture: WorkbenchFixture = {
     },
     {
       name: 'Columns wider than the card',
-      try: 'The columns add up to about 960px in a 530px table. Scroll sideways (a trackpad swipe or a sideways wheel): the header and rows move together until Notes is fully in view, and stop there. Nothing is drawn past the rounded border.',
+      try: 'The columns add up to about 960px in a 530px table. Scroll sideways (a trackpad swipe or a sideways wheel): the header and rows move together until Notes is fully in view, and stop there. Under Right to left it opens on its right edge and the same swipe the other way reaches Notes on the left. Nothing is drawn past the rounded border.',
       width: 560,
       height: 320,
       stretch: true,

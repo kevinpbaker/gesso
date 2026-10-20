@@ -15,7 +15,8 @@ import {
   type UiRole,
   type UiSemanticsRecord,
   type UiColorValue,
-  fr
+  fr,
+  LazyRow
 } from 'gesso-core';
 import { DataTable } from './DataTable';
 import { LazyList } from './LazyList';
@@ -356,6 +357,68 @@ describe('DataTable', () => {
     expect(ui.getVisibleBox(age).x).toBeCloseTo(ui.getLayout(age).x - 200, 5);
     // The header scrolls with the rows, so the columns still line up.
     expect(ui.getVisibleBox(heading).x).toBeCloseTo(ui.getLayout(heading).x - 200, 5);
+  });
+
+  it('scrolls sideways toward its end when it reads right to left, starting at its right edge', () => {
+    const ui = mount(
+      Box(
+        { width: 300, height: 200, textDirection: 'rtl' },
+        createComponent(DataTable<Person>, {
+          label: 'People',
+          columns: [
+            { key: 'name', header: 'Name', width: 250, cell: (person: Person) => Text({ text: person.name }) },
+            { key: 'age', header: 'Age', width: 250, cell: (person: Person) => Text({ text: String(person.age) }) }
+          ],
+          rows: PEOPLE,
+          width: 300,
+          height: 200
+        })
+      )
+    );
+    const name = ui.getByText(PEOPLE[0].name);
+    const age = ui.getByText(String(PEOPLE[0].age));
+    // The first column takes the right 250, and the second starts 50
+    // from the left edge and runs 200 past it.
+    expect(ui.getVisibleBox(name).x).toBeGreaterThan(50);
+    const atStart = ui.getVisibleBox(age).x;
+
+    // At its start, a swipe further toward the start has nothing to move.
+    ui.fireEvent.wheel({ x: 150, y: 100, deltaX: 400, deltaY: 0 });
+    ui.frame();
+    ui.frame(400);
+    expect(ui.getVisibleBox(age).x).toBe(atStart);
+
+    // Toward the end it goes 200, the overflow, and no further. It used
+    // to go nowhere: the offset was clamped at 0, the start edge.
+    ui.fireEvent.wheel({ x: 150, y: 100, deltaX: -400, deltaY: 0 });
+    ui.frame();
+    ui.frame(400);
+    expect(ui.getVisibleBox(age).x).toBeCloseTo(atStart + 200, 5);
+  });
+
+  it('keeps the rows a lazy row mounts in step with a right-to-left scroll', () => {
+    const ui = mount(
+      Box(
+        { width: 200, height: 100, textDirection: 'rtl' },
+        LazyRow({ width: 200, height: 100, count: 100, estimatedExtent: 50 }, index =>
+          Box({ width: 50, height: 100 }, Text({ text: `item ${index}` }))
+        )
+      )
+    );
+    // The first item is at the start, the right edge.
+    expect(ui.getVisibleBox(ui.getByText('item 0')).x).toBeGreaterThanOrEqual(150);
+
+    ui.fireEvent.wheel({ x: 100, y: 50, deltaX: -1000, deltaY: 0 });
+    for (let frame = 0; frame < 6; frame++) {
+      ui.frame(400 + frame * 16);
+    }
+    // 1000 toward the end is twenty items along: item 20 is mounted,
+    // and in view, rather than the window still holding the first few
+    // because it read the negative offset as the start.
+    const twenty = ui.getVisibleBox(ui.getByText('item 20'));
+    expect(twenty.x).toBeGreaterThanOrEqual(0);
+    expect(twenty.x).toBeLessThan(200);
+    expect(ui.queryByText('item 0')).toBeNull();
   });
 
   it('leaves a table whose columns share its width with nothing to scroll sideways', () => {

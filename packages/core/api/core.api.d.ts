@@ -2654,6 +2654,12 @@ declare const SCROLLBAR_HOVER_ZONE = 16;
 type ScrollbarAxis = 'x' | 'y';
 declare function scrollLeaderOf(node: UiNode): UiNode | null;
 declare function scrollRange(rec: LayoutRecord, axis: ScrollbarAxis): number;
+declare function scrollsFromRight(rec: LayoutRecord): boolean;
+interface ScrollBounds {
+  readonly min: number;
+  readonly max: number;
+}
+declare function scrollBounds(rec: LayoutRecord, axis: ScrollbarAxis): ScrollBounds;
 interface ScrollbarThumb {
   axis: ScrollbarAxis;
   thumb: LayoutBox;
@@ -3742,6 +3748,7 @@ declare class LayoutEngine {
   private markLayoutDirty;
   private applyScroll;
   private applyFollowedScroll;
+  private clampScroll;
   private applyScrollOffset;
   private applySticky;
   private resolveStickyOffset;
@@ -5909,6 +5916,8 @@ export {
   ScrollbarThumb,
   scrollbarThumbs,
   scrollbarZoneAt,
+  scrollBounds,
+  ScrollBounds,
   ScrollContainerState,
   ScrollLayerStats,
   scrollLeaderOf,
@@ -5916,6 +5925,7 @@ export {
   scrollPosition,
   ScrollPositionArgs,
   scrollRange,
+  scrollsFromRight,
   ScrollSink,
   ScrollView,
   ScrollViewProps,
@@ -6831,6 +6841,8 @@ import {
   ScrollbarThumb,
   scrollbarThumbs,
   scrollbarZoneAt,
+  scrollBounds,
+  ScrollBounds,
   ScrollContainerState,
   ScrollLayerStats,
   scrollLeaderOf,
@@ -6838,6 +6850,7 @@ import {
   scrollPosition,
   ScrollPositionArgs,
   scrollRange,
+  scrollsFromRight,
   ScrollSink,
   ScrollView,
   ScrollViewProps,
@@ -7573,9 +7586,11 @@ export {
   scrollbarThumb,
   scrollbarThumbs,
   scrollbarZoneAt,
+  scrollBounds,
   scrollLeaderOf,
   scrollPosition,
   scrollRange,
+  scrollsFromRight,
   ScrollView,
   selectableTextNodes,
   selectableTextOf,
@@ -7817,6 +7832,7 @@ export {
   type ScrollAdjustment,
   type ScrollbarAxis,
   type ScrollbarThumb,
+  type ScrollBounds,
   type ScrollContainerState,
   type ScrollLayerStats,
   type ScrollOffset,

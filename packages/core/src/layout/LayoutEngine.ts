@@ -25,7 +25,7 @@ import { MAX_MEASURES_PER_CHILD, isLayoutProtocol } from './CustomLayout';
 import type { UiLayoutChild, UiLayoutContext, UiLayoutProtocol } from './CustomLayout';
 import { LayoutRecord } from './LayoutRecord';
 import type { ArrangementMemo, TextMemo } from './LayoutRecord';
-import { scrollLeaderOf, scrollRange } from './Scrollbars';
+import { scrollBounds, scrollLeaderOf, scrollsFromRight } from './Scrollbars';
 import { fillSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
 import { CharacterCountTextMeasurer, fitsWidth, layoutFitsAnyWidth } from './TextMeasurer';
@@ -1436,8 +1436,8 @@ export class LayoutEngine {
       const viewTop = container.y + container.scrollY;
       let scrollX = container.scrollX + revealShift(left, right, viewLeft, container.width);
       let scrollY = container.scrollY + revealShift(top, bottom, viewTop, container.height);
-      scrollX = this.clamp(scrollX, 0, Math.max(0, container.contentWidth - container.width));
-      scrollY = this.clamp(scrollY, 0, Math.max(0, container.contentHeight - container.height));
+      scrollX = this.clampScroll(container, 'x', scrollX);
+      scrollY = this.clampScroll(container, 'y', scrollY);
       if (scrollX !== container.scrollX || scrollY !== container.scrollY) {
         adjustments.push({ container: current, scrollX, scrollY });
       }
@@ -3352,14 +3352,20 @@ export class LayoutEngine {
    * this already, but placement is the truth for any container.
    */
   private updateContentExtent(node: UiNode, rec: LayoutRecord): void {
+    // A container that scrolls from its right edge has its content
+    // start there and run off to the left, so its extent is how far
+    // left the children reach, measured from the right.
+    const fromRight = scrollsFromRight(rec);
+    let left = rec.x + rec.width - rec.paddingRight;
     let right = rec.x + rec.paddingLeft;
     let bottom = rec.y + rec.paddingTop;
     this.forEachChild(node, child => {
       const cRec = this.record(child);
+      left = Math.min(left, cRec.x - cRec.marginLeft);
       right = Math.max(right, cRec.x + cRec.width + cRec.marginRight);
       bottom = Math.max(bottom, cRec.y + cRec.height + cRec.marginBottom);
     });
-    rec.contentWidth = right - rec.x + rec.paddingRight;
+    rec.contentWidth = fromRight ? rec.x + rec.width - left + rec.paddingLeft : right - rec.x + rec.paddingRight;
     rec.contentHeight = bottom - rec.y + rec.paddingBottom;
   }
 
@@ -4440,9 +4446,15 @@ export class LayoutEngine {
     const followsY = axis !== 'x';
     const rawX = followsX ? (source?.scrollX ?? 0) : (this.numberProp(node, 'scrollX') ?? 0);
     const rawY = followsY ? (source?.scrollY ?? 0) : (this.numberProp(node, 'scrollY') ?? 0);
-    rec.scrollX = this.clamp(rawX, 0, scrollRange(rec, 'x'));
-    rec.scrollY = this.clamp(rawY, 0, scrollRange(rec, 'y'));
+    rec.scrollX = this.clampScroll(rec, 'x', rawX);
+    rec.scrollY = this.clampScroll(rec, 'y', rawY);
     rec.transformDirty = false;
+  }
+
+  /** An offset clamped to what the record can scroll along the axis; see `scrollBounds`. */
+  private clampScroll(rec: LayoutRecord, axis: 'x' | 'y', offset: number): number {
+    const { min, max } = scrollBounds(rec, axis);
+    return this.clamp(offset, min, max);
   }
 
   /**
@@ -4456,8 +4468,8 @@ export class LayoutEngine {
     const rec = this.record(node);
     const rawX = this.numberProp(node, 'scrollX') ?? 0;
     const rawY = this.numberProp(node, 'scrollY') ?? 0;
-    const scrollX = this.clamp(rawX, 0, scrollRange(rec, 'x'));
-    const scrollY = this.clamp(rawY, 0, scrollRange(rec, 'y'));
+    const scrollX = this.clampScroll(rec, 'x', rawX);
+    const scrollY = this.clampScroll(rec, 'y', rawY);
     if (scrollX !== rec.scrollX || scrollY !== rec.scrollY) {
       rec.scrollX = scrollX;
       rec.scrollY = scrollY;
@@ -4523,14 +4535,20 @@ export class LayoutEngine {
     const parentIsScroller = parent === scroller;
     // Bounds the node may move within: its parent's content box, in
     // the same pre-scroll frame as the node's record.
+    // A scroller's content runs the length of its content extent, from
+    // its right edge when it scrolls from there.
+    const fromRight = parentIsScroller && scrollsFromRight(pRec);
     const boundTop = pRec.y + pRec.paddingTop;
-    const boundLeft = pRec.x + pRec.paddingLeft;
+    const boundLeft = fromRight
+      ? pRec.x + pRec.width - pRec.contentWidth + pRec.paddingLeft
+      : pRec.x + pRec.paddingLeft;
     const boundBottom = parentIsScroller
       ? pRec.y + pRec.contentHeight - pRec.paddingBottom
       : pRec.y + pRec.height - pRec.paddingBottom;
-    const boundRight = parentIsScroller
-      ? pRec.x + pRec.contentWidth - pRec.paddingRight
-      : pRec.x + pRec.width - pRec.paddingRight;
+    const boundRight =
+      parentIsScroller && !fromRight
+        ? pRec.x + pRec.contentWidth - pRec.paddingRight
+        : pRec.x + pRec.width - pRec.paddingRight;
     // The scrollport's edges in that frame.
     const viewTop = sRec.y + sRec.scrollY + (parentIsScroller ? 0 : 0);
     const viewLeft = sRec.x + sRec.scrollX;

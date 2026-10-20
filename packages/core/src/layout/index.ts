@@ -4,13 +4,16 @@ export {
   scrollbarThumbs,
   scrollbarZoneAt,
   scrollRange,
+  scrollBounds,
+  scrollsFromRight,
   scrollLeaderOf,
   SCROLLBAR_THICKNESS,
   SCROLLBAR_INSET,
   SCROLLBAR_MIN_THUMB,
   SCROLLBAR_HOVER_ZONE,
   type ScrollbarAxis,
-  type ScrollbarThumb
+  type ScrollbarThumb,
+  type ScrollBounds
 } from './Scrollbars';
 export { LayoutRecord } from './LayoutRecord';
 export type { SubtreeBounds } from './SubtreeBounds';
