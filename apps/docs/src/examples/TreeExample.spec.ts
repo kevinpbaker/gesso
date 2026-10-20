@@ -156,13 +156,15 @@ describe('the docs tree example', () => {
     ui.frame();
     expect(chosen(ui)).toBe('graph');
 
+    // End stops on the last row that can be chosen: vendor, after it,
+    // is disabled, and the keys step over a disabled row.
     ui.fireEvent.press('End');
     ui.frame();
-    expect(chosen(ui)).toBe('vendor');
-    // Clamped rather than wrapped.
+    expect(chosen(ui)).toBe('docs');
+    // Clamped rather than wrapped, and never onto vendor.
     ui.fireEvent.press('ArrowDown');
     ui.frame();
-    expect(chosen(ui)).toBe('vendor');
+    expect(chosen(ui)).toBe('docs');
     ui.fireEvent.press('Home');
     ui.frame();
     expect(chosen(ui)).toBe('src');

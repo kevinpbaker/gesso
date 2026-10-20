@@ -38,9 +38,9 @@ const RUNS: readonly Run[] = [
  * `compare` sorts; the Team column has none, so its header takes no
  * click, no focus and no keys.
  *
- * No cell names a colour. `color` is inherited, so the text in a
- * chosen row is drawn in the selection foreground without any cell
- * knowing that the row is chosen.
+ * Every cell binds the `color` it is handed. The row does not colour
+ * its text for it, so a cell that left it out would keep the control
+ * foreground on the selection background when its row is chosen.
  */
 const COLUMNS: readonly DataColumn<Run>[] = [
   {

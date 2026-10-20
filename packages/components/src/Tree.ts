@@ -190,13 +190,26 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
   const revision = combineLatest([inputs.nodes, expanded.value]);
   const count = revision.pipe(map(() => rows().length));
 
+  // A disabled row is not a place the keyboard can stop, as a disabled
+  // option is not one in `Select` or `Menu`: the arrows step over it,
+  // and nothing chooses it to be activated after.
   const choose = (index: number): void => {
     const all = rows();
-    if (index < 0 || index >= all.length) {
+    if (index < 0 || index >= all.length || all[index].node.disabled === true) {
       return;
     }
     selected.change(all[index].node.key);
     list.reveal(index);
+  };
+  /** The first row that can be chosen from `start` on, walking by `delta`; -1 for none. Clamped, never wrapped. */
+  const seek = (start: number, delta: number): number => {
+    const all = rows();
+    for (let index = start; index >= 0 && index < all.length; index += delta) {
+      if (all[index].node.disabled !== true) {
+        return index;
+      }
+    }
+    return -1;
   };
   /** The row asked for by `revealKey` and not shown yet. */
   let pending: string | null = null;
@@ -215,7 +228,16 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
   });
   ctx.effect(combineLatest([revision, list.size]), revealPending);
 
-  const step = (by: number): void => choose(stepIndex(indexOfSelected(), by, rows().length));
+  /**
+   * Moves by `by` rows, to the nearest row that can be chosen: past the
+   * target if that is disabled, and back towards where it started if
+   * everything past it is, so a page key at the end still lands.
+   */
+  const step = (by: number): void => {
+    const target = stepIndex(indexOfSelected(), by, rows().length);
+    const ahead = seek(target, by < 0 ? -1 : 1);
+    choose(ahead !== -1 ? ahead : seek(target, by < 0 ? 1 : -1));
+  };
   const setOpen = (key: string, open: boolean): void => {
     const current = expanded.current();
     if (open === current.includes(key)) {
@@ -230,16 +252,25 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
    * reason a row has to know its parent as well as its level.
    */
   const forward = (): void => {
+    const all = rows();
     const index = indexOfSelected();
-    const row = rows()[index];
+    const row = all[index];
     if (row === undefined) {
-      choose(0);
+      choose(seek(0, 1));
       return;
     }
     if (hasChildren(row.node) && !expanded.current().includes(row.node.key)) {
       setOpen(row.node.key, true);
     } else if (hasChildren(row.node)) {
-      step(1);
+      // Into the branch and nowhere else: an open folder with nothing in
+      // it yet (or only disabled rows) keeps the choice, where a step
+      // would have carried it on to the next sibling.
+      for (let next = index + 1; next < all.length && all[next].level > row.level; next += 1) {
+        if (all[next].node.disabled !== true) {
+          choose(next);
+          return;
+        }
+      }
     }
   };
   const back = (): void => {
@@ -257,8 +288,13 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       choose(all.findIndex(candidate => candidate.node.key === row.parent));
     }
   };
+  /** The chosen row's key, unless it is disabled: a selection written from outside can name one. */
+  const enabledSelection = (): string | null => {
+    const row = rows()[indexOfSelected()];
+    return row === undefined || row.node.disabled === true ? null : row.node.key;
+  };
   const activate = (): void => {
-    const key = selected.current();
+    const key = enabledSelection();
     if (key !== null) {
       inputs.onActivate.value?.(key);
     }
@@ -324,7 +360,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         backgroundColor: chosen.pipe(map(on => (on ? 'selectionBackground' : 'transparent'))),
         onClick: () => {
           choose(index);
-          if (branch) {
+          if (branch && row.node.disabled !== true) {
             setOpen(row.node.key, !expanded.current().includes(row.node.key));
           }
         },
@@ -380,8 +416,10 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
     ArrowUp: () => step(-1),
     ArrowRight: forward,
     ArrowLeft: back,
-    Home: () => choose(0),
-    End: () => choose(rows().length - 1),
+    PageDown: () => step(PAGE),
+    PageUp: () => step(-PAGE),
+    Home: () => choose(seek(0, 1)),
+    End: () => choose(seek(rows().length - 1, -1)),
     Enter: activate,
     ' ': activate
   });
@@ -416,7 +454,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       onKeyDown: (event: UiKeyboardEvent) => {
         // The menu key, or Shift+F10: the chosen row's menu, as a right click on it would open.
         const menu = event.key === 'ContextMenu' || (event.key === 'F10' && event.modifiers.shift === true);
-        const key = selected.current();
+        const key = enabledSelection();
         if (menu && key !== null && inputs.onContextMenu.value !== undefined) {
           event.preventDefault();
           event.stopPropagation();
@@ -439,22 +477,35 @@ function hasChildren(node: TreeNode): boolean {
  *
  * Iterative rather than recursive: a deep tree is a real shape, and a
  * stack overflow in a list component would be found by a user rather
- * than by a spec.
+ * than by a spec. The stack holds one entry per open level — the
+ * siblings being walked and how far along them — so the depth costs
+ * memory rather than call frames.
  */
 function flatten(nodes: readonly TreeNode[], open: ReadonlySet<string>): TreeRow[] {
   const rows: TreeRow[] = [];
-  const visit = (siblings: readonly TreeNode[], level: number, parent: string | null): void => {
-    siblings.forEach((node, position) => {
-      rows.push({ node, level, position, siblings: siblings.length, parent });
-      if (hasChildren(node) && open.has(node.key) && node.children !== undefined) {
-        visit(node.children, level + 1, node.key);
-      }
-    });
-  };
-  visit(nodes, 1, null);
+  const stack: { siblings: readonly TreeNode[]; next: number; parent: string | null }[] = [
+    { siblings: nodes, next: 0, parent: null }
+  ];
+  while (stack.length > 0) {
+    const top = stack[stack.length - 1];
+    if (top.next >= top.siblings.length) {
+      stack.pop();
+      continue;
+    }
+    const position = top.next;
+    const node = top.siblings[position];
+    top.next += 1;
+    rows.push({ node, level: stack.length, position, siblings: top.siblings.length, parent: top.parent });
+    if (hasChildren(node) && open.has(node.key) && node.children !== undefined) {
+      stack.push({ siblings: node.children, next: 0, parent: node.key });
+    }
+  }
   return rows;
 }
 
 function sameKeys(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((key, index) => key === b[index]);
 }
+
+/** Rows a page key moves by; see `LazyList`. */
+const PAGE = 10;

@@ -44,6 +44,14 @@ describe('PlainView', () => {
     expect(actions).toEqual([{ action: 'refresh', value: null }]);
   });
 
+  it('names its region View when it is given no name of its own', () => {
+    const ui = renderTest(createComponent(PlainView, { node: { type: 'text', text: 'hello' } }), {
+      width: 400,
+      height: 300
+    });
+    expect(ui.getSemantics(ui.getByRole('region')).label).toBe('View');
+  });
+
   it('writes only what changed when the tree is sent again: a node that stays keeps its node and its focus', () => {
     const tree = (count: number) =>
       view({ type: 'text', text: `${count} in this file` }, { type: 'button', label: 'Refresh', action: 'refresh' });
