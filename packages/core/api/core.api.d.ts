@@ -1701,7 +1701,7 @@ interface SheetRange {
   readonly firstColumn: number;
   readonly lastColumn: number;
 }
-type SheetRowRenderer = (row: number, firstColumn: number, lastColumn: number) => UiChild;
+type SheetRowRenderer = (row: number, firstColumn: number, lastColumn: number, slot?: number) => UiChild;
 interface UiVirtualSheetOptions {
   readonly rowCount: Reactive<number>;
   readonly columnCount: Reactive<number>;
@@ -1719,6 +1719,7 @@ interface UiVirtualSheetOptions {
     readonly width: number;
     readonly height: number;
   };
+  readonly recycleRows?: boolean;
 }
 type SheetHeaderRenderer = (firstColumn: number, lastColumn: number) => UiChild;
 declare const VIRTUAL_SHEET_PROP = "virtualSheet";
@@ -1747,6 +1748,10 @@ declare class UiVirtualSheet {
   private viewport;
   private readonly mountedRows;
   private readonly frozenMounted;
+  private readonly recycleRows;
+  private readonly rowSlots;
+  private readonly freeSlots;
+  private slotCount;
   private mountedHeader;
   constructor(options: UiVirtualSheetOptions, renderRow: SheetRowRenderer, renderHeader?: SheetHeaderRenderer);
   setColumnWidths(widths: number | readonly number[]): void;
@@ -1782,6 +1787,7 @@ declare class UiVirtualSheet {
   private recompute;
   private windowFor;
   private buildChildren;
+  private assignSlots;
   private wrapHeader;
   private withLead;
   private wrap;
