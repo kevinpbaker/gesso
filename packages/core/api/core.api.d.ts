@@ -142,6 +142,7 @@ declare abstract class UiAnimation<T> {
   private readonly delayMs;
   protected startedAt: number;
   private begun;
+  private lastAdvancedAt;
   private readonly subject;
   private nextDueAt;
   private lastWritten;
@@ -157,6 +158,7 @@ declare abstract class UiAnimation<T> {
   };
   begin(now: number): void;
   get hasBegun(): boolean;
+  continueFrom(previous: UiAnimation<T>): void;
   protected onBegin(): void;
   advance(now: number): void;
   private scheduleNext;
