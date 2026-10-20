@@ -615,7 +615,21 @@ function optionRow(
       setSize: total,
       onClick: () => choose(option)
     },
-    Text({ text: option.label, color: foreground, flexGrow: 1, flexShrink: 1, textWrap: 'none', selectable: false }),
+    // One line, cut short with an ellipsis where the list is narrower
+    // than the label, before the detail and the tick rather than over
+    // them: without a least width of nothing, a line that cannot wrap is
+    // as wide as its text and runs past the list's edge.
+    Text({
+      text: option.label,
+      color: foreground,
+      flexGrow: 1,
+      flexShrink: 1,
+      minWidth: 0,
+      maxLines: 1,
+      textWrap: 'none',
+      textOverflow: 'ellipsis',
+      selectable: false
+    }),
     ...(option.detail === undefined
       ? []
       : [Text({ text: option.detail, color: 'textMuted', fontSize: 12, textWrap: 'none', selectable: false })]),

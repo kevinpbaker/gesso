@@ -1,10 +1,12 @@
-import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
+import { BehaviorSubject, combineLatest, map, Subject, type Observable } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs, FocusService } from 'gesso-framework';
+import { input, type ComponentContext, type Inputs, FocusService, ScrollService } from 'gesso-framework';
 import {
   Column,
   Row,
   Text,
+  measureFlow,
+  type LayoutBox,
   type UiChild,
   type UiElement,
   type UiNode,
@@ -93,9 +95,13 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
   const labelHidden = inputs.labelHidden?.value === true;
   const fontSize = compact ? 12 : undefined;
   const focusStore = ctx.inject(FocusService);
+  const scroll = ctx.inject(ScrollService);
   const focus = trackFocus(ctx, inputs.ref);
   const overlay = useOverlay(ctx, 'select');
   const active = new BehaviorSubject(0);
+  /** The open list's rows, by index, for keeping the highlight in view. */
+  const rows = new Map<number, UiNode>();
+  const scrollerBox = new Subject<LayoutBox>();
   let trapped = false;
   const value = controlled<string>({
     component: 'Select',
@@ -199,11 +205,44 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
     !event.modifiers.meta &&
     !event.modifiers.alt;
 
+  /**
+   * The highlighted row is kept on screen, as `Menu` keeps its own: a
+   * list longer than the window is cut to it and scrolls, and the arrows,
+   * End or a letter walking past its edge would otherwise move the
+   * highlight out of sight. Again whenever the scroller is given a new
+   * box, because the row the list opens on, the chosen one, has not been
+   * laid out when it is highlighted.
+   */
+  const reveal = (): void => {
+    const node = overlay.isOpen() ? rows.get(active.value) : undefined;
+    if (node !== undefined) {
+      scroll.scrollIntoView(node, 4);
+    }
+  };
+  ctx.effect(active, reveal);
+  ctx.effect(scrollerBox, reveal);
+
+  /** A row arriving or leaving; a leaving row takes out only its own entry. */
+  const track = (index: number, node: UiNode, present: boolean): void => {
+    if (present) {
+      rows.set(index, node);
+    } else if (rows.get(index) === node) {
+      rows.delete(index);
+    }
+  };
+
   const consume = (event: UiKeyboardEvent): void => {
     event.preventDefault();
     event.stopPropagation();
   };
 
+  /**
+   * A frame around a column that scrolls, as `Menu` is built. The frame
+   * is the listbox, its keys and the focus trap, and keeps the border
+   * still while the rows move under it; the overlay layer cuts it to the
+   * room the window has. A column rather than a `ScrollView`, so the
+   * list stays as wide as its longest option rather than the window.
+   */
   const list = (): UiElement =>
     Column(
       {
@@ -216,7 +255,6 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         focusable: true,
         minWidth: 180,
         padding: 4,
-        gap: 2,
         backgroundColor: 'surface',
         borderColor: 'border',
         borderWidth: 1,
@@ -253,9 +291,14 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
           }
         }
       },
-      inputs.options.pipe(
-        map(options =>
-          options.map((option, index) => row(option, index, options.length, active, value.value, choose, compact))
+      Column(
+        { overflow: 'auto', minHeight: 0, gap: 2, modifiers: [measureFlow(scrollerBox)] },
+        inputs.options.pipe(
+          map(options =>
+            options.map((option, index) =>
+              row(option, index, options.length, active, value.value, choose, track, compact)
+            )
+          )
         )
       )
     );
@@ -356,14 +399,31 @@ function row(
   active: Observable<number>,
   chosen: Observable<string>,
   choose: (value: string) => void,
+  track: (index: number, node: UiNode, present: boolean) => void,
   compact = false
 ): UiElement {
   const selected = chosen.pipe(map(current => current === option.value));
+  const foreground = option.disabled === true ? 'controlForegroundDisabled' : 'controlForeground';
+  let mounted: UiNode | null = null;
   return Row(
     {
       key: option.value,
+      ref: (node: UiNode | null) => {
+        if (node !== null) {
+          mounted = node;
+          track(index, node, true);
+        } else if (mounted !== null) {
+          track(index, mounted, false);
+          mounted = null;
+        }
+      },
+      // Its own height, in a list given less room than its rows want:
+      // the column scrolls them rather than shrinking them to fit.
+      flexShrink: 0,
       modifiers: [CONTROL_INTERACTION],
       ...(compact ? { paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4 } : { padding: 8 }),
+      gap: 8,
+      y: 'center',
       borderRadius: 4,
       disabled: option.disabled === true,
       backgroundColor: active.pipe(map(current => (current === index ? 'controlBackgroundHovered' : 'transparent'))),
@@ -379,7 +439,18 @@ function row(
     },
     Text({
       text: option.label,
-      color: option.disabled === true ? 'controlForegroundDisabled' : 'controlForeground',
+      color: foreground,
+      flexGrow: 1,
+      fontSize: compact ? 12 : undefined,
+      selectable: false
+    }),
+    // The chosen option is ticked, in the column `Combobox` and `Menu`
+    // keep for theirs: the highlight follows the arrows, and once it has
+    // left the value, `selected` alone shows nothing on screen.
+    Text({
+      text: selected.pipe(map(on => (on ? '✓' : ''))),
+      color: foreground,
+      width: 12,
       fontSize: compact ? 12 : undefined,
       selectable: false
     })

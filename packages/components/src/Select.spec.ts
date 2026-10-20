@@ -124,3 +124,88 @@ describe('a select in a narrow row', () => {
     expect(value.x + value.width).toBeLessThanOrEqual(priority.x + priority.width - 16);
   });
 });
+
+const COUNTRIES = Array.from({ length: 50 }, (_, at) => ({ value: `c${at + 1}`, label: `Country ${at + 1}` }));
+
+/**
+ * Found in the component workbench, on fifty countries: the open list
+ * had no height of its own to keep to, so it ran past the top and the
+ * bottom of the window, and End highlighted an option nobody could see.
+ */
+describe('a select with more options than the window has room for', () => {
+  function mountLong(start: string) {
+    const ui = renderTest(
+      Column({ padding: 10 }, createComponent(Select, { label: 'Country', defaultValue: start, options: COUNTRIES })),
+      { width: 400, height: 400 }
+    );
+    ui.fireEvent.focus(ui.getByRole('combobox', { name: 'Country' }));
+    ui.fireEvent.press('Enter');
+    ui.frame();
+    return ui;
+  }
+
+  it('is cut to the window, and keeps the highlight in view as the keys walk it', () => {
+    const ui = mountLong('c1');
+    const list = () => ui.getLayout(ui.getByRole('listbox'));
+    expect(list().y).toBeGreaterThanOrEqual(0);
+    expect(list().y + list().height).toBeLessThanOrEqual(400);
+    expect(ui.getVisibleBox(ui.getByRole('option', { name: 'Country 50' })).y).toBeGreaterThan(400);
+
+    ui.fireEvent.press('End');
+    ui.frame();
+    const last = ui.getVisibleBox(ui.getByRole('option', { name: 'Country 50' }));
+    expect(last.y).toBeGreaterThanOrEqual(list().y);
+    expect(last.y + last.height).toBeLessThanOrEqual(list().y + list().height);
+
+    ui.fireEvent.press('Home');
+    ui.frame();
+    expect(ui.getVisibleBox(ui.getByRole('option', { name: 'Country 1' })).y).toBeGreaterThanOrEqual(list().y);
+  });
+
+  it('opens scrolled to the chosen option', () => {
+    const ui = mountLong('c40');
+    const list = ui.getLayout(ui.getByRole('listbox'));
+    const chosen = ui.getVisibleBox(ui.getByRole('option', { name: 'Country 40' }));
+    expect(chosen.y).toBeGreaterThanOrEqual(list.y);
+    expect(chosen.y + chosen.height).toBeLessThanOrEqual(list.y + list.height);
+  });
+});
+
+/**
+ * The chosen option was a `selected` state and nothing drawn: once the
+ * arrows had moved the highlight off it, nothing on screen said which
+ * one the select holds. A tick, in the column a menu and a combobox
+ * keep for theirs.
+ */
+describe('the chosen option in an open select', () => {
+  it('is ticked, and only it', () => {
+    const value = new BehaviorSubject('label');
+    const ui = renderTest(
+      createComponent(Select, {
+        label: 'Field',
+        value,
+        onChange: (next: string) => value.next(next),
+        options: [
+          { value: 'status', label: 'Status' },
+          { value: 'label', label: 'Label' }
+        ]
+      }),
+      { width: 400, height: 300 }
+    );
+    ui.fireEvent.focus(ui.getByRole('combobox', { name: 'Field' }));
+    ui.fireEvent.press('Enter');
+    ui.frame();
+
+    const ticks = ui.getAllByText('✓');
+    expect(ticks).toHaveLength(1);
+    const tick = ui.getLayout(ticks[0]);
+    const row = ui.getLayout(ui.getByRole('option', { name: 'Label' }));
+    expect(tick.y).toBeGreaterThanOrEqual(row.y);
+    expect(tick.y + tick.height).toBeLessThanOrEqual(row.y + row.height);
+
+    // Walking off it leaves the tick where the value is.
+    ui.fireEvent.press('ArrowUp');
+    ui.frame();
+    expect(ui.getAllByText('✓')).toHaveLength(1);
+  });
+});
