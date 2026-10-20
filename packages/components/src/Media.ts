@@ -1,9 +1,10 @@
-import { map, type Observable } from 'rxjs';
+import { combineLatest, distinctUntilChanged, map, type Observable } from 'rxjs';
 
 import {
   createComponent,
   input,
   internalState,
+  show,
   type ComponentContext,
   type InputCell,
   type Inputs,
@@ -121,6 +122,18 @@ export interface ImageProps extends ControlLayoutProps, MediaPlaceholderProps {
   alt?: string;
   objectFit?: ObjectFit;
   borderRadius?: number;
+  /**
+   * Told when the picture starts loading, arrives, or fails, as
+   * `Video`'s `onState` is.
+   *
+   * Nothing is drawn for a picture that will not load beyond the
+   * placeholder tint, because what to show instead belongs to whatever
+   * holds it: `Avatar` falls back to the person's initials, a gallery
+   * might draw a broken-picture glyph. This is how they find out. A
+   * failure is reported once every candidate in `src` has failed, and
+   * carries the last error.
+   */
+  onState?: (state: 'loading' | 'loaded' | 'failed', error?: unknown) => void;
 }
 
 /**
@@ -145,7 +158,10 @@ export function Image(inputs: Inputs<ImageProps>, ctx: ComponentContext): UiChil
   const source = {
     resolver: store.images,
     source: inputs.src,
-    onState: (next: 'loading' | 'loaded' | 'failed') => (status.value = next)
+    onState: (next: 'loading' | 'loaded' | 'failed', error?: unknown) => {
+      status.value = next;
+      inputs.onState.value?.(next, error);
+    }
   };
 
   return Box({
@@ -372,6 +388,21 @@ export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChil
     }, after);
   };
 
+  /**
+   * Leaving lets the countdown already running finish, which is what
+   * makes a pointer that leaves and comes straight back not flicker.
+   * With no countdown at all (`hideAfterMs` of zero) there is nothing
+   * to finish, and leaving is the only thing that puts the bar away.
+   */
+  const leave = (): void => {
+    if ((wanted?.hideAfterMs ?? DEFAULT_HIDE_AFTER_MS) > 0) {
+      rouse();
+      return;
+    }
+    restIdle();
+    roused.value = false;
+  };
+
   ctx.onUnmount(restIdle);
 
   /**
@@ -472,8 +503,31 @@ export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChil
             autoplay: held.value?.paused !== true,
             loop: inputs.loop.value,
             rate: inputs.rate.value,
+            // The rest of what the inline one is doing. The level is
+            // the node's rather than the playback's, so a copy built
+            // without it came up loud and unmuted over a clip that was
+            // neither; and a clip whose time belongs to an outside
+            // clock must not grow a second idea of where it is.
+            clock: inputs.clock.value,
+            poster: inputs.poster.value,
+            volume: held.value?.volume ?? inputs.volume.value,
+            muted: held.value?.muted ?? inputs.muted.value,
             controls: wanted,
-            onVolume: inputs.onVolume.value,
+            // Handed back to the inline one rather than straight to
+            // the caller: that is the clip left on screen afterwards,
+            // and it reports the change from there.
+            onVolume:
+              inputs.onVolume.value === undefined
+                ? undefined
+                : (level: number, silent: boolean) => {
+                    const inline = held.value;
+                    if (inline === null) {
+                      inputs.onVolume.value?.(level, silent);
+                      return;
+                    }
+                    inline.setVolume(level);
+                    inline.setMuted(silent);
+                  },
             width: percent(100),
             height: percent(100)
           })
@@ -506,10 +560,7 @@ export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChil
             // it has no use for.
             onPointerEnter: rouse,
             onPointerMove: rouse,
-            // Leaving does not hide it; it lets the countdown that is
-            // already running finish, which is what makes a pointer
-            // that leaves and comes straight back not flicker.
-            onPointerLeave: rouse
+            onPointerLeave: leave
           }),
       // The same tint `Image` draws, from the same prop: a clip waiting
       // on a fetch, a demux and a decoder configuration has nothing to
@@ -630,9 +681,12 @@ const SPINNER_BLADES = 8;
  * happening and cannot say how much, and `busy` is the state for that.
  */
 export function Spinner(inputs: Inputs<SpinnerProps>, ctx: ComponentContext): UiChild {
-  const size = inputs.size.value ?? 20;
+  // Followed, like `Icon`'s: a spinner that grows with its container,
+  // or turns `danger` when the wait has gone on too long, is the same
+  // spinner, and neither is a reason to key a new one.
+  const size = input(inputs.size, 20);
   const label = input(inputs.label, 'Loading');
-  const color = inputs.color.value ?? 'controlAccent';
+  const color = input(inputs.color, 'controlAccent' as UiColorValue);
   const step = internalState(0);
 
   const animations = ctx.inject(AnimationService);
@@ -645,19 +699,22 @@ export function Spinner(inputs: Inputs<SpinnerProps>, ctx: ComponentContext): Ui
   });
   ctx.onUnmount(() => animations.stop(step));
 
-  const blade = size * 0.22;
-  const radius = size / 2 - blade / 2;
   const blades: UiElement[] = [];
   for (let i = 0; i < SPINNER_BLADES; i++) {
     const angle = (i / SPINNER_BLADES) * Math.PI * 2;
+    const blade = size.pipe(map(side => side * 0.22));
+    const at = (side: number, along: number): number => {
+      const width = side * 0.22;
+      return side / 2 - width / 2 + (side / 2 - width / 2) * along;
+    };
     blades.push(
       Box({
         position: 'absolute',
-        left: size / 2 - blade / 2 + radius * Math.sin(angle),
-        top: size / 2 - blade / 2 - radius * Math.cos(angle),
+        left: size.pipe(map(side => at(side, Math.sin(angle)))),
+        top: size.pipe(map(side => at(side, -Math.cos(angle)))),
         width: blade,
         height: blade,
-        borderRadius: blade / 2,
+        borderRadius: blade.pipe(map(width => width / 2)),
         backgroundColor: color,
         // The trail: the blade in front is brightest, and the rest fade
         // behind it. Fixed per blade, so rotating the container is the
@@ -682,10 +739,10 @@ export function Spinner(inputs: Inputs<SpinnerProps>, ctx: ComponentContext): Ui
       // each turns the spinner about its middle. Written against the
       // property's old docblock it turned about its top-left corner and
       // swung across the card, which is what the browser showed.
-      transform: step.pipe(
-        map(current => ({
-          x: size / 2,
-          y: size / 2,
+      transform: combineLatest([step, size]).pipe(
+        map(([current, side]) => ({
+          x: side / 2,
+          y: side / 2,
           rotation: (current / SPINNER_BLADES) * Math.PI * 2
         }))
       )
@@ -723,17 +780,32 @@ export function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentCont
   const min = input(inputs.min, 0);
   const max = input(inputs.max, 1);
   const thickness = inputs.thickness.value ?? 6;
-  const indeterminate = inputs.value.value === undefined;
   const step = internalState(0);
 
-  if (indeterminate) {
-    // The same shape as `Spinner`: a stepped, repeating tween sampled
-    // once per step, so the sweep costs twenty-four writes a sweep and
-    // twenty-four wake-ups, not sixty a second. It keeps sweeping
-    // under reduced motion for the same reason a spinner keeps
-    // turning — a still indeterminate bar states that nothing is
-    // happening.
-    const animations = ctx.inject(AnimationService);
+  // Followed rather than decided at build. A task usually starts before
+  // its size is known (an upload before the length header, a job before
+  // its first count), so a bar that chose once kept sweeping after the
+  // value arrived, and a determinate one whose value went away again
+  // computed a NaN.
+  const indeterminate = inputs.value.pipe(
+    map(current => current === undefined),
+    distinctUntilChanged()
+  );
+
+  // The same shape as `Spinner`: a stepped, repeating tween sampled
+  // once per step, so the sweep costs twenty-four writes a sweep and
+  // twenty-four wake-ups, not sixty a second. It keeps sweeping under
+  // reduced motion for the same reason a spinner keeps turning — a
+  // still indeterminate bar states that nothing is happening. Started
+  // from the left each time, so a bar that comes back to sweeping does
+  // not resume wherever it was.
+  const animations = ctx.inject(AnimationService);
+  const sweeping = indeterminate.subscribe(on => {
+    if (!on) {
+      animations.stop(step);
+      return;
+    }
+    step.value = 0;
     animations.animate(step, PROGRESS_STEPS, {
       duration: PROGRESS_STEPS * PROGRESS_STEP_MS,
       easing: steps(PROGRESS_STEPS),
@@ -741,42 +813,20 @@ export function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentCont
       repeat: true,
       reducedMotion: 'keep'
     });
-    ctx.onUnmount(() => animations.stop(step));
-  }
+  });
+  ctx.onUnmount(() => {
+    sweeping.unsubscribe();
+    animations.stop(step);
+  });
 
-  const fraction: Observable<number> = indeterminate
-    ? step.pipe(map(() => 0))
-    : inputs.value.pipe(
-        map(current => {
-          const low = min.value;
-          const high = max.value;
-          const span = high - low;
-          return span <= 0 ? 0 : Math.min(1, Math.max(0, ((current as number) - low) / span));
-        })
-      );
-
-  const bar = indeterminate
-    ? // A sliver that sweeps the track. `left` is a percentage of the
-      // track, so the sweep is layout rather than a computed offset and
-      // it follows the track when the bar is resized.
-      Box({
-        position: 'absolute',
-        top: 0,
-        left: step.pipe(map(current => percent((current / PROGRESS_STEPS) * 100))),
-        width: percent(100 / 4),
-        height: thickness,
-        borderRadius: thickness / 2,
-        backgroundColor: 'controlAccent'
-      })
-    : Box({
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: fraction.pipe(map(part => percent(part * 100))),
-        height: thickness,
-        borderRadius: thickness / 2,
-        backgroundColor: 'controlAccent'
-      });
+  // The range is followed with the value, so a bar whose `max` grows
+  // under an unchanged value moves when the range does.
+  const fraction: Observable<number> = combineLatest([inputs.value, min, max]).pipe(
+    map(([current, low, high]) => {
+      const span = high - low;
+      return current === undefined || span <= 0 ? 0 : Math.min(1, Math.max(0, (current - low) / span));
+    })
+  );
 
   return Box(
     {
@@ -790,11 +840,36 @@ export function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentCont
       role: 'progressbar',
       label,
       // Absent while indeterminate, which is what ARIA means by it.
-      valueNow: indeterminate ? undefined : inputs.value,
-      valueMin: indeterminate ? undefined : min,
-      valueMax: indeterminate ? undefined : max,
-      states: (indeterminate ? ['busy'] : []) as UiSemanticState[]
+      valueNow: inputs.value,
+      valueMin: combineLatest([indeterminate, min]).pipe(map(([on, low]) => (on ? undefined : low))),
+      valueMax: combineLatest([indeterminate, max]).pipe(map(([on, high]) => (on ? undefined : high))),
+      states: indeterminate.pipe(map(on => (on ? ['busy'] : []) as UiSemanticState[]))
     },
-    ...(bar === null ? [] : [bar])
+    show(
+      indeterminate,
+      () =>
+        // A sliver that sweeps the track. `left` is a percentage of the
+        // track, so the sweep is layout rather than a computed offset
+        // and it follows the track when the bar is resized.
+        Box({
+          position: 'absolute',
+          top: 0,
+          left: step.pipe(map(current => percent((current / PROGRESS_STEPS) * 100))),
+          width: percent(100 / 4),
+          height: thickness,
+          borderRadius: thickness / 2,
+          backgroundColor: 'controlAccent'
+        }),
+      () =>
+        // In flow rather than pinned to `left: 0`, so the track's own
+        // start alignment places it, and that mirrors under a
+        // right-to-left reading: progress fills the way the line reads.
+        Box({
+          width: fraction.pipe(map(part => percent(part * 100))),
+          height: thickness,
+          borderRadius: thickness / 2,
+          backgroundColor: 'controlAccent'
+        })
+    )
   );
 }

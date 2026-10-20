@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { UiNodeType } from 'gesso-core';
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
@@ -71,7 +72,12 @@ describe('the docs progress bar example', () => {
       const ui = mount();
       await vi.advanceTimersByTimeAsync(0);
       const track = ui.getByRole('progressbar', { name: 'Indexing' });
-      const sliver = track.firstChild;
+      // Under the fragment `show` leaves where the sliver goes, since the
+      // bar swaps sliver and fill as its value comes and goes.
+      let sliver = track.firstChild;
+      while (sliver !== null && sliver.type === UiNodeType.Fragment) {
+        sliver = sliver.firstChild;
+      }
       if (sliver === null) {
         throw new Error('The indeterminate bar has no sliver.');
       }

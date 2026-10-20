@@ -140,12 +140,12 @@ export const progressBarFixture: WorkbenchFixture = {
     },
     {
       name: 'No width given',
-      try: 'Not stretched and given no width. Look for a visible track; a zero-width bar is worth noting.',
+      try: 'Not stretched and given no width, so there is no track: it fills the width it is given, as a slider does, and asks for none of its own. Nothing here is the expected picture.',
       render: () => <ProgressBar label="Unsized" value={0.5} />
     },
     {
       name: 'Right to left',
-      try: 'Switch the toolbar to Right to left: decide whether the fill should grow from the right. Today it grows from the left.',
+      try: 'Switch the toolbar to Right to left: the fill grows from the right edge, and the right end of a full bar is rounded like the track. Back to Left to right: it grows from the left again.',
       width: 320,
       stretch: true,
       render: () => <ProgressBar label="Mirrored" value={0.3} />

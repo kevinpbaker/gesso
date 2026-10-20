@@ -151,6 +151,34 @@ describe('Avatar: the fallback chain', () => {
     expect(node()).toBe(before);
   });
 
+  it('falls back to the initials when the picture will not load, and tries a new one', async () => {
+    const bitmap = fakeBitmap();
+    const src = new BehaviorSubject('gone.png');
+    const ui = renderTest(Column({}, createComponent(Avatar, { src, name: 'Grace Hopper' })), {
+      width: 400,
+      height: 300,
+      media: {
+        resolver: new DefaultImageResolver({
+          fetch: url => (url.includes('gone') ? Promise.reject(new Error('404')) : Promise.resolve(new Blob())),
+          decode: () => Promise.resolve(bitmap)
+        })
+      }
+    });
+    await ui.settle();
+    ui.frame();
+
+    // A url that 404s is the commonest broken avatar there is, and it
+    // used to leave an empty disc where the person's initials belong.
+    expect(ui.getByText('GH')).toBeTruthy();
+
+    // A new url is a new chance: the picture is tried again.
+    src.next('grace.png');
+    ui.frame();
+    await ui.settle();
+    expect(ui.queryByText('GH')).toBeNull();
+    expect(ui.allNodes().some(node => node.properties.get('image') === bitmap)).toBe(true);
+  });
+
   it('prefers explicit initials over the ones derived from the name', () => {
     const ui = mount(createComponent(Avatar, { name: 'Ada Lovelace', initials: 'GS' }));
 

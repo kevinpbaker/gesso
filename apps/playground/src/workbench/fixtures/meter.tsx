@@ -117,12 +117,12 @@ export const meterFixture: WorkbenchFixture = {
     },
     {
       name: 'No width given',
-      try: 'Not stretched and given no width. Look for a visible track; a zero-width or invisible meter is a bug worth noting.',
+      try: 'Not stretched and given no width, so there is no track: it fills the width it is given, as a slider does, and asks for none of its own. Nothing here is the expected picture.',
       render: () => <Meter label="Unsized" value={0.6} />
     },
     {
       name: 'Right to left',
-      try: 'Switch the toolbar to Right to left: decide whether the fill should start at the right. Today it is drawn from the left edge.',
+      try: 'Switch the toolbar to Right to left: the fill starts at the right edge of the track and the reading moves to the left of the bar. Back to Left to right: it starts at the left again.',
       width: 320,
       stretch: true,
       render: () => <Meter label="Mirrored" value={0.3} showValue />

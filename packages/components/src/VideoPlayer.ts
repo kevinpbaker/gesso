@@ -1,4 +1,4 @@
-import { map } from 'rxjs';
+import { combineLatest, map } from 'rxjs';
 
 import {
   Box,
@@ -9,12 +9,13 @@ import {
   type UiChild,
   type UiColorValue,
   type ObjectFit,
+  type VideoState,
   type VideoTransport,
   type VttCue
 } from 'gesso-core';
-import { createComponent, input, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
+import { createComponent, input, internalState, show, type ComponentContext, type Inputs } from 'gesso-framework';
 
-import { Video } from './Media';
+import { Video, type MediaPlaceholderProps } from './Media';
 import { layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 
 import { followTransport } from './VideoControls';
@@ -56,9 +57,12 @@ export function Captions(inputs: Inputs<CaptionsProps>, _ctx: ComponentContext):
   // through a cell would dirty a node once a frame to say so.
   let hint = 0;
 
-  const text = inputs.position.pipe(
-    map(position => {
-      const found = cueAt(inputs.cues.value, position, hint);
+  // The track is followed as well as the position: a paused clip's
+  // position stands still, and a track fetched after the clip was
+  // paused would otherwise wait for a play to be looked at.
+  const text = combineLatest([inputs.cues, inputs.position]).pipe(
+    map(([cues, position]) => {
+      const found = cueAt(cues, position, hint);
       hint = found.index;
       return found.cue?.text ?? '';
     })
@@ -86,7 +90,7 @@ export function Captions(inputs: Inputs<CaptionsProps>, _ctx: ComponentContext):
   );
 }
 
-export interface VideoPlayerProps extends ControlLayoutProps {
+export interface VideoPlayerProps extends ControlLayoutProps, MediaPlaceholderProps {
   src: string;
   /**
    * What a screen reader reads for the picture.
@@ -107,6 +111,20 @@ export interface VideoPlayerProps extends ControlLayoutProps {
   onTransport?: (transport: VideoTransport) => void;
   /** Told when the level changed, so an application can pass it to whatever makes the noise. */
   onVolume?: (volume: number, muted: boolean) => void;
+  /**
+   * Told when the clip starts loading, gets a picture, or fails, with
+   * what went wrong. As `Video`'s: nothing but the placeholder is drawn
+   * for a clip that will not play, so this is the only way an
+   * application can say why.
+   */
+  onState?: (state: VideoState, error?: unknown) => void;
+  /** A picture to show until the first frame; see `Video`. */
+  poster?: string;
+  /** The starting level, 0 to 1. Defaults to 1. */
+  volume?: number;
+  muted?: boolean;
+  /** Playback speed. Defaults to 1. */
+  rate?: number;
 }
 
 /**
@@ -131,7 +149,6 @@ export interface VideoPlayerProps extends ControlLayoutProps {
  */
 export function VideoPlayer(inputs: Inputs<VideoPlayerProps>, ctx: ComponentContext): UiChild {
   const held = internalState<VideoTransport | null>(null, 'VideoPlayer.transport');
-  const captions = inputs.captions.value;
   // The same extrapolated position the bar draws its scrubber from,
   // for the same reason a caption needs one: a clip's pictures arrive
   // at whatever rate it was encoded at, and a caption that waited for
@@ -154,13 +171,25 @@ export function VideoPlayer(inputs: Inputs<VideoPlayerProps>, ctx: ComponentCont
       flex: 1,
       minHeight: 0,
       onVolume: inputs.onVolume.value,
+      // Read at build, as `Video` reads them: see its props.
+      onState: (state: VideoState, error?: unknown) => inputs.onState.value?.(state, error),
+      poster: inputs.poster.value,
+      placeholderColor: inputs.placeholderColor.value,
+      volume: inputs.volume.value,
+      muted: inputs.muted.value,
+      rate: inputs.rate.value,
       onTransport: (transport: VideoTransport) => {
         held.value = transport;
         inputs.onTransport.value?.(transport);
       }
     }),
-    ...(captions === undefined || captions.length === 0
-      ? []
-      : [createComponent(Captions, { cues: captions, position })])
+    // Followed rather than read once. A track is usually fetched after
+    // the player is on screen, so the first thing this is given is an
+    // empty list, and one read at mount drew no captions ever after.
+    // The row is still left out entirely while there is no track, so a
+    // clip without one does not give up eight pixels to a missing line.
+    show(inputs.captions.pipe(map(cues => cues !== undefined && cues.length > 0)), () =>
+      createComponent(Captions, { cues: inputs.captions.pipe(map(cues => cues ?? [])), position })
+    )
   );
 }

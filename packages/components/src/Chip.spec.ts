@@ -47,6 +47,33 @@ describe('Chip', () => {
     expect(on.getByRole('button')).toHaveSemantics({ name: 'Metal', states: ['pressed'] });
   });
 
+  it('draws a count and an icon that arrive after it was built', () => {
+    // The usual order for a filter row: the chips are drawn before the
+    // counts behind them have come back from the server.
+    const count = internalState<number | undefined>(undefined);
+    const icon = internalState<string | undefined>(undefined);
+    const ui = placed(createComponent(Chip, { label: 'Metal', count, icon }));
+    const button = ui.getByRole('button');
+    const bare = ui.getLayout(button).width;
+
+    count.value = 119;
+    icon.value = 'M0 0h24v24H0z';
+    ui.frame();
+
+    expect(ui.getByText('119')).toBeTruthy();
+    expect(button).toHaveSemantics({ name: 'Metal, 119' });
+    // Wider by the glyph and the figure, not just the figure.
+    const counted = ui.getLayout(ui.getByText('119')).width;
+    expect(ui.getLayout(button).width).toBeGreaterThan(bare + counted + 8);
+
+    // And gone again, with no gap left where they stood.
+    count.value = undefined;
+    icon.value = undefined;
+    ui.frame();
+    expect(ui.queryByText('119')).toBeNull();
+    expect(ui.getLayout(button).width).toBe(bare);
+  });
+
   it('follows a selected cell as it changes, without re-rendering', () => {
     const selected = internalState(false);
     const ui = mount(createComponent(Chip, { label: 'Metal', selected }));

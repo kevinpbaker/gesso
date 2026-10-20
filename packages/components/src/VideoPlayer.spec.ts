@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createComponent } from 'gesso-framework';
+import { createComponent, internalState } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import {
   Column,
@@ -118,6 +118,55 @@ describe('VideoPlayer', () => {
     seen!.seek(30);
     expect(seen!.position).toBe(30);
   });
+  it('says why a clip would not play', async () => {
+    const states: string[] = [];
+    let error: unknown;
+    const resolver: VideoResolver = {
+      resolve: () => Promise.reject(new Error('not a video')),
+      release: () => {},
+      dispose: () => {}
+    };
+    const mounted = renderTest(
+      Column(
+        {},
+        createComponent(VideoPlayer, {
+          src: 'page.html',
+          alt: 'A clip',
+          width: 320,
+          height: 200,
+          onState: (state: string, why?: unknown) => {
+            states.push(state);
+            error = why;
+          }
+        })
+      ),
+      { media: { videoResolver: resolver } }
+    );
+    await mounted.settle();
+
+    // A player draws nothing but its placeholder for a clip that will
+    // not play, and had no way to tell the application so.
+    expect(states.at(-1)).toBe('failed');
+    expect((error as Error).message).toBe('not a video');
+  });
+
+  it('shows captions that arrive after it mounted', async () => {
+    // The usual order: the player is on screen before its .vtt has
+    // been fetched, so the track it is first given is empty.
+    const cues = internalState<readonly (typeof TRACK)[number][]>([]);
+    const mounted = mountPlayer(
+      Column(
+        {},
+        createComponent(VideoPlayer, { src: 'clip.mp4', alt: 'A clip', width: 320, height: 200, captions: cues })
+      )
+    );
+    await mounted.settle();
+    expect(mounted.queryByText('The first thing said.')).toBeNull();
+
+    cues.value = TRACK;
+    await mounted.settle();
+    expect(mounted.getByText('The first thing said.')).toBeTruthy();
+  });
 });
 
 describe('Captions', () => {
@@ -135,6 +184,17 @@ describe('Captions', () => {
     // An empty plate under a video is a caption track that looks
     // broken, so the whole box goes rather than just the words.
     expect(mounted.queryByText('A')).toBeNull();
+  });
+  it('follows a track that changes while the position stands still', async () => {
+    const cues = internalState<readonly (typeof TRACK)[number][]>([]);
+    const mounted = renderTest(Column({}, createComponent(Captions, { cues, position: 1 })));
+    await mounted.settle();
+
+    // A paused clip's position does not move, so a caption that only
+    // looked again when it did would wait for a play that may not come.
+    cues.value = TRACK;
+    await mounted.settle();
+    expect(mounted.getByText('The first thing said.')).toBeTruthy();
   });
 });
 

@@ -9,7 +9,7 @@ import {
   type UiRole
 } from 'gesso-core';
 
-import { computed, createComponent, input, type ComponentContext, type Inputs } from 'gesso-framework';
+import { computed, createComponent, input, show, type ComponentContext, type Inputs } from 'gesso-framework';
 
 import { followedChildren, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 import { Button } from './Button';
@@ -152,10 +152,13 @@ import { Button } from './Button';
  * changes its `key` and is built again, which is the rule `Button`,
  * `Chip` and `Badge` all state for the props that decide their shape.
  *
- * Whether `title` and `message` were supplied is read once too, for the
- * ordinary reason: an empty `Text` still occupies a line, so a banner
- * with no title would carry a blank one. Their *text* is bound, and so
- * is `tone`'s paint, so the words and the colours follow a cell.
+ * `title` and `message` are not read once. An empty `Text` still
+ * occupies a line, so each line is in the tree only while its text is
+ * not empty: a banner with no title carries no blank line for one, and
+ * neither does a banner whose title is bound to a cell that has not
+ * been filled yet, which is a title that has not arrived rather than
+ * one the caller declined. Their text is bound, and so is `tone`'s
+ * paint, so the words and the colours follow a cell.
  */
 export type AlertTone = 'neutral' | 'accent' | 'danger';
 
@@ -205,13 +208,11 @@ export function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChi
 
   // Read once. `live` and the tone the banner is built with decide the
   // role and the urgency, which have to be settled before the text they
-  // are about changes; the other two decide whether an element exists
-  // at all. See the note on reading once above.
+  // are about changes; `onDismiss` decides whether there is a button at
+  // all. See the note on reading once above.
   const announced = input(inputs.live, true).value !== false;
   const urgent = (inputs.tone.value ?? 'neutral') === 'danger';
   const dismissible = inputs.onDismiss.value !== undefined;
-  const titled = inputs.title.value !== undefined;
-  const described = inputs.message.value !== undefined;
 
   const ground = <R>(read: (paint: AlertGround) => R) => computed(() => read(TONES[tone.value ?? 'neutral']));
 
@@ -228,35 +229,38 @@ export function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChi
     return headline.length > 0 ? headline : message.value;
   });
 
-  const lines: UiChild[] = [];
-  if (titled) {
-    lines.push(
-      Text({
-        text: title,
-        // A role rather than a size, so a banner's headline is set in
-        // the same type as the prose around it and follows the theme
-        // with it. The weight is what makes it a headline.
-        textStyle: 'body',
-        fontWeight: 600,
-        color: ground(paint => paint.title),
-        selectable: false
-      })
-    );
-  }
-  if (described) {
-    lines.push(
-      Text({
-        text: message,
-        textStyle: 'body',
-        // The body of a banner is prose, and prose on a control sheet
-        // is `textMuted` everywhere else in the library. The tone is
-        // said once, by the title and the edge; saying it again here
-        // would make a declined card three sentences of red.
-        color: 'textMuted',
-        selectable: true
-      })
-    );
-  }
+  // Each line only while it has something to say: an empty `Text` is
+  // still a line tall, and the column's gap would stand beside it.
+  const lines: UiChild[] = [
+    show(
+      computed(() => title.value.length > 0),
+      () =>
+        Text({
+          text: title,
+          // A role rather than a size, so a banner's headline is set in
+          // the same type as the prose around it and follows the theme
+          // with it. The weight is what makes it a headline.
+          textStyle: 'body',
+          fontWeight: 600,
+          color: ground(paint => paint.title),
+          selectable: false
+        })
+    ),
+    show(
+      computed(() => message.value.length > 0),
+      () =>
+        Text({
+          text: message,
+          textStyle: 'body',
+          // The body of a banner is prose, and prose on a control sheet
+          // is `textMuted` everywhere else in the library. The tone is
+          // said once, by the title and the edge; saying it again here
+          // would make a declined card three sentences of red.
+          color: 'textMuted',
+          selectable: true
+        })
+    )
+  ];
   // Followed, so an alert drawn again in place shows its new content; given none at first, it keeps none.
   if (inputs.children.value !== undefined) {
     lines.push(followedChildren(inputs.children, () => Row()));

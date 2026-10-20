@@ -1089,6 +1089,51 @@ describe('Video', () => {
     expect(mounted.getAllByRole('group', { name: 'A clip' })).toHaveLength(1);
   });
 
+  it('carries the level into fullscreen, and what is changed there back out', async () => {
+    const heard: [number, boolean][] = [];
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, {
+          src: 'clip.mp4',
+          alt: 'A clip',
+          controls: true,
+          volume: 0.4,
+          muted: true,
+          onVolume: (level: number, silent: boolean) => heard.push([level, silent]),
+          width: 360,
+          height: 200
+        })
+      )
+    );
+    await mounted.settle();
+    const shell = mounted.runtime.services.get(ShellService);
+
+    mounted.fireEvent.click(mounted.getByRole('button', { name: 'Fullscreen' }));
+    shell.applyFullscreen(true);
+    await mounted.settle();
+
+    // The copy is built fresh, and was built at full volume and
+    // unmuted: a muted clip went loud-looking the moment it filled the
+    // screen, its bar offering Mute and a full level.
+    const volumes = mounted.getAllByRole('slider', { name: 'Volume' });
+    expect(volumes).toHaveLength(2);
+    const [inline, copy] = volumes.map(slider => mounted.getSemantics(slider).valueNow);
+    expect(copy).toBe(inline);
+    expect(mounted.getAllByRole('button', { name: 'Unmute' })).toHaveLength(2);
+
+    // Unmuted on the copy, which is the bar a person in fullscreen has.
+    const unmute = mounted.getAllByRole('button', { name: 'Unmute' });
+    mounted.fireEvent.click(unmute[unmute.length - 1]!);
+    await mounted.settle();
+    expect(heard.at(-1)).toEqual([0.4, false]);
+
+    shell.applyFullscreen(false);
+    await mounted.settle();
+    // And the clip left behind agrees with what was done to the copy.
+    expect(mounted.getByRole('button', { name: 'Mute' })).toBeTruthy();
+  });
+
   it('takes the copy away when the person leaves fullscreen by some other means', async () => {
     const mounted = mountVideo(
       Column({}, createComponent(Video, { src: 'clip.mp4', alt: 'A clip', controls: true, width: 360, height: 200 }))
@@ -1266,6 +1311,31 @@ describe('Video', () => {
       expect(bar.properties.get('opacity')).toBe(1);
 
       await ui.wait(2100);
+      await ui.settleFade();
+      expect(bar.properties.get('opacity')).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('with no idle window, keeps the bar up until the pointer leaves, and then takes it away', async () => {
+    vi.useFakeTimers();
+    try {
+      const ui = withControls(0);
+      await vi.advanceTimersByTimeAsync(0);
+      const bar = ui.mounted.getByRole('toolbar');
+      const box = ui.mounted.getLayout(ui.node());
+
+      ui.mounted.fireEvent.pointerMove(box.x + box.width / 2, box.y + 10);
+      await ui.settleFade();
+      await ui.wait(5000);
+      await ui.settleFade();
+      expect(bar.properties.get('opacity')).toBe(1);
+
+      // Zero is documented as "until the pointer leaves", and leaving
+      // used to rouse it like any other movement, which with no
+      // countdown to run meant up for good.
+      ui.mounted.fireEvent.pointerMove(box.x + box.width + 80, box.y + box.height + 80);
       await ui.settleFade();
       expect(bar.properties.get('opacity')).toBe(0);
     } finally {
@@ -1538,6 +1608,31 @@ describe('Spinner and ProgressBar', () => {
     }
   });
 
+  it('follows a size and a colour that change after it was built', () => {
+    let node: UiNode | null = null;
+    const size = new BehaviorSubject(20);
+    const color = new BehaviorSubject<UiColorValue>('controlAccent');
+    const mounted = renderTest(
+      Column({ ref: (n: UiNode | null) => (node = n) }, createComponent(Spinner, { size, color }))
+    );
+    mounted.frame();
+    const spinner = firstElement(node!);
+    expect(mounted.getLayout(spinner).width).toBe(20);
+
+    // Both used to be read at build, so a spinner keyed to nothing kept
+    // its first size and its first ink whatever it was later given.
+    size.next(40);
+    color.next('danger');
+    mounted.frame();
+    expect(mounted.getLayout(spinner).width).toBe(40);
+    const blade = spinner.firstChild!;
+    expect(blade.properties.get('backgroundColor')).toBe('danger');
+    // The blades are laid out on the new ring, not the old one.
+    expect(mounted.getLayout(blade).width).toBeCloseTo(40 * 0.22);
+    const pivot = spinner.properties.get('transform') as { x: number };
+    expect(pivot.x).toBe(20);
+  });
+
   it("attaches a caller's rootModifiers to the element each of them draws", () => {
     attachedTo.length = 0;
     let spinnerHost: UiNode | null = null;
@@ -1592,5 +1687,91 @@ describe('Spinner and ProgressBar', () => {
       valueNow: undefined,
       states: ['busy']
     });
+  });
+});
+
+describe('ProgressBar, followed', () => {
+  /** A bar 200 wide, whose value, range and reading direction a spec can move. */
+  function mountBar(props: Record<string, unknown>, theme?: UiTheme) {
+    let host: UiNode | null = null;
+    const mounted = renderTest(
+      Column(
+        { width: 220, padding: 10, ...(theme === undefined ? {} : { theme, textStyle: theme.typography.body }) },
+        Column({ ref: (n: UiNode | null) => (host = n), width: 200 }, createComponent(ProgressBar, props))
+      ),
+      { width: 220, height: 60 }
+    );
+    mounted.frame();
+    const bar = (): UiNode => firstElement(host!);
+    /** The accent box inside the track: the fill, or the sweeping sliver. */
+    const fill = (): UiNode | undefined => {
+      const stack: UiNode[] = [bar()];
+      while (stack.length > 0) {
+        const node = stack.pop()!;
+        if (node !== bar() && node.properties.get('backgroundColor') === 'controlAccent') return node;
+        for (let child = node.firstChild; child !== null; child = child.nextSibling) stack.push(child);
+      }
+      return undefined;
+    };
+    return { mounted, bar, fill };
+  }
+
+  it('stops sweeping and reports the value once one arrives, and sweeps again when it goes', () => {
+    vi.useFakeTimers();
+    try {
+      const value = new BehaviorSubject<number | undefined>(undefined);
+      const { mounted, bar, fill } = mountBar({ value, label: 'Upload' });
+      expect(semanticsOf(bar())).toMatchObject({ valueNow: undefined, states: ['busy'] });
+
+      // An upload that starts before its size is known is the usual
+      // order, and the bar was told once, at build, which kind it was.
+      value.next(0.6);
+      vi.advanceTimersByTime(400);
+      mounted.frame(400);
+      expect(semanticsOf(bar())).toMatchObject({ valueNow: 0.6, states: [] });
+      expect(bar().properties.get('valueMax')).toBe(1);
+      expect(mounted.getLayout(fill()!).width).toBeCloseTo(120);
+      // Still: nothing is moving it now.
+      const at = mounted.getLayout(fill()!).x;
+      vi.advanceTimersByTime(400);
+      mounted.frame(800);
+      expect(mounted.getLayout(fill()!).x).toBe(at);
+
+      // And back. A determinate bar whose value went away computed NaN.
+      value.next(undefined);
+      mounted.frame(900);
+      expect(semanticsOf(bar())).toMatchObject({ valueNow: undefined, states: ['busy'] });
+      expect(bar().properties.get('valueMax')).toBeUndefined();
+      const width = mounted.getLayout(fill()!).width;
+      expect(Number.isNaN(width)).toBe(false);
+      expect(width).toBeCloseTo(50);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('follows a change to the range alone', () => {
+    const max = new BehaviorSubject(1);
+    const { mounted, fill } = mountBar({ value: 0.5, max });
+    expect(mounted.getLayout(fill()!).width).toBeCloseTo(100);
+
+    max.next(2);
+    mounted.frame();
+    expect(mounted.getLayout(fill()!).width).toBeCloseTo(50);
+  });
+
+  it('fills from the right when the reading runs right to left', () => {
+    const rtl: UiTheme = {
+      ...lightTheme,
+      typography: Object.fromEntries(
+        Object.entries(lightTheme.typography).map(([role, style]) => [role, { ...style, textDirection: 'rtl' }])
+      ) as unknown as UiTheme['typography']
+    };
+    const { mounted, bar, fill } = mountBar({ value: 0.25 }, rtl);
+    const track = mounted.getLayout(bar());
+    const part = mounted.getLayout(fill()!);
+    expect(part.width).toBeCloseTo(50);
+    // Progress runs the way the reading does, as it does in a browser.
+    expect(part.x + part.width).toBeCloseTo(track.x + track.width);
   });
 });
