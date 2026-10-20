@@ -326,6 +326,58 @@ describe('DataTable', () => {
     expect(ui.getLayout(cellsOf(rows[1])[1]).width).toBe(60);
   });
 
+  it('scrolls sideways to columns wider than the table, header and rows together', () => {
+    const ui = mount(
+      createComponent(DataTable<Person>, {
+        label: 'People',
+        columns: [
+          { key: 'name', header: 'Name', width: 250, cell: (person: Person) => Text({ text: person.name }) },
+          { key: 'age', header: 'Age', width: 250, cell: (person: Person) => Text({ text: String(person.age) }) }
+        ],
+        rows: PEOPLE,
+        width: 300,
+        height: 200
+      })
+    );
+    const age = ui.getByText(String(PEOPLE[0].age));
+    const heading = ui.getByText('Age');
+    // The second column starts at 250 in a 300-wide table, so most of
+    // it is past the edge.
+    expect(ui.getVisibleBox(age).x).toBeGreaterThan(250);
+
+    ui.fireEvent.wheel({ x: 150, y: 100, deltaX: 400, deltaY: 0 });
+    ui.frame();
+    ui.frame(400);
+
+    // 500 of columns in 300 of table scroll 200 and no further. A
+    // sideways wheel used to move nothing: the scroller measured its
+    // content as the table's own width, so there was nothing to scroll
+    // to, and the second column stayed cut off at the edge.
+    expect(ui.getVisibleBox(age).x).toBeCloseTo(ui.getLayout(age).x - 200, 5);
+    // The header scrolls with the rows, so the columns still line up.
+    expect(ui.getVisibleBox(heading).x).toBeCloseTo(ui.getLayout(heading).x - 200, 5);
+  });
+
+  it('leaves a table whose columns share its width with nothing to scroll sideways', () => {
+    const ui = mount(
+      createComponent(DataTable<Person>, {
+        label: 'People',
+        columns: COLUMNS,
+        rows: PEOPLE,
+        width: 300,
+        height: 200
+      })
+    );
+    const name = ui.getByText(PEOPLE[0].name);
+    const before = ui.getVisibleBox(name).x;
+
+    ui.fireEvent.wheel({ x: 150, y: 100, deltaX: 400, deltaY: 0 });
+    ui.frame();
+    ui.frame(400);
+
+    expect(ui.getVisibleBox(name).x).toBe(before);
+  });
+
   it('sorts on a header press and re-renders the rows in place', () => {
     const ui = mount(
       createComponent(DataTable<Person>, {

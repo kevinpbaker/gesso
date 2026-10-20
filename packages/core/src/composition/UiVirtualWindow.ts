@@ -446,7 +446,14 @@ export class UiVirtualWindow {
           columnGap: this.grid.columnGap,
           rowGap: 0,
           autoFlow: 'row',
-          width: percent(100)
+          width: percent(100),
+          // As wide as the list, and no narrower than the tracks that
+          // have a size of their own. A scroll container measures its
+          // content by its children's boxes, and at a bare 100% this
+          // grid's box was the viewport however far its tracks ran past
+          // it, so columns wider than the list were clipped with
+          // nothing to scroll to.
+          minWidth: tracksMinimum(this.grid.columns, this.grid.columnGap ?? 0)
         },
         ...children
       )
@@ -481,6 +488,30 @@ export class UiVirtualWindow {
     }
     return this.axis === 'column' ? Column({ ...props, flexShrink: 0 }, item) : Row({ ...props, flexShrink: 0 }, item);
   }
+}
+
+/**
+ * The width a lazy grid's tracks need before any of them is given
+ * free space: every fixed track, the floor of every `minmax`, and the
+ * gaps between them.
+ *
+ * A track sized by its content (`auto`, or the minimum an `fr` track
+ * takes from its cells) adds nothing here, because nothing is laid out
+ * yet to ask; a percentage adds nothing either, being a share of the
+ * very width this answers. So a table of fixed widths scrolls sideways
+ * exactly as far as it is wide, and one of `fr` tracks still fits its
+ * box, as it did.
+ */
+function tracksMinimum(columns: readonly UiTrackSize[], gap: number): number {
+  let total = gap * Math.max(0, columns.length - 1);
+  for (const track of columns) {
+    if (typeof track === 'number') {
+      total += track;
+    } else if (track.unit === 'minmax' && typeof track.min === 'number') {
+      total += track.min;
+    }
+  }
+  return total;
 }
 
 /**

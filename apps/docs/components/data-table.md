@@ -81,6 +81,22 @@ new table when the columns change. `rowHeight` and `columnGap` are read
 the same way. `rows` is bound, so new data does arrive, and so does a
 different number of rows.
 
+### Columns wider than the table
+
+Columns with widths of their own can add up to more than the table is
+wide, and then the table scrolls sideways as well as down: a sideways
+wheel or a trackpad swipe moves the header and the rows together, so
+every header stays over its column. It scrolls as far as the fixed
+widths reach, counting pixel widths, the floor of each `minmax` and the
+gaps between columns. `fr`, `auto` and `percent` columns add nothing to
+that reach, since they share whatever width there is, so a table made
+only of them always fits its box and never scrolls sideways.
+
+One gap under `textDirection: 'rtl'`: the columns mirror, so the ones
+that do not fit run off the left edge, and a scroll container does not
+yet scroll toward its start side. A wide right-to-left table shows its
+first columns and cannot reach the rest.
+
 ### Colouring a cell
 
 A cell's text is the application's, so the table cannot colour it, and
