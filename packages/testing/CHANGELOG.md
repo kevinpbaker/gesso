@@ -1,5 +1,16 @@
 # gesso-testing
 
+## 0.6.25
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - gesso-core@0.6.25
+  - gesso-framework@0.6.25
+
 ## 0.6.24
 
 ### Patch Changes

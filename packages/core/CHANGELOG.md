@@ -1,5 +1,13 @@
 # gesso-core
 
+## 0.6.25
+
+### Patch Changes
+
+- A binding stamps its emissions with a clock read once per turn rather than once per emission. A window that connects thousands of bindings in a frame read the clock thousands of times to stamp the same frame; the age the inspector reports is still good to a frame.
+- The text measurer's paragraph cache moves an entry to the recent end only once it has aged into the older half, instead of on every hit. A scrollbar drag through a sheet asks the cache about 500 times a frame, and moving the entry on every hit cost 4.5 ms of a 21 ms frame. Eviction still takes the least recently asked for.
+- `LazySheet` takes `recycleRows`. Each row in view is mounted in a slot that outlives it and keyed by the slot, and the row renderer is told which slot it is in as a fourth argument. A row coming into view takes a slot a row leaving has just given up, so its node is reused; a renderer that keeps its cells by slot hands back the same elements, and the reconciler passes over them. A scrollbar drag through a long sheet used to build and tear down every cell on screen every frame; in gessosheet it now draws at a 4.9 ms median frame instead of 20 ms. Frozen rows are keyed by row as before, and a sheet without `recycleRows` is unchanged.
+
 ## 0.6.24
 
 ## 0.6.23
