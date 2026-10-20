@@ -1,5 +1,15 @@
 # gesso-framework
 
+## 0.6.25
+
+### Patch Changes
+
+- `fanOut` registries have `move(key, datum)`, which points a live key at another datum and pushes what it reads there if it differs. The cell keeps its identity, so everything bound to it stays bound. It is what a grid needs to reuse the cell in a row's slot for whichever row is in that slot now, without releasing it and tearing its bindings down.
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - gesso-core@0.6.25
+
 ## 0.6.24
 
 ### Patch Changes
