@@ -186,5 +186,31 @@ export const EXAMPLES: readonly ExampleMeta[] = [
       'runs no drawing code at all.',
     source: 'apps/playground/src/examples/PaintApp.tsx',
     tags: ['painting', 'vector paths', 'both renderers', 'clip and blur', 'JSX', 'render worker']
+  },
+  {
+    route: 'example-modifiers',
+    title: 'Modifiers',
+    description:
+      'Every modifier the library ships, one card each, with the card saying what to try: hover, press, Tab, ' +
+      'drag, rest and hold the pointer. Behaviour is attached to an element rather than wrapped around it, so ' +
+      'there is no wrapper component anywhere on the page, and one of the eight is written outside the framework ' +
+      'to show that an application can write its own. It runs in the render worker on purpose, because focus, ' +
+      'drag and an anchored overlay are exactly what could quietly depend on being on the thread the events ' +
+      'arrive on.',
+    source: 'apps/playground/src/examples/ModifiersApp.tsx',
+    tags: ['modifiers', 'focus', 'drag', 'tooltip', 'both renderers', 'render worker']
+  },
+  {
+    route: 'framework',
+    title: 'One app, on two threads',
+    description:
+      'The same application mounted two ways, switched in the header. On a render worker, components, layout and ' +
+      'drawing all run off the main thread, so Block main thread freezes the page for two seconds without costing ' +
+      'the canvas a frame. On the main thread the identical app stalls for the same two seconds, which is the ' +
+      'contrast the worker exists for. Both carry the inspector, the frame profiler, a renderer toggle and the ' +
+      'devtools panel, and the main-thread one adds an action log, because there the channel ports it taps are ' +
+      'on the page.',
+    source: 'apps/playground/src/FrameworkPlayground.ts',
+    tags: ['render worker', 'main thread', 'channels', 'services', 'inspector', 'profiler', 'action log']
   }
 ];

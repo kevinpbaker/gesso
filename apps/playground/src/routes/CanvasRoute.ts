@@ -34,7 +34,7 @@ export function mountCanvasRoute(host: HTMLElement): () => void {
     dataWorker?.postMessage({ type: 'control', op: { op: 'set', path, value } } satisfies DataWorkerMessage);
   };
 
-  const panel = mountPlaygroundPanel(host, 'canvas', state, dispatch);
+  const panel = mountPlaygroundPanel(host, 'renderers/canvas', state, dispatch);
   const canvas = createPreviewCanvas(panel.preview);
 
   if (!supportsOffscreenCanvas(canvas)) {

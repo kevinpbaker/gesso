@@ -20,7 +20,7 @@ import { mountInspectorPanel } from '../shell/InspectorPanel';
  */
 export function mountLayoutRoute(host: HTMLElement): () => void {
   const state = new PlaygroundState();
-  const panel = mountPlaygroundPanel(host, 'debug', state);
+  const panel = mountPlaygroundPanel(host, 'renderers/dom', state);
   const playground = new LayoutPlayground({
     clock: callback => new UiAnimationFrameClock(callback)
   });

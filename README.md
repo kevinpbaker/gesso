@@ -312,30 +312,33 @@ pnpm create:app ../my-app --local   # scaffold a project against this working tr
 
 One shell, switched by hash:
 
-| Route             | What you'll see                                                                                |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| `#debug`          | Layout inspector over DOM boxes: hover a node, read why it's that size                         |
-| `#canvas`         | Canvas2D renderer across three threads: main, data worker, render worker                       |
-| `#framework`      | The component runtime in a render worker. Stall the main thread, watch the heartbeat keep time |
-| `#framework-sync` | The same app on the main thread, so the contrast is unmissable                                 |
-| `#modifiers`      | Behaviour attached to an element without a wrapper component                                   |
-| `#webgpu`         | The WebGPU renderer drawing the real framework tree                                            |
-| `#compare`        | Canvas2D and WebGPU side by side with a live pixel diff                                        |
-| `#benchmark`      | WebGPU throughput                                                                              |
-| `#examples`       | Ten small complete apps, below                                                                 |
+| Route                | What you'll see                                                                   |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `#workbench`         | Every component in its states, to check by hand                                   |
+| `#examples`          | Small complete apps, below                                                        |
+| `#renderers/dom`     | One layout scene as DOM boxes: hover a node, read why it's that size              |
+| `#renderers/canvas`  | The same scene in Canvas2D across three threads: main, data worker, render worker |
+| `#renderers/webgpu`  | The same scene through the WebGPU renderer                                        |
+| `#renderers/compare` | Canvas2D and WebGPU side by side with a live pixel diff                           |
+| `#benchmark`         | WebGPU throughput. Not in the nav; it is a tool to run, not a page to browse      |
 
-| Example                | What it demonstrates                                                                            |
-| ---------------------- | ----------------------------------------------------------------------------------------------- |
-| `#example-signin`      | A passcode sign-in, written in JSX                                                              |
-| `#example-notes`       | Text editing and IME over a channel, persisted to OPFS from the app worker                      |
-| `#example-theme`       | Theming through the environment                                                                 |
-| `#example-live`        | A live feed bound straight to the canvas                                                        |
-| `#example-router`      | Nested routes, typed params and a guard, walked by the browser's Back button                    |
-| `#example-animation`   | A board that moves, and an idle app that does not                                               |
-| `#example-input`       | Gestures and shortcuts                                                                          |
-| `#example-layout`      | Layout an application can shape at runtime                                                      |
-| `#example-paint`       | Painting                                                                                        |
-| `#example-transitions` | Shared elements morphing between routes, with video decoded by WebCodecs and audio on the shell |
+The four renderer views are one page with a switch in the header. The routes they replaced (`#debug`, `#canvas`, `#webgpu`, `#compare`, `#framework-sync`, `#modifiers`) still work and redirect to where each now lives.
+
+| Example                  | What it demonstrates                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| `#example-signin`        | A passcode sign-in, written in JSX                                                              |
+| `#example-notes`         | Text editing and IME over a channel, persisted to OPFS from the app worker                      |
+| `#example-theme`         | Theming through the environment                                                                 |
+| `#example-live`          | A live feed bound straight to the canvas                                                        |
+| `#example-router`        | Nested routes, typed params and a guard, walked by the browser's Back button                    |
+| `#example-animation`     | A board that moves, and an idle app that does not                                               |
+| `#example-input`         | Gestures and shortcuts                                                                          |
+| `#example-layout`        | Layout an application can shape at runtime                                                      |
+| `#example-paint`         | Painting                                                                                        |
+| `#example-transitions`   | Shared elements morphing between routes, with video decoded by WebCodecs and audio on the shell |
+| `#example-modifiers`     | Behaviour attached to an element without a wrapper component                                    |
+| `#framework`             | One app on a render worker; stall the main thread and watch the heartbeat keep time             |
+| `#framework/main-thread` | The same app on the main thread, so the contrast is unmissable                                  |
 
 Each example is meant to be read as much as run. The card on the examples page names the source file.
 

@@ -46,7 +46,7 @@ interface FrameMetrics {
  * reports which backend is actually drawing — WebGPU falls back to
  * Canvas2D where it is unavailable, and the label says so.
  *
- * Compare with #framework-sync, which runs the same app on the main
+ * Compare with #framework/main-thread, which runs the same app on the main
  * thread and visibly stalls.
  *
  * The action log is not here, and that is still the thread model
@@ -59,7 +59,7 @@ interface FrameMetrics {
  * and the record for X15.
  */
 export function mountFrameworkRoute(host: HTMLElement): () => void {
-  const shell = mountShell(host, { routeId: 'framework', metrics: true });
+  const shell = mountShell(host, { routeId: 'framework/worker', metrics: true });
   const inspectorPanel = mountNodeInspector(shell.preview);
   // Mounted once for the route: the strip is a record of what has
   // happened, and a renderer switch is one of the things worth seeing
@@ -113,7 +113,7 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
     if (inspecting) {
       app.setInspector(true);
     }
-    const disconnectDevtools = connectRouteDevtools(app, 'framework', { picker });
+    const disconnectDevtools = connectRouteDevtools(app, 'framework/worker', { picker });
     return {
       dispose: () => {
         disconnectDevtools();
@@ -157,7 +157,7 @@ export function mountFrameworkRoute(host: HTMLElement): () => void {
  * which is exactly what the worker route avoids.
  */
 export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
-  const shell = mountShell(host, { routeId: 'framework-sync', metrics: true });
+  const shell = mountShell(host, { routeId: 'framework/main-thread', metrics: true });
   const inspectorPanel = mountNodeInspector(shell.preview);
   const profiler = mountFrameProfiler(shell.preview);
   // No `onError` to give: this configuration renders on this thread,
@@ -220,7 +220,7 @@ export function mountFrameworkSyncRoute(host: HTMLElement): () => void {
     }
     // The one route whose action log the panel can show: the log is
     // here, on the ports, and the panel is sent each entry.
-    const disconnectDevtools = connectRouteDevtools(builder, 'framework-sync', { actions, picker });
+    const disconnectDevtools = connectRouteDevtools(builder, 'framework/main-thread', { actions, picker });
     return {
       dispose: () => {
         disconnectDevtools();

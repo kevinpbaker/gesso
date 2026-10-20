@@ -21,7 +21,7 @@ import { mountVideoExampleRoute } from './routes/VideoExampleRoute';
 import { mountTransitionsStandaloneRoute } from './routes/TransitionsStandaloneRoute';
 import { mountWebGPURoute } from './routes/WebGPURoute';
 import { mountWorkbenchRoute } from './routes/WorkbenchRoute';
-import { DEFAULT_ROUTE_ID, findRoute, routeIdFromHash, ROUTES } from './shell/routes';
+import { allViews, DEFAULT_ROUTE_ID, findView, redirectFor } from './shell/routes';
 
 /** Mounts a route into `host` and returns its teardown. */
 type Mount = (host: HTMLElement) => () => void;
@@ -36,16 +36,18 @@ type Mount = (host: HTMLElement) => () => void;
  * by quietly falling back to the layout route.
  */
 const MOUNTS: Record<string, Mount> = {
-  debug: mountLayoutRoute,
-  canvas: mountCanvasRoute,
-  framework: mountFrameworkRoute,
-  'framework-sync': mountFrameworkSyncRoute,
-  modifiers: mountModifiersRoute,
-  webgpu: mountWebGPURoute,
-  compare: mountCompareRoute,
+  // A route with modes maps each of its views, not the route itself:
+  // every mode of these is a different implementation of the same page.
+  'renderers/dom': mountLayoutRoute,
+  'renderers/canvas': mountCanvasRoute,
+  'renderers/webgpu': mountWebGPURoute,
+  'renderers/compare': mountCompareRoute,
+  'framework/worker': mountFrameworkRoute,
+  'framework/main-thread': mountFrameworkSyncRoute,
   benchmark: mountBenchmarkRoute,
   workbench: mountWorkbenchRoute,
   examples: mountExamplesRoute,
+  'example-modifiers': mountModifiersRoute,
   'example-signin': mountSignInExampleRoute,
   'example-notes': mountNotesExampleRoute,
   'example-theme': mountThemeExampleRoute,
@@ -61,7 +63,9 @@ const MOUNTS: Record<string, Mount> = {
 };
 
 if (import.meta.env.DEV) {
-  const missing = ROUTES.filter(route => MOUNTS[route.id] === undefined).map(route => route.id);
+  const missing = allViews()
+    .filter(view => MOUNTS[view.id] === undefined)
+    .map(view => view.id);
   if (missing.length > 0) {
     throw new Error(`Routes declared with no mount function: ${missing.join(', ')}.`);
   }
@@ -77,12 +81,20 @@ function mountRoute(): void {
     throw new Error("Missing '#app' element.");
   }
 
-  // The first segment only. A route may own the rest of the fragment —
-  // the routing example runs a Gesso app whose own url lives there —
-  // and remounting the page on every one of its navigations would
-  // destroy the app the person is navigating.
-  const requested = routeIdFromHash(window.location.hash);
-  const id = findRoute(requested) === undefined ? DEFAULT_ROUTE_ID : requested;
+  // Replaced rather than pushed, and without a hashchange, so the old
+  // address leaves no history entry to come Back to.
+  const redirect = redirectFor(window.location.hash);
+  if (redirect !== undefined) {
+    history.replaceState(history.state, '', redirect);
+  }
+
+  // The view, not the whole fragment: the route id, plus the mode for a
+  // route with modes. A route may own the rest of the fragment — the
+  // routing example runs a Gesso app whose own url lives there — and
+  // remounting the page on every one of its navigations would destroy
+  // the app the person is navigating.
+  const view = findView(window.location.hash) ?? findView(DEFAULT_ROUTE_ID)!;
+  const id = view.id;
   if (id === mountedId) {
     return;
   }

@@ -2,7 +2,7 @@ import { connectDevtools, createDirectPorts, getDevtoolsHook, mountDevtoolsPanel
 import type { ActionLog, DevtoolsApp, DevtoolsPicker } from 'gesso-devtools';
 import type { AppShell } from './AppShell';
 import { addToggleAction } from './InspectorPanel';
-import { findRoute } from './routes';
+import { findView } from './routes';
 
 /**
  * The devtools panel as a pane in the playground: the answer to
@@ -61,7 +61,7 @@ export function connectRouteDevtools(
   extras: { actions?: ActionLog; picker?: DevtoolsPicker } = {}
 ): () => void {
   return connectDevtools(app, {
-    name: findRoute(routeId)?.title ?? routeId,
+    name: findView(routeId)?.title ?? routeId,
     ...(extras.actions === undefined ? {} : { actions: extras.actions }),
     ...(extras.picker === undefined ? {} : { picker: extras.picker })
   });
