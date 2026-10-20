@@ -49,7 +49,9 @@ Backspace in the empty field takes the last one off.
 
 A `ComboboxOption` is a `value` and a `label`, plus an optional `detail`
 drawn quieter beside the label (a handle, a team), `keywords` it also
-answers to, and `disabled`.
+answers to, and `disabled`. A label longer than the list is wide is cut
+short with an ellipsis inside the list, so it never runs past the edge
+or pushes the chosen option's tick out of its column.
 
 ## Matching
 

@@ -106,6 +106,12 @@ reader's landmark list that leads nowhere.
 
 ## Collapsing
 
+A trail longer than the strip it sits in wraps between crumbs onto a
+further line, rather than running off the side of whatever holds it.
+Each separator lives inside the crumb it follows, so a line never starts
+with one. Wrapping is what keeps every crumb reachable without a fold;
+folding is for a trail that would wrap more than reads well.
+
 `maxItems` is off by default, because most trails are three crumbs and
 a component should not decide for a caller that theirs is too long.
 Above 0, a trail longer than `maxItems` keeps its first crumb and its

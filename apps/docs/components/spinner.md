@@ -30,6 +30,11 @@ has no value, because it has none to have.
 row keeps its size. The layout props on
 [the library page](/components/) apply.
 
+`size` and `color` are both followed, like an icon's: a spinner that
+grows with its container, or turns `danger` when the wait has gone on
+too long, is the same spinner, and neither is a reason to give it a new
+`key`.
+
 `color` names a palette entry, and unlike an [icon](/components/icon)
 this one resolves at paint: the blades are boxes rather than a raster,
 so a theme change recolours them with nothing redrawn.

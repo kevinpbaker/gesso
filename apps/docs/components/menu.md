@@ -141,6 +141,8 @@ the highlight is on. Opening the menu highlights the first item that can
 be chosen, `Down` and `Up` step past a disabled row in both directions
 and wrap around it, and `Home` and `End` answer with the ends of what
 can be chosen. Position in the list makes no difference to any of that.
+A menu whose items are all disabled opens with no row highlighted,
+rather than the first painted as if `Enter` would choose it.
 
 A disabled row refuses a press as well, so nothing a pointer can do
 chooses an item the keyboard cannot reach.

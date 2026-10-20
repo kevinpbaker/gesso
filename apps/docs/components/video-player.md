@@ -27,16 +27,37 @@ same pieces and loses nothing.
 
 ## Props
 
-| Prop           | Type                          | Default   | What it does                                      |
-| -------------- | ----------------------------- | --------- | ------------------------------------------------- |
-| `src`          | `string`                      | required  | What the video resolver is asked for.             |
-| `alt`          | `string`                      | none      | What a screen reader reads for the picture.       |
-| `captions`     | `readonly VttCue[]`           | none      | The caption track, as `parseWebVtt` returns it.   |
-| `autoplay`     | `boolean`                     | `false`   | Start as soon as the clip is decoded.             |
-| `loop`         | `boolean`                     | `false`   | Start again when it ends.                         |
-| `objectFit`    | `ObjectFit`                   | `'cover'` | How each frame meets a box that is not its shape. |
-| `borderRadius` | `number`                      | `0`       | Rounds the box, and clips the picture to it.      |
-| `onTransport`  | `(t: VideoTransport) => void` | none      | Handed the same handle the player itself drives.  |
+| Prop               | Type                          | Default             | What it does                                            |
+| ------------------ | ----------------------------- | ------------------- | ------------------------------------------------------- |
+| `src`              | `string`                      | required            | What the video resolver is asked for.                   |
+| `alt`              | `string`                      | none                | What a screen reader reads for the picture.             |
+| `captions`         | `readonly VttCue[]`           | none                | The caption track, as `parseWebVtt` returns it.         |
+| `autoplay`         | `boolean`                     | `false`             | Start as soon as the clip is decoded.                   |
+| `loop`             | `boolean`                     | `false`             | Start again when it ends.                               |
+| `objectFit`        | `ObjectFit`                   | `'cover'`           | How each frame meets a box that is not its shape.       |
+| `borderRadius`     | `number`                      | `0`                 | Rounds the box, and clips the picture to it.            |
+| `onTransport`      | `(t: VideoTransport) => void` | none                | Handed the same handle the player itself drives.        |
+| `onVolume`         | `(volume, muted) => void`     | none                | Told when the level changed. Draws the volume control.  |
+| `onState`          | `(s, error?) => void`         | none                | Told when the clip loads, gets a picture, or fails.     |
+| `poster`           | `string`                      | none                | A still to show until there is a frame to show instead. |
+| `placeholderColor` | `UiColorValue`                | `controlBackground` | The tint while the box has no picture on it.            |
+| `volume`           | `number`                      | `1`                 | The starting level, 0 to 1.                             |
+| `muted`            | `boolean`                     | `false`             | Whether it starts silenced.                             |
+| `rate`             | `number`                      | `1`                 | How fast to play.                                       |
+
+`captions` is followed: a track is usually fetched once the player is
+already on screen, so the first thing it is handed is often an empty
+list, and captions that arrive later are drawn when they do. While
+there is no track the caption row is left out altogether, so a clip
+without one does not give up the room for a missing line.
+
+The props after `onTransport` are passed through to the `Video`
+underneath and mean exactly what they mean there, read when the player
+is built as `Video` reads them: `volume` and `muted` are where the
+level starts, and the volume control is drawn only when `onVolume` is
+there to carry it to whatever makes the noise. `onState` is the one to wire: a clip
+that will not play draws nothing but the placeholder, so it is the only
+way an application can say why.
 
 ## It does not autoplay, and `Video` does
 
@@ -88,7 +109,10 @@ Three pieces, none of which knows anything about video:
   is the index it last answered, which makes the common case, one
   frame later, a step rather than a search.
 - `Captions` draws it, and draws nothing at all between cues: an empty
-  plate under a video is a caption track that looks broken.
+  plate under a video is a caption track that looks broken. It follows
+  its `cues` as well as the position, so a track that changes while a
+  paused clip's position stands still is looked at straight away rather
+  than on the next play.
 
 <<< @/src/examples/VideoPlayerExample.tsx#captions
 

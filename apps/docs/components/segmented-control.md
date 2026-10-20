@@ -98,6 +98,7 @@ component with a mode.
 | `label`        | `string`                     | `''`       | The group's accessible name. It is not drawn: the heading beside it is yours.                |
 | `disabled`     | `boolean`                    | `false`    | Refuses clicks and keys for the whole track, and marks the subtree unavailable.              |
 | `size`         | `ButtonSize`                 | `'medium'` | `small`, `medium` or `large`, resolved through the same tokens a `Button` uses.              |
+| `ref`          | `UiNodeRef`                  | none       | Receives the track, the node that takes focus, for focusing it or anchoring something to it. |
 
 Every prop takes a plain value or an Observable of one, including
 `options`. The layout props on [the library page](/components/) apply

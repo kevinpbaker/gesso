@@ -29,16 +29,16 @@ runtime's manager.
 const focus = ctx.inject(FocusService);
 ```
 
-| Member            | What it does                                                    |
-| ----------------- | --------------------------------------------------------------- |
-| `focus(node, o?)` | Moves focus there. A node that cannot take it is ignored        |
-| `blur()`          | Drops focus without moving it anywhere                          |
-| `focusNext()`     | The next focusable node, wrapping                               |
-| `focusPrevious()` | The previous one, wrapping                                      |
-| `trap(node)`      | Confines focus to that subtree until it is released             |
-| `releaseTrap()`   | Ends the innermost trap and restores the control that opened it |
-| `focused`         | The node holding focus, or null, as state to bind to            |
-| `trapped`         | Whether a trap is open, as state to bind to                     |
+| Member            | What it does                                                        |
+| ----------------- | ------------------------------------------------------------------- |
+| `focus(node, o?)` | Moves focus there. A node that cannot take it is ignored            |
+| `blur()`          | Drops focus without moving it anywhere                              |
+| `focusNext()`     | The next focusable node, wrapping                                   |
+| `focusPrevious()` | The previous one, wrapping                                          |
+| `trap(node)`      | Confines focus to that subtree until it is released                 |
+| `releaseTrap(n?)` | Ends the innermost trap, or the one on `n`, and restores its opener |
+| `focused`         | The node holding focus, or null, as state to bind to                |
+| `trapped`         | Whether a trap is open, as state to bind to                         |
 
 `focus(node)` scrolls the node into view, as focus from code does in a
 browser. `focus(node, { preventScroll: true })` leaves every scroll
@@ -110,7 +110,10 @@ closes.
 - **A removed subtree is an implicit release.** A scope whose root has
   left the tree is a trap that ended, so it pops and restores. A dialog
   that simply unmounts hands the keyboard back without sequencing its
-  own teardown, and a `releaseTrap()` afterwards does nothing.
+  own teardown, and a `releaseTrap(node)` naming it afterwards does
+  nothing. Name the node when something else may have trapped over
+  yours: a bare `releaseTrap()` ends the innermost trap, which is then
+  the other one's.
 - **Entering a scope is settled once per frame.** A `ref` fires once
   its node's own props are written and it has the environment (the
   theme) it will be under, but before its children exist, so a trap

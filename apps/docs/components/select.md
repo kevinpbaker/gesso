@@ -133,7 +133,11 @@ While the list is open:
 | A printed character | Moves the highlight to the first option starting with it  |
 
 Opening the list puts the highlight on whatever is already chosen, so
-the walk starts where the value is rather than at the top.
+the walk starts where the value is rather than at the top. The chosen
+option also carries a tick at its end, in the column a
+[combobox](/components/combobox) and a [menu](/components/menu) keep for
+theirs, because the highlight follows the arrows: once it has moved off
+the value, the `selected` state alone would show nothing on screen.
 
 ### Type-ahead and the page's shortcuts
 
@@ -207,6 +211,14 @@ four-pixel offset and a `bottom-start` placement, which is what lets the
 layout engine flip it above the trigger at the bottom of the viewport
 and shift it sideways to stay on screen. The entry takes a backdrop, so
 a press or a wheel anywhere outside closes it.
+
+The layer also cuts the list to the room the window has, and the rows
+scroll inside it, the way a menu's do, so fifty countries do not run
+past the top and bottom of the window. The highlighted option is kept in
+view as the arrows, `Home`, `End` or a letter move it, and the list
+opens scrolled to the chosen one. The border stays still while the rows
+move under it, and the list stays as wide as its longest option rather
+than the window.
 
 Because the layer sits above the app root, the list inherits none of the
 scoped values of the tree that opened it, and it would come out light

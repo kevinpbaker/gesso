@@ -223,7 +223,12 @@ writes its end state and completes, and the dialog is simply present.
 `modal` is unconditional rather than a prop, because there is no
 non-modal form of this component: the trap is taken as the content
 enters the tree and released when it leaves, including when the dialog
-disappears because it unmounted rather than because it closed.
+disappears because it unmounted rather than because it closed. It
+releases its own trap by name, not whichever is innermost, so a dialog
+its owner closes (on a timer, or when a save finishes) while a menu or
+another dialog is open over it leaves that one holding the keyboard,
+rather than ending its trap and letting focus leave the window still on
+top. A [menu](/components/menu) releases its own the same way.
 
 ## What has been checked
 

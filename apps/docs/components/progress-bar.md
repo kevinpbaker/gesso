@@ -52,14 +52,20 @@ The fill is clamped to the track, because a fill wider than its track
 would be a lie about the picture. The reported value is not clamped,
 because that would be a lie about the number.
 
-Whether a bar is determinate is decided once, when it is built, from
-whether `value` was supplied. A bar that starts with no value and later
-gets one does not change its mind: give it a `key` that changes with
-the answer, so the old one leaves and a determinate one arrives.
+Whether a bar is determinate follows `value` as it comes and goes.
+A task usually starts before its size is known, an upload before the
+length header or a job before its first count, so a bar bound to a
+value that is `undefined` at first sweeps until a number arrives and
+then fills, and goes back to sweeping, from the start of the track, if
+the number goes away again. A change to `min` or `max` alone moves the
+fill too, so a bar whose range grows under an unchanged value shows it.
+
+The fill grows from where the track starts, which is the right edge under a
+right-to-left reading: progress fills the way the line reads.
 
 ## Indeterminate
 
-Given no `value`, a sliver sweeps the track and the record says `busy`
+While there is no `value`, a sliver sweeps the track and the record says `busy`
 with no value at all. It sweeps in twenty-four positions 90 ms apart,
 which is the same shape the [spinner](/components/spinner) uses and
 costs the same: one property written eleven times a second rather than

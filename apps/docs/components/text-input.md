@@ -39,7 +39,7 @@ everything else on this table is shared.
 | `required`     | `boolean`                 | `false` | Announced as `required`. It validates nothing on its own; the message is `error`'s job.                                                                 |
 | `multiline`    | `boolean`                 | `false` | Wraps the text instead of scrolling it, raises the field's minimum height from 32 to 72, and hands Enter to the text. `TextArea` sets it, and drops it. |
 | `secret`       | `boolean`                 | `false` | A password field. See [Secret fields](#secret-fields).                                                                                                  |
-| `onSubmit`     | `() => void`              | none    | Called when Enter is pressed in a single-line field.                                                                                                    |
+| `onSubmit`     | `() => void`              | none    | Called on Enter in a single-line field, and on Command-Enter or Control-Enter in a multiline one, where Enter alone is a new line.                      |
 | `ref`          | `UiNodeRef`               | none    | Receives the node that _is_ the field, which is what a form focuses and an overlay anchors to, rather than the component's outer column.                |
 
 ### Layout and modifiers
@@ -179,6 +179,7 @@ worker as readily as on the main thread.
 | Backspace, Delete         | Delete one grapheme back or forward; with the word modifier, one word |
 | Command, Backspace        | Delete to the start of the line (Mac)                                 |
 | Enter                     | Single line: calls `onSubmit`. Multiline: inserts a newline           |
+| Command or Control, Enter | Calls `onSubmit`, in a multiline field as in a single-line one        |
 | Primary, A                | Select all                                                            |
 | Primary, Z                | Undo; with Shift, redo. Control+Y also redoes off a Mac               |
 | Tab                       | Leaves the field. Nothing here captures it, in a `TextArea` either    |
@@ -188,6 +189,11 @@ it. "Primary" is Command on a Mac and Control elsewhere. A key the
 application handles first and marks handled never reaches this map: the
 field's editing is a default behaviour, and `onKeyDown` runs ahead of
 it, which is exactly how `onSubmit` takes Enter away from the text.
+
+In a multiline field Enter is the text's, so `onSubmit` is reached with
+Command or Control held, either one on every platform, which is the
+convention a comment box or a chat composer has already taught. Without
+a modifier, Enter goes on inserting a newline.
 
 ## Semantics
 

@@ -120,17 +120,17 @@ ring is drawn on it; the rows are not focusable, and which one is chosen
 is said by its own selection colour. A chosen row scrolled out of view is
 scrolled back in.
 
-| Key          | What it does                                                       |
-| ------------ | ------------------------------------------------------------------ |
-| Down         | The next row in the open list                                      |
-| Up           | The previous row                                                   |
+| Key          | What it does                                                                                   |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| Down         | The next row in the open list                                                                  |
+| Up           | The previous row                                                                               |
 | Right        | Opens a closed branch; on an open branch, steps to its first child, and an empty one stays put |
-| Left         | Closes an open branch; on a leaf, steps to its parent              |
-| Home         | The first row                                                      |
-| End          | The last row of the open list                                      |
-| Page Down    | Ten rows on                                                        |
-| Page Up      | Ten rows back                                                      |
-| Enter, Space | Calls `onActivate` with the chosen row's key                       |
+| Left         | Closes an open branch; on a leaf, steps to its parent                                          |
+| Home         | The first row                                                                                  |
+| End          | The last row of the open list                                                                  |
+| Page Down    | Ten rows on                                                                                    |
+| Page Up      | Ten rows back                                                                                  |
+| Enter, Space | Calls `onActivate` with the chosen row's key                                                   |
 
 Right and Left are the ARIA tree keys, and they are the reason a row has
 to know its parent as well as its level. Down and Up move by one row in

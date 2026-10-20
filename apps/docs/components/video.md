@@ -125,7 +125,10 @@ const pinned: VideoControlsOptions = { alwaysVisible: true };
 ```
 
 The bar comes up when the pointer is over the picture and goes when it
-leaves, which is what every player does. It is also up whenever the
+leaves, which is what every player does. Leaving lets the idle
+countdown already running finish, so a pointer that leaves and comes
+straight back does not make it flicker; with `hideAfterMs: 0` there is
+no countdown, and leaving puts the bar away at once. It is also up whenever the
 clip is **paused**, because a paused clip with no visible way to
 restart it is the one state the hover rule alone gets badly wrong.
 
@@ -182,6 +185,14 @@ which costs nothing and needs no new machinery: playback is reference
 counted by source, so the copy resolves the playback the inline one is
 holding and picks it up exactly where it is. That is the same
 mechanism that carries a clip through a route change.
+
+The copy is the inline clip in every way that shows. It starts at the
+inline clip's volume and mute rather than its own defaults, keeps its
+`clock`, so a clip whose time belongs to something outside does not
+grow a second idea of where it is, and keeps its `poster`. A level
+changed in fullscreen is handed back to the inline clip, which is the
+one left on screen afterwards, so it is still there after leaving and
+`onVolume` reports it from there.
 
 **The surface has to be resized, and nothing else was going to do
 it.** A `ResizeObserver` watches the host, and the host does not
@@ -257,9 +268,11 @@ what two of them look like:
   is painted over the background, and the clip stops on the last frame
   it drew.
 
-There is no error slot and no callback for any of the three. What to do
-about a clip that will not play is draw your own message beside it, and
-decide with the resolver whether to ask again.
+There is no error slot. `onState` is told when a clip fails, with what
+went wrong, which is the only place an application can see it; what to
+do about a clip that will not play is draw your own message beside it,
+and decide with the resolver whether to ask again. A `VideoPlayer`
+passes its own `onState` through for the same purpose.
 
 ## What drives the frames
 
