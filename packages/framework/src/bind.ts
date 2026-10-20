@@ -27,22 +27,39 @@ import type { InternalState } from './InternalState';
  * site rather than hidden by a helper pretending the key is writable.
  *
  * Sugar over the controlled contract, not a replacement for it.
+ *
+ * A renamed value with the handler left as `onChange` is an overload of
+ * its own rather than a default on the event name's type parameter. A
+ * parameter with no argument to infer from is inferred from where the
+ * result goes, and a spread into JSX goes into the props around it, so
+ * the default never applied: the name became every prop beside the
+ * spread, and `<Switch label="Sync" {...bind(on, 'checked')} />` said
+ * `label` was given twice.
  */
 export function bind<T>(cell: InternalState<T>): { value: InternalState<T>; onChange: (next: T) => void };
-export function bind<T, V extends string, E extends string = 'onChange'>(
+export function bind<T, V extends string>(
+  cell: InternalState<T>,
+  value: V
+): { [K in V]: InternalState<T> } & { onChange: (next: T) => void };
+export function bind<T, V extends string, E extends string>(
   cell: InternalState<T>,
   value: V,
-  onChange?: E
+  onChange: E
 ): { [K in V]: InternalState<T> } & { [K in E]: (next: T) => void };
 export function bind<T>(
   cell: ReadableCell<T>,
   write: (next: T) => void
 ): { value: ReadableCell<T>; onChange: (next: T) => void };
-export function bind<T, V extends string, E extends string = 'onChange'>(
+export function bind<T, V extends string>(
+  cell: ReadableCell<T>,
+  write: (next: T) => void,
+  value: V
+): { [K in V]: ReadableCell<T> } & { onChange: (next: T) => void };
+export function bind<T, V extends string, E extends string>(
   cell: ReadableCell<T>,
   write: (next: T) => void,
   value: V,
-  onChange?: E
+  onChange: E
 ): { [K in V]: ReadableCell<T> } & { [K in E]: (next: T) => void };
 export function bind<T>(
   cell: ReadableCell<T>,

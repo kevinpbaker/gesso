@@ -7,6 +7,7 @@ import {
   Row,
   Text,
   type UiChild,
+  type UiKeyboardEvent,
   type UiTextChangeEvent,
   type UiSemanticState
 } from 'gesso-core';
@@ -33,8 +34,10 @@ import {
  *
  * The field holds text while it is being typed — a half-written
  * "-" or "1." is not a number yet — and reports a value only when the
- * text parses. Blurring normalises what is there, which is what stops
- * a field from being left holding "12abc".
+ * text parses to one the field could hold: inside the range and on a
+ * step. Anything else waits for the field to be left, or for Enter,
+ * which bound it and report the result. A field left blank or holding
+ * "12abc" goes back to the value it had, rather than inventing one.
  */
 export interface NumberInputProps extends ControlLayoutProps {
   /** Receives the node that *is* the control, for focus and anchoring. */
@@ -95,18 +98,35 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
     value.change(bounded);
   };
   const move = (by: number): void => commit(value.current() + by);
+  const arrows = keymap({
+    ArrowUp: () => move(step.value),
+    ArrowDown: () => move(-step.value)
+  });
 
+  // A keystroke is not a decision. With a minimum of 10, the "1" on the
+  // way to "15" is out of range, and clamping it there turned it into
+  // "10" under the caret, so the next digit made "105". Text that is
+  // not yet a value the field could hold stays as typed and is settled
+  // on commit.
   const typed = (event: UiTextChangeEvent): void => {
     text.next(event.value);
-    const parsed = Number(event.value);
-    if (event.value.trim() !== '' && Number.isFinite(parsed)) {
-      const bounded = clamp(parsed, min.value, max.value, step.value);
-      // Typed past a bound, the field shows the bound. The value may not
-      // move (it is often already there), so this cannot wait for it to.
-      if (bounded !== parsed) {
-        text.next(String(bounded));
-      }
-      value.change(bounded);
+    const parsed = parse(event.value);
+    if (parsed !== undefined && clamp(parsed, min.value, max.value, step.value) === parsed) {
+      value.change(parsed);
+    }
+  };
+  // Leaving the field, or Enter, settles the text. What does not parse
+  // goes back to the value the field had, unreported because nothing
+  // changed: a number field has no empty value to report, and the 0 it
+  // used to report is a number nobody typed, often not even in range.
+  // `commit` writes the text itself as well as the value, because the
+  // bounded value is often the one already held and would not move.
+  const settle = (): void => {
+    const parsed = parse(text.value);
+    if (parsed === undefined) {
+      text.next(String(value.current()));
+    } else {
+      commit(parsed);
     }
   };
 
@@ -145,11 +165,16 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
         valueMax: max,
         states: states(invalid, required),
         onInput: typed,
-        onBlur: () => commit(Number(text.value) || 0),
-        onKeyDown: keymap({
-          ArrowUp: () => move(step.value),
-          ArrowDown: () => move(-step.value)
-        })
+        onBlur: settle,
+        onKeyDown: (event: UiKeyboardEvent) => {
+          // Settled and left to travel on: Enter in a form is also the
+          // form's, and this should not take it.
+          if (event.key === 'Enter') {
+            settle();
+            return;
+          }
+          arrows(event);
+        }
       }),
       stepper('−', () => move(-step.value), disabled, tokens),
       stepper('+', () => move(step.value), disabled, tokens)
@@ -200,6 +225,12 @@ function stepper(
     },
     Text({ text: glyph, color: foregroundToken(disabled), fontSize: 14, selectable: false })
   );
+}
+
+/** The number some text is, or nothing for text that is not one, blank included. */
+function parse(text: string): number | undefined {
+  const parsed = Number(text);
+  return text.trim() !== '' && Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function clamp(value: number, min: number, max: number, step: number): number {

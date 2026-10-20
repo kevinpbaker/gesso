@@ -9,7 +9,8 @@ import {
   type UiPointerEvent,
   type LayoutBox,
   percent,
-  measure
+  measure,
+  resolveString
 } from 'gesso-core';
 
 import { input, type ComponentContext, type Inputs } from 'gesso-framework';
@@ -116,13 +117,36 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
   };
   const page = (): number => Math.max(step.value, (max.value - min.value) / 10);
 
-  /** A pointer inside the track is a fraction of the range. */
+  /**
+   * Whether the slider reads right to left, asked at the moment a key or
+   * a press arrives.
+   *
+   * The layout already mirrors under `textDirection: 'rtl'`, so the fill
+   * grows from the right without anything here knowing; it is the two
+   * things that turn a position or a key into a value that have to be
+   * told. Without this a press near the right edge of a track filled
+   * from the right read as nearly the maximum, and Right made the fill
+   * longer by moving it left. Up and Down are not about reading
+   * direction and stay as they are.
+   */
+  const rtl = (): boolean => {
+    const node = focus.node();
+    return node !== null && resolveString(node, 'textDirection') === 'rtl';
+  };
+  /** Right is more left to right, and less right to left. */
+  const across =
+    (by: number): (() => void) =>
+    () =>
+      move(rtl() ? -by : by);
+
+  /** A pointer inside the track is a fraction of the range, from where the track starts. */
   const toValue = (event: UiPointerEvent): number => {
     const box = track.value;
     if (box.width <= 0) {
       return value.current();
     }
-    const fraction = Math.min(1, Math.max(0, (event.x - box.x) / box.width));
+    const along = Math.min(1, Math.max(0, (event.x - box.x) / box.width));
+    const fraction = rtl() ? 1 - along : along;
     return min.value + fraction * (max.value - min.value);
   };
   const seek = (event: UiPointerEvent): void => {
@@ -160,9 +184,9 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
       valueMax: max,
       valueText: spoken,
       onKeyDown: keymap({
-        ArrowRight: () => move(step.value),
+        ArrowRight: across(step.value),
         ArrowUp: () => move(step.value),
-        ArrowLeft: () => move(-step.value),
+        ArrowLeft: across(-step.value),
         ArrowDown: () => move(-step.value),
         PageUp: () => move(page()),
         PageDown: () => move(-page()),
@@ -243,8 +267,9 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
                 borderRadius: THUMB / 2,
                 // Half of it either side of the boundary, so the
                 // handle is centred on the value rather than starting
-                // at it.
-                marginLeft: -THUMB / 2,
+                // at it. The start margin rather than the left one,
+                // because right to left the boundary is on its right.
+                marginStart: -THUMB / 2,
                 backgroundColor: fill(disabled)
               })
             )

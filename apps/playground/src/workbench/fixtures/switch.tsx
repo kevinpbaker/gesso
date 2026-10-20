@@ -56,7 +56,7 @@ function SetFromOutside(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const on = internalState(false);
   return (
     <row gap={12} y="center">
-      <Switch label="Sync" {...bind(on, 'checked', 'onChange')} />
+      <Switch label="Sync" {...bind(on, 'checked')} />
       <Button label="Flip from outside" size="small" variant="outlined" onClick={() => (on.value = !on.value)} />
     </row>
   );

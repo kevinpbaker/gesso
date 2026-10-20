@@ -685,12 +685,18 @@ declare function bind<T>(cell: InternalState<T>): {
   value: InternalState<T>;
   onChange: (next: T) => void;
 };
-declare function bind<T, V extends string, E extends string = 'onChange'>(cell: InternalState<T>, value: V, onChange?: E): { [K in V]: InternalState<T>; } & { [K in E]: (next: T) => void; };
+declare function bind<T, V extends string>(cell: InternalState<T>, value: V): { [K in V]: InternalState<T>; } & {
+  onChange: (next: T) => void;
+};
+declare function bind<T, V extends string, E extends string>(cell: InternalState<T>, value: V, onChange: E): { [K in V]: InternalState<T>; } & { [K in E]: (next: T) => void; };
 declare function bind<T>(cell: ReadableCell<T>, write: (next: T) => void): {
   value: ReadableCell<T>;
   onChange: (next: T) => void;
 };
-declare function bind<T, V extends string, E extends string = 'onChange'>(cell: ReadableCell<T>, write: (next: T) => void, value: V, onChange?: E): { [K in V]: ReadableCell<T>; } & { [K in E]: (next: T) => void; };
+declare function bind<T, V extends string>(cell: ReadableCell<T>, write: (next: T) => void, value: V): { [K in V]: ReadableCell<T>; } & {
+  onChange: (next: T) => void;
+};
+declare function bind<T, V extends string, E extends string>(cell: ReadableCell<T>, write: (next: T) => void, value: V, onChange: E): { [K in V]: ReadableCell<T>; } & { [K in E]: (next: T) => void; };
 declare class ThemeTokenCell<T extends object> extends InternalState<T> {
   readonly modifier: UiModifier;
   constructor(extension: UiThemeExtension<T>);

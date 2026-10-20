@@ -65,7 +65,7 @@ function Secret(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   );
 }
 
-/** A text area, with a line count so Enter can be seen to insert rather than submit. */
+/** A text area, with a line count so Enter can be seen to insert and Mod-Enter to submit. */
 function Notes(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const value = internalState('');
   const submits = internalState(0);
@@ -166,7 +166,7 @@ export const textInputFixture: WorkbenchFixture = {
     },
     {
       name: 'TextArea',
-      try: 'Type, then press Enter twice: two new lines appear and the submit count stays at 0. Keep typing past the right edge: words wrap onto the next line rather than scroll.',
+      try: 'Type, then press Enter twice: two new lines appear and the submit count stays at 0. Press Cmd-Enter or Ctrl-Enter: the count goes up and no line is added. Keep typing past the right edge: words wrap onto the next line rather than scroll.',
       stretch: true,
       render: () => <Notes />
     },
