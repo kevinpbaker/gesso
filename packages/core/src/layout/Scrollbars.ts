@@ -43,6 +43,38 @@ export function scrollRange(rec: LayoutRecord, axis: ScrollbarAxis): number {
 }
 
 /**
+ * Whether a record scrolls from its right edge: a scroll container that
+ * reads right to left.
+ *
+ * Its content starts at the right and overflows to the left, so its
+ * horizontal offset follows CSS: 0 shows the start edge, and the offset
+ * runs down to minus the overflow to show the rest. A field is left
+ * out: it scrolls its own text by the caret (see
+ * `LayoutEngine.textScrollAdjustment`), from 0 up, in either direction.
+ */
+export function scrollsFromRight(rec: LayoutRecord): boolean {
+  return rec.mirrored && rec.scrollable && !rec.scrollsText;
+}
+
+/** The offsets a record can be scrolled between along an axis. */
+export interface ScrollBounds {
+  readonly min: number;
+  readonly max: number;
+}
+
+/**
+ * The lowest and highest offset along an axis: `[0, scrollRange]`, or
+ * `[-scrollRange, 0]` across a container that scrolls from its right
+ * edge. Every clamp of an offset reads this, so the engine, the wheel,
+ * a scrollbar drag and a reveal agree about where the content ends in
+ * both directions.
+ */
+export function scrollBounds(rec: LayoutRecord, axis: ScrollbarAxis): ScrollBounds {
+  const range = scrollRange(rec, axis);
+  return axis === 'x' && scrollsFromRight(rec) ? { min: -range, max: 0 } : { min: 0, max: range };
+}
+
+/**
  * One scrollbar's geometry, in the container's record coordinates
  * (pre-scroll, like the record box): the thumb rectangle and the
  * numbers that map pointer travel back to scroll offset.
@@ -89,7 +121,11 @@ function thumbFor(rec: LayoutRecord, axis: ScrollbarAxis): ScrollbarThumb | null
   const length = Math.min(track, Math.max(SCROLLBAR_MIN_THUMB, (track * viewport) / content));
   const travel = Math.max(0, track - length);
   const maxScroll = scrollRange(rec, axis);
-  const offset = axis === 'y' ? rec.scrollY : rec.scrollX;
+  // Measured from the low end of the bounds, so a right-to-left
+  // container's thumb sits at the right while it shows its start edge
+  // (an offset of 0, the top of its range) and moves left with it.
+  const { min } = scrollBounds(rec, axis);
+  const offset = (axis === 'y' ? rec.scrollY : rec.scrollX) - min;
   const along = SCROLLBAR_INSET + (maxScroll > 0 ? (travel * offset) / maxScroll : 0);
   const thumb: LayoutBox =
     axis === 'y'

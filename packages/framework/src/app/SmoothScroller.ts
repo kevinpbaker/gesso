@@ -94,8 +94,12 @@ export class SmoothScroller {
   constructor(
     private readonly graph: UiGraph,
     private readonly animations: AnimationService,
-    /** The container's clamp, read fresh because content grows. */
-    private readonly limitOf: (node: UiNode, axis: Axis) => number
+    /**
+     * The offsets the container can be scrolled between, read fresh
+     * because content grows. The low end is negative across a container
+     * that scrolls from its right edge; see `scrollBounds`.
+     */
+    private readonly boundsOf: (node: UiNode, axis: Axis) => { readonly min: number; readonly max: number }
   ) {}
 
   /**
@@ -112,8 +116,8 @@ export class SmoothScroller {
   scrollBy(node: UiNode, axis: Axis, delta: number, from: number): void {
     const cell = this.cellFor(node, axis).cell;
     const pending = this.destinationOf(cell);
-    const limit = this.limitOf(node, axis);
-    const target = clamp((pending ?? from) + delta, 0, limit);
+    const { min, max } = this.boundsOf(node, axis);
+    const target = clamp((pending ?? from) + delta, min, max);
     if (pending !== undefined && target === pending) {
       return;
     }

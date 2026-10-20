@@ -87,7 +87,10 @@ left, before it paints, for the same reason.
 
 The engine clamps the offset to the container's **content extent**,
 which it measures from the children it placed plus the container's own
-padding. Two things follow:
+padding. A container that reads right to left measures that extent from
+its right edge, and its `scrollX` runs from minus the overflow up to
+`0` rather than from `0` up; see
+[Right to left](/layout/right-to-left). Two things follow:
 
 - An offset written against content that has since shrunk comes back
   into range on its own, rather than leaving a list scrolled past its

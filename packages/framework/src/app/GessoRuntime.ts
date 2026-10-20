@@ -32,7 +32,9 @@ import {
   type UiElement,
   Stack,
   scrollbarThumb,
+  scrollBounds,
   scrollRange,
+  scrollsFromRight,
   type LayoutRecord,
   UiVirtualWindow,
   UiVirtualSheet,
@@ -775,9 +777,9 @@ export class GessoRuntime {
       (node, axis) => {
         const record = this.engine.recordFor(node);
         if (record === undefined) {
-          return 0;
+          return { min: 0, max: 0 };
         }
-        return scrollRange(record, axis === 'scrollY' ? 'y' : 'x');
+        return scrollBounds(record, axis === 'scrollY' ? 'y' : 'x');
       }
     );
     // And the router, whose matches hold route definitions, which hold
@@ -3133,8 +3135,17 @@ export class GessoRuntime {
     const going = (node: UiNode, record: LayoutRecord, axis: 'x' | 'y'): number => {
       const written = node.getProperty(axis === 'x' ? 'scrollX' : 'scrollY');
       const offset = typeof written === 'number' ? written : axis === 'x' ? record.scrollX : record.scrollY;
-      return Math.min(Math.max(offset, 0), scrollRange(record, axis));
+      const { min, max } = scrollBounds(record, axis);
+      return Math.min(Math.max(offset, min), max);
     };
+    // What the controllers are told is measured from the low end of the
+    // bounds, so every container reads to them as [0, range] and their
+    // arithmetic (room left, a paced target, a thumb drag) is the same
+    // in both directions. They only ever write deltas back, which mean
+    // the same in either frame. A right-to-left container's real offset
+    // runs from minus its overflow up to 0; see `scrollBounds`.
+    const fromLow = (node: UiNode, record: LayoutRecord, axis: 'x' | 'y'): number =>
+      going(node, record, axis) - scrollBounds(record, axis).min;
     return {
       containerState: (node): ScrollContainerState | undefined => {
         const record = this.engine.recordFor(node);
@@ -3142,8 +3153,8 @@ export class GessoRuntime {
           return undefined;
         }
         return {
-          scrollX: going(node, record, 'x'),
-          scrollY: going(node, record, 'y'),
+          scrollX: fromLow(node, record, 'x'),
+          scrollY: fromLow(node, record, 'y'),
           maxScrollX: scrollRange(record, 'x'),
           maxScrollY: scrollRange(record, 'y'),
           horizontal: node.getProperty('direction') === 'row' || node.type === UiNodeType.Row,
@@ -3298,13 +3309,20 @@ export class GessoRuntime {
       const column = window.axis === 'column';
       // A wheel may have written a newer offset than the record holds.
       const scrollProp = node.properties.get(column ? 'scrollY' : 'scrollX');
-      const scroll = typeof scrollProp === 'number' ? scrollProp : column ? rec.scrollY : rec.scrollX;
+      const offset = typeof scrollProp === 'number' ? scrollProp : column ? rec.scrollY : rec.scrollX;
+      // The window counts from the list's start. A row that reads right
+      // to left starts at its right edge and scrolls there with a
+      // negative offset, so the distance from its start is the offset
+      // negated, and so is any correction the window hands back.
+      const sign = !column && scrollsFromRight(rec) ? -1 : 1;
+      const scroll = sign * offset;
       const measures: VirtualItemMeasure[] = [];
       const lead = this.collectVirtualMeasures(node, column, measures);
       const result = window.update({ scroll, extent: column ? rec.height : rec.width, lead }, measures);
       if (result.scrollAdjust !== 0) {
         const axis = column ? 'scrollY' : 'scrollX';
-        node.setProperty(axis, scroll + result.scrollAdjust);
+        const adjust = sign * result.scrollAdjust;
+        node.setProperty(axis, offset + adjust);
         this.graph.markDirty(node, DirtyFlags.Transform);
         // This is a coordinate correction, not a scroll: the content
         // above moved, so the viewport moves with it to keep the same
@@ -3313,7 +3331,7 @@ export class GessoRuntime {
         // overwritten by the animation's next tick and the list would
         // slip by this much every frame, which is the jitter anchoring
         // exists to prevent.
-        this.smoothScroller.adjust(node, axis, result.scrollAdjust);
+        this.smoothScroller.adjust(node, axis, adjust);
       }
     }
   }
@@ -3340,8 +3358,12 @@ export class GessoRuntime {
     // A wheel may have written newer offsets than the record holds.
     const x = node.properties.get('scrollX');
     const y = node.properties.get('scrollY');
+    // Counted from the sheet's start, as a lazy row's window is: a
+    // sheet that reads right to left starts at its right edge and
+    // scrolls there with a negative offset.
+    const sign = scrollsFromRight(rec) ? -1 : 1;
     sheet.update({
-      scrollX: typeof x === 'number' ? x : rec.scrollX,
+      scrollX: sign * (typeof x === 'number' ? x : rec.scrollX),
       scrollY: typeof y === 'number' ? y : rec.scrollY,
       width: rec.width,
       height: rec.height

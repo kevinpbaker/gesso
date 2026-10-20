@@ -92,10 +92,9 @@ gaps between columns. `fr`, `auto` and `percent` columns add nothing to
 that reach, since they share whatever width there is, so a table made
 only of them always fits its box and never scrolls sideways.
 
-One gap under `textDirection: 'rtl'`: the columns mirror, so the ones
-that do not fit run off the left edge, and a scroll container does not
-yet scroll toward its start side. A wide right-to-left table shows its
-first columns and cannot reach the rest.
+Under `textDirection: 'rtl'` the columns mirror: the first is on the
+right, the ones that do not fit run off the left edge, and the table
+opens on its right edge and scrolls left to reach them.
 
 ### Colouring a cell
 
