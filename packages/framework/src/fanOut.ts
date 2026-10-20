@@ -98,15 +98,24 @@ export class FanCell<V, D = unknown> extends Observable<V> implements ReadableCe
   /** @internal */
   readonly subject: BehaviorSubject<V>;
 
+  /** @internal What the cell reads with; changed only by `FanOut.move`. */
+  held: D;
+
   constructor(
     initial: V,
     readonly key: FanKey,
-    readonly datum: D,
+    datum: D,
     readonly label: string | undefined
   ) {
     const subject = new BehaviorSubject(initial);
     super(subscriber => subject.subscribe(subscriber));
     this.subject = subject;
+    this.held = datum;
+  }
+
+  /** What the reader is given beside the key: where the cell is, for a grid. */
+  get datum(): D {
+    return this.held;
   }
 
   get value(): V {
@@ -236,6 +245,32 @@ export class FanOut<S, V, D = undefined> {
   }
 
   /**
+   * Points a live key at another datum, and pushes what it reads there.
+   *
+   * For a surface that keeps its cells by place on screen rather than
+   * by what they show: a grid that reuses the cell in a row's slot for
+   * whichever row is in that slot now. The cell keeps its identity, so
+   * everything bound to it stays bound, and its value is read again
+   * from the latest snapshot and pushed only if it differs. Releasing
+   * the key and taking a new one instead would complete the cell and
+   * tear its bindings down, which is the cost this exists to avoid.
+   *
+   * A key that is not live is made, as `for` would make it.
+   */
+  move(key: FanKey, datum: D): FanCell<V, D> {
+    const cell = this.cells.get(key);
+    if (cell === undefined) {
+      return this.for(key, datum);
+    }
+    cell.held = datum;
+    const next = this.hasSnapshot ? this.read(this.snapshot as S, key, datum) : this.initial(key, datum);
+    if (!this.equal(cell.subject.value, next)) {
+      cell.subject.next(next);
+    }
+    return cell;
+  }
+
+  /**
    * Drops a key.
    *
    * The cell completes, so anything still bound to it is torn down
@@ -290,7 +325,7 @@ export class FanOut<S, V, D = undefined> {
       if (cell === undefined) {
         continue;
       }
-      const next = this.read(snapshot, key, cell.datum);
+      const next = this.read(snapshot, key, cell.held);
       if (!this.equal(cell.subject.value, next)) {
         cell.subject.next(next);
       }

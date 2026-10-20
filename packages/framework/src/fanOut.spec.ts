@@ -96,6 +96,31 @@ describe('fanOut', () => {
     expect(seen).toHaveBeenCalledExactlyOnceWith([1, 3]);
   });
 
+  it('moves a key to another datum, keeping the cell and pushing what it reads there', () => {
+    const source = new BehaviorSubject<Grid>({ r1: 10, r2: 20, r3: 20 });
+    const cells = fanOut<Grid, number, string>(source, (grid, _key, row) => grid[row] ?? 0, { initial: 0 });
+    const slot = cells.for('slot0', 'r1');
+    const seen: number[] = [];
+    slot.subscribe(value => seen.push(value));
+
+    expect(cells.move('slot0', 'r2')).toBe(slot);
+    expect(slot.datum).toBe('r2');
+    // r3 reads the same as r2, so nothing more is pushed.
+    cells.move('slot0', 'r3');
+    expect(seen).toEqual([10, 20]);
+    // And the next snapshot is read at the new datum.
+    source.next({ r1: 10, r2: 20, r3: 30 });
+    expect(seen).toEqual([10, 20, 30]);
+  });
+
+  it('makes a key that is not live when asked to move it', () => {
+    const cells = fanOut<Grid, number, string>(new BehaviorSubject<Grid>({ r1: 1 }), (grid, _key, row) => grid[row] ?? 0, {
+      initial: 0
+    });
+    expect(cells.move('slot0', 'r1').value).toBe(1);
+    expect(cells.size).toBe(1);
+  });
+
   it('refreshes by hand when the reading changed and the source did not', () => {
     // A selection moving across a grid whose values are all the same is
     // this case, and it is why the reader takes the key rather than the
