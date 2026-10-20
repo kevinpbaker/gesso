@@ -110,7 +110,7 @@ export const toastFixture: WorkbenchFixture = {
     },
     {
       name: 'Raised again while showing',
-      try: 'Raise it, wait two seconds, raise it again: it stays up a full 3 seconds after the second press rather than leaving one second later.',
+      try: 'Raise it, wait two seconds, raise it again: open is already true, so the second press is not a change and it leaves 3 seconds after the first (Toast documents this: close it first, or mount a fresh toast per notice). Raise it and rest the pointer on it: it stays until the pointer leaves, then 3 seconds more.',
       render: () => <Raise trigger="Copy" message="Copied" duration={3000} />
     },
     {
@@ -133,7 +133,7 @@ export const toastFixture: WorkbenchFixture = {
     },
     {
       name: 'Bottom, start, end',
-      try: 'Three toasts 48px up: one at the left, one centred, one at the right, none overlapping. In right-to-left, start and end swap sides. Hide closes all three.',
+      try: 'Three toasts 48px up: one at the left, one centred, one at the right, none overlapping. Start is the left and end the right in right-to-left too (documented: the overlay layer places by physical edges). Hide closes all three.',
       render: () => <Places />
     },
     {

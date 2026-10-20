@@ -305,7 +305,9 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
 
   inputs.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
-      active.next(Math.max(0, from(0)));
+      // -1 when nothing can be chosen: no row is highlighted, rather
+      // than the first one painted as Enter's when Enter would do nothing.
+      active.next(from(0));
       shown = body();
       place(shown);
     } else if (isOpen !== true && overlay.isOpen()) {

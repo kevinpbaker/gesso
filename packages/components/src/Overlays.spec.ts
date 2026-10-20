@@ -769,3 +769,36 @@ describe('Menu', () => {
     expect(ui.entries()).toHaveLength(0);
   });
 });
+
+describe('Menu with nothing it can choose', () => {
+  it('opens with no row highlighted rather than a disabled one', () => {
+    // It opened on the first row whatever it was: `from(0)` said there
+    // was none to highlight, and `Math.max(0, …)` highlighted it anyway.
+    const open = new BehaviorSubject(false);
+    const chosen: string[] = [];
+    const ui = mount(
+      createComponent(Menu, {
+        open,
+        at: { x: 20, y: 20 },
+        items: [
+          { value: 'cut', label: 'Cut', disabled: true },
+          { value: 'copy', label: 'Copy', disabled: true }
+        ],
+        onSelect: (value: string) => chosen.push(value),
+        onOpenChange: (next: boolean) => open.next(next)
+      })
+    );
+    open.next(true);
+    ui.frame();
+
+    const painted = () => ui.getAllByRole('menuitem').map(row => row.properties.get('backgroundColor'));
+    expect(painted()).toEqual(['transparent', 'transparent']);
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('End');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(painted()).toEqual(['transparent', 'transparent']);
+    expect(chosen).toEqual([]);
+    expect(open.value).toBe(true);
+  });
+});

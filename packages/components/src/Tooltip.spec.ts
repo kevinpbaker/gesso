@@ -242,6 +242,71 @@ describe('the tooltip modifier', () => {
   });
 });
 
+describe('Escape on a tooltip', () => {
+  // WCAG 1.4.13: what appears on hover or focus can be dismissed without
+  // moving either. Neither surface answered Escape, so a tooltip over
+  // what the person wanted to read stayed until the pointer or the focus
+  // went somewhere else.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('closes one the pointer opened, with the pointer still on it and focus elsewhere', () => {
+    const ui = mount(Column(Button({ text: 'Other', label: 'Other' }), createComponent(Trigger, {})));
+    ui.fireEvent.focus(ui.getByLabel('Other'));
+    ui.hover('Save');
+    vi.advanceTimersByTime(400);
+    expect(ui.entries()).toHaveLength(1);
+
+    ui.fireEvent.keyDown('Escape');
+    expect(ui.entries()).toHaveLength(0);
+    // Resting there is not a new hover.
+    ui.hover('Save');
+    vi.advanceTimersByTime(1000);
+    expect(ui.entries()).toHaveLength(0);
+  });
+
+  it('closes one focus opened, leaving focus where it was', () => {
+    const ui = mount(Column(createComponent(Trigger, {})));
+    ui.fireEvent.tab();
+    expect(ui.entries()).toHaveLength(1);
+
+    ui.fireEvent.keyDown('Escape');
+    expect(ui.entries()).toHaveLength(0);
+    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByLabel('Save'));
+  });
+
+  it('closes the component’s as well', () => {
+    const ui = mount(
+      Column(
+        createComponent(Tooltip, {
+          text: 'Saves the note',
+          children: Box({ label: 'Save note', width: 80, height: 24 }, Text({ text: 'Save' }))
+        })
+      )
+    );
+    ui.hover('Save note');
+    vi.advanceTimersByTime(400);
+    expect(ui.entries()).toHaveLength(1);
+
+    ui.fireEvent.keyDown('Escape');
+    expect(ui.entries()).toHaveLength(0);
+  });
+
+  it('leaves Escape to the page when no tooltip is open', () => {
+    const escaped: string[] = [];
+    const ui = mount(Column({ onKeyDown: event => escaped.push(event.key) }, createComponent(Trigger, {})));
+    ui.fireEvent.tab();
+    ui.fireEvent.keyDown('Escape');
+    expect(escaped).toEqual([]);
+    ui.fireEvent.keyDown('Escape');
+    expect(escaped).toEqual(['Escape']);
+  });
+});
+
 describe('the Tooltip component', () => {
   beforeEach(() => {
     vi.useFakeTimers();

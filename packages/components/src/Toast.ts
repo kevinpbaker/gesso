@@ -1,4 +1,4 @@
-import { input, type ComponentContext, type Inputs } from 'gesso-framework';
+import { FocusService, input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Button, Row, Text, type UiChild, type UiNode } from 'gesso-core';
 import { useOverlay } from './overlay';
 
@@ -12,7 +12,15 @@ import { useOverlay } from './overlay';
  *
  * Auto-dismiss is a plain timer. It is cleared when the toast closes
  * or its component unmounts, so a toast cannot outlive the screen that
- * raised it.
+ * raised it. It waits while the pointer is on the toast or focus is in
+ * it, and starts again, from the whole duration, when they leave: a
+ * toast must not close under somebody reading it or about to press its
+ * action.
+ *
+ * Writing `open` true again while it is up is not a change, so it does
+ * not restart the timer: an input cell passes on a value that differs
+ * from the last, and there is nothing here to hear. To raise a notice
+ * anew, close it first or mount a fresh toast keyed by the notice.
  */
 export interface ToastProps {
   open?: boolean;
@@ -30,7 +38,11 @@ export interface ToastProps {
    */
   action?: string;
   onAction?: () => void;
-  /** Which part of the bottom edge it's pinned to. */
+  /**
+   * Which part of the bottom edge it's pinned to. `bottom-start` is the
+   * left corner and `bottom-end` the right, in right-to-left text as
+   * well: the overlay layer places by physical edges.
+   */
   placement?: ToastPlacement;
   /** Pixels between the toast and the viewport's edges. */
   offset?: number;
@@ -47,8 +59,14 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
   const placement = input(inputs.placement, 'bottom-start');
   const offset = input(inputs.offset, 24);
   const overlay = useOverlay(ctx, 'toast');
+  const focus = ctx.inject(FocusService);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let placeholder: UiNode | null = null;
+  /** The toast's node while it is up. */
+  let shown: UiNode | null = null;
+  /** Whether the pointer is on it, and whether focus is in it: either holds the timer. */
+  let pointed = false;
+  let focused = false;
 
   const cancel = (): void => {
     if (timer !== null) {
@@ -57,6 +75,25 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
     }
   };
   ctx.onUnmount(cancel);
+
+  /** The whole duration from now, unless it is being read. */
+  const start = (): void => {
+    cancel();
+    if (overlay.isOpen() && duration.value > 0 && !pointed && !focused) {
+      timer = setTimeout(close, duration.value);
+    }
+  };
+
+  // Focus in it is followed through the service and not the toast's own
+  // events: the buttons take it, and a focus event does not bubble.
+  ctx.effect(focus.focused, node => {
+    const inside = shown !== null && contains(shown, node);
+    if (inside !== focused) {
+      focused = inside;
+      if (inside) cancel();
+      else start();
+    }
+  });
 
   const close = (): void => {
     cancel();
@@ -81,7 +118,16 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
         borderColor: tone.value === 'error' ? 'danger' : 'border',
         borderRadius: 8,
         role: tone.value === 'error' ? 'alert' : 'status',
-        label: message.value
+        label: message.value,
+        ref: (node: UiNode | null) => (shown = node),
+        onPointerEnter: () => {
+          pointed = true;
+          cancel();
+        },
+        onPointerLeave: () => {
+          pointed = false;
+          start();
+        }
       },
       Text({
         text: message,
@@ -129,10 +175,12 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
       if (placeholder === null) {
         return;
       }
+      // Neither is on a toast that has only now appeared; a pointer
+      // that left one as it closed was not heard leaving.
+      pointed = false;
+      focused = false;
       overlay.show(body(), { ...pin(placement.value, offset.value), environment: placeholder, onClose: cancel });
-      if (duration.value > 0) {
-        timer = setTimeout(close, duration.value);
-      }
+      start();
     } else if (!wanted && overlay.isOpen()) {
       close();
     }
@@ -165,4 +213,13 @@ function pin(placement: ToastPlacement, offset: number) {
     default:
       return { bottom: offset, left: offset };
   }
+}
+
+function contains(root: UiNode, node: UiNode | null): boolean {
+  for (let at = node; at !== null; at = at.parent) {
+    if (at === root) {
+      return true;
+    }
+  }
+  return false;
 }

@@ -95,3 +95,51 @@ describe('a toast declared open', () => {
     expect(themeOf(ui)).toBe(darkTheme);
   });
 });
+
+describe('a toast that is being read', () => {
+  // Its timer ran whatever the person was doing with it. Tabbing to Undo
+  // and reaching it as the four seconds ran out closed the toast under
+  // the focus, which went with it, and the pointer resting on it to
+  // read a long message saw it leave from under the pointer.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('stays up while focus is in it, and starts its time again when focus leaves', () => {
+    const ui = mount({ message: 'Message deleted', action: 'Undo', duration: 1000 });
+    const undo = ui.getByRole('button', { name: 'Undo' });
+    ui.fireEvent.focus(undo);
+    vi.advanceTimersByTime(5000);
+    ui.frame();
+    expect(ui.entries()).toHaveLength(1);
+    expect(ui.runtime.input.focus.focusedNode).toBe(undo);
+
+    ui.fireEvent.blur();
+    ui.frame();
+    vi.advanceTimersByTime(999);
+    expect(ui.entries()).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    ui.frame();
+    expect(ui.entries()).toHaveLength(0);
+    expect(ui.closed).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays up while the pointer is on it, and starts its time again when the pointer leaves', () => {
+    const ui = mount({ message: 'Note saved', duration: 1000 });
+    const box = ui.getLayout(ui.getByRole('status'));
+    ui.fireEvent.pointerMove(box.x + 4, box.y + box.height / 2);
+    vi.advanceTimersByTime(5000);
+    ui.frame();
+    expect(ui.entries()).toHaveLength(1);
+
+    ui.fireEvent.pointerMove(599, 0);
+    vi.advanceTimersByTime(999);
+    expect(ui.entries()).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    ui.frame();
+    expect(ui.entries()).toHaveLength(0);
+  });
+});
