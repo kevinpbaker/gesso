@@ -63,14 +63,26 @@ const COLUMNS: readonly DataGridColumn[] = [
   { key: 'note', header: 'Note', width: 260, editable: true }
 ];
 
+/** How big a range is, for the line under the grid. */
+function describeRange(range: { from: DataGridCell; to: DataGridCell }): string {
+  const index = (key: string) => COLUMNS.findIndex(column => column.key === key);
+  const rows = Math.abs(range.to.row - range.from.row) + 1;
+  const columns = Math.abs(index(range.to.column) - index(range.from.column)) + 1;
+  return rows === 1 && columns === 1
+    ? 'one cell'
+    : `${rows} ${rows === 1 ? 'row' : 'rows'} by ${columns} ${columns === 1 ? 'column' : 'columns'}`;
+}
+
 // #region grid
 /**
  * A budget of ten thousand rows, edited in place.
  *
  * **The data stays here.** The grid holds no values: it asks
- * `getValue` for the cells in view, reports a committed edit through
- * `onCellChange`, and reads the cells in view again straight after,
- * which is how the Total beside an edited quarter changes with it.
+ * `getValue` for the cells in view, reports a changed cell through
+ * `onCellChange`, and reads that cell back straight after. The Total
+ * beside an edited quarter is worked out from it, which the grid
+ * cannot know, so every change also moves `revision` on, and the
+ * grid reads the cells in view again.
  *
  * **The active cell is controlled,** so the line under the grid can
  * say where it is. The application writes back every cell it is asked
@@ -79,7 +91,9 @@ const COLUMNS: readonly DataGridColumn[] = [
  * The Item column is frozen: scroll sideways and it stays, with the
  * header above everything. Click a cell, then use the arrows, Tab,
  * Home and End, Page Up and Page Down, Ctrl+Home and Ctrl+End. Enter
- * or F2 edits, typing replaces, Escape puts the old value back.
+ * or F2 edits, typing replaces, Escape puts the old value back. Shift
+ * with an arrow, or a drag, selects a range; Ctrl+C copies it and
+ * Ctrl+V pastes from the active cell.
  */
 export function Budget(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const edits = new Map<string, string>();
@@ -92,6 +106,8 @@ export function Budget(_inputs: Inputs<{}>, _ctx: ComponentContext) {
 
   const active = internalState<DataGridCell>({ row: 0, column: 'item' });
   const last = internalState('nothing yet');
+  const revision = internalState(0);
+  const range = internalState('one cell');
 
   return (
     <column gap={10} padding={16} width={percent(100)} height={percent(100)}>
@@ -104,9 +120,12 @@ export function Budget(_inputs: Inputs<{}>, _ctx: ComponentContext) {
         onCellChange={(row, column, value) => {
           edits.set(`${row}:${column}`, value);
           last.value = `${column.toUpperCase()} of row ${row + 1} set to "${value}"`;
+          revision.value += 1;
         }}
+        revision={revision}
         activeCell={active}
         onActiveCellChange={cell => (active.value = cell)}
+        onSelectionChange={selection => (range.value = describeRange(selection))}
         flexGrow={1}
         minHeight={0}
       />
@@ -115,6 +134,7 @@ export function Budget(_inputs: Inputs<{}>, _ctx: ComponentContext) {
         fontSize={12}
         color="textMuted"
       />
+      <text text={range.pipe(map(size => `Selected: ${size}`))} fontSize={12} color="textMuted" />
       <text text={last.pipe(map(edit => `Last edit: ${edit}`))} fontSize={12} color="textMuted" />
     </column>
   );

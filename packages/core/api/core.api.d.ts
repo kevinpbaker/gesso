@@ -2036,6 +2036,10 @@ declare const UiProperties: {
   readonly autocomplete: UiPropertyDefinition<UiAutocomplete | undefined>;
   readonly orientation: UiPropertyDefinition<UiOrientation | undefined>;
   readonly level: UiPropertyDefinition<number | undefined>;
+  readonly rowIndex: UiPropertyDefinition<number | undefined>;
+  readonly columnIndex: UiPropertyDefinition<number | undefined>;
+  readonly rowCount: UiPropertyDefinition<number | undefined>;
+  readonly columnCount: UiPropertyDefinition<number | undefined>;
   readonly transform: UiPropertyDefinition<Partial<UiTransform> | undefined>;
   readonly text: UiPropertyDefinition<string | undefined>;
   readonly image: UiPropertyDefinition<ImageBitmap | undefined>;
@@ -2113,7 +2117,7 @@ type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
-type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
+type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
 type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];
@@ -2623,6 +2627,7 @@ declare const UiEnvironmentKeys: {
   readonly theme: UiEnvironmentKey<UiTheme>;
   readonly textStyle: UiEnvironmentKey<UiTextStyle>;
   readonly color: UiEnvironmentKey<UiColorValue>;
+  readonly textDirection: UiEnvironmentKey<UiTextDirection | undefined>;
   readonly contentColor: UiEnvironmentKey<UiColor>;
   readonly containerSize: UiEnvironmentKey<UiContainerSize>;
   readonly insets: UiEnvironmentKey<UiInsetSource>;
@@ -5308,6 +5313,10 @@ interface UiSemanticsRecord {
   readonly posInSet?: number;
   readonly setSize?: number;
   readonly level?: number;
+  readonly rowIndex?: number;
+  readonly columnIndex?: number;
+  readonly rowCount?: number;
+  readonly columnCount?: number;
   readonly activeDescendant?: string;
   readonly controls?: string;
   readonly autocomplete?: UiAutocomplete;

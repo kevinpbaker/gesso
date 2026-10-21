@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { UiNode } from 'gesso-core';
-import { createComponent } from 'gesso-framework';
+import { ShellService, createComponent } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
 
@@ -50,8 +50,10 @@ describe('the docs data grid example', () => {
     expect(ui.getAllByRole('columnheader').map(node => ui.getSemantics(node).label)).toEqual(
       expect.arrayContaining(['Item', 'Owner', 'Q1'])
     );
+    // The header row is row 1 of ROWS + 1, so the first data row is row 2.
+    expect(ui.getSemantics(grid(ui))).toMatchObject({ rowCount: ROWS + 1, columnCount: 8 });
     const rows = ui.getAllByRole('row').slice(1);
-    expect(ui.getSemantics(rows[0])).toMatchObject({ posInSet: 1, setSize: ROWS });
+    expect(ui.getSemantics(rows[0])).toMatchObject({ rowIndex: 2 });
     // A window of them, not ten thousand.
     expect(rows.length).toBeLessThan(30);
   });
@@ -98,6 +100,34 @@ describe('the docs data grid example', () => {
     expect(line(ui, 'Last edit:')).toBe('Last edit: nothing yet');
   });
 
+  it('selects a range, copies it as tab-separated text, and pastes a block', () => {
+    const ui = budget();
+    const copied: string[] = [];
+    ui.runtime.services.get(ShellService).setHandler(request => {
+      if (request.type === 'clipboard') {
+        copied.push(request.text);
+      }
+    });
+    ui.fireEvent.click(ui.getAllByRole('gridcell', { name: '111' })[0]);
+    ui.frame();
+
+    press(ui, 'ArrowRight', { shift: true });
+    press(ui, 'ArrowDown', { shift: true });
+    expect(line(ui, 'Selected:')).toBe('Selected: 2 rows by 2 columns');
+    press(ui, 'c', { ctrl: true });
+    // Stored values, not the separated ones the cells draw.
+    expect(copied).toEqual(['111\t148\n222\t296']);
+
+    press(ui, 'Escape');
+    expect(line(ui, 'Selected:')).toBe('Selected: one cell');
+    ui.fireEvent.paste('1000\t2000\n');
+    ui.frame();
+    expect(line(ui, 'Selected:')).toBe('Selected: 1 row by 2 columns');
+    expect(line(ui, 'Last edit:')).toBe('Last edit: Q2 of row 1 set to "2000"');
+    // 1000 + 2000 + 185 + 222, and the total read again for it.
+    expect(ui.getAllByRole('gridcell', { name: '3,407' })).toHaveLength(1);
+  });
+
   it('walks to the far corner of ten thousand rows from the keyboard', () => {
     const ui = budget();
     ui.fireEvent.focus(grid(ui));
@@ -107,7 +137,7 @@ describe('the docs data grid example', () => {
     ui.frame();
     expect(line(ui, 'Active:')).toBe(`Active: NOTE, row ${ROWS} of ${ROWS}`);
     const rows = ui.getAllByRole('row');
-    expect(ui.getSemantics(rows.at(-1)!).posInSet).toBe(ROWS);
+    expect(ui.getSemantics(rows.at(-1)!).rowIndex).toBe(ROWS + 1);
 
     press(ui, 'Home', { ctrl: true });
     ui.frame();

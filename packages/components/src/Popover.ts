@@ -1,3 +1,4 @@
+import { distinctUntilChanged } from 'rxjs';
 import {
   input,
   themeTokenCell,
@@ -72,12 +73,22 @@ export type PopoverAlign = 'start' | 'center' | 'end';
  * so a popover left open behind the focus is one the keyboard cannot
  * get back into except through the anchor, which would close it. The
  * Tab order inside the panel is the panel's own and does not wrap.
+ * A control inside that takes Tab for itself, by cancelling the key,
+ * keeps it: the panel acts only on a Tab nothing inside it used. A
+ * `TextArea` is not one of those; Tab leaves it here as it does
+ * anywhere.
+ *
+ * **Focus leaving any other way closes it too**: moved by code, by a
+ * shortcut that focuses another control, or by an assistive
+ * technology. Focus on the anchor, or in an overlay opened from inside
+ * the panel (a `Select`'s list, a nested popover), is still inside, by
+ * the same rule a press outside is judged by.
  *
  * **Controlled by default.** With `open` the application owns the
  * state, and every way of closing it (Escape, a press outside, Tab
- * out, the anchor pressed again) is a request through `onOpenChange`
- * that it may refuse by not writing the value back. With
- * `defaultOpen` it owns its own.
+ * out, focus moved away, the anchor pressed again) is a request
+ * through `onOpenChange` that it may refuse by not writing the value
+ * back. With `defaultOpen` it owns its own.
  */
 export interface PopoverProps {
   /** Whether it is open, for an application that owns the state. */
@@ -157,6 +168,20 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
   let hiding = false;
   /** Set by a press outside, which moves focus where it landed rather than back to the anchor. */
   let pressedAway = false;
+  /**
+   * What the last press outside landed on, until the focus it moves has
+   * been heard: that press has asked to close already, and an owner who
+   * refused should not be asked twice for one gesture.
+   */
+  let pressedOn: UiNode | null = null;
+  /** True while this component is moving focus itself, out beside the anchor on Tab. */
+  let moving = false;
+  /**
+   * Whether focus has been inside since the popover opened. Until it
+   * has, focus elsewhere is where it was before the panel took it, not
+   * focus that left.
+   */
+  let entered = false;
 
   const anchor = (): UiNode | null => inputs.anchor.value ?? null;
 
@@ -180,9 +205,15 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
    */
   const tab = (event: UiKeyboardEvent): void => {
     const root = panel;
-    if (root === null) {
+    // A control inside that wanted Tab for itself, to indent, say, has
+    // cancelled it on the way here, and keeps it. Nothing in the
+    // library does that, a `TextArea` included, but an application's
+    // own field may.
+    if (root === null || event.defaultPrevented) {
       return;
     }
+    event.preventDefault();
+    event.stopPropagation();
     const stops = tabStopsIn(root);
     const at = focus.focused.value;
     const index = at === null ? -1 : stops.indexOf(at);
@@ -199,6 +230,19 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
   const leave = (back: boolean): void => {
     const trigger = anchor();
     release();
+    // Focus is about to leave on purpose, and the close is asked for
+    // below; the watch on focus should not ask as well.
+    moving = true;
+    try {
+      step(trigger, back);
+    } finally {
+      moving = false;
+    }
+    requestClose();
+  };
+
+  /** Focus to the anchor, and on Tab forward to what follows it. */
+  const step = (trigger: UiNode | null, back: boolean): void => {
     if (trigger !== null) {
       focus.focus(trigger);
       if (!back) {
@@ -211,7 +255,6 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
         }
       }
     }
-    requestClose();
   };
 
   /** The anchor pressed, however it was pressed: open when shut, shut when open. */
@@ -233,12 +276,46 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
    * and a press on an option in a select inside the popover is a press
    * inside it as far as the person is concerned.
    */
-  const outside = (): void => {
+  const outside = (event: UiInputEvent): void => {
     pressedAway = true;
+    pressedOn = event.target;
     requestClose();
     pressedAway = false;
   };
   const insideToo = (): readonly (UiNode | null)[] => [anchor(), ...laterEntries(panel)];
+
+  /** Whether a node is inside as a press is judged: the panel, the anchor, or an overlay opened from the panel. */
+  const inside = (node: UiNode): boolean =>
+    (panel !== null && contains(panel, node)) || insideToo().some(root => root !== null && contains(root, node));
+
+  /**
+   * Focus that leaves by any route but Tab or a press, which have asked
+   * already: moved by code, by a shortcut that focuses something else,
+   * or by an assistive technology. A popover left open with the focus
+   * outside it is the one Tab out closes to avoid. Focus going nowhere
+   * (`null`, a window losing focus) is not focus somewhere else. Only a
+   * move counts: a change of modality on the same node is reported as a
+   * focus change too, and would use up the press it follows.
+   */
+  ctx.effect(focus.focused.pipe(distinctUntilChanged()), node => {
+    const pressed = pressedOn;
+    pressedOn = null;
+    // A node not in the tree is not a place focus went: a `Select`
+    // focuses its list as it opens it, a moment before the list's entry
+    // is attached in the overlay layer, where it would be judged inside.
+    if (node === null || panel === null || hiding || !overlay.isOpen() || rootOf(node) !== rootOf(panel)) {
+      return;
+    }
+    if (inside(node)) {
+      entered = true;
+      return;
+    }
+    if (!entered || moving || (pressed !== null && contains(node, pressed))) {
+      return;
+    }
+    // Focus is outside already, so `hide` leaves it where it went.
+    requestClose();
+  });
 
   /**
    * Focus goes in once the panel has been laid out, which is the first
@@ -308,7 +385,7 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
         tabStop: false,
         // Escape asks to close; the keyboard goes back to the anchor
         // when it does, in `hide`.
-        onKeyDown: keymap({ Escape: requestClose, Tab: tab })
+        onKeyDown: (event: UiKeyboardEvent) => (event.key === 'Tab' ? tab(event) : escape(event))
       },
       // The content, scrolling where the window has less room than it
       // wants, as a dialog's body does. Four pixels of its own round
@@ -318,8 +395,11 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
     );
   };
 
+  const escape = keymap({ Escape: requestClose });
+
   const show = (): void => {
     const trigger = anchor();
+    entered = false;
     overlay.show(body(focus.trapped.value), {
       anchor: trigger,
       // The anchor's tree, for the theme and for the reading direction
@@ -472,6 +552,14 @@ function laterEntries(panel: UiNode | null): UiNode[] {
     later.push(entry);
   }
   return later;
+}
+
+function rootOf(node: UiNode): UiNode {
+  let at = node;
+  while (at.parent !== null) {
+    at = at.parent;
+  }
+  return at;
 }
 
 function contains(root: UiNode, node: UiNode | null): boolean {

@@ -5,7 +5,7 @@ import type { UiColor } from '../properties/UiColor';
 import { lightTheme, themesEqual } from './UiTheme';
 import { defaultTextStyle, textStylesEqual } from '../properties/UiTextStyle';
 import { UiBasicColors, colorValuesEqual, colorsEqual } from '../properties/UiColor';
-import type { UiColorValue } from '../properties/UiPropertyValues';
+import type { UiColorValue, UiTextDirection } from '../properties/UiPropertyValues';
 import type { UiContainerSize } from './UiContainerSize';
 import { unknownContainerSize } from './UiContainerSize';
 import type { UiInsetSource } from './UiInsets';
@@ -49,6 +49,23 @@ export const UiEnvironmentKeys = {
     name: 'color',
     defaultValue: defaultTextStyle.color,
     compare: colorValuesEqual
+  }),
+
+  /**
+   * The reading direction an ancestor set itself, with `textDirection`,
+   * or none.
+   *
+   * Its own key because a type role is a size and a weight, not a
+   * reading direction: a label naming `bodySmall` inside a box that
+   * reads right to left keeps reading right to left, as `font` in CSS
+   * leaves `direction` alone. A role still brings its own direction
+   * where nothing above set one, which is how a theme whose roles all
+   * read right to left mirrors a page from its root.
+   */
+  textDirection: createEnvironmentKey<UiTextDirection | undefined>({
+    name: 'textDirection',
+    defaultValue: undefined,
+    compare: (a, b) => a === b
   }),
 
   contentColor: createEnvironmentKey<UiColor>({

@@ -50,6 +50,14 @@ export interface UiSemanticsRecord {
   readonly setSize?: number;
   /** How deep a treeitem sits, 1 for a root. */
   readonly level?: number;
+  /** A row's 1-based place among all its grid's rows, mounted or not. */
+  readonly rowIndex?: number;
+  /** A cell's 1-based place among all its grid's columns, mounted or not. */
+  readonly columnIndex?: number;
+  /** How many rows a grid holds in all; -1 when not known. */
+  readonly rowCount?: number;
+  /** How many columns a grid holds in all; -1 when not known. */
+  readonly columnCount?: number;
   /** The record id of the descendant that's active while this one keeps focus. */
   readonly activeDescendant?: string;
   /** The record id of what this one shows or changes, such as the list a combobox opens. */
@@ -470,6 +478,10 @@ function describe(
     posInSet: node.properties.get('posInSet') as number | undefined,
     setSize: node.properties.get('setSize') as number | undefined,
     level: node.properties.get('level') as number | undefined,
+    rowIndex: node.properties.get('rowIndex') as number | undefined,
+    columnIndex: node.properties.get('columnIndex') as number | undefined,
+    rowCount: node.properties.get('rowCount') as number | undefined,
+    columnCount: node.properties.get('columnCount') as number | undefined,
     activeDescendant: (node.properties.get('activeDescendant') as UiNode | null | undefined)?.id,
     controls: (node.properties.get('controls') as UiNode | null | undefined)?.id,
     autocomplete: node.properties.get('autocomplete') as UiAutocomplete | undefined,

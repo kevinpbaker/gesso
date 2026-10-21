@@ -208,4 +208,47 @@ describe('UiGraph environment propagation', () => {
     // It already existed and now paints differently, so it is dirty.
     expect(node.isDirty()).toBe(true);
   });
+
+  it('keeps the reading direction through a text that names a type role', () => {
+    // A container that reads right to left, and a label in it that asks
+    // for the theme's `bodySmall`. The role is a size and a weight, not
+    // a reading direction, as `font` in CSS does not reset `direction`;
+    // looked up whole, it put the label back to left to right inside a
+    // control that had mirrored around it.
+    const graph = new UiGraph();
+    const box = graph.createNode('box', UiNodeType.Box);
+    box.setProperty('textDirection', 'rtl');
+    graph.appendChild(graph.root, box);
+    const label = graph.createNode('label', UiNodeType.Text);
+    label.setProperty('textStyle', 'bodySmall');
+    graph.appendChild(box, label);
+    box.environment = graph.buildNodeEnvironment(box);
+    label.environment = graph.buildNodeEnvironment(label);
+
+    const style = label.environment!.get(UiEnvironmentKeys.textStyle);
+    expect(style.fontSize).toBe(lightTheme.typography.bodySmall.fontSize);
+    expect(style.textDirection).toBe('rtl');
+
+    // A direction the node sets itself still wins over the one it reads in.
+    label.setProperty('textDirection', 'ltr');
+    label.environment = graph.buildNodeEnvironment(label);
+    expect(label.environment!.get(UiEnvironmentKeys.textStyle).textDirection).toBe('ltr');
+  });
+
+  it('still mirrors every role of a theme that reads right to left', () => {
+    const typography = Object.fromEntries(
+      Object.entries(lightTheme.typography).map(([role, style]) => [role, { ...style, textDirection: 'rtl' }])
+    ) as unknown as typeof lightTheme.typography;
+    const graph = new UiGraph();
+    const box = graph.createNode('box', UiNodeType.Box);
+    box.setProperty('theme', { ...lightTheme, typography });
+    box.setProperty('textStyle', 'body');
+    graph.appendChild(graph.root, box);
+    const label = graph.createNode('label', UiNodeType.Text);
+    label.setProperty('textStyle', 'title');
+    graph.appendChild(box, label);
+    box.environment = graph.buildNodeEnvironment(box);
+    label.environment = graph.buildNodeEnvironment(label);
+    expect(label.environment!.get(UiEnvironmentKeys.textStyle).textDirection).toBe('rtl');
+  });
 });

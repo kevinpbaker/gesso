@@ -74,26 +74,83 @@ function describeCell(cell: DataGridCell): string {
   return `Active: ${cell.column}, row ${cell.row + 1}`;
 }
 
+function describeRange(range: { from: DataGridCell; to: DataGridCell }): string {
+  return `Range: ${range.from.column} ${range.from.row + 1} to ${range.to.column} ${range.to.row + 1}`;
+}
+
+/** Item, three months and a total, every one editable so the formulas can be changed. */
+const BUDGET_COLUMNS: readonly DataGridColumn[] = [
+  { key: 'item', header: 'Item', width: 130, editable: true },
+  ...['Jan', 'Feb', 'Mar'].map((month): DataGridColumn => ({
+    key: month.toLowerCase(),
+    header: month,
+    width: 84,
+    editable: true,
+    align: 'end'
+  })),
+  { key: 'total', header: 'Total', width: 96, editable: true, align: 'end' }
+];
+const BUDGET_ITEMS = ['Rent', 'Salaries', 'Laptops', 'Travel', 'Coffee', 'Software'];
+
 /**
- * A grid over a store held here, with the active cell and the last edit
- * read back in two lines under it, so what the grid drew can be checked
- * against what it said.
+ * A small budget as a spreadsheet would hold it: values in the months,
+ * a SUM along each row, totals and an average under them, and two rows
+ * that are errors on purpose.
+ */
+function budgetSeed(row: number, column: string): string {
+  const months = ['jan', 'feb', 'mar'];
+  const n = row + 1;
+  if (row < BUDGET_ITEMS.length) {
+    if (column === 'item') {
+      return BUDGET_ITEMS[row];
+    }
+    if (column === 'total') {
+      return `=SUM(B${n}:D${n})`;
+    }
+    return String(((row + 2) * 137 * (months.indexOf(column) + 3)) % 900);
+  }
+  const letter = { jan: 'B', feb: 'C', mar: 'D', total: 'E' }[column];
+  switch (row) {
+    case 7:
+      return column === 'item' ? 'Total' : `=SUM(${letter}1:${letter}6)`;
+    case 8:
+      return column === 'item' ? 'Average' : `=ROUND(AVERAGE(${letter}1:${letter}6), 1)`;
+    case 9:
+      return column === 'item' ? 'Per head (0 people)' : column === 'jan' ? '=B8/0' : '';
+    case 10:
+      return column === 'item' ? 'Past the edge' : column === 'jan' ? '=Z99+1' : '';
+    default:
+      return '';
+  }
+}
+
+/**
+ * A grid over a store held here, with the active cell, the range and
+ * the last edit read back in lines under it, so what the grid drew can
+ * be checked against what it said.
  */
 function LiveGrid(
   inputs: Inputs<{
     rows: number;
     columns: readonly DataGridColumn[];
     frozenColumns?: number;
+    frozenRows?: number;
+    rowHeader?: boolean | ((row: number) => string);
+    formulas?: boolean;
+    values?: (row: number, column: string) => string;
     readOnly?: boolean;
     disabled?: boolean;
   }>,
   _ctx: ComponentContext
 ) {
   const edits = new Map<string, string>();
-  const read = (row: number, column: string): string => edits.get(`${row}:${column}`) ?? seed(row, column);
+  const values = inputs.values.value ?? seed;
+  const read = (row: number, column: string): string => edits.get(`${row}:${column}`) ?? values(row, column);
   const columns = inputs.columns.value;
   const active = internalState<DataGridCell>({ row: 0, column: columns[0].key });
+  const range = internalState('one cell');
   const last = internalState('nothing yet');
+  const resized = internalState('nothing yet');
   return (
     <column gap={8} width={percent(100)} height={percent(100)}>
       <DataGrid
@@ -101,6 +158,9 @@ function LiveGrid(
         columns={columns}
         rowCount={inputs.rows.value}
         frozenColumns={inputs.frozenColumns.value ?? 0}
+        frozenRows={inputs.frozenRows.value ?? 0}
+        rowHeader={inputs.rowHeader.value ?? false}
+        formulas={inputs.formulas.value ?? false}
         readOnly={inputs.readOnly.value ?? false}
         disabled={inputs.disabled.value ?? false}
         getValue={read}
@@ -108,8 +168,10 @@ function LiveGrid(
           edits.set(`${row}:${column}`, value);
           last.value = `${column}, row ${row + 1} = "${value}"`;
         }}
+        onColumnResize={(column, width) => (resized.value = `${column} is ${width}px`)}
         activeCell={active}
         onActiveCellChange={cell => (active.value = cell)}
+        onSelectionChange={next => (range.value = describeRange(next))}
         flexGrow={1}
         minHeight={0}
       />
@@ -117,7 +179,46 @@ function LiveGrid(
         {active.pipe(map(describeCell))}
       </text>
       <text textStyle="bodySmall" color="textMuted">
+        {range}
+      </text>
+      <text textStyle="bodySmall" color="textMuted">
         {last.pipe(map(edit => `Last edit: ${edit}`))}
+      </text>
+      <text textStyle="bodySmall" color="textMuted">
+        {resized.pipe(map(width => `Last resize: ${width}`))}
+      </text>
+    </column>
+  );
+}
+
+/** Widths the application owns, with a button that puts them back. */
+function OwnedWidths(_inputs: Inputs<{}>, _ctx: ComponentContext) {
+  const start = { id: 56, name: 140, team: 110, score: 72 };
+  const widths = internalState<Record<string, number>>(start);
+  return (
+    <column gap={8} width={percent(100)} height={percent(100)}>
+      <DataGrid
+        label="People"
+        columns={COLUMNS}
+        rowCount={60}
+        getValue={seed}
+        columnWidths={widths}
+        onColumnResize={(column, width) => (widths.value = { ...widths.value, [column]: Math.min(width, 240) })}
+        flexGrow={1}
+        minHeight={0}
+      />
+      <row gap={6}>
+        <Button label="Reset widths" size="small" variant="outlined" onClick={() => (widths.value = start)} />
+      </row>
+      <text textStyle="bodySmall" color="textMuted">
+        {widths.pipe(
+          map(
+            record =>
+              `Widths: ${Object.entries(record)
+                .map(([key, width]) => `${key} ${width}`)
+                .join(', ')}`
+          )
+        )}
       </text>
     </column>
   );
@@ -185,7 +286,7 @@ export const dataGridFixture: WorkbenchFixture = {
     },
     {
       name: 'Keyboard editing walk',
-      try: 'Click Ravi 1, then without the mouse: Down, Right, Tab, Shift+Tab, End, Home move the outline as named. F2 opens the editor with the caret after the text; Left moves the caret, not the outline. Type and Tab: committed, outline one right. Type a letter over Score: it replaces the value. Escape: the old value is back. Delete clears an editable cell. Tab from Score leaves the grid.',
+      try: 'Click Ravi 1, then without the mouse: Down, Right, Tab, Shift+Tab, End, Home move the outline as named. F2 opens the editor with the caret after the text; Left moves the caret, not the outline. Type and Tab: committed, outline one right. Type a letter over Score: it replaces the value. Escape: the old value is back. Delete clears an editable cell. Tab from Score leaves the grid. On Name, type a whole word as fast as you can and press Enter at once: every letter is in the committed value, in order, and none is lost to the editor opening.',
       width: 520,
       height: 320,
       stretch: true,
@@ -193,11 +294,27 @@ export const dataGridFixture: WorkbenchFixture = {
     },
     {
       name: '100,000 rows by 50 columns',
-      try: 'Fling the wheel both ways and drag both scrollbars. Cells always read C<column>:<row> for the row and column they are in, with no blanks, gaps or repeats, and the header stays put. Ctrl+End (Cmd+End) goes to C49:100000 and shows it; Ctrl+Home comes back. Scrolling stays smooth: no visible stall while dragging.',
+      try: 'Fling the wheel both ways and drag both scrollbars. Cells always read C<column>:<row> for the row and column they are in, with no blanks, gaps or repeats, and the header stays put. Ctrl+End (Cmd+End) goes to C49:100000 and shows it; Ctrl+Home comes back. Scrolling stays smooth: no visible stall while dragging, even dragging the vertical thumb from top to bottom in one quick move.',
       width: 560,
       height: 380,
       stretch: true,
       render: () => <LiveGrid rows={100_000} columns={FIFTY} />
+    },
+    {
+      name: 'Selecting a range',
+      try: 'Click Ravi 1, then Shift+Down twice and Shift+Right twice: nine cells take a light selection fill with a 2px border round the block, the Ravi 1 cell keeps its own background and its accent outline, and the Range line reads name 1 to score 3. Shift+click a cell further down: the block reaches it. Drag from Ana 2 down and across: the block follows the pointer, and holding the drag below the grid scrolls it. Escape: back to one outlined cell, no fill. Ctrl+A (Cmd+A): every cell filled, the outline still where it was. A plain arrow: one cell again. Type a letter with a block selected: the active cell edits.',
+      width: 520,
+      height: 340,
+      stretch: true,
+      render: () => <LiveGrid rows={60} columns={COLUMNS} />
+    },
+    {
+      name: 'Copy and paste',
+      try: 'Select Name and Team for rows 1 to 3 and press Ctrl+C (Cmd+C), then paste into a real spreadsheet or a text editor: three lines, the two values on each separated by a tab. Copy a block of cells from a spreadsheet, click Name on row 10 here and press Ctrl+V: the values land across and down from it, the read-only # and Team columns keep their own values, the block ends up selected, and the Last edit line names the last value written. Paste a block wider than the grid: the extra columns are dropped. Ctrl+X on a block copies all of it and empties Name and Score but not # or Team. Delete on a block empties the same cells.',
+      width: 520,
+      height: 340,
+      stretch: true,
+      render: () => <LiveGrid rows={60} columns={MIXED_COLUMNS} />
     },
     {
       name: 'Frozen first column',
@@ -206,6 +323,46 @@ export const dataGridFixture: WorkbenchFixture = {
       height: 320,
       stretch: true,
       render: () => <LiveGrid rows={200} columns={FROZEN_COLUMNS} frozenColumns={1} />
+    },
+    {
+      name: 'Resizing columns',
+      try: 'Hover the line at the right of a header: the pointer becomes a column-resize cursor. Drag it right: the column and every cell under it widen with the pointer, the columns after it move along, and the Last resize line counts the pixels. Drag far left: it stops at 40px, never narrower. Double-click the line after Notes: the column fits the longest note in view (no ellipsis) or, if none is long, its header. Click a Name cell and press Alt+Shift+Right three times: Name grows 10px a press without the outline moving; Alt+Shift+Left shrinks it back.',
+      width: 520,
+      height: 320,
+      stretch: true,
+      render: () => <LiveGrid rows={40} columns={LONG_COLUMNS} />
+    },
+    {
+      name: 'Widths owned by the app',
+      try: 'Drag Name wider: it follows only up to 240px, because the application caps what it writes back, and the Widths line agrees with what is drawn. Reset widths puts every column back at once.',
+      width: 520,
+      height: 320,
+      stretch: true,
+      render: () => <OwnedWidths />
+    },
+    {
+      name: 'Frozen rows and columns',
+      try: 'The first two rows stay under the header while the rest scroll up under them, with a heavier line beneath row 2; Name stays at the left with its own heavier line, and the top-left cells stay put both ways. Ctrl+End (Cmd+End), then Up: each row is shown in full below row 2, never half under it. Page Down moves by the rows visible below the frozen ones. Ctrl+Home goes back to row 1 and scrolls the rest to the top.',
+      width: 520,
+      height: 320,
+      stretch: true,
+      render: () => <LiveGrid rows={200} columns={FROZEN_COLUMNS} frozenColumns={1} frozenRows={2} />
+    },
+    {
+      name: 'Row headers',
+      try: 'A narrow column of row numbers stays at the left while the rest scroll sideways. Click number 3: the whole row is selected, the outline is on its first visible cell, and the number takes the selection fill. Shift+click 7: rows 3 to 7. Click the blank corner above the numbers: everything is selected. Ctrl+C after clicking a number copies the whole row.',
+      width: 520,
+      height: 320,
+      stretch: true,
+      render: () => <LiveGrid rows={200} columns={FROZEN_COLUMNS} rowHeader />
+    },
+    {
+      name: 'Formulas: a budget',
+      try: 'Each header shows its letter (A to E). Totals read as numbers, not formulas, Row 10 shows #DIV/0! and row 11 #REF! in red. Click Jan for Rent (B1), type 1000 and press Enter: its row Total, the Jan Total in row 8 and the Average in row 9 all change at once. F2 on a Total shows =SUM(B1:D1) in the editor. Type =B1*2 in an empty cell: it shows the result. Type =E1 into E1: #CYCLE!. Select the Totals row and copy: the text has numbers, not formulas.',
+      width: 560,
+      height: 380,
+      stretch: true,
+      render: () => <LiveGrid rows={14} columns={BUDGET_COLUMNS} values={budgetSeed} rowHeader formulas />
     },
     {
       name: 'Read-only columns',

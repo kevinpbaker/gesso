@@ -1,10 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent, OverlayService, type ComponentProps } from 'gesso-framework';
+import {
+  createComponent,
+  OverlayService,
+  RouterService,
+  type ComponentProps,
+  type ShellRequest
+} from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Box, Button, Column, type UiKeyboardEvent, type UiNode, type UiSemanticsRecord } from 'gesso-core';
+import {
+  Box,
+  Button,
+  Column,
+  IconRasterizer,
+  type IconSpec,
+  type UiKeyboardEvent,
+  type UiNode,
+  type UiSemanticsRecord
+} from 'gesso-core';
 
 import { COLLAPSED_WIDTH, NavigationRail, type NavigationItem } from './NavigationRail';
 
@@ -566,5 +581,229 @@ describe('NavigationRail, rows', () => {
     const badge = ui.getLayout(ui.getByText('99+'));
 
     expect(label.x + label.width).toBeLessThanOrEqual(badge.x);
+  });
+});
+
+/** A press of the middle button alone, through the pointer controller, released where it landed. */
+function middleClick(ui: Rendered, node: UiNode): void {
+  const box = ui.getLayout(node);
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  ui.fireEvent.pointerDown(x, y, { buttons: 4 });
+  ui.fireEvent.pointerUp(x, y);
+  ui.frame();
+}
+
+describe('NavigationRail, opening a destination somewhere new', () => {
+  it('reports a Cmd-click, a Ctrl-click and a middle click apart from onChange, and leaves the value alone', () => {
+    const elsewhere: string[] = [];
+    const { ui, changes } = mount({ defaultValue: 'inbox', onOpenElsewhere: key => elsewhere.push(key) });
+
+    ui.fireEvent.click(row(ui, 'Drafts'), { modifiers: { meta: true } });
+    ui.fireEvent.click(row(ui, 'Settings'), { modifiers: { ctrl: true } });
+    middleClick(ui, row(ui, 'Drafts'));
+    ui.frame();
+
+    expect(elsewhere).toEqual(['drafts', 'settings', 'drafts']);
+    expect(changes).toEqual([]);
+    expect(current(ui)).toEqual(['Inbox']);
+
+    // The middle press is forgotten: the next plain click is a plain one.
+    ui.fireEvent.click(row(ui, 'Drafts'));
+    ui.frame();
+    expect(changes).toEqual(['drafts']);
+    expect(elsewhere).toHaveLength(3);
+  });
+
+  it('opens the focused destination somewhere new on Cmd-Enter or Ctrl-Enter', () => {
+    const elsewhere: string[] = [];
+    const { ui, changes } = mount({ defaultValue: 'inbox', onOpenElsewhere: key => elsewhere.push(key) });
+    ui.fireEvent.focus(row(ui, 'Drafts'));
+    ui.frame();
+
+    ui.fireEvent.press('Enter', { meta: true });
+    ui.fireEvent.press('Enter', { ctrl: true });
+    ui.frame();
+    expect(elsewhere).toEqual(['drafts', 'drafts']);
+    expect(changes).toEqual([]);
+    expect(current(ui)).toEqual(['Inbox']);
+  });
+
+  it('treats a modified press as a plain one when nothing asked to hear about it', () => {
+    const { ui, changes } = mount({ defaultValue: 'inbox' });
+
+    ui.fireEvent.click(row(ui, 'Drafts'), { modifiers: { meta: true } });
+    ui.frame();
+    ui.fireEvent.focus(row(ui, 'Settings'));
+    ui.fireEvent.press('Enter', { ctrl: true });
+    ui.frame();
+
+    expect(changes).toEqual(['drafts', 'settings']);
+  });
+
+  it('opens or closes a group on a modified press, and ignores one on a disabled row', () => {
+    const elsewhere: string[] = [];
+    const { ui, changes, opened } = mount({ onOpenElsewhere: key => elsewhere.push(key) });
+
+    ui.fireEvent.click(row(ui, 'Labels'), { modifiers: { meta: true } });
+    ui.fireEvent.click(row(ui, 'Outbox'), { modifiers: { meta: true } });
+    ui.frame();
+
+    expect(opened).toEqual([['labels']]);
+    expect(elsewhere).toEqual([]);
+    expect(changes).toEqual([]);
+  });
+
+  it('follows a destination’s `to` in place on a plain press, and through the shell on a modified one', () => {
+    const items: NavigationItem[] = [
+      { key: 'inbox', label: 'Inbox', to: '/inbox' },
+      { key: 'drafts', label: 'Drafts', to: '/drafts?sort=new' }
+    ];
+    const { ui, changes } = mount({ items, defaultValue: 'inbox' });
+    const requests: ShellRequest[] = [];
+    ui.runtime.onShellRequest(request => requests.push(request));
+    const router = ui.runtime.services.get(RouterService);
+    const opens = () => requests.filter(request => request.type === 'openRoute');
+
+    ui.fireEvent.click(row(ui, 'Drafts'), { modifiers: { meta: true } });
+    ui.frame();
+    // Somewhere new, with nothing moved here.
+    expect(opens()).toEqual([{ type: 'openRoute', url: '/drafts?sort=new' }]);
+    expect(router.url.value).toBe('/');
+    expect(changes).toEqual([]);
+    expect(current(ui)).toEqual(['Inbox']);
+
+    ui.fireEvent.click(row(ui, 'Drafts'));
+    ui.frame();
+    expect(changes).toEqual(['drafts']);
+    expect(router.url.value).toBe('/drafts?sort=new');
+    expect(opens()).toHaveLength(1);
+  });
+});
+
+describe('NavigationRail, a disabled group', () => {
+  const LOCKED: readonly NavigationItem[] = [
+    { key: 'inbox', label: 'Inbox' },
+    {
+      key: 'labels',
+      label: 'Labels',
+      disabled: true,
+      items: [
+        { key: 'work', label: 'Work' },
+        { key: 'family', label: 'Family' }
+      ]
+    },
+    { key: 'shut', label: 'Shut', disabled: true, items: [{ key: 'inside', label: 'Inside' }] },
+    { key: 'settings', label: 'Settings' }
+  ];
+
+  it('announces the group and everything in it as disabled, and draws them so', () => {
+    const { ui } = mount({ items: LOCKED, defaultExpanded: ['labels'] });
+
+    expect(ui.getByRole('treeitem', { name: 'Labels', disabled: true })).toBeTruthy();
+    expect(ui.getByRole('treeitem', { name: 'Work', disabled: true })).toBeTruthy();
+    expect(ui.getByRole('treeitem', { name: 'Family', disabled: true })).toBeTruthy();
+    expect(ui.getByRole('treeitem', { name: 'Inbox' })).not.toHaveSemantics({ disabled: true });
+    // Still says whether it is open: a disabled group is not a hidden one.
+    expect(row(ui, 'Labels')).toHaveSemantics({ states: ['expanded'] });
+    expect(ui.getByText('Labels').properties.get('color')).toBe('controlForegroundDisabled');
+    expect(ui.getByText('Work').properties.get('color')).toBe('controlForegroundDisabled');
+    expect(ui.getByText('Inbox').properties.get('color')).toBe('controlForeground');
+  });
+
+  it('neither opens nor closes on a press, and ignores a press on a row inside it', () => {
+    const { ui, changes, opened } = mount({ items: LOCKED, defaultExpanded: ['labels'] });
+
+    ui.fireEvent.click(row(ui, 'Shut'));
+    ui.fireEvent.click(row(ui, 'Labels'));
+    ui.fireEvent.click(row(ui, 'Work'));
+    ui.frame();
+
+    expect(opened).toEqual([]);
+    expect(changes).toEqual([]);
+    expect(labels(ui)).toEqual(['Inbox', 'Labels', 'Work', 'Family', 'Shut', 'Settings']);
+  });
+
+  it('is skipped by the arrows and by type-ahead, with what it holds', () => {
+    const { ui, heard } = mount({ items: LOCKED, defaultExpanded: ['labels'] });
+    ui.fireEvent.tab();
+    ui.frame();
+    expect(row(ui, 'Inbox')).toHaveFocus();
+
+    press(ui, 'ArrowDown');
+    expect(row(ui, 'Settings')).toHaveFocus();
+    press(ui, 'w');
+    expect(row(ui, 'Settings')).toHaveFocus();
+    expect(heard).toEqual(['w']);
+    press(ui, 'ArrowUp');
+    expect(row(ui, 'Inbox')).toHaveFocus();
+  });
+});
+
+describe('NavigationRail, icons', () => {
+  let drawn: IconSpec[] = [];
+  beforeEach(() => {
+    drawn = [];
+    vi.spyOn(IconRasterizer.prototype, 'raster').mockImplementation((spec: IconSpec) => {
+      drawn.push(spec);
+      return new Promise(() => {});
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const STROKE = 'M4 6h16M4 12h16M4 18h16';
+  const CIRCLE = 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18z';
+  const DOT = 'M12 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2z';
+  const OUTLINED: readonly NavigationItem[] = [
+    { key: 'filled', label: 'Filled', icon: SQUARE },
+    { key: 'outline', label: 'Outline', icon: { path: STROKE, style: 'stroke', strokeWidth: 1.5 } },
+    { key: 'two', label: 'Two', icon: { path: [CIRCLE, DOT], style: 'stroke' } },
+    {
+      key: 'group',
+      label: 'Group',
+      icon: { path: SQUARE, fillRule: 'evenodd' },
+      items: [{ key: 'inside', label: 'Inside' }]
+    }
+  ];
+  // The rows' icons are 18 square; the group's arrow is drawn through
+  // `Icon` too, smaller, and is not what these specs are about.
+  const summary = () =>
+    drawn
+      .filter(spec => spec.size === 18)
+      .map(spec => [spec.path, spec.style, spec.strokeWidth, spec.fillRule ?? 'nonzero']);
+
+  it('fills a string icon exactly as before', () => {
+    mount({ items: [{ key: 'a', label: 'A', icon: SQUARE }] });
+
+    expect(summary()).toEqual([[SQUARE, 'fill', 2, 'nonzero']]);
+  });
+
+  it('strokes an outline icon, draws each of several paths, and passes a fill rule through', () => {
+    mount({ items: OUTLINED });
+
+    expect(summary()).toEqual([
+      [SQUARE, 'fill', 2, 'nonzero'],
+      [STROKE, 'stroke', 1.5, 'nonzero'],
+      [CIRCLE, 'stroke', 2, 'nonzero'],
+      [DOT, 'stroke', 2, 'nonzero'],
+      [SQUARE, 'fill', 2, 'evenodd']
+    ]);
+  });
+
+  it('draws the same glyphs in a collapsed rail', () => {
+    const { ui } = mount({ items: OUTLINED, collapsed: true });
+
+    expect(summary().map(([path, style]) => [path, style])).toEqual([
+      [SQUARE, 'fill'],
+      [STROKE, 'stroke'],
+      [CIRCLE, 'stroke'],
+      [DOT, 'stroke'],
+      [SQUARE, 'fill']
+    ]);
+    // An outline icon is an icon: no monogram stands in for it.
+    expect(ui.queryByText('O')).toBeNull();
+    expect(ui.queryByText('T')).toBeNull();
   });
 });

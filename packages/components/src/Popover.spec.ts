@@ -1,7 +1,22 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Box, Button, Column, EditableText, Row, ScrollView, Text, percent, type UiNode } from 'gesso-core';
+import {
+  Box,
+  Button,
+  Column,
+  EditableText,
+  Row,
+  ScrollView,
+  Text,
+  percent,
+  shortcut,
+  shortcuts,
+  UiShortcutRegistry,
+  type UiKeyboardEvent,
+  type UiModifier,
+  type UiNode
+} from 'gesso-core';
 import { OverlayService, createComponent } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
@@ -9,6 +24,7 @@ import 'gesso-testing/matchers';
 import { Dialog } from './Dialog';
 import { Popover, placementOf } from './Popover';
 import { Select } from './Select';
+import { TextArea } from './TextInput';
 
 type Mounted = Rendered & {
   readonly anchor: BehaviorSubject<UiNode | null>;
@@ -29,6 +45,8 @@ function mount(
     height?: number;
     /** Where the trigger sits in the page. */
     at?: { x: 'start' | 'center' | 'end'; y: 'start' | 'center' | 'end' };
+    /** On the page's root, for its shortcuts. */
+    modifiers?: UiModifier<never>[];
   } = {}
 ): Mounted {
   const anchor = new BehaviorSubject<UiNode | null>(null);
@@ -43,7 +61,8 @@ function mount(
         height: percent(100),
         textDirection: options.direction ?? 'ltr',
         x: options.at?.x ?? 'start',
-        y: options.at?.y ?? 'start'
+        y: options.at?.y ?? 'start',
+        modifiers: options.modifiers ?? []
       },
       Row(
         { gap: 8, padding: 20 },
@@ -269,6 +288,217 @@ describe('Popover, keyboard', () => {
     expect(ui.getByLabel('Filters')).toHaveFocus();
   });
 });
+
+describe('Popover, Tab and the controls inside it', () => {
+  it('lets Tab leave a TextArea inside it, as it does anywhere in the library', () => {
+    // A TextArea does not take Tab for a tab character (see its page):
+    // Tab leaves the field. Inside the panel that means the next control
+    // in the panel, and after the last one out beside the anchor.
+    const notes: string[] = [];
+    const ui = mount({
+      defaultOpen: true,
+      content: Column(
+        createComponent(TextArea, { label: 'Notes', defaultValue: 'a', onChange: (next: string) => notes.push(next) }),
+        Button({ label: 'Done', padding: 4 }, Text({ text: 'Done' }))
+      )
+    });
+    ui.fireEvent.keyDown('Tab');
+    expect(ui.getByRole('textbox', { name: 'Notes' })).toHaveFocus();
+
+    ui.fireEvent.keyDown('Tab');
+    expect(ui.getByLabel('Done')).toHaveFocus();
+    expect(notes).toEqual([]);
+    expect(entries(ui)).toHaveLength(1);
+
+    ui.fireEvent.keyDown('Tab', { shift: true });
+    expect(ui.getByRole('textbox', { name: 'Notes' })).toHaveFocus();
+    expect(entries(ui)).toHaveLength(1);
+  });
+
+  it('leaves Tab to a control inside it that consumes the key', () => {
+    // A code field, say, that indents on Tab: it cancels the key, and
+    // the panel acts only on a Tab nothing inside it used.
+    const field = new BehaviorSubject<UiNode | null>(null);
+    const indents: string[] = [];
+    const ui = mount({
+      defaultOpen: true,
+      initialFocus: field,
+      content: Column(
+        EditableText({
+          ref: (node: UiNode | null) => field.next(node),
+          label: 'Code',
+          value: '',
+          multiline: true,
+          width: 160,
+          onKeyDown: (event: UiKeyboardEvent) => {
+            if (event.key === 'Tab') {
+              indents.push(event.modifiers.shift ? 'out' : 'in');
+              event.preventDefault();
+            }
+          }
+        }),
+        Button({ label: 'Done', padding: 4 }, Text({ text: 'Done' }))
+      )
+    });
+    expect(ui.getByRole('textbox', { name: 'Code' })).toHaveFocus();
+
+    ui.fireEvent.keyDown('Tab');
+    ui.fireEvent.keyDown('Tab', { shift: true });
+    ui.frame();
+
+    expect(indents).toEqual(['in', 'out']);
+    expect(ui.getByRole('textbox', { name: 'Code' })).toHaveFocus();
+    expect(entries(ui)).toHaveLength(1);
+    expect(ui.changes).toEqual([]);
+  });
+});
+
+describe('Popover, focus leaving by other routes', () => {
+  it('closes when focus is moved outside it by code, and leaves focus where it went', () => {
+    const ui = mount({ defaultOpen: true });
+    ui.fireEvent.keyDown('Tab');
+    expect(ui.getByLabel('First')).toHaveFocus();
+
+    ui.fireEvent.focus(ui.getByLabel('After'));
+    ui.frame();
+
+    expect(entries(ui)).toHaveLength(0);
+    expect(ui.changes).toEqual([false]);
+    // Not pulled back to the anchor: where focus went was somebody's choice.
+    expect(ui.getByLabel('After')).toHaveFocus();
+  });
+
+  it('closes when a shortcut focuses a control outside it', () => {
+    const registry = new UiShortcutRegistry();
+    let ui: Mounted | null = null;
+    ui = mount(
+      { defaultOpen: true },
+      {
+        modifiers: [
+          shortcuts({ registry }),
+          shortcut({
+            registry,
+            keys: 'Mod+j',
+            label: 'Jump to After',
+            scoped: false,
+            run: () => ui!.runtime.input.focus.focus(ui!.getByLabel('After'))
+          })
+        ] as UiModifier<never>[]
+      }
+    );
+    expect(panel(ui)).toHaveFocus();
+
+    ui.fireEvent.keyDown('j', { ctrl: true, meta: true });
+    ui.frame();
+    expect(ui.getByLabel('After')).toHaveFocus();
+    expect(entries(ui)).toHaveLength(0);
+    expect(ui.changes).toEqual([false]);
+  });
+
+  it('closes when an assistive technology moves focus outside it', () => {
+    const ui = mount({ defaultOpen: true });
+    ui.runtime.applySemanticsAction({ id: ui.getByLabel('After').id, action: 'focus' });
+    ui.frame();
+    expect(ui.getByLabel('After')).toHaveFocus();
+    expect(entries(ui)).toHaveLength(0);
+    expect(ui.changes).toEqual([false]);
+  });
+
+  it('asks once, and an owner who refuses keeps it open', () => {
+    const open = new BehaviorSubject(true);
+    const ui = mount({ open });
+    expect(panel(ui)).toHaveFocus();
+
+    ui.fireEvent.focus(ui.getByLabel('After'));
+    ui.frame();
+    expect(ui.changes).toEqual([false]);
+    expect(entries(ui)).toHaveLength(1);
+    expect(ui.getByLabel('After')).toHaveFocus();
+  });
+
+  it('stays open when focus goes to its anchor', () => {
+    const ui = mount({ defaultOpen: true });
+    ui.fireEvent.focus(ui.getByLabel('Filters'));
+    ui.frame();
+    expect(entries(ui)).toHaveLength(1);
+    expect(ui.changes).toEqual([]);
+  });
+
+  it('does not close on opening while focus is elsewhere, before focus has come in', () => {
+    const open = new BehaviorSubject(false);
+    const ui = mount({ open });
+    ui.fireEvent.focus(ui.getByLabel('After'));
+
+    open.next(true);
+    ui.frame();
+    expect(entries(ui)).toHaveLength(1);
+    expect(panel(ui)).toHaveFocus();
+    expect(ui.changes).toEqual([]);
+  });
+
+  it('asks only once for a press outside that also moves focus', () => {
+    const open = new BehaviorSubject(true);
+    const ui = mount({ open });
+    pressOn(ui, ui.getByLabel('After'));
+    expect(ui.getByLabel('After')).toHaveFocus();
+    expect(ui.changes).toEqual([false]);
+  });
+
+  it('keeps open while focus is in a nested popover, and closes both when it goes outside', () => {
+    const inner = new BehaviorSubject<UiNode | null>(null);
+    const ui = mount({
+      defaultOpen: true,
+      content: Column(
+        Button({ ref: (node: UiNode | null) => inner.next(node), label: 'More', padding: 4 }, Text({ text: 'More' })),
+        createComponent(Popover, { anchor: inner, label: 'More options', content: Text({ text: 'Inner text' }) })
+      )
+    });
+    pressOn(ui, ui.getByLabel('More'));
+    expect(ui.getByRole('dialog', { name: 'More options' })).toHaveFocus();
+    expect(entries(ui)).toHaveLength(2);
+
+    ui.fireEvent.focus(ui.getByLabel('After'));
+    ui.frame();
+    expect(entries(ui)).toHaveLength(0);
+    expect(ui.getByLabel('After')).toHaveFocus();
+  });
+
+  it('keeps open while focus is in a select’s list opened from inside it', () => {
+    const ui = mount({
+      defaultOpen: true,
+      content: createComponent(Select, {
+        label: 'Sort',
+        defaultValue: 'new',
+        options: [
+          { value: 'new', label: 'Newest' },
+          { value: 'old', label: 'Oldest' }
+        ]
+      })
+    });
+    ui.fireEvent.focus(ui.getByRole('combobox', { name: 'Sort' }));
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(entries(ui)).toHaveLength(2);
+    // Focus is in the select's own entry, outside the panel's subtree.
+    expect(isIn(panel(ui), focused(ui)!)).toBe(false);
+    expect(ui.changes).toEqual([]);
+
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(entries(ui)).toHaveLength(1);
+    expect(ui.getByRole('combobox', { name: 'Sort' })).toHaveFocus();
+    expect(ui.changes).toEqual([]);
+  });
+});
+
+function isIn(root: UiNode, node: UiNode): boolean {
+  for (let at: UiNode | null = node; at !== null; at = at.parent) {
+    if (at === root) {
+      return true;
+    }
+  }
+  return false;
+}
 
 describe('Popover, pointer', () => {
   it('is not modal: a press outside closes it and still lands on what was pressed', () => {

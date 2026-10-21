@@ -208,6 +208,37 @@ describe('buildSemanticsTree', () => {
     );
   });
 
+  it("places a virtualized grid's rows and cells in the whole data, not in what is mounted", () => {
+    // Scrolled down and to the right, the grid mounts rows 41 and 42
+    // and columns 7 and 8 of a 1000 by 20 table. Without the indices a
+    // reader counts the mounted cells and calls the first one row 1,
+    // column 1, which is not where it is.
+    const t = new Tree();
+    const grid = t.node(UiNodeType.Column, { role: 'grid', label: 'Orders', rowCount: 1000, columnCount: 20 });
+    const rows = [41, 42].map(rowIndex => {
+      const row = t.node(UiNodeType.Row, { role: 'row', rowIndex });
+      t.add(
+        row,
+        ...[7, 8].map(columnIndex =>
+          t.node(UiNodeType.Box, { role: 'gridcell', label: `${rowIndex}:${columnIndex}`, columnIndex })
+        )
+      );
+      return row;
+    });
+    t.add(grid, ...rows);
+    t.add(t.root, grid);
+
+    const [table, first, firstCell, secondCell] = t.build();
+    expect(table).toMatchObject({ role: 'grid', rowCount: 1000, columnCount: 20 });
+    expect(first).toMatchObject({ role: 'row', rowIndex: 41 });
+    expect(firstCell).toMatchObject({ role: 'gridcell', columnIndex: 7 });
+    expect(secondCell).toMatchObject({ role: 'gridcell', columnIndex: 8 });
+    // A record that does not say leaves the key out, so it diffs as
+    // nothing rather than as a change to undefined.
+    expect('rowIndex' in firstCell!).toBe(false);
+    expect('rowCount' in first!).toBe(false);
+  });
+
   it('takes a gridcell, the cell of an interactive grid that can be selected', () => {
     const t = new Tree();
     const grid = t.node(UiNodeType.Column, { role: 'grid', label: 'October 2026' });

@@ -78,13 +78,30 @@ export {
   type PlainViewProps
 } from './PlainView';
 export { DataTable, type DataColumn, type DataTableProps, type DataTableSort } from './DataTable';
-export { DataGrid, type DataGridCell, type DataGridColumn, type DataGridProps } from './DataGrid';
+export { DataGrid, type DataGridCell, type DataGridColumn, type DataGridProps, type DataGridRange } from './DataGrid';
+export {
+  cellName,
+  columnIndex,
+  columnLetters,
+  createFormulaEvaluator,
+  formatFormulaNumber,
+  formatFormulaValue,
+  formulaError,
+  isFormulaError,
+  parseCellName,
+  type FormulaError,
+  type FormulaErrorCode,
+  type FormulaEvaluator,
+  type FormulaResolver,
+  type FormulaValue
+} from './formula';
 export {
   NavigationRail,
   type NavigationRailProps,
   type NavigationItem,
   type NavigationDestination,
-  type NavigationGroup
+  type NavigationGroup,
+  type NavigationIcon
 } from './NavigationRail';
 export { Popover, type PopoverProps, type PopoverSide, type PopoverAlign } from './Popover';
 export { Tree, type TreeDecoration, type TreeNode, type TreeProps } from './Tree';

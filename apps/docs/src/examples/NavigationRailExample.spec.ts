@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { UiSemanticsRecord } from 'gesso-core';
-import { createComponent, createShellHistory, RouterService } from 'gesso-framework';
+import { createComponent, createShellHistory, RouterService, type ShellRequest } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
 
@@ -37,9 +37,10 @@ function current(ui: Rendered): (string | undefined)[] {
 /**
  * What the page claims: the rail shows where the router is, a press
  * asks the router to go and the rail follows the url rather than the
- * press, the keys move focus and only Enter navigates, the group starts
- * open, the disabled row cannot be reached, and collapsing keeps every
- * name.
+ * press, a modified press opens the page somewhere new and leaves this
+ * one alone, the keys move focus and only Enter navigates, the group
+ * starts open, the disabled row cannot be reached, and collapsing keeps
+ * every name.
  */
 describe('the docs navigation rail example', () => {
   it('starts on the inbox, with the group open and the inbox marked current', () => {
@@ -100,6 +101,24 @@ describe('the docs navigation rail example', () => {
     ui.frame();
     expect(url(ui)).toBe('/labels/family');
     expect(current(ui)).toEqual(['Family']);
+  });
+
+  it('opens a page somewhere new on a Cmd-click or Ctrl-Enter, and stays where it is', () => {
+    const ui = mount();
+    const requests: ShellRequest[] = [];
+    ui.runtime.onShellRequest(request => requests.push(request));
+
+    ui.fireEvent.click(ui.getByRole('treeitem', { name: 'Work' }), { modifiers: { meta: true } });
+    ui.fireEvent.focus(ui.getByRole('treeitem', { name: 'Settings' }));
+    ui.fireEvent.press('Enter', { ctrl: true });
+    ui.frame();
+
+    expect(requests.filter(request => request.type === 'openRoute')).toEqual([
+      { type: 'openRoute', url: '/labels/work' },
+      { type: 'openRoute', url: '/settings' }
+    ]);
+    expect(url(ui)).toBe('/inbox');
+    expect(current(ui)).toEqual(['Inbox']);
   });
 
   it('collapses to icons and keeps every row named', () => {

@@ -1,4 +1,4 @@
-import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
+import { BehaviorSubject, combineLatest, map } from 'rxjs';
 import {
   type UiNodeRef,
   Box,
@@ -10,8 +10,7 @@ import {
   type UiPointerEvent,
   type LayoutBox,
   percent,
-  measure,
-  resolveString
+  measure
 } from 'gesso-core';
 
 import { input, type ComponentContext, type Inputs } from 'gesso-framework';
@@ -23,10 +22,10 @@ import {
   foregroundToken,
   keymap,
   layoutOf,
-  quantize,
   type ControlLayoutProps,
   modifiersOf
 } from './internals';
+import { clamp, fractionOf, pageStep, readsRightToLeft, snap, thumbLayer, trackFill, valueAt } from './sliderTrack';
 
 /**
  * A span chosen from a range: a low value and a high one, each with a
@@ -140,9 +139,8 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
    * key press start from the same tidy pair.
    */
   const tidy = (value: readonly [number, number], low: number, high: number): readonly [number, number] => {
-    const clamp = (n: number): number => Math.min(high, Math.max(low, n));
-    const a = clamp(value[0]);
-    const b = clamp(value[1]);
+    const a = clamp(value[0], low, high);
+    const b = clamp(value[1], low, high);
     return a <= b ? [a, b] : [b, a];
   };
   const shown = combineLatest([pair.value, min, max]).pipe(map(([value, low, high]) => tidy(value, low, high)));
@@ -164,9 +162,9 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
    * Moves one end to a value, snapped to the step and held inside what
    * that end may reach, and reports the new pair if anything moved.
    *
-   * Snapping is counted from `min` across the whole range, the same
-   * grid `Slider` uses, so the two thumbs land on the same grid. The
-   * bounds are applied after snapping: a step that would cross the
+   * `snap` counts the grid from `min` across the whole range, the same
+   * grid `Slider` uses, so the two thumbs land on the same grid, and
+   * applies the bounds after snapping: a step that would cross the
    * other thumb stops against it rather than being rounded past it.
    */
   const set = (end: End, next: number): void => {
@@ -175,30 +173,22 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
     }
     const now = current();
     const [floor, ceiling] = boundsOf(end, now, minDistance.value);
-    const snapped = quantize(next, min.value, max.value, step.value);
-    const placed = Math.min(ceiling, Math.max(floor, snapped));
+    const placed = snap(next, min.value, max.value, step.value, floor, ceiling);
     const result: readonly [number, number] = end === 'low' ? [placed, now[1]] : [now[0], placed];
     if (result[0] !== now[0] || result[1] !== now[1]) {
       pair.change(result);
     }
   };
   const valueOf = (end: End): number => current()[end === 'low' ? 0 : 1];
-  const page = (): number => Math.max(step.value, (max.value - min.value) / 10);
+  const page = (): number => pageStep(min.value, max.value, step.value);
 
   /**
    * Whether the slider reads right to left, asked at the moment a key
-   * or a press arrives, exactly as `Slider` asks it.
-   *
-   * The layout mirrors on its own under `textDirection: 'rtl'`: the
-   * fill and both thumbs are laid out from the track's start, which is
-   * then its right edge. What has to be told is the two things that
-   * turn a position or a key into a value. Either thumb's node will do,
-   * since they sit in the same subtree; the low one is asked.
+   * or a press arrives, exactly as `Slider` asks it. Either thumb's
+   * node will do, since they sit in the same subtree; the low one is
+   * asked.
    */
-  const rtl = (): boolean => {
-    const node = lowFocus.node() ?? highFocus.node();
-    return node !== null && resolveString(node, 'textDirection') === 'rtl';
-  };
+  const rtl = (): boolean => readsRightToLeft(lowFocus.node() ?? highFocus.node());
 
   /** The keymap for one thumb. Every binding clamps through `set`, so none can cross the other thumb. */
   const keysFor = (end: End): ((event: UiKeyboardEvent) => void) => {
@@ -220,15 +210,7 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
   };
 
   /** A pointer inside the track is a fraction of the range, from where the track starts. */
-  const toValue = (event: UiPointerEvent): number | null => {
-    const box = track.value;
-    if (box.width <= 0) {
-      return null;
-    }
-    const along = Math.min(1, Math.max(0, (event.x - box.x) / box.width));
-    const fraction = rtl() ? 1 - along : along;
-    return min.value + fraction * (max.value - min.value);
-  };
+  const toValue = (event: UiPointerEvent): number | null => valueAt(event.x, track.value, rtl(), min.value, max.value);
 
   /**
    * Which thumb a press at `at` takes hold of: the nearer one.
@@ -320,11 +302,10 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
   };
 
   const fractions = combineLatest([shown, min, max]).pipe(
-    map(([[low, high], bottom, top]): readonly [number, number] => {
-      const span = top - bottom;
-      const of = (n: number): number => (span === 0 ? 0 : Math.min(1, Math.max(0, (n - bottom) / span)));
-      return [of(low), of(high)];
-    })
+    map(([[low, high], bottom, top]): readonly [number, number] => [
+      fractionOf(low, bottom, top),
+      fractionOf(high, bottom, top)
+    ])
   );
   const say = (n: number, format: ((value: number) => string) | undefined): string =>
     format === undefined ? String(n) : format(n);
@@ -339,47 +320,30 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
     const index = end === 'low' ? 0 : 1;
     const focus = focusOf(end);
     const bounds = combineLatest([shown, minDistance, min, max]).pipe(map(([now, gap]) => boundsOf(end, now, gap)));
-    // A layer of its own over the track, the track's height and place,
-    // as `Slider` lays its thumb: a spacer as wide as the thumb's
-    // fraction, then the thumb pulled back by half its width so it is
-    // centred on the value. The start margin rather than the left one,
-    // because right to left the value is on the spacer's left.
-    return Row(
-      { width: percent(100), height: 6, y: 'center', hitTestable: false },
-      // Neither may shrink. At the top of the range the spacer is the
-      // whole row and the thumb's far half overhangs it, and a row that
-      // shrank its children to fit would pull the thumb back off the
-      // value, eight pixels short of the end of the fill.
-      Box({ width: fractions.pipe(map(parts => percent(parts[index] * 100))), height: 0, flexShrink: 0 }),
-      Box({
-        ref: focus.ref,
-        flexShrink: 0,
-        // The track under it takes the press and decides which thumb
-        // it meant, which is the nearer one and so almost always this
-        // one; letting the thumb take it too would make the two thumbs
-        // overlapping at one end a question of paint order.
-        hitTestable: false,
-        focusable: true,
-        disabled,
-        modifiers: [CONTROL_FOCUS_RING],
-        width: THUMB,
-        height: THUMB,
-        borderRadius: THUMB / 2,
-        marginStart: -THUMB / 2,
-        // A ring in the track's own colour, so two thumbs sitting
-        // together still read as two.
-        borderWidth: 2,
-        borderColor: 'controlBackground',
-        backgroundColor: fill(disabled),
-        role: 'slider',
-        label: names.pipe(map(both => both[index])),
-        valueNow: shown.pipe(map(now => now[index])),
-        valueMin: bounds.pipe(map(range => range[0])),
-        valueMax: bounds.pipe(map(range => range[1])),
-        valueText: combineLatest([shown, inputs.format]).pipe(map(([now, format]) => say(now[index], format))),
-        onKeyDown: keysFor(end)
-      })
-    );
+    // A layer of its own over the track, as `Slider` lays its thumb.
+    return thumbLayer(fractions.pipe(map(parts => parts[index])), THUMB, {
+      ref: focus.ref,
+      // The track under it takes the press and decides which thumb
+      // it meant, which is the nearer one and so almost always this
+      // one; letting the thumb take it too would make the two thumbs
+      // overlapping at one end a question of paint order.
+      hitTestable: false,
+      focusable: true,
+      disabled,
+      modifiers: [CONTROL_FOCUS_RING],
+      // A ring in the track's own colour, so two thumbs sitting
+      // together still read as two.
+      borderWidth: 2,
+      borderColor: 'controlBackground',
+      backgroundColor: trackFill(disabled),
+      role: 'slider',
+      label: names.pipe(map(both => both[index])),
+      valueNow: shown.pipe(map(now => now[index])),
+      valueMin: bounds.pipe(map(range => range[0])),
+      valueMax: bounds.pipe(map(range => range[1])),
+      valueText: combineLatest([shown, inputs.format]).pipe(map(([now, format]) => say(now[index], format))),
+      onKeyDown: keysFor(end)
+    });
   };
 
   return Column(
@@ -440,7 +404,7 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
             height: 4,
             width: fractions.pipe(map(([low, high]) => percent((high - low) * 100))),
             borderRadius: 2,
-            backgroundColor: fill(disabled)
+            backgroundColor: trackFill(disabled)
           })
         )
       ),
@@ -468,8 +432,4 @@ function derivedNames(stem: string): readonly [string, string] {
   }
   const phrase = /^[A-Z]{2}/.test(trimmed) ? trimmed : trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
   return [`Minimum ${phrase}`, `Maximum ${phrase}`];
-}
-
-function fill(disabled: Observable<boolean>): Observable<string> {
-  return disabled.pipe(map(off => (off ? 'controlForegroundDisabled' : 'controlAccent')));
 }

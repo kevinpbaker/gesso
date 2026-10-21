@@ -1,6 +1,15 @@
-import { Button, Checkbox, Popover, Select, TextInput, type PopoverAlign, type PopoverSide } from 'gesso-components';
-import type { UiChild, UiNode } from 'gesso-core';
-import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
+import {
+  Button,
+  Checkbox,
+  Popover,
+  Select,
+  TextArea,
+  TextInput,
+  type PopoverAlign,
+  type PopoverSide
+} from 'gesso-components';
+import type { UiChild, UiKeyboardEvent, UiNode } from 'gesso-core';
+import { FocusService, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import type { WorkbenchFixture } from '../fixture';
 
 /** The line under a trigger that says what last happened, so a request or a choice can be seen to land. */
@@ -154,6 +163,83 @@ function FormPopover(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   );
 }
 
+/**
+ * Tab inside the panel, and focus leaving it by code. A `TextArea`,
+ * which Tab leaves as it does anywhere, a field of the page's own that
+ * keeps Tab by cancelling it, and a field outside that a timer focuses,
+ * as a shortcut or an assistive technology would.
+ */
+function FocusAway(_inputs: Inputs<{}>, ctx: ComponentContext) {
+  const focus = ctx.inject(FocusService);
+  const open = internalState(false);
+  const anchor = internalState<UiNode | null>(null);
+  const panel = internalState<UiNode | null>(null);
+  const outside = internalState<UiNode | null>(null);
+  const notes = internalState('');
+  const kept = internalState(0);
+  const said = internalState('Closed');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  ctx.onUnmount(() => clearTimeout(timer));
+  const later = (): void => {
+    clearTimeout(timer);
+    said.value = 'Focus moves to Search in 3 seconds';
+    timer = setTimeout(() => {
+      if (outside.value !== null) {
+        focus.focus(outside.value);
+      }
+    }, 3000);
+  };
+  return (
+    <column gap={8} x="start">
+      <row gap={8} y="center">
+        <Trigger text="Notes" onRef={node => (anchor.value = node)} open={open} panel={panel} />
+        <Button label="Move focus to Search in 3s" variant="outlined" size="small" onClick={later} />
+      </row>
+      <TextInput
+        ref={(node: UiNode | null) => (outside.value = node)}
+        label="Search"
+        labelHidden
+        placeholder="Search"
+        width={200}
+      />
+      <Said text={said} />
+      <Popover
+        open={open}
+        onOpenChange={(next: boolean) => {
+          open.value = next;
+          said.value = next ? 'Open' : 'Closed';
+        }}
+        anchor={anchor}
+        panelRef={(node: UiNode | null) => (panel.value = node)}
+        label="Notes"
+        width={260}
+        content={
+          <column gap={10}>
+            <TextArea label="Notes" value={notes} onChange={(next: string) => (notes.value = next)} />
+            <text textStyle="bodySmall" text="Indent field: keeps Tab" />
+            <editabletext
+              label="Indent field"
+              value=""
+              multiline
+              padding={6}
+              borderWidth={1}
+              borderColor="border"
+              onKeyDown={(event: UiKeyboardEvent) => {
+                if (event.key === 'Tab') {
+                  event.preventDefault();
+                  kept.value += 1;
+                  said.value = `Tab kept by the indent field ${kept.value} times`;
+                }
+              }}
+            />
+            <Button label="Done" onClick={() => (open.value = false)} />
+          </column>
+        }
+      />
+    </column>
+  );
+}
+
 /** A popover holding a select and a popover of its own. */
 function Nested(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const inner = internalState<UiNode | null>(null);
@@ -243,9 +329,15 @@ export const popoverFixture: WorkbenchFixture = {
     },
     {
       name: 'Select and nested popover inside',
-      try: 'Open it, then open Sort by and choose Oldest first: the choice lands and the outer popover stays open. Press More…: a second popover opens to its end. Press inside the second: both stay. Press on the outer one’s text: only the second closes. Escape from the outer closes it back to its button.',
+      try: 'Open it, then open Sort by and choose Oldest first: the choice lands and the outer popover stays open, also while focus is in the list. Press More…: a second popover opens to its end and takes focus, and the outer one stays open. Press inside the second: both stay. Press on the outer one’s text: only the second closes. Escape from the outer closes it back to its button.',
       width: 320,
       render: () => <Nested />
+    },
+    {
+      name: 'Tab inside, and focus moved away',
+      try: 'Open Notes and Tab: focus goes to the Notes area. Type a line, then Tab: no tab character is typed, focus moves to the indent field. Tab there: focus stays and the line counts the Tab it kept, with the panel open. Click Done. Now press Move focus to Search in 3s, open Notes within the 3 seconds and wait: when Search takes focus the panel closes, and the focus ring stays on Search rather than going back to Notes.',
+      width: 360,
+      render: () => <FocusAway />
     },
     {
       name: 'Start and end, right to left',
@@ -261,7 +353,7 @@ export const popoverFixture: WorkbenchFixture = {
     },
     {
       name: 'Controlled, refusing to close',
-      try: 'Open it, then press Escape, press outside, and Tab out: each time the line says it was asked to close and refused, and the panel stays. Done closes it.',
+      try: 'Open it, then press Escape, press outside, and Tab out: each time the line says it was asked to close and refused, once per press, and the panel stays. Done closes it.',
       render: () => <Anchored trigger="Unsaved changes" stubborn content={NOTE} />
     },
     {

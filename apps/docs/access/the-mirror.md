@@ -71,7 +71,9 @@ not over the node it stands for gives a screen reader's cursor, a
 magnifier and touch exploration the wrong answer.
 
 Each record becomes attributes on its element: `role`, `aria-label`,
-`aria-description`, `aria-disabled`, `aria-live`, the value and set attributes, and
+`aria-description`, `aria-disabled`, `aria-live`, the value and set attributes,
+a grid's `aria-rowcount` and `aria-colcount` and its rows' and cells'
+`aria-rowindex` and `aria-colindex`, and
 one attribute per state, so `checked` is `aria-checked="true"` and
 `collapsed` is `aria-expanded="false"`. A relation, `activeDescendant`
 or `controls`, becomes `aria-activedescendant` or `aria-controls` naming

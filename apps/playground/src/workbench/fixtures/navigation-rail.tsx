@@ -82,6 +82,53 @@ const DISABLED: readonly NavigationItem[] = [
   { key: 'last', label: 'Last (disabled)', icon: ICON.gear, disabled: true }
 ];
 
+/**
+ * Heroicons' outline glyphs, drawn as lines 1.5 wide. MIT licensed,
+ * copyright Tailwind Labs, Inc. (https://github.com/tailwindlabs/heroicons).
+ * Bars is one path of three subpaths; the eye is two paths laid over
+ * each other.
+ */
+const OUTLINE = {
+  bars: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
+  eye: [
+    'M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z',
+    'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'
+  ],
+  home: 'm2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'
+} as const;
+
+const OUTLINED: readonly NavigationItem[] = [
+  { key: 'filled', label: 'Filled (as before)', icon: ICON.home },
+  { key: 'home', label: 'Outline home', icon: { path: OUTLINE.home, style: 'stroke', strokeWidth: 1.5 } },
+  { key: 'bars', label: 'Outline bars', icon: { path: OUTLINE.bars, style: 'stroke', strokeWidth: 1.5 } },
+  { key: 'eye', label: 'Two paths', icon: { path: OUTLINE.eye, style: 'stroke', strokeWidth: 1.5 } },
+  { key: 'thick', label: 'Stroke 2.5', icon: { path: OUTLINE.bars, style: 'stroke', strokeWidth: 2.5 } },
+  { key: 'locked', label: 'Disabled', icon: { path: OUTLINE.eye, style: 'stroke', strokeWidth: 1.5 }, disabled: true }
+];
+
+const LOCKED_GROUP: readonly NavigationItem[] = [
+  { key: 'home', label: 'Home', icon: ICON.home },
+  {
+    key: 'billing',
+    label: 'Billing (disabled)',
+    icon: ICON.tag,
+    disabled: true,
+    defaultExpanded: true,
+    items: [
+      { key: 'invoices', label: 'Invoices', badge: 2 },
+      { key: 'plans', label: 'Plans', items: [{ key: 'pro', label: 'Pro' }] }
+    ]
+  },
+  {
+    key: 'admin',
+    label: 'Admin (disabled, shut)',
+    icon: ICON.gear,
+    disabled: true,
+    items: [{ key: 'users', label: 'Users' }]
+  },
+  { key: 'inbox', label: 'Inbox', icon: ICON.inbox }
+];
+
 /** A rail whose value is held here and read back in a line under it. */
 function LiveRail(
   inputs: Inputs<{
@@ -91,12 +138,14 @@ function LiveRail(
     startCollapsed?: boolean;
     width?: number;
     direction?: 'ltr' | 'rtl';
+    elsewhere?: boolean;
   }>,
   _ctx: ComponentContext
 ) {
   const value = internalState<string | null>(inputs.start.value ?? null);
   const collapsed = internalState(inputs.startCollapsed.value === true);
   const presses = internalState(0);
+  const opened = internalState<string | null>(null);
   return (
     <column gap={8} width={percent(100)} height={percent(100)} textDirection={inputs.direction.value ?? 'ltr'}>
       {inputs.collapsible.value === true ? (
@@ -116,6 +165,13 @@ function LiveRail(
             value.value = key;
             presses.value += 1;
           }}
+          onOpenElsewhere={
+            inputs.elsewhere.value === true
+              ? key => {
+                  opened.value = key;
+                }
+              : undefined
+          }
           collapsed={collapsed}
           width={inputs.width.value ?? 240}
         />
@@ -126,6 +182,11 @@ function LiveRail(
       <text textStyle="bodySmall" color="textMuted">
         {presses.pipe(map(count => `Activated ${count} times`))}
       </text>
+      {inputs.elsewhere.value === true ? (
+        <text textStyle="bodySmall" color="textMuted">
+          {opened.pipe(map(key => `Opened elsewhere: ${key ?? 'nothing yet'}`))}
+        </text>
+      ) : null}
     </column>
   );
 }
@@ -190,6 +251,30 @@ export const navigationRailFixture: WorkbenchFixture = {
       height: 300,
       stretch: true,
       render: () => <LiveRail items={DISABLED} />
+    },
+    {
+      name: 'Disabled group',
+      try: 'Billing and everything under it (Invoices, Plans, Pro) is greyed, its arrow too, and clicking any of them does nothing: Billing does not close. Admin is shut and cannot be opened. Tab in: focus lands on Home; Down goes straight to Inbox. Typing I from Home reaches Inbox, not Invoices.',
+      width: 300,
+      height: 360,
+      stretch: true,
+      render: () => <LiveRail items={LOCKED_GROUP} />
+    },
+    {
+      name: 'Outline icons',
+      try: 'The first row is a filled glyph; the rest are drawn as lines, crisp and unfilled, in the same 18 square and on the same text line. Two paths shows an eye: outline and pupil together, aligned. Stroke 2.5 is visibly heavier than Outline bars. Click a row: its icon takes the selection colour like its label. Disabled is grey. Collapse: the same outlines, centred, none replaced by a letter.',
+      width: 300,
+      height: 400,
+      stretch: true,
+      render: () => <LiveRail items={OUTLINED} start="filled" collapsible />
+    },
+    {
+      name: 'Open elsewhere',
+      try: 'Cmd-click Settings (Ctrl-click off a Mac), or middle-click it: the line reads Opened elsewhere: settings and Active stays home, with Home still highlighted. Focus Work and press Cmd-Enter or Ctrl-Enter: the same, for work. A plain click or Enter still makes the row active. Cmd-clicking Projects opens or closes it as a plain click does.',
+      width: 300,
+      height: 400,
+      stretch: true,
+      render: () => <LiveRail items={GROUPS} start="home" elsewhere />
     },
     {
       name: 'Right to left',

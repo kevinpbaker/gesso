@@ -399,6 +399,16 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Semantics',
     note: 'How deep a tree item sits, 1 for a root. A tree is a flat list of rows, so nothing else carries this.'
   },
+  rowIndex: {
+    group: 'Semantics',
+    note: "A row's place among all its grid's rows, counting from 1 and counting the ones not mounted. Set on the row."
+  },
+  columnIndex: {
+    group: 'Semantics',
+    note: "A cell's place among all its grid's columns, counting from 1 and counting the ones not mounted."
+  },
+  rowCount: { group: 'Semantics', note: 'How many rows a grid or table holds in all, or -1 when not known.' },
+  columnCount: { group: 'Semantics', note: 'How many columns a grid or table holds in all, or -1 when not known.' },
   activeDescendant: {
     group: 'Semantics',
     note: "The node that's active while this one keeps focus, such as a combobox's highlighted option. Read as if it had focus."
