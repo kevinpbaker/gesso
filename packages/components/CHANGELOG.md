@@ -1,5 +1,175 @@
 # gesso-components
 
+## 0.6.27
+
+### Patch Changes
+
+- bdc4780: `Button` can be the trigger of a popup. It takes `expanded`, announced as expanded or collapsed as it changes, and `controls`, the node it opens, such as a `Popover`'s panel from `panelRef`. A button given neither says neither, so an ordinary button is not announced as collapsed. A popover's trigger used to have to be a raw `<button>` element to say what it opened; the Popover page and its example now use `Button`.
+- bdc4780: `ColorPicker` can pick an opacity. With the new `alpha` prop, a strip under the hue bar fades the colour into a checkerboard, and dragging or pressing it sets how opaque the colour is. It is a slider named "opacity" that reads its value as a percentage, and it takes the arrows like the square and the hue bar: 1% a press, 10% with Shift. The swatch beside the field shows the colour over the same checkerboard, the field takes `#rrggbbaa` and the `#rgba` shorthand as well as the six- and three-digit forms, and `onChange` always reports `#rrggbbaa`. A value without alpha is read as fully opaque. Without `alpha` the picker is exactly as it was: no strip, `#rrggbb` in and out, and an eight-digit value is still not a colour to it.
+- bdc4780: Every component's text now takes its size from a role of the theme's typography (`textStyle`) instead of a raw `fontSize`, so a theme that changes its type scale restyles the whole library. Field labels, helper and error text, tooltips, menu bar commands, compact menu and select rows and table headers use `bodySmall` (headers as `label` at weight 600); cell values, tree and navigation rows, toast messages and dialog and drawer descriptions use `body`; a card's heading is `bodyLarge` at weight 600; dialog and drawer titles use `title`.
+
+  There is a small visible change with the stock scale: text that was 13px is now 14px `body`, dialog and drawer titles are 20px rather than 18px, and every moved text takes its role's line height (16, 20, 24 or 28) rather than 1.2 times its size, so some rows and headings are a few pixels taller. Glyphs that are really icons (a tick, a sort arrow, a stepper's − and +, a close cross, a navigation rail's monogram) and an avatar's initials keep sizes of their own.
+
+- 08f3995: `DataGrid` is new: an editable spreadsheet grid of any size, built on `LazySheet`, so a grid of a hundred thousand rows by fifty columns mounts only the cells in view. You give it the columns (a key, a header and a pixel width each, optionally `editable`, `align` and a display `format`), a `rowCount` and a `getValue(row, column)`; it never holds the data, asks only for what is on screen, and reports a committed edit through `onCellChange(row, column, value)`, reading the cells in view again straight after. A `revision` prop re-reads them when the data changes for any other reason.
+
+  The header stays while the rows scroll, and `frozenColumns` keeps columns at the start in view while the rest scroll sideways, on the right under a right-to-left reading. One active cell, controlled through `activeCell` and `onActiveCellChange` or left to the grid with `defaultActiveCell`, is walked with the arrows (mirrored right to left), Home and End, Ctrl or Cmd with Home and End, Page Up and Page Down, and Tab across a row; Tab off the end of a row leaves the grid rather than trapping the keyboard. Enter or F2 edits a cell, typing a character replaces it, Enter commits and moves down, Tab commits and moves across, Escape puts the old value back, and Delete clears it. Cells in columns that are not `editable`, or in a `readOnly` grid, refuse all of these. A click makes a cell active and a double click edits it.
+
+  The grid is announced as a `grid` whose active cell is its `activeDescendant` and is `selected`, with `columnheader` header cells, `gridcell` cells marked `readonly` where they cannot be edited, and rows that give their place in the whole data with `posInSet` and `setSize`.
+
+- ff9dd85: `DataGrid` selects ranges, copies and pastes, and jumps faster.
+
+  A range of cells grows from the active cell with Shift and the arrows, Home, End, Page Up and Page Down (with Ctrl or Cmd for the corners), with a drag across cells, or with a Shift+click; Ctrl+A or Cmd+A selects every cell and Escape collapses the range back onto the active cell. The range is drawn with the theme's selection fill and a border round it, and every cell in it is announced as `selected`. It can be left to the grid, started with `defaultSelection`, or owned by the application through `selection` and `onSelectionChange`, with a `DataGridRange` of two corner cells. Whatever moves the active cell collapses the range onto it, and typing or Enter still edits the active cell.
+
+  Ctrl+C or Cmd+C copies the range as tab-separated text, a line per row, through `ShellService.copyText`, taking the stored values rather than the formatted ones and quoting any value with a tab, a line break or a quote in it. A paste writes a block from the active cell across and down through `onCellChange`, stops at the grid's edges, keeps every read-only cell's value, and selects what landed. Ctrl+X copies and then clears the range's editable cells, and Delete and Backspace now clear every editable cell in the range rather than the active cell alone.
+
+  After a commit, a clear or a paste the grid now reads back only the cell that changed, where it used to read every cell in view. An application whose other cells follow from an edited one (a total) should move `revision` on in `onCellChange`, as the docs example now does.
+
+  Keys typed between the one that opens the editor and the editor taking the keyboard are kept, in order: typing a word quickly over a cell no longer loses its second letter, and an Enter typed in the same moment commits it.
+
+  The grid recycles its rows, so a jump that replaces every row in view (a scrollbar drag down a long sheet, Ctrl+End, an active cell sent far away) reuses the cell nodes instead of building new ones: about 11 ms a frame for a 1200 by 800 grid in the test runtime, down from about 30.
+
+- ff9dd85: `DataGrid` resizes columns, freezes rows, shows row headers, works out formulas, and tells a screen reader where each cell sits in the whole data.
+
+  Columns can be resized by dragging the edge at the end of a header, down to a column's new `minWidth` (40 pixels by default), by double-clicking that edge to fit the column to its widest value in view, or with Alt+Shift and Left or Right on the active cell's column. Under right to left the end edge is the left one, so a drag or Alt+Shift+Left the other way widens it. `onColumnResize(key, width)` reports every new width, and `columnWidths`, a record of widths by key, makes the widths the application's to own. A column with `resizable: false` keeps its width.
+
+  `frozenRows` keeps rows at the top below the header while the rest scroll under them, with a heavier line under the last one. `rowHeader` adds a column of row headers at the start that stays while the rest scroll sideways: `true` numbers the rows, or a function names them, in a column `rowHeaderWidth` wide. A click on a row header selects that row, a Shift+click a run of rows, and a click on the corner above them selects everything. Home and Ctrl+Home now also scroll the columns, and with Ctrl the rows, back to their start, so going home past a frozen pane no longer leaves the sheet scrolled.
+
+  With `formulas`, a value that starts with `=` is worked out as a formula with A1 references by column position and row number, and the cell shows its result through the column's `format` while the editor shows the formula. Every formula in view is worked out again after a commit, clear, cut or paste, and on a new `revision`. Errors are shown by their code in the danger colour, a copy takes a formula's result rather than its text, and each column header shows its letter.
+
+  The grid now says how many rows and columns it has (`rowCount` and `columnCount`, the header row and row headers counted), each row its `rowIndex` and each cell its `columnIndex`, which the mirror writes as `aria-rowcount`, `aria-colcount`, `aria-rowindex` and `aria-colindex`. Rows no longer carry `posInSet` and `setSize`, which belong to the items of a list or tree, not to the rows of a grid.
+
+- bdc4780: `DataTable` takes `revealSelected`, as `LazyList` does. With it, a row the application chooses by writing `selectedRow` (a record opened from a search, a link to one line of a long log) is scrolled into view clear of the sticky header, including a row far from the window that has never been mounted. A row chosen before the table has been laid out is revealed once it has a height. The table follows the row rather than its position, so a sort that carries the chosen row elsewhere does not scroll after it. Without the prop a written row is drawn as chosen and nothing more, as before, and rows reached from the keyboard scroll into view either way.
+- ed7b54a: `DatePicker` fixes, all found in the component workbench. Days that `min` or `max` leave out are now disabled while the calendar is open. Before, they were worked out once for each month shown, so moving a bound (a due date's `min` following its start, say) left the wrong days dimmed and announced. The cursor's ring on the chosen day now uses the focus ring colour. It used to be the accent on an accent fill, so it disappeared. In a narrow row the trigger gives way: a long placeholder is cut short with an ellipsis before the chevron instead of running past the border. A value that isn't a real date shows the placeholder muted, the same as an empty one.
+
+  `ColorPicker` now shows a colour typed into its field in the swatch beside the field. Before, the square and `onChange` followed it but the swatch kept the old colour. `width` is now documented as read once, when the picker is built.
+
+  `ColorPalette` rings and opens on the swatch a value names however it is written, so `#F00` finds red the way `#FF0000` already did.
+
+- 08f3995: `Drawer` is new: a panel that slides in from an edge of the window. `side` is `start`, `end`, `top` or `bottom`, with `start` and `end` following the reading direction, so a `start` drawer comes in from the right in right-to-left text and its content is laid out right to left too. `size` is its width (or height for `top` and `bottom`) and is clamped to the window, so a drawer never runs off the far side of a phone.
+
+  It is modal by default: the page is dimmed and kept from presses, a press on the dimmed page closes it, Tab cycles inside it, and closing gives the keyboard back to whatever opened it. It releases only its own focus trap, so it can be opened from inside a `Dialog` and closed under an open `Menu` without taking the keyboard from either. `modal={false}` is a panel beside the page instead: nothing dimmed, nothing trapped, and the page stays usable. Escape closes either while focus is inside it.
+
+  `open` and `onOpenChange` make it controlled, `defaultOpen` lets it own its state, and `onClose` is there under the name `Dialog` uses. It slides in and back out through `AnimationService`, takes no presses or keys while it is leaving, and simply appears and disappears under reduced motion. It is a `dialog` named by its `title` (or `label`), with the `modal` state when modal.
+
+- ff9dd85: A spreadsheet formula engine for the grid, in `formula.ts`, with no dependencies. A cell's raw string that starts with `=` is a formula; anything else is a number when the whole of it reads as one, blank when it is empty, and text otherwise. Formulas take A1 references (`B3`, `$B$3`, `AA10`) and ranges (`A1:C3`), the operators `+ - * / ^ &` and `= <> < <= > >=`, and the functions SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, IF, AND, OR, NOT, ROUND, ABS, CONCAT, LEN, UPPER and LOWER, in any case. Precedence follows the sheets people already use: `-2^2` is 4 and `2^3^2` is 64.
+
+  `createFormulaEvaluator(resolve)` never holds the data. It asks `resolve(row, column)` for the raw string of only the cells a formula reads, and an `undefined` answer, past the end of the data, becomes `#REF!`. `evaluate(row, column)` gives a cell's value and `display(row, column)` its text; values are kept until `invalidate()`, which a grid calls after an edit or when its data changes, so scrolling recomputes nothing. A running total fifty thousand rows long evaluates without overflowing the stack.
+
+  Errors are values, as in a sheet, and flow through whatever reads them: `#DIV/0!`, `#REF!`, `#NAME?` for an unknown function, `#VALUE!` for the wrong type or number of arguments, `#NUM!` for a result that is not a finite number, `#CYCLE!` for every cell on a circular reference, and `#ERROR!` for a formula that does not parse. They are objects, so text that happens to read `#REF!` is never taken for one. `formatFormulaNumber` shows a number to the fifteen digits a double really carries, so `0.1 + 0.2` reads `0.3`, and `columnLetters`, `columnIndex`, `cellName` and `parseCellName` convert between positions and A1 names.
+
+- cbac578: A `DataTable`, or any `LazyGrid`, whose columns are wider than it is scrolls sideways to reach them. The grid that holds the header and the rows was exactly as wide as the list, however far its tracks ran past it, and a scroll container measures its content by its children's boxes, so the columns past the edge were cut off with nothing to scroll to. The grid is now at least as wide as its fixed tracks, the floors of its `minmax` tracks and the gaps between them, so a sideways wheel or swipe moves the header and the rows together until the last column is in view. A table of `fr`, `auto` or `percent` columns still fits its box. Under right-to-left the overflowing columns are still out of reach, because scroll containers do not yet scroll toward their start side.
+- fd3adc4: Media and status components follow the values they are given instead of freezing the first one.
+
+  - `VideoPlayer` shows captions that arrive after it mounted. A track is usually fetched once the player is already on screen, and an empty list at mount used to mean no captions ever. `Captions` also follows a track that changes while a paused clip's position stands still.
+  - `VideoPlayer` now passes `onState`, `poster`, `placeholderColor`, `volume`, `muted` and `rate` through to its `Video`, so an application can say why a clip will not play.
+  - `ProgressBar` switches between sweeping and filling as its `value` comes and goes, rather than deciding once at build. A bar that started without a value kept sweeping after one arrived, and a bar whose value went away reported a NaN. It also follows a change to `min` or `max` alone.
+  - `ProgressBar` and `Meter` fill from the right under a right-to-left reading.
+  - `Spinner` follows a `size` or `color` that changes.
+  - A `Video` whose controls have `hideAfterMs: 0` puts the bar away when the pointer leaves, as documented, instead of keeping it up for good.
+  - The fullscreen copy of a `Video` starts at the inline clip's volume and mute, keeps its `clock` and `poster`, and a level changed in fullscreen is still there after leaving it.
+  - `Image` has an `onState` prop, like `Video`'s, and `Avatar` uses it: a picture that fails to load falls back to the initials (or the glyph) instead of leaving an empty disc. A new `src` is tried again.
+  - `Alert` draws no blank title line while a bound `title` is empty, and the line appears when the title does. The same holds for `message`.
+  - `Chip` draws a `count` or `icon` that arrives after the chip was built; the accessible name already included the count, so a screen reader and the screen now agree.
+  - `Skeleton`'s and `SkeletonText`'s `shimmer` are documented as read once.
+
+- bdc4780: A `MenuBar` can be reached from anywhere in the application, not only by tabbing to it. F10 moves focus to the bar, on the title it was last left on, and F10 again, Escape on the closed bar or choosing a command puts focus back on the control that had it. Alt pressed and released with no other key between does the same, and Alt with a menu's mnemonic opens that menu from wherever focus is, as in a Windows application. The keys are heard after the focused control has had them, so a control that binds F10 or an Alt chord keeps it, and Shift+F10 is left to context menus. Two new props turn them off for an application with its own use for them: `f10Key` (default true) and `altKey` (default true, except on macOS, where Option types characters and no such convention exists).
+
+  `menuBarStep` keeps the bar's focused title when Escape or Tab gives the keyboard back, and treats F10 as leaving the bar in one press, open or closed. Escape and Tab used to reset the bar to its first menu.
+
+- 08f3995: `NavigationRail` is new: the column of destinations an application keeps down its side, with one of them active. Rows take an optional icon and a badge, groups of rows open and close, and `collapsed` narrows the rail to a column of icons whose labels show as tooltips and stay the rows' accessible names. It is controlled by default, so the router can own where the application is: compute `value` from `router.isActive` and call `router.go` from `onChange`, and Back, Forward and links elsewhere move the rail with no code of their own. It is one tab stop; the arrows move focus between rows without navigating, Enter or Space activates, Right and Left open, close and walk groups (mirrored when the rail reads right to left), Home and End reach the ends, a letter jumps to the next row starting with it, and disabled rows are skipped. A screen reader finds a `navigation` landmark holding a `tree`, with the active row marked `current` and each group `expanded` or `collapsed`. A rail taller than its box scrolls, and the active row is kept in view.
+- ff9dd85: `NavigationRail` can open a destination somewhere new. A Cmd-click (Ctrl-click off a Mac), a middle click, or Cmd-Enter or Ctrl-Enter on a focused row is reported to the new `onOpenElsewhere(key)` instead of `onChange`, and the active value does not move. A destination can also carry `to`, a router url or a `RouteTarget` as `Link` takes one: a plain press then navigates there after `onChange`, and a modified one asks the shell to open it somewhere new (`ShellService.openRoute`). It is opt-in: a rail with neither answers a modified press as a plain one, as before.
+
+  A `NavigationGroup` can be `disabled`: its heading and every row under it are announced as unavailable, drawn in the disabled ink, skipped by the arrows and type-ahead, and inert to the pointer, and the group no longer opens or closes from the rail.
+
+  An icon can be drawn as lines. `icon` now takes a `NavigationIcon`: a path string, filled exactly as before, or `{ path, style: 'stroke', strokeWidth }` for an outline icon set, where `path` may be several paths laid over each other and `fillRule` is passed through for a filled one.
+
+- 66690b6: A `NumberInput` with a minimum can be typed into. Every keystroke used to be clamped, so with `min: 10` the "1" of "15" became "10" under the caret and the "5" made it "105". The field now keeps what is typed, reports a number only once it is one the field could hold, and bounds the text when it is left or Enter is pressed. A field left blank or holding text that is not a number goes back to the value it had, where it used to report 0, a number nobody typed and often not in range.
+
+  A `Slider` under `textDirection: 'rtl'` agrees with what it draws. The fill already grew from the right, but a press and the arrow keys still read left to right, so a press near the right edge set nearly the maximum and Right made the fill longer. A press now counts from where the track starts, Left is more and Right is less, Up and Down are unchanged, and the thumb sits centred on the end of the fill rather than six pixels short of it.
+
+  A `RadioGroup` marked `invalid` or given an `error` rings its circles in the danger colour, as a `Checkbox` rings its box; it used to say so only in the message under it. Its `direction` is documented as read once, when the group renders. A row of options under `textDirection: 'rtl'` takes Left as the next option and Right as the previous one, so the arrows move toward the option they point at; they used to move away from it.
+
+  `SegmentedControl` takes a `ref`, as every other control does, and hands it the track.
+
+  `onSubmit` on a `TextArea`, or on a multiline `TextInput`, is called on Command-Enter or Control-Enter. It was on the props and never called, since Enter alone is a new line there.
+
+  `bind(cell, 'checked')` spreads into JSX beside other props. The handler's name defaulted to `onChange` only in principle: it was inferred from the props around the spread, so `<Switch label="Sync" {...bind(on, 'checked')} />` failed to compile with "'label' is specified more than once" and needed `'onChange'` spelled out.
+
+- bdc4780: Overlays follow the reading direction. An overlay entry's `placement`
+  now names `start` and `end` as reading edges: along the top or the
+  bottom, `-start` lines the entry up with the anchor's start edge, which
+  is its right under `textDirection="rtl"`, and the new sides `start`,
+  `end`, `start-start`, `start-end`, `end-start` and `end-end` open beside
+  the anchor toward those edges. `left` and `right` stay physical. An
+  unanchored entry takes `start` and `end` edge offsets beside `left` and
+  `right`. The direction is read from the entry's `environment`, or its
+  anchor, the same node its theme comes from, and followed while the
+  entry is open.
+
+  So under right-to-left text a `Toast` at `bottom-start` is pinned to the
+  bottom right corner and `bottom-end` to the bottom left; a `Menu` lines
+  up with its button's right edge, opens a context menu leftward from the
+  pointer, opens submenus to the left of their items (flipping right at
+  the window edge), and swaps Left and Right for opening and closing them;
+  `Combobox`, `DatePicker`, `Select` and `MenuBar` line their lists up
+  with the trigger's right edge; and `Tooltip` takes `start` and `end`
+  sides. Code that passed `bottom-start` to mean the left edge in a
+  right-to-left tree now gets the right edge.
+
+- fb803f1: A `Dialog` closed by its owner while a menu or another dialog is open over it no longer takes the keyboard from that one. It used to release whichever focus trap was innermost, so a dialog closed by a timer or a finished save under an open `Menu` ended the menu's trap instead of its own, and focus left the window still on top. It now releases only its own, as `Menu` already did.
+
+  `Tooltip` and the `tooltip()` modifier close on Escape, wherever focus is and whether the pointer or the keyboard opened them, and stay closed until the pointer or focus arrives again (WCAG 1.4.13). With no tooltip open, Escape goes on to the page as before.
+
+  A `Toast` waits while the pointer is on it or focus is in it, and starts its time again from the whole `duration` when they leave. Tabbing to Undo as the four seconds ran out used to close the toast under the focus, and focus went with it. Writing `open` true again while a toast is up is not a change and does not restart the timer, which is now said in its docs, as is that `bottom-start` is the left corner in right-to-left text too.
+
+  `MenuBar` marks the title the arrows are on with the focus ring's colour while the bar has keyboard focus, so Left and Right visibly move along a closed bar. A command chosen with the pointer is followed by `onDismiss`, as one chosen with the keys always was and as the docs say.
+
+  A `Menu` whose items are all disabled opens with no row highlighted, rather than the first painted as if Enter would choose it.
+
+- 08f3995: A new `Popover`: a panel anchored to the control that opened it, for a filter panel, a short form beside the thing it edits, or a note too long for a tooltip. It is a non-modal dialog. Opening it moves focus in, to an `initialFocus` node or the panel itself; Escape closes it and puts focus back on the trigger; Tab walks the panel and, past either end, leaves it beside the trigger and closes it. There is no backdrop and no focus trap, so a press anywhere outside closes it and still lands on whatever was pressed, while a press in a `Select` or a second popover opened from inside it counts as inside.
+
+  It is controlled with `open` and `onOpenChange`, where every close is a request the application may refuse, or self-managing with `defaultOpen`. It hears its anchor's presses itself, from the pointer, the keyboard or an assistive technology, so the trigger needs no `onClick` for it. `side` is `bottom`, `top`, `start` or `end` with an `align`, flipping and shifting to stay on screen, and `start` and `end` mirror under right-to-left. The panel announces itself as a `dialog` named by `label`, and `panelRef` hands over its node for the trigger's `controls`.
+
+- ff9dd85: `Popover` now leaves Tab to a control inside it that takes the key for itself. The panel walks its own controls on Tab, and it used to do that even when the focused control had already cancelled the key, so a field of your own that indents on Tab lost focus instead. It now acts only on a Tab nothing inside it used. A `TextArea` is not such a control: Tab leaves a `TextArea` everywhere in the library, and inside a popover it still moves on to the panel's next control.
+
+  A popover also closes when focus leaves it by a route other than Tab or a press: focus moved by code, by a shortcut that focuses another control, or by an assistive technology. Before, it stayed open with focus outside it. As with every other way of closing, this is a request through `onOpenChange(false)` that a controlled owner can refuse, and focus stays where it went. Focus on the anchor, or in an overlay opened from inside the panel (a `Select`'s list, a nested popover), does not count as leaving, by the same rule a press outside is judged by. A press outside that also moves focus asks to close once, not twice.
+
+- 08f3995: `RangeSlider` chooses a span from a range: a low and a high value, each with a thumb of its own. Each thumb is its own tab stop and its own `slider` to an assistive technology, named from the label ("Minimum price", "Maximum price") or by `thumbLabels`, and announces a minimum and maximum that stop at the other thumb. The keys are `Slider`'s, per thumb, mirrored right to left in the same way. A press on the track moves the nearer thumb and drags it; two thumbs sitting together are told apart by the direction of the drag. The thumbs never cross, and `minDistance` keeps a gap between them. It is controlled with `value` and `onChange`, or self-managing with `defaultValue`, and reports every pair already in order.
+- bdc4780: Scrolling a `DataTable`, `LazyList` or `Tree` to a row that was never mounted lands the row in view even when the rows are taller or shorter than the estimate. The jump goes by the estimate for every row on the way, and when that was short of the real height the row it was for ended up below the bottom edge, and stayed there: nothing ran another frame to measure it. A `UiVirtualWindow` can now hold an item in view (`holdInView`) until it has been measured, the runtime runs the frame that measures it, and the window folds the correction into the scroll adjustment it already returns.
+- bdc4780: Arrow keys move toward the arrow pressed in a right-to-left `MenuBar`, `DatePicker` and collapsed `NavigationRail`. A bar's titles and a calendar's week run from the right under `textDirection: 'rtl'`, but Left still meant the previous title or the day before, so the ring moved away from the arrow; Left is now the next title and the day after there. A collapsed `NavigationRail` opens its labels on its end side, toward what it serves, rather than always on the right.
+- b6af70e: A `Select` with more options than the window has room for fits on screen. Its open list had no height to keep to, so fifty countries ran past the top and bottom of the window and End highlighted an option nobody could see. The list is now cut to the room the window has and scrolls, the way a `Menu` does, and keeps the highlighted option in view as the arrows, Home, End or a letter move it, opening scrolled to the chosen one. The chosen option is also ticked, in the column `Combobox` and `Menu` keep for theirs, so it still shows once the highlight has moved off it.
+
+  A `Combobox` option whose label is longer than its list is cut short with an ellipsis inside the list, rather than running past its edge and pushing its tick out after it.
+
+- bdc4780: `Select` type-ahead is a search now, as in WAI-ARIA's listbox. Characters typed within half a second of each other are one search, so `b` then `l` reaches Blueberry past Banana, and a space in the middle of one is part of it, so "new z" reaches New Zealand. Typing the same letter again walks the options starting with it, from the current one and wrapping. It used to be one character matched from the top every time, so the second of two options sharing a first letter could only be reached with the arrows. Disabled options are still skipped. Closed, a search still changes the value without opening the list; open, it moves the highlight and Enter takes it.
+- ff9dd85: `Slider` and `RangeSlider` now share one implementation of their track: how a press turns into a value, how a value is snapped and held in range, which way the track reads right to left, and where a thumb sits on it. Nothing a user sees or an application calls changes, but a fix to either control's track now reaches both, where before each carried its own copy.
+- 264aa3a: A `Slider` with `thumb` set draws its thumb centred on the end of the fill at the top of the range, as it already did everywhere else. At the maximum the thumb overhangs the track by half its width, and the row holding it shrank the spacer before it to make room, so the thumb sat about six pixels short of the end of the fill it marks.
+- c97fa3d: A `Divider` is visible wherever it is put. A horizontal rule in a column that aligns its children to the start used to be zero wide and as tall as the column's spare height, and an upright rule in a row that centres its children, a `Toolbar`'s included, had no height at all. A rule now stretches across its parent and grows along it while staying one pixel thick, and a caller's own layout props win over those defaults.
+
+  Tabs and breadcrumbs no longer run off the side of whatever holds them. A `Tabs` strip with more tabs than room wraps onto further lines, so the selected tab is always on screen, and a long `Breadcrumb` trail wraps between crumbs, never leaving a separator at the start of a line. A `Tabs` panel whose tab was removed from `tabs` stops being named after it; the value itself is left for its owner to move, as `Pagination` leaves a page it did not choose.
+
+  `FindBar`'s field follows the find session, so closing a search and opening it again shows an empty field over "No results" instead of the old words. A bar that unmounts now clears the service's field only when that field is its own, so it no longer takes the caret away from another bar.
+
+  `Card` follows its `padding` as it changes, instead of keeping the first value. `Link`'s documentation now says what disabled does: Tab skips a disabled link, as it does every disabled control.
+
+- 9115330: `Tree` treats a disabled row as one the keyboard cannot stop on. The arrows, Home, End and the new Page Up and Page Down step over it, as they do over a disabled option in `Select` or `Menu`; a click does not choose it or open it; and Enter, Space or the menu key never activates one, even when the application's own `selectedKey` names it. Right on an open folder with nothing in it now keeps the choice where it is, where it used to move on to the row after the folder, and a tree nested tens of thousands of levels deep opens instead of overflowing the stack.
+
+  `LazyList` no longer reports row 0 as chosen when Home is pressed in an empty list. `PlainView` names its region "View" when it is given no `label`; it was taking a name from whatever it drew first. A `PlainView` checkbox or select that changes into another kind of node no longer leaves a subscription behind for the life of the view.
+
+- Updated dependencies [ff9dd85]
+- Updated dependencies [bdc4780]
+- Updated dependencies [baf8dec]
+- Updated dependencies [cbac578]
+- Updated dependencies [66690b6]
+- Updated dependencies [bdc4780]
+- Updated dependencies [bdc4780]
+- Updated dependencies [ff9dd85]
+- Updated dependencies [69e5d47]
+- Updated dependencies [bdc4780]
+- Updated dependencies [3daa932]
+  - gesso-core@0.6.27
+  - gesso-framework@0.6.27
+
 ## 0.6.26
 
 ### Patch Changes

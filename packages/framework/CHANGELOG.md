@@ -1,5 +1,57 @@
 # gesso-framework
 
+## 0.6.27
+
+### Patch Changes
+
+- ff9dd85: A grid can say where its rows and cells sit in the whole of its data, not only among the ones that are mounted. Four new semantics properties carry it: `rowCount` and `columnCount` on the `grid`, `treegrid` or `table` (use -1 when the count is not known), `rowIndex` on each `row` and `columnIndex` on each cell, all counting from 1. They are carried into the semantics record under the same names, and the accessibility mirror writes them as `aria-rowcount`, `aria-colcount`, `aria-rowindex` and `aria-colindex`. A virtualized grid used to leave a screen reader counting the cells in view, so after scrolling sideways the first visible cell was announced as column 1 whatever column it was really in.
+- bdc4780: A key release the application claims cancels the browser's default, as a key press already did. A lone Alt opens a Windows browser's menu when it is released, so a `MenuBar` that takes focus on Alt also had the browser's own menu open over it. On the main thread the platform adapter now passes a claimed release on to the browser event; in a render worker, `interceptKey` is asked about releases as well as presses.
+- 66690b6: A `NumberInput` with a minimum can be typed into. Every keystroke used to be clamped, so with `min: 10` the "1" of "15" became "10" under the caret and the "5" made it "105". The field now keeps what is typed, reports a number only once it is one the field could hold, and bounds the text when it is left or Enter is pressed. A field left blank or holding text that is not a number goes back to the value it had, where it used to report 0, a number nobody typed and often not in range.
+
+  A `Slider` under `textDirection: 'rtl'` agrees with what it draws. The fill already grew from the right, but a press and the arrow keys still read left to right, so a press near the right edge set nearly the maximum and Right made the fill longer. A press now counts from where the track starts, Left is more and Right is less, Up and Down are unchanged, and the thumb sits centred on the end of the fill rather than six pixels short of it.
+
+  A `RadioGroup` marked `invalid` or given an `error` rings its circles in the danger colour, as a `Checkbox` rings its box; it used to say so only in the message under it. Its `direction` is documented as read once, when the group renders. A row of options under `textDirection: 'rtl'` takes Left as the next option and Right as the previous one, so the arrows move toward the option they point at; they used to move away from it.
+
+  `SegmentedControl` takes a `ref`, as every other control does, and hands it the track.
+
+  `onSubmit` on a `TextArea`, or on a multiline `TextInput`, is called on Command-Enter or Control-Enter. It was on the props and never called, since Enter alone is a new line there.
+
+  `bind(cell, 'checked')` spreads into JSX beside other props. The handler's name defaulted to `onChange` only in principle: it was inferred from the props around the spread, so `<Switch label="Sync" {...bind(on, 'checked')} />` failed to compile with "'label' is specified more than once" and needed `'onChange'` spelled out.
+
+- bdc4780: Overlays follow the reading direction. An overlay entry's `placement`
+  now names `start` and `end` as reading edges: along the top or the
+  bottom, `-start` lines the entry up with the anchor's start edge, which
+  is its right under `textDirection="rtl"`, and the new sides `start`,
+  `end`, `start-start`, `start-end`, `end-start` and `end-end` open beside
+  the anchor toward those edges. `left` and `right` stay physical. An
+  unanchored entry takes `start` and `end` edge offsets beside `left` and
+  `right`. The direction is read from the entry's `environment`, or its
+  anchor, the same node its theme comes from, and followed while the
+  entry is open.
+
+  So under right-to-left text a `Toast` at `bottom-start` is pinned to the
+  bottom right corner and `bottom-end` to the bottom left; a `Menu` lines
+  up with its button's right edge, opens a context menu leftward from the
+  pointer, opens submenus to the left of their items (flipping right at
+  the window edge), and swaps Left and Right for opening and closing them;
+  `Combobox`, `DatePicker`, `Select` and `MenuBar` line their lists up
+  with the trigger's right edge; and `Tooltip` takes `start` and `end`
+  sides. Code that passed `bottom-start` to mean the left edge in a
+  right-to-left tree now gets the right edge.
+
+- bdc4780: Scrolling a `DataTable`, `LazyList` or `Tree` to a row that was never mounted lands the row in view even when the rows are taller or shorter than the estimate. The jump goes by the estimate for every row on the way, and when that was short of the real height the row it was for ended up below the bottom edge, and stayed there: nothing ran another frame to measure it. A `UiVirtualWindow` can now hold an item in view (`holdInView`) until it has been measured, the runtime runs the frame that measures it, and the window folds the correction into the scroll adjustment it already returns.
+- 69e5d47: A scroll container that reads right to left can reach everything in it. Its content starts at the right edge and overflows to the left, but its horizontal offset was clamped to `[0, overflow]`, toward the right, so a wide right-to-left table, row or sheet showed its first columns and nothing a wheel, a swipe or a dragged thumb could do reached the rest. Such a container now follows CSS: `scrollX` runs from minus the overflow up to `0`, where `0` shows the start edge and is where an unscrolled container sits. Its content extent is measured from the right edge, the horizontal thumb starts at the right of its track, revealing a row scrolls left to it, a sticky column at `right: 0` holds there, and a `LazyRow` or `LazySheet` mounts what the offset shows. `scrollBounds` and `scrollsFromRight` answer the range and the direction for a record. Text fields are unchanged: a field scrolls its own text by the caret, from `0` up.
+- Updated dependencies [ff9dd85]
+- Updated dependencies [bdc4780]
+- Updated dependencies [baf8dec]
+- Updated dependencies [cbac578]
+- Updated dependencies [bdc4780]
+- Updated dependencies [ff9dd85]
+- Updated dependencies [69e5d47]
+- Updated dependencies [bdc4780]
+- Updated dependencies [3daa932]
+  - gesso-core@0.6.27
+
 ## 0.6.26
 
 ### Patch Changes
