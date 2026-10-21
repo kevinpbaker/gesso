@@ -2180,6 +2180,7 @@ declare class UiGraphBuilder {
   private reconcileRef;
   private matchNode;
   private createNode;
+  private inOrder;
   private moveBefore;
   private readonly declaredProps;
   private reconcileProps;
