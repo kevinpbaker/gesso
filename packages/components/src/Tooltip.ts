@@ -5,6 +5,7 @@ import {
   Box,
   Text,
   UiEventType,
+  UiNodeType,
   defineModifier,
   type UiChild,
   type UiInputEvent,
@@ -279,6 +280,13 @@ function closeOnEscape(event: UiInputEvent, isOpen: () => boolean, close: () => 
     return;
   }
   close();
+  // A field being typed in keeps its Escape: there it already means "put
+  // it back", and a tooltip its focus opened took the key for itself, so
+  // cancelling a rename took two presses and the first did nothing the
+  // person could see. The tooltip still closes.
+  if (event.target?.type === UiNodeType.EditableText) {
+    return;
+  }
   event.preventDefault();
   event.stopPropagation();
 }

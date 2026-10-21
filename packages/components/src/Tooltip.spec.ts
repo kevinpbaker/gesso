@@ -3,7 +3,7 @@ import { BehaviorSubject, map } from 'rxjs';
 
 import { createComponent, OverlayService, type ComponentContext, type OverlayPlacement } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Box, Button, Column, percent, Row, Text, type UiChild } from 'gesso-core';
+import { Box, Button, Column, EditableText, percent, Row, Text, type UiChild } from 'gesso-core';
 import { Tooltip, tooltip } from './Tooltip';
 
 /**
@@ -294,6 +294,26 @@ describe('Escape on a tooltip', () => {
 
     ui.fireEvent.keyDown('Escape');
     expect(ui.entries()).toHaveLength(0);
+  });
+
+  it('closes one over a text field and leaves the field its Escape', () => {
+    const heard: string[] = [];
+    function Field(_props: Record<string, never>, ctx: ComponentContext): UiChild {
+      return EditableText({
+        label: 'Name',
+        width: 120,
+        height: 24,
+        onKeyDown: event => heard.push(event.key),
+        modifiers: [tooltip(ctx, { text: 'Rename this workbook' })]
+      });
+    }
+    const ui = mount(Column(createComponent(Field, {})));
+    ui.fireEvent.tab();
+    expect(ui.entries()).toHaveLength(1);
+
+    ui.fireEvent.keyDown('Escape');
+    expect(ui.entries()).toHaveLength(0);
+    expect(heard).toEqual(['Escape']);
   });
 
   it('leaves Escape to the page when no tooltip is open', () => {
