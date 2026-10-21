@@ -255,6 +255,14 @@ const NEW_DISPLAY = 0.15;
 const BEAT_PASSES = 3;
 /** Refreshes apart the two an interval is read between must be, at least. */
 const MIN_BEAT_SPAN = 6;
+/**
+ * The most refreshes a frame waits for a tick that has not sat in this
+ * thread's queue (see `tick`): a frame is drawn on a stale one after
+ * that, so a thread that is always behind still draws.
+ */
+const MAX_QUEUED_REFRESHES = 8;
+/** How long, at least, between timing this thread's refreshes again once they were given up; see `retryLocal`. */
+const RETRY_LOCAL_MS = 2000;
 /** The most refreshes a frame is given: two, sixty at 120 Hz; slower than that is no smoother. */
 const MAX_STRIDE = 2;
 
@@ -308,6 +316,8 @@ export class UiHostFrameClock implements UiFrameClock {
   /** Gaps between this thread's own refreshes while frames ran back to back. */
   private readonly localIntervals: number[] = [];
   private lastLocalTime: number | null = null;
+  /** How long the frame drawn at `lastLocalTime` took, which says whether the gap after it was the refresh's or the frame's. */
+  private lastLocalCost = 0;
   /** The display's interval and the host's time origin, once the host has said. */
   private display: { readonly interval: number; readonly origin: number } | null = null;
   /**
@@ -316,6 +326,11 @@ export class UiHostFrameClock implements UiFrameClock {
    * show (see \`displayInterval\`).
    */
   private locked = false;
+  /** This thread's own `requestAnimationFrame` once given up, kept to see whether it keeps time after all. */
+  private givenUp: ((callback: (time: number) => void) => number) | null = null;
+  /** When this thread's refreshes were last timed again, and their times while they are being. */
+  private lastRetry = -Infinity;
+  private retrying: number[] | null = null;
   /** The host's recent refresh times, which give the beat its phase. */
   private readonly refreshes: number[] = [];
   /** Host refreshes since the last frame drawn on the beat. */
@@ -365,7 +380,11 @@ export class UiHostFrameClock implements UiFrameClock {
           // if this refresh showed it keeps none.
           this.recordLocal(time);
           if (this.pending) {
+            const started = this.now();
             this.deliver(time);
+            this.lastLocalCost = this.now() - started;
+          } else {
+            this.lastLocalCost = 0;
           }
         });
       }
@@ -424,10 +443,14 @@ export class UiHostFrameClock implements UiFrameClock {
     const previous = this.lastLocalTime;
     this.lastLocalTime = time;
     // Only gaps between frames that ran back to back measure the
-    // refresh: a gap across an idle stretch measures the idleness.
+    // refresh: a gap across an idle stretch measures the idleness. And
+    // only after a frame that left room: one that took most of the gap
+    // made the gap, and says how slow the frame was, not the refresh.
+    // Counted, a scroll whose frames took 8 ms on a 165 Hz display gave
+    // the refreshes up a second after `retryLocal` had taken them back.
     if (previous !== null && this.pending) {
       const interval = time - previous;
-      if (interval > 0 && interval < MAX_CADENCE_MS) {
+      if (interval > 0 && interval < MAX_CADENCE_MS && this.lastLocalCost < interval / 2) {
         this.localIntervals.push(interval);
         if (this.localIntervals.length > LOCAL_SAMPLES) {
           this.localIntervals.shift();
@@ -453,8 +476,75 @@ export class UiHostFrameClock implements UiFrameClock {
     if (ratio <= 1 + OFF_BEAT) {
       return;
     }
+    this.givenUp = this.local;
     this.local = null;
     this.locked = true;
+  }
+
+  /**
+   * Times this thread's own refreshes again, now and then, once they were
+   * given up, and takes them back if they keep the display's time.
+   *
+   * Given up for good, a worker's refreshes stayed given up whatever had
+   * made them slow. A Chrome worker busy between its frames, opening a
+   * large file or scrolling through lines it has never drawn, refreshes
+   * late and unevenly, which no measure of the gaps alone told from
+   * WebKit's timer: 5.5, 25.5, 10.9, 25 ms on a 165 Hz display one time,
+   * 12.1, 6.1, 12.2, 24.2 the next. Its frames then went through the
+   * host's ticks for as long as the page was open, a message and a hop
+   * through the page's thread each. Timed again while frames are cheap,
+   * they come a refresh apart and are taken back; WebKit's come 15 ms
+   * apart on a 120 Hz display however idle the thread is, and stay given
+   * up. Nine refreshes every two seconds or more, while frames come cheap.
+   */
+  private retryLocal(interval: number): void {
+    if (this.givenUp === null || this.hidden || this.costs.length < SLOW_SAMPLES) {
+      return;
+    }
+    // One under way is waited for, but not for ever: a page hidden during it stops its refreshes.
+    const now = this.now();
+    if (now - this.lastRetry < RETRY_LOCAL_MS) {
+      return;
+    }
+    const sorted = [...this.costs].sort((a, b) => a - b);
+    if (sorted[Math.floor(sorted.length / 2)]! > interval * FAST_FRAME) {
+      return;
+    }
+    this.lastRetry = now;
+    const local = this.givenUp;
+    const times: number[] = [];
+    this.retrying = times;
+    const step = (time: number): void => {
+      if (this.retrying !== times) {
+        return;
+      }
+      times.push(time);
+      if (times.length <= LOCAL_SAMPLES) {
+        local(step);
+        return;
+      }
+      this.retrying = null;
+      const gaps = times
+        .slice(1)
+        .map((value, index) => value - times[index]!)
+        .sort((a, b) => a - b);
+      if (this.givenUp === null || this.display === null || gaps[Math.floor(gaps.length / 2)]! / this.display.interval > 1 + OFF_BEAT) {
+        return;
+      }
+      this.local = this.givenUp;
+      this.givenUp = null;
+      this.locked = false;
+      this.localIntervals.length = 0;
+      this.lastLocalTime = null;
+      this.costs.length = 0;
+      this.stride = 1;
+      this.clearFallback();
+      this.setActive(false);
+      if (this.pending) {
+        this.requestFrame();
+      }
+    };
+    local(step);
   }
 
   /** A time on the host's clock, on this thread's. */
@@ -542,6 +632,7 @@ export class UiHostFrameClock implements UiFrameClock {
     const started = this.now();
     this.deliver(this.toLocal(refresh));
     this.recordCost(this.now() - started, beat.interval);
+    this.retryLocal(beat.interval);
   }
 
   /**
@@ -750,7 +841,15 @@ export class UiHostFrameClock implements UiFrameClock {
       if (this.pending) {
         this.clearFallback();
         this.idleTicks = 0;
-        if (this.refreshesSinceFrame >= this.stride) {
+        // A tick that sat in this thread's queue, behind a frame that took
+        // longer than a refresh, is passed over while one has not: what is
+        // queued with it is let through first. The queue alternates ticks
+        // and the pointer's moves, and drawing on each tick let one move
+        // through a frame, so a scrollbar thumb dragged through a large
+        // file, at 15 ms a frame on a 165 Hz display, fell a second behind
+        // the pointer and went on scrolling after it stopped.
+        const queued = this.now() - this.toLocal(time) > this.display.interval;
+        if (this.refreshesSinceFrame >= this.stride && (!queued || this.refreshesSinceFrame >= MAX_QUEUED_REFRESHES)) {
           this.deliverOnBeat(time);
         }
         return;
