@@ -275,6 +275,15 @@ export class UiWheelController {
   private preciseUntil = -Infinity;
 
   /**
+   * Until when the wheel is taken to be a mouse wheel, which a burst of
+   * large steps keeps it; see `wheel`.
+   */
+  private wheelUntil = -Infinity;
+
+  /** When the last wheel event arrived, to tell a step that starts a burst. */
+  private lastArrived = -Infinity;
+
+  /**
    * The node the last wheel landed on, or null before any.
    *
    * A wheel is evidence of where the pointer is, and sometimes the
@@ -313,10 +322,31 @@ export class UiWheelController {
       this.dispatcher.dispatch(event, target);
     }
     const arrived = this.now();
-    const notched = isNotchedWheel(deltaMode, wheelDeltaY) && arrived > this.preciseUntil;
-    if (!notched) {
+    // A large step that starts a burst is a wheel's notch whatever its
+    // legacy delta says. That delta is the only thing `isNotchedWheel`
+    // can read, and it is not always a multiple of 120: drivers, scroll
+    // settings and display scaling all change it, and a mouse whose
+    // notches fail the test had every one land in a single frame, as a
+    // trackpad's step does, while one whose notches pass glided. A
+    // trackpad's gesture starts small, as a finger starts moving, so it
+    // never starts with one of these and is caught as precise by its
+    // first step. A burst that started as a wheel stays one while its
+    // steps stay large. Only for an event that carries a legacy delta at
+    // all, as every browser's does: a dispatch without one is no
+    // evidence of a device, and lands at once, as it always has.
+    const large =
+      deltaMode === UiWheelDeltaMode.Pixel &&
+      wheelDeltaY !== undefined &&
+      Math.max(Math.abs(deltaX), Math.abs(deltaY)) >= WHEEL_STEP_PX;
+    const startsBurst = arrived - this.lastArrived >= QUIET_BEFORE_NOTCH_MS;
+    const wheelLike = isNotchedWheel(deltaMode, wheelDeltaY) || (large && (startsBurst || arrived <= this.wheelUntil));
+    const notched = wheelLike && arrived > this.preciseUntil;
+    if (notched) {
+      this.wheelUntil = arrived + PRECISE_MEMORY_MS;
+    } else {
       this.preciseUntil = arrived + PRECISE_MEMORY_MS;
     }
+    this.lastArrived = arrived;
     if (!event.defaultPrevented && target !== null) {
       this.eventTime = at ?? arrived;
       this.scrollChain(target, event, deltaX, deltaY, deltaMode, notched);
@@ -784,6 +814,20 @@ export function isScrollContainer(node: UiNode): boolean {
  * hand from a trackpad to a mouse.
  */
 const PRECISE_MEMORY_MS = 400;
+
+/**
+ * The smallest step, in pixels, taken for a wheel's notch on its size
+ * alone. A notch is a hundred pixels or more in every browser at its
+ * defaults; a trackpad's first step is a few.
+ */
+const WHEEL_STEP_PX = 50;
+
+/**
+ * How long the wheel has to have been still for a step to start a burst.
+ * Longer than the gap between a trackpad's events, momentum included, so
+ * a large step in the middle of a gesture is never mistaken for a notch.
+ */
+const QUIET_BEFORE_NOTCH_MS = 150;
 
 export interface UiWheelControllerOptions {
   /**

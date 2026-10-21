@@ -3009,6 +3009,8 @@ declare class UiWheelController {
   private lastFrame;
   private frameInterval;
   private preciseUntil;
+  private wheelUntil;
+  private lastArrived;
   lastWheelTarget: UiNode | null;
   lastScrolled: UiNode | null;
   wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number,
