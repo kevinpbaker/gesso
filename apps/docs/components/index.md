@@ -4,14 +4,14 @@ description: What gesso-components is, the contract every control in it honours,
 
 # Components
 
-`gesso-components` is the library a screen is built out of: forty-four
+`gesso-components` is the library a screen is built out of: forty-five
 controls, from a checkbox to a virtualized table, all of them themed,
 keyboard operable and announced to an assistive technology from the day
 they were written.
 
 They are ordinary components. Each one is a function that runs once and
 returns elements, built from `gesso-core` and nothing you do not also
-have. What the library adds is that the same forty-four answer the
+have. What the library adds is that the same forty-five answer the
 same four questions the same way, so learning one control is most of
 learning the rest.
 
@@ -159,6 +159,7 @@ The pages, by what they are for:
   [Select](/components/select), [Combobox](/components/combobox),
   [DatePicker](/components/date-picker).
 - **Entering a value:** [TextInput and TextArea](/components/text-input),
+  [RichTextEditor](/components/rich-text-editor),
   [Slider](/components/slider), [RangeSlider](/components/range-slider),
   [NumberInput](/components/number-input).
 - **Showing data:** [DataTable](/components/data-table),

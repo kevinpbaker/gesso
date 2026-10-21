@@ -34,6 +34,22 @@ export { TextInput, TextArea, type TextInputProps, type TextAreaProps } from './
 export { Slider, type SliderProps } from './Slider';
 export { RangeSlider, type RangeSliderProps } from './RangeSlider';
 export { NumberInput, type NumberInputProps } from './NumberInput';
+export { RichTextEditor, richTextShortcuts, type RichTextEditorProps } from './richText/RichTextEditor';
+export { RichTextView, type RichTextViewProps } from './richText/RichTextView';
+export {
+  mentionCompletions,
+  referenceCompletions,
+  type RichTextCompletionSource,
+  type RichTextMentionable,
+  type RichTextOption,
+  type RichTextReferenceOptions,
+  type RichTextSearch,
+  type RichTextShortcut,
+  type RichTextSuggestion,
+  type RichTextTrigger
+} from './richText/completion';
+export { type RichTextToken } from './richText/inline';
+export { RICH_TEXT_SLASH_COMMANDS, type RichTextBlockKind, type RichTextSlashCommand } from './richText/slash';
 export { Card, Divider, Toolbar, Tabs, Accordion } from './Structure';
 export type {
   CardProps,

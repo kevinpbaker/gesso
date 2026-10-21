@@ -313,6 +313,89 @@ interface NumberInputProps extends ControlLayoutProps {
   required?: boolean;
 }
 declare function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentContext): UiChild;
+interface RichTextToken {
+  readonly pattern: RegExp;
+  readonly sigil?: string;
+  readonly startsAt?: (text: string, at: number) => boolean;
+}
+interface RichTextSuggestion {
+  readonly value: string;
+  readonly label: string;
+  readonly detail?: string;
+}
+interface RichTextOption extends RichTextSuggestion {
+  readonly keywords?: readonly string[];
+}
+type RichTextTrigger = {
+  readonly character: string;
+} | {
+  readonly prefixes: readonly string[] | Observable<readonly string[]>;
+  readonly separator: string;
+};
+interface RichTextSearch {
+  readonly prefix: string;
+  readonly query: string;
+}
+interface RichTextShortcut {
+  readonly keys: string;
+  readonly label: string;
+}
+interface SourceBase {
+  readonly trigger: RichTextTrigger;
+  readonly label: string;
+  readonly empty?: string;
+  readonly width?: number;
+  readonly insert?: (suggestion: RichTextSuggestion) => string;
+  readonly announce?: (suggestion: RichTextSuggestion) => string;
+  readonly ends?: (query: string, matches: number | null) => boolean;
+  readonly token?: RichTextToken;
+  readonly shortcut?: RichTextShortcut;
+}
+type RichTextCompletionSource = SourceBase & ({
+  readonly options: readonly RichTextOption[] | Observable<readonly RichTextOption[]>;
+  readonly search?: undefined;
+} | {
+  readonly search: (ask: RichTextSearch) => Observable<readonly RichTextSuggestion[]> | PromiseLike<readonly RichTextSuggestion[]>;
+  readonly options?: undefined;
+});
+interface RichTextMentionable {
+  readonly handle: string;
+  readonly name: string;
+}
+declare function mentionCompletions(people: readonly RichTextMentionable[] | Observable<readonly RichTextMentionable[]>): RichTextCompletionSource;
+interface RichTextReferenceOptions {
+  readonly prefixes: readonly string[] | Observable<readonly string[]>;
+  readonly search: (ask: RichTextSearch) => Observable<readonly RichTextSuggestion[]> | PromiseLike<readonly RichTextSuggestion[]>;
+}
+declare function referenceCompletions(options: RichTextReferenceOptions): RichTextCompletionSource;
+type RichTextBlockKind = 'paragraph' | 'h1' | 'h2' | 'h3' | 'bullet' | 'ordered' | 'task' | 'quote' | 'code' | 'rule';
+interface RichTextSlashCommand {
+  readonly value: RichTextBlockKind;
+  readonly label: string;
+  readonly keywords: readonly string[];
+  readonly hint: string;
+}
+declare const RICH_TEXT_SLASH_COMMANDS: readonly RichTextSlashCommand[];
+interface RichTextEditorProps extends ControlLayoutProps {
+  value?: string;
+  defaultValue?: string;
+  onChange?: (markdown: string) => void;
+  label?: string;
+  placeholder?: string;
+  fit?: boolean;
+  onSubmit?: () => void;
+  onBlur?: () => void;
+  completions?: readonly RichTextCompletionSource[];
+  slashCommands?: readonly RichTextSlashCommand[];
+  showSource?: boolean;
+}
+declare function RichTextEditor(inputs: Inputs<RichTextEditorProps>, ctx: ComponentContext): UiChild;
+declare function richTextShortcuts(completions?: readonly RichTextCompletionSource[], submit?: string | null): RichTextShortcut[];
+interface RichTextViewProps extends ControlLayoutProps {
+  value: string;
+  completions?: readonly RichTextCompletionSource[];
+}
+declare function RichTextView(inputs: Inputs<RichTextViewProps>, _ctx: ComponentContext): UiChild;
 interface CardProps extends ControlLayoutProps {
   title?: string;
   label?: string;
@@ -1277,6 +1360,7 @@ export {
   Link,
   matches,
   maxLength,
+  mentionCompletions,
   Menu,
   MENU_BAR_CLOSED,
   MENU_SEPARATOR,
@@ -1301,7 +1385,12 @@ export {
   RadioGroup,
   range,
   RangeSlider,
+  referenceCompletions,
   required,
+  RICH_TEXT_SLASH_COMMANDS,
+  RichTextEditor,
+  richTextShortcuts,
+  RichTextView,
   SegmentedControl,
   Select,
   Skeleton,
@@ -1427,6 +1516,19 @@ export {
   type RadioGroupProps,
   type RadioOption,
   type RangeSliderProps,
+  type RichTextBlockKind,
+  type RichTextCompletionSource,
+  type RichTextEditorProps,
+  type RichTextMentionable,
+  type RichTextOption,
+  type RichTextReferenceOptions,
+  type RichTextSearch,
+  type RichTextShortcut,
+  type RichTextSlashCommand,
+  type RichTextSuggestion,
+  type RichTextToken,
+  type RichTextTrigger,
+  type RichTextViewProps,
   type Schema,
   type SegmentedControlProps,
   type SegmentedOption,
