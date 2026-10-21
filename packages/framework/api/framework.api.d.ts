@@ -1434,6 +1434,7 @@ interface GessoRuntimeOptions {
   fonts?: readonly FontFamilyDeclaration[];
   services?: ServiceRegistry;
   routes?: RouterRoutes;
+  url?: string;
   channels?: ChannelRegistry;
   clock?: UiFrameClockFactory;
   width?: number;
@@ -1563,6 +1564,7 @@ declare class GessoRuntime {
   get scrollability(): UiScrollability;
   onEditingState(listener: ((state: EditingState | null) => void) | null): void;
   get editingState(): EditingState | null;
+  private toShell;
   onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
   onAudioRequest(listener: ((request: AudioRequest) => void) | null): void;
   applyAudioSample(sample: AudioSample): void;
@@ -1700,6 +1702,7 @@ type ShellToRuntimeMessage = {
   textInput?: 'proxy' | 'keys';
   appPort?: MessagePort;
   accessibility?: boolean;
+  url?: string;
 } | {
   type: 'resize';
   width: number;
@@ -2315,7 +2318,6 @@ declare class GessoApp {
   private readonly inputEnabled;
   private readonly accessibilityEnabled;
   private readonly adapter;
-  private readonly historyOptions;
   private readonly onOpenRoute;
   private running;
   private resizeObserver;
