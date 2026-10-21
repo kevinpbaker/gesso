@@ -280,6 +280,22 @@ interface SliderProps extends ControlLayoutProps {
   thumb?: boolean;
 }
 declare function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiChild;
+interface RangeSliderProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  value?: readonly [number, number];
+  defaultValue?: readonly [number, number];
+  onChange?: (value: readonly [number, number]) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  minDistance?: number;
+  label?: string;
+  thumbLabels?: readonly [string, string];
+  disabled?: boolean;
+  format?: (value: number) => string;
+  labelHidden?: boolean;
+}
+declare function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentContext): UiChild;
 interface NumberInputProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   value?: number;
@@ -369,6 +385,22 @@ interface DialogProps {
   width?: number;
 }
 declare function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiChild;
+type DrawerSide = 'start' | 'end' | 'top' | 'bottom';
+interface DrawerProps {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onClose?: () => void;
+  side?: DrawerSide;
+  size?: number;
+  modal?: boolean;
+  dismissible?: boolean;
+  title?: string;
+  description?: string;
+  label?: string;
+  content?: UiChild;
+}
+declare function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiChild;
 interface OverlayHandle {
   readonly id: string;
   readonly open: Observable<boolean>;
@@ -741,6 +773,84 @@ interface DataTableProps<T> extends ControlLayoutProps {
   label?: string;
 }
 declare function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentContext): UiChild;
+interface DataGridColumn {
+  readonly key: string;
+  readonly header: string;
+  readonly width: number;
+  readonly editable?: boolean;
+  readonly align?: 'start' | 'center' | 'end';
+  readonly format?: (value: string) => string;
+}
+interface DataGridCell {
+  readonly row: number;
+  readonly column: string;
+}
+interface DataGridProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  columns: readonly DataGridColumn[];
+  rowCount: number;
+  getValue: (row: number, column: string) => string;
+  onCellChange?: (row: number, column: string, value: string) => void;
+  revision?: unknown;
+  frozenColumns?: number;
+  activeCell?: DataGridCell;
+  defaultActiveCell?: DataGridCell;
+  onActiveCellChange?: (cell: DataGridCell) => void;
+  rowHeight?: number;
+  headerHeight?: number;
+  readOnly?: boolean;
+  disabled?: boolean;
+  label?: string;
+}
+declare function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): UiChild;
+interface NavigationDestination {
+  readonly key: string;
+  readonly label: string;
+  readonly icon?: string;
+  readonly badge?: number | string;
+  readonly badgeLabel?: string;
+  readonly disabled?: boolean;
+}
+interface NavigationGroup {
+  readonly key: string;
+  readonly label: string;
+  readonly icon?: string;
+  readonly items: readonly NavigationItem[];
+  readonly defaultExpanded?: boolean;
+}
+type NavigationItem = NavigationDestination | NavigationGroup;
+interface NavigationRailProps extends ControlLayoutProps {
+  items: readonly NavigationItem[];
+  value?: string | null;
+  defaultValue?: string | null;
+  onChange?: (key: string) => void;
+  expanded?: readonly string[];
+  defaultExpanded?: readonly string[];
+  onExpandedChange?: (expanded: readonly string[]) => void;
+  collapsed?: boolean;
+  width?: UiLength;
+  label?: string;
+}
+declare function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: ComponentContext): UiChild;
+type PopoverSide = 'bottom' | 'top' | 'start' | 'end';
+type PopoverAlign = 'start' | 'center' | 'end';
+interface PopoverProps {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  anchor?: UiNode | null;
+  content?: UiChild;
+  label?: string;
+  description?: string;
+  side?: PopoverSide;
+  align?: PopoverAlign;
+  offset?: number;
+  initialFocus?: UiNode | null;
+  width?: number;
+  disabled?: boolean;
+  panelRef?: UiNodeRef;
+}
+declare function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): UiChild;
 interface TreeNode {
   readonly key: string;
   readonly label: string;
@@ -1079,10 +1189,12 @@ export {
   controlled,
   controlMessage,
   controlTokens,
+  DataGrid,
   DataTable,
   DatePicker,
   Dialog,
   Divider,
+  Drawer,
   email,
   field,
   fieldArray,
@@ -1109,6 +1221,7 @@ export {
   Meter,
   minLength,
   monthGrid,
+  NavigationRail,
   normalizeHex,
   NumberInput,
   Pagination,
@@ -1117,10 +1230,12 @@ export {
   pattern,
   plainNodeOf,
   PlainView,
+  Popover,
   ProgressBar,
   quantize,
   RadioGroup,
   range,
+  RangeSlider,
   required,
   SegmentedControl,
   Select,
@@ -1177,11 +1292,16 @@ export {
   type ControlRadiusTokens,
   type ControlTokens,
   type DataColumn,
+  type DataGridCell,
+  type DataGridColumn,
+  type DataGridProps,
   type DataTableProps,
   type DataTableSort,
   type DatePickerProps,
   type DialogProps,
   type DividerProps,
+  type DrawerProps,
+  type DrawerSide,
   type Field,
   type FieldArray,
   type FieldArrayOptions,
@@ -1213,6 +1333,10 @@ export {
   type MenuProps,
   type MeterOptimum,
   type MeterProps,
+  type NavigationDestination,
+  type NavigationGroup,
+  type NavigationItem,
+  type NavigationRailProps,
   type NumberInputProps,
   type OverlayHandle,
   type OverlayOptions,
@@ -1223,10 +1347,14 @@ export {
   type PlainNode,
   type PlainNodeType,
   type PlainViewProps,
+  type PopoverAlign,
+  type PopoverProps,
+  type PopoverSide,
   type Problems,
   type ProgressBarProps,
   type RadioGroupProps,
   type RadioOption,
+  type RangeSliderProps,
   type Schema,
   type SegmentedControlProps,
   type SegmentedOption,

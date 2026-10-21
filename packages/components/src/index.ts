@@ -32,6 +32,7 @@ export { Switch, type SwitchProps } from './Switch';
 export { RadioGroup, type RadioGroupProps, type RadioOption } from './Radio';
 export { TextInput, TextArea, type TextInputProps, type TextAreaProps } from './TextInput';
 export { Slider, type SliderProps } from './Slider';
+export { RangeSlider, type RangeSliderProps } from './RangeSlider';
 export { NumberInput, type NumberInputProps } from './NumberInput';
 export { Card, Divider, Toolbar, Tabs, Accordion } from './Structure';
 export type {
@@ -46,6 +47,7 @@ export type {
 export { SplitPane, type SplitPaneProps } from './SplitPane';
 export { FindBar, type FindBarProps } from './FindBar';
 export { Dialog, type DialogProps } from './Dialog';
+export { Drawer, type DrawerProps, type DrawerSide } from './Drawer';
 export { ColorPalette, normalizeHex, PALETTE, type ColorPaletteProps, type PaletteColor } from './ColorPalette';
 export { ColorPicker, hexOfHsv, hsvOfHex, type ColorPickerProps, type Hsv } from './ColorPicker';
 export { Menu, type MenuProps, type MenuItem } from './Menu';
@@ -76,6 +78,15 @@ export {
   type PlainViewProps
 } from './PlainView';
 export { DataTable, type DataColumn, type DataTableProps, type DataTableSort } from './DataTable';
+export { DataGrid, type DataGridCell, type DataGridColumn, type DataGridProps } from './DataGrid';
+export {
+  NavigationRail,
+  type NavigationRailProps,
+  type NavigationItem,
+  type NavigationDestination,
+  type NavigationGroup
+} from './NavigationRail';
+export { Popover, type PopoverProps, type PopoverSide, type PopoverAlign } from './Popover';
 export { Tree, type TreeDecoration, type TreeNode, type TreeProps } from './Tree';
 export {
   Image,

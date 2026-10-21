@@ -1,0 +1,203 @@
+import { map } from 'rxjs/operators';
+
+import { percent } from 'gesso-core';
+import { Button, NavigationRail, type NavigationItem } from 'gesso-components';
+import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
+import type { WorkbenchFixture } from '../fixture';
+
+/** Filled glyphs on a 24 grid; a hole is a second subpath wound the other way. */
+const ICON = {
+  home: 'M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z',
+  inbox: 'M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v7h4l1 2h4l1-2h4V6z',
+  drafts: 'M15.5 3.5l5 5L9 20H4v-5z',
+  sent: 'M3 20l18-8L3 4v6l12 2-12 2z',
+  tag: 'M3 3h9l9 9-9 9-9-9z',
+  gear: 'M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20zm0 6a4 4 0 1 1 0 8 4 4 0 1 1 0-8z'
+} as const;
+
+const PLAIN: readonly NavigationItem[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'activity', label: 'Activity' },
+  { key: 'members', label: 'Members' },
+  { key: 'billing', label: 'Billing' },
+  { key: 'settings', label: 'Settings' }
+];
+
+const MAIL: readonly NavigationItem[] = [
+  { key: 'home', label: 'Home', icon: ICON.home },
+  { key: 'inbox', label: 'Inbox', icon: ICON.inbox, badge: 12, badgeLabel: '12 unread' },
+  { key: 'drafts', label: 'Drafts', icon: ICON.drafts, badge: 'New' },
+  { key: 'sent', label: 'Sent', icon: ICON.sent, badge: 1500, badgeLabel: '1,500 sent' },
+  { key: 'settings', label: 'Settings', icon: ICON.gear }
+];
+
+const GROUPS: readonly NavigationItem[] = [
+  { key: 'home', label: 'Home', icon: ICON.home },
+  {
+    key: 'labels',
+    label: 'Labels',
+    icon: ICON.tag,
+    defaultExpanded: true,
+    items: [
+      { key: 'work', label: 'Work', badge: 4 },
+      { key: 'family', label: 'Family' },
+      {
+        key: 'archive',
+        label: 'Archive',
+        items: [
+          { key: 'archive-2024', label: '2024' },
+          { key: 'archive-2023', label: '2023' },
+          { key: 'archive-empty', label: 'Nothing here', disabled: true }
+        ]
+      }
+    ]
+  },
+  { key: 'projects', label: 'Projects', items: [{ key: 'gesso', label: 'Gesso' }] },
+  { key: 'settings', label: 'Settings', icon: ICON.gear }
+];
+
+const LONG: readonly NavigationItem[] = [
+  { key: 'a', label: 'Quarterly reports for every region, reviewed and approved', icon: ICON.inbox, badge: 128 },
+  {
+    key: 'b',
+    label: 'A group whose heading is longer than the rail could ever be wide',
+    icon: ICON.tag,
+    defaultExpanded: true,
+    items: [{ key: 'b1', label: 'quarterly-report-final-final-v3-reviewed-by-legal.pdf', badge: 'Draft' }]
+  },
+  { key: 'c', label: 'Short', icon: ICON.gear }
+];
+
+const MANY: readonly NavigationItem[] = Array.from({ length: 60 }, (_, at) => ({
+  key: `page-${at + 1}`,
+  label: `Page ${at + 1}`,
+  ...(at % 7 === 0 ? { badge: at } : {})
+}));
+
+const DISABLED: readonly NavigationItem[] = [
+  { key: 'first', label: 'First (disabled)', icon: ICON.home, disabled: true },
+  { key: 'open', label: 'Available', icon: ICON.inbox },
+  { key: 'middle', label: 'Middle (disabled)', icon: ICON.drafts, disabled: true },
+  { key: 'also', label: 'Also available', icon: ICON.sent },
+  { key: 'last', label: 'Last (disabled)', icon: ICON.gear, disabled: true }
+];
+
+/** A rail whose value is held here and read back in a line under it. */
+function LiveRail(
+  inputs: Inputs<{
+    items: readonly NavigationItem[];
+    start?: string | null;
+    collapsible?: boolean;
+    startCollapsed?: boolean;
+    width?: number;
+    direction?: 'ltr' | 'rtl';
+  }>,
+  _ctx: ComponentContext
+) {
+  const value = internalState<string | null>(inputs.start.value ?? null);
+  const collapsed = internalState(inputs.startCollapsed.value === true);
+  const presses = internalState(0);
+  return (
+    <column gap={8} width={percent(100)} height={percent(100)} textDirection={inputs.direction.value ?? 'ltr'}>
+      {inputs.collapsible.value === true ? (
+        <Button
+          label={collapsed.pipe(map(narrow => (narrow ? 'Expand' : 'Collapse')))}
+          size="small"
+          variant="outlined"
+          onClick={() => (collapsed.value = !collapsed.value)}
+        />
+      ) : null}
+      <box flexGrow={1} minHeight={0} backgroundColor="controlBackground" borderRadius={8} x="start" y="stretch">
+        <NavigationRail
+          label="Workbench"
+          items={inputs.items.value}
+          value={value}
+          onChange={key => {
+            value.value = key;
+            presses.value += 1;
+          }}
+          collapsed={collapsed}
+          width={inputs.width.value ?? 240}
+        />
+      </box>
+      <text textStyle="bodySmall" color="textMuted">
+        {value.pipe(map(key => `Active: ${key ?? 'nothing'}`))}
+      </text>
+      <text textStyle="bodySmall" color="textMuted">
+        {presses.pipe(map(count => `Activated ${count} times`))}
+      </text>
+    </column>
+  );
+}
+
+export const navigationRailFixture: WorkbenchFixture = {
+  id: 'navigation-rail',
+  name: 'NavigationRail',
+  source: 'packages/components/src/NavigationRail.ts',
+  states: [
+    {
+      name: 'Plain list',
+      try: 'Tab onto it: focus lands on Overview, the active row, with a ring. Down and Up move the ring without changing the active line; Enter makes the focused row active. Tab again leaves the rail in one step.',
+      width: 300,
+      height: 330,
+      stretch: true,
+      render: () => <LiveRail items={PLAIN} start="overview" />
+    },
+    {
+      name: 'Icons and badges',
+      try: 'Every label starts on one line after its icon. Inbox shows 12, Drafts New, Sent 99+ at the row end. Click Inbox: its row, icon and label take the selection colours and the badge stays readable.',
+      width: 300,
+      height: 330,
+      stretch: true,
+      render: () => <LiveRail items={MAIL} start="home" />
+    },
+    {
+      name: 'Groups, nested',
+      try: 'Labels starts open. Click Archive: 2023 and 2024 appear indented a step further. Focus Projects and press Right: it opens; Right again goes to Gesso; Left goes back to Projects; Left again closes it. Choose 2023, then close Labels: the Labels heading turns bold because it hides the active page.',
+      width: 300,
+      height: 400,
+      stretch: true,
+      render: () => <LiveRail items={GROUPS} start="home" />
+    },
+    {
+      name: 'Collapsed',
+      try: 'Icons only, centred, in a narrow column; Projects, which has no icon, shows P. Hover a row: its label appears beside it after a pause. Tab in and arrow down: each row shows its label as it gains focus. Expand: labels return at full width and the tooltips stop.',
+      width: 300,
+      height: 420,
+      stretch: true,
+      render: () => <LiveRail items={GROUPS} start="inbox" collapsible startCollapsed />
+    },
+    {
+      name: 'Long labels, narrow',
+      try: 'The rail is 170 wide. Every label is one line cut with an ellipsis before its badge or arrow, nothing is drawn past the rail edge, and the badges are whole, never cut.',
+      width: 240,
+      height: 260,
+      stretch: true,
+      render: () => <LiveRail items={LONG} start="b1" width={170} />
+    },
+    {
+      name: 'Many items',
+      try: 'Page 45 is active and in view without scrolling. Wheel back to the top, then Tab in: focus goes to Page 45 and the list scrolls to it. End reaches Page 60 with the list following; Home brings Page 1 back. Every label starts with P, so typing P steps focus one row down each time.',
+      width: 300,
+      height: 360,
+      stretch: true,
+      render: () => <LiveRail items={MANY} start="page-45" />
+    },
+    {
+      name: 'Disabled items',
+      try: 'Disabled rows are greyed. Clicking one does nothing. Tab in: focus lands on Available, not on First. Down goes to Also available, skipping Middle; End stays there, because Last is disabled; Home goes back to Available.',
+      width: 300,
+      height: 300,
+      stretch: true,
+      render: () => <LiveRail items={DISABLED} />
+    },
+    {
+      name: 'Right to left',
+      try: 'Icons are on the right and badges and arrows on the left; Archive and its years are indented from the right. Focus Projects and press Left: it opens, Left again goes to Gesso, Right goes back to it and Right again closes it.',
+      width: 300,
+      height: 420,
+      stretch: true,
+      render: () => <LiveRail items={GROUPS} start="work" direction="rtl" />
+    }
+  ]
+};

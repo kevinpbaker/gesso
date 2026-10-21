@@ -4,14 +4,14 @@ description: What gesso-components is, the contract every control in it honours,
 
 # Components
 
-`gesso-components` is the library a screen is built out of: thirty-nine
+`gesso-components` is the library a screen is built out of: forty-four
 controls, from a checkbox to a virtualized table, all of them themed,
 keyboard operable and announced to an assistive technology from the day
 they were written.
 
 They are ordinary components. Each one is a function that runs once and
 returns elements, built from `gesso-core` and nothing you do not also
-have. What the library adds is that the same thirty-nine answer the
+have. What the library adds is that the same forty-four answer the
 same four questions the same way, so learning one control is most of
 learning the rest.
 
@@ -146,17 +146,20 @@ The pages, by what they are for:
   [Select](/components/select), [Combobox](/components/combobox),
   [DatePicker](/components/date-picker).
 - **Entering a value:** [TextInput and TextArea](/components/text-input),
-  [Slider](/components/slider), [NumberInput](/components/number-input).
+  [Slider](/components/slider), [RangeSlider](/components/range-slider),
+  [NumberInput](/components/number-input).
 - **Showing data:** [DataTable](/components/data-table),
-  [Tree](/components/tree), [LazyList](/components/lazy-list).
+  [DataGrid](/components/data-grid), [Tree](/components/tree), [LazyList](/components/lazy-list).
 - **Arranging a screen:** [Tabs](/components/tabs),
   [Accordion](/components/accordion), [Card](/components/card),
   [Divider](/components/divider), [Toolbar](/components/toolbar),
   [SplitPane](/components/split-pane), [FindBar](/components/find-bar).
 - **Finding the way around one:** [Breadcrumb](/components/breadcrumb),
+  [NavigationRail](/components/navigation-rail),
   [Pagination](/components/pagination).
 - **Layering over a screen:** [Dialog](/components/dialog),
-  [Menu](/components/menu), [Tooltip](/components/tooltip),
+  [Drawer](/components/drawer), [Menu](/components/menu),
+  [Tooltip](/components/tooltip), [Popover](/components/popover),
   [Toast](/components/toast).
 - **Showing media:** [Image](/components/image),
   [Avatar](/components/avatar), [Video](/components/video),

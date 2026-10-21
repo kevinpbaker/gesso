@@ -1,0 +1,5 @@
+---
+'gesso-components': patch
+---
+
+`NavigationRail` is new: the column of destinations an application keeps down its side, with one of them active. Rows take an optional icon and a badge, groups of rows open and close, and `collapsed` narrows the rail to a column of icons whose labels show as tooltips and stay the rows' accessible names. It is controlled by default, so the router can own where the application is: compute `value` from `router.isActive` and call `router.go` from `onChange`, and Back, Forward and links elsewhere move the rail with no code of their own. It is one tab stop; the arrows move focus between rows without navigating, Enter or Space activates, Right and Left open, close and walk groups (mirrored when the rail reads right to left), Home and End reach the ends, a letter jumps to the next row starting with it, and disabled rows are skipped. A screen reader finds a `navigation` landmark holding a `tree`, with the active row marked `current` and each group `expanded` or `collapsed`. A rail taller than its box scrolls, and the active row is kept in view.
