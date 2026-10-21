@@ -259,11 +259,16 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
             Row(
               { width: percent(100), height: 6, y: 'center', hitTestable: false },
               // Measured from the same fraction the fill is, so the
-              // two cannot disagree about where the value is.
-              Box({ width: fraction.pipe(map(part => percent(part * 100))), height: 0 }),
+              // two cannot disagree about where the value is. Neither
+              // box may shrink: at the far end the thumb overhangs the
+              // row by half its width, and a row out of room shrinks
+              // its children to fit, which drew the thumb short of the
+              // end of the fill.
+              Box({ width: fraction.pipe(map(part => percent(part * 100))), height: 0, flexShrink: 0 }),
               Box({
                 width: THUMB,
                 height: THUMB,
+                flexShrink: 0,
                 borderRadius: THUMB / 2,
                 // Half of it either side of the boundary, so the
                 // handle is centred on the value rather than starting

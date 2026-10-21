@@ -67,6 +67,22 @@ describe('Slider, right to left', () => {
     }
   });
 
+  it('centres its thumb on the end of the fill at either end of the track', () => {
+    for (const direction of ['ltr', 'rtl'] as const) {
+      for (const defaultValue of [0, 100]) {
+        const { ui } = mount(direction, { thumb: true, defaultValue });
+        const strip = trackOf(ui);
+        const fill = ui.getLayout(strip.firstChild!.firstChild!)!;
+        const thumb = ui.getLayout(strip.lastChild!.lastChild!)!;
+        const end = direction === 'ltr' ? fill.x + fill.width : fill.x;
+        // At the far end the thumb hangs half off the track, and the row
+        // holding it used to shrink the spacer before it to make room, so
+        // the thumb sat short of the end of the fill it marks.
+        expect(thumb.x + thumb.width / 2, `${direction} at ${defaultValue}`).toBe(end);
+      }
+    }
+  });
+
   it('moves the value toward the arrow, so Left is more', () => {
     const { ui, changes } = mount('rtl');
     ui.fireEvent.focus(ui.getByRole('slider'));
