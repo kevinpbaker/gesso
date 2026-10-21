@@ -11,8 +11,10 @@ paragraph that breaks its lines from all of them together.
 
 <LiveExample id="richtext" height="420" />
 
-Everything on that card is four `<text>` elements. There is no rich
-text component, and no node per word.
+Everything on that card is four `<text>` elements: no component, and
+no node per word. Runs are enough to read markdown. To edit it, the
+library has [RichTextEditor](/components/rich-text-editor), which is
+built from the same runs, and its read-only twin `RichTextView`.
 
 ## Runs
 
@@ -145,6 +147,7 @@ renderer draws it. Its characters keep their offsets, so a selection,
 a copy, find-in-page and undo all still see them. It is how a markdown
 editor draws `**bold**` as a bold word while the asterisks stay in the
 string being typed, which the rule above insists on.
+[RichTextEditor](/components/rich-text-editor) is that editor.
 
 ```tsx
 <editabletext

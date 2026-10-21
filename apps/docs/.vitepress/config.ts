@@ -145,6 +145,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'RadioGroup', link: '/components/radio-group' },
       { text: 'SegmentedControl', link: '/components/segmented-control' },
       { text: 'TextInput and TextArea', link: '/components/text-input' },
+      { text: 'RichTextEditor', link: '/components/rich-text-editor' },
       { text: 'Slider', link: '/components/slider' },
       { text: 'RangeSlider', link: '/components/range-slider' },
       { text: 'NumberInput', link: '/components/number-input' },

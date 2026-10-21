@@ -32,6 +32,7 @@ import { plainViewFixture } from './plain-view';
 import { popoverFixture } from './popover';
 import { progressBarFixture } from './progress-bar';
 import { radioGroupFixture } from './radio-group';
+import { richTextEditorFixture } from './rich-text-editor';
 import { rangeSliderFixture } from './range-slider';
 import { segmentedControlFixture } from './segmented-control';
 import { selectFixture } from './select';
@@ -56,6 +57,7 @@ export const FIXTURES: readonly WorkbenchFixture[] = [
   switchFixture,
   radioGroupFixture,
   textInputFixture,
+  richTextEditorFixture,
   numberInputFixture,
   sliderFixture,
   rangeSliderFixture,
