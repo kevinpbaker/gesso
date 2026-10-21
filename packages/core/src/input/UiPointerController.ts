@@ -225,6 +225,8 @@ export class UiPointerController {
   }
 
   private lastPosition: { x: number; y: number } | null = null;
+  /** Whether the last hover hit was on a scrollbar; see `overScrollbar`. */
+  private hoverOnScrollbar = false;
   /** The pressed node and its ancestors when the press began, deepest first. */
   private downPath: UiNode[] = [];
 
@@ -260,6 +262,16 @@ export class UiPointerController {
   }
 
   /**
+   * Whether the pointer is on a scrollbar, or dragging a thumb: the arrow
+   * is shown there whatever the content under the bar asks for, as over a
+   * native scrollbar. A hit on a bar is its scroll container's, so the
+   * cursor set above that (an editor's I-beam) was shown over the thumb.
+   */
+  get overScrollbar(): boolean {
+    return this.scrollbarDrag !== null || this.hoverOnScrollbar;
+  }
+
+  /**
    * Pointer press. Hit-tests at the point, establishes hover, and
    * dispatches PointerDown to the pressed node. Subsequent moves and
    * the up are routed to that node until release.
@@ -282,6 +294,7 @@ export class UiPointerController {
       return event;
     }
     const hit = this.hitTester.hitTest(x, y);
+    this.hoverOnScrollbar = hit?.scrollbar !== undefined;
     if (hit?.scrollbar !== undefined && this.scrollSink !== null) {
       this.activePointer = pointer;
       this.pressScrollbar(hit.node, hit.scrollbar.axis, hit.scrollbar.onThumb, x, y);
@@ -387,7 +400,9 @@ export class UiPointerController {
         this.scrollSink.revealScrollbars(zone.node);
       }
     }
-    const target = this.hitTester.hitTest(x, y)?.node ?? null;
+    const hit = this.hitTester.hitTest(x, y);
+    this.hoverOnScrollbar = hit?.scrollbar !== undefined;
+    const target = hit?.node ?? null;
     this.updateHover(target, x, y, buttons, modifiers, pointer);
     this.selection?.pointerHover?.(target, x, y);
     if (target === null) {
@@ -696,6 +711,7 @@ export class UiPointerController {
     if (pointer.kind !== 'touch') {
       return;
     }
+    this.hoverOnScrollbar = false;
     this.updateHover(null, x, y, 0, modifiers, pointer);
   }
 }

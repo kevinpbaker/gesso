@@ -6,6 +6,7 @@ import {
   Button,
   Column,
   Row,
+  ScrollView,
   Text,
   type UiCursor,
   DirtyFlags,
@@ -268,5 +269,36 @@ describe('GessoRuntime cursor', () => {
     cursorProp.next('grab');
     if (clock.isPending) clock.tick(16);
     expect(cursors).toEqual(['grab']);
+  });
+
+  it("shows the arrow over a scrollbar, as a native one does, whatever the content's cursor", () => {
+    let clock!: UiManualFrameClock;
+    // An editor's shape: a text area that asks for the I-beam, scrolling far more than it shows.
+    const runtime = new GessoRuntime({
+      root: Box({ width: 200, height: 200, cursor: 'text' }, ScrollView({ width: 200, height: 200 }, Column({ height: 4000 }))),
+      canvas: mockCanvas(800, 600),
+      width: 800,
+      height: 600,
+      clock: cb => (clock = new UiManualFrameClock(cb))
+    });
+    const cursors: (string | null)[] = [];
+    runtime.onCursor(cursor => cursors.push(cursor));
+    runtime.start();
+    if (clock.isPending) clock.tick(0);
+
+    runtime.input.pointer.pointerMove(100, 100);
+    expect(runtime.cursor).toBe('text');
+    // The thumb, at the top of the bar down the right edge.
+    runtime.input.pointer.pointerMove(197, 5);
+    expect(runtime.cursor).toBeNull();
+    // Dragged off the bar, it is still the thumb's.
+    runtime.input.pointer.pointerDown(197, 5, 1);
+    runtime.input.pointer.pointerMove(100, 60, 1);
+    if (clock.isPending) clock.tick(16);
+    expect(runtime.cursor).toBeNull();
+    runtime.input.pointer.pointerUp(100, 60, 0);
+    runtime.input.pointer.pointerMove(100, 100);
+    expect(runtime.cursor).toBe('text');
+    expect(cursors).toEqual(['text', null, 'text']);
   });
 });

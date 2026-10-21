@@ -3873,9 +3873,9 @@ export class GessoRuntime {
     );
   }
 
-  /** Hands the listener the hovered node's cursor, when it changed. */
+  /** Hands the listener the hovered node's cursor, when it changed: the arrow over a scrollbar, as a native one shows. */
   private sendCursor(): void {
-    const cursor = resolveCursor(this.input.pointer.hoveredNode);
+    const cursor = this.input.pointer.overScrollbar ? null : resolveCursor(this.input.pointer.hoveredNode);
     if (cursor === this.lastCursor) {
       return;
     }
