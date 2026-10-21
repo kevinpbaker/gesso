@@ -61,9 +61,13 @@ role takes that role's style whole, direction included, so a theme whose
 body reads one way and whose headings read the other would mirror a page
 in pieces.
 
-`textDirection` on an element is still an ordinary property, and it
-mirrors that element's own box. It does not reach the element's
-children, because it is not a provider; the theme is.
+`textDirection` on an element mirrors that element and what is under
+it, and it outlasts a type role named below it. A role is a size, a
+weight and a line, not a reading direction, as `font` in CSS leaves
+`direction` alone, so a label that names `bodySmall` inside a box set to
+read right to left keeps reading right to left. A role brings its own
+direction only where nothing above set one, which is what lets a theme
+whose roles all read right to left mirror a page from its root.
 
 ## What mirrors
 

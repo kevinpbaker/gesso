@@ -36,6 +36,8 @@ mapping table.
 | `valueText`                        | How the value should be spoken when the number is not it, as in `40%` or `3 stories`                                      |
 | `posInSet`, `setSize`              | A row's 1-based place in a set, including the items that are not mounted                                                  |
 | `level`                            | How deep a `treeitem` sits, 1 for a root                                                                                  |
+| `rowCount`, `columnCount`          | How many rows and columns a `grid` or `table` holds in all, header included, or -1 when not known                         |
+| `rowIndex`, `columnIndex`          | A `row`'s 1-based place among all the rows, and a cell's among all the columns, counting the ones not mounted             |
 | `activeDescendant`                 | The node that's active while this one keeps focus, such as the highlighted option of a combobox whose field has the caret |
 | `controls`                         | The node this one shows or changes, such as the list a combobox's field has open                                          |
 | `autocomplete`                     | What a field offers as it's typed into: `list` for suggestions to pick from, `inline` for the rest of the word, or `both` |
@@ -57,6 +59,15 @@ a combobox whose list is closed. A field that opens a list of
 suggestions says all three: `controls` for the list while it's open,
 `activeDescendant` for the highlighted option, and `autocomplete:
 'list'` throughout.
+
+A grid that mounts only the rows and columns in view says where they
+are with the last two pairs. The grid carries `rowCount` and
+`columnCount`, each `row` its `rowIndex`, and each cell its
+`columnIndex`; a cell does not repeat its row's index, which a reader
+takes from the row. Without them a reader counts the mounted cells, so
+after the grid scrolls sideways the first cell in view is announced as
+column 1 whatever column it is in. Leave all four unset on a grid that
+mounts everything: the counts are then the ones the reader sees.
 
 `disabled` is not among them, deliberately. It is already a property,
 already inherited by a whole subtree, and two ways to say the same

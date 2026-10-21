@@ -338,6 +338,29 @@ describe('SemanticsMirror', () => {
     expect(element.getAttribute('aria-setsize')).toBe('5');
   });
 
+  it("writes a grid's size and a row's and cell's place in it as ARIA, and stops writing them", () => {
+    const { elementFor, apply } = setup();
+    apply({
+      patches: [
+        { op: 'add', node: record('grid', { role: 'grid', label: 'Orders', rowCount: 1000, columnCount: 20 }) },
+        { op: 'add', node: record('row', { parent: 'grid', role: 'row', rowIndex: 41 }) },
+        { op: 'add', node: record('cell', { parent: 'row', role: 'gridcell', label: 'Shipped', columnIndex: 7 }) }
+      ]
+    });
+
+    expect(elementFor('grid').getAttribute('aria-rowcount')).toBe('1000');
+    expect(elementFor('grid').getAttribute('aria-colcount')).toBe('20');
+    expect(elementFor('row').getAttribute('aria-rowindex')).toBe('41');
+    expect(elementFor('cell').getAttribute('aria-colindex')).toBe('7');
+    // A cell is not given its row's index: ARIA reads it from the row.
+    expect(elementFor('cell').getAttribute('aria-rowindex')).toBeNull();
+
+    // A cell recycled into a grid that no longer says where it is must
+    // not keep announcing the column it was in before.
+    apply({ patches: [{ op: 'update', node: record('cell', { parent: 'row', role: 'gridcell', label: 'Shipped' }) }] });
+    expect(elementFor('cell').getAttribute('aria-colindex')).toBeNull();
+  });
+
   it('says a list whose selection is a set is multiselectable', () => {
     const { elementFor, apply } = setup();
     apply({

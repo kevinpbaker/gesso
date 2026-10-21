@@ -1421,6 +1421,59 @@ export const UiProperties = {
     affects: S
   }),
 
+  /**
+   * A row's 1-based place among all the rows of its grid or table,
+   * counting the header and the rows that are not mounted. A
+   * virtualized grid mounts a window of its rows, and without this a
+   * reader counts the mounted ones and calls the first of them row 1.
+   * Set on the `row`, not on its cells, which read it from there. See
+   * `aria-rowindex`.
+   */
+  rowIndex: defineProperty<number | undefined>({
+    name: 'rowIndex',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /**
+   * A cell's 1-based place among all the columns of its grid or table,
+   * counting the ones that are not mounted. A grid that virtualizes
+   * sideways mounts only the columns in view, so once it scrolls a
+   * cell's place among its siblings is no longer the column it is in.
+   * See `aria-colindex`.
+   */
+  columnIndex: defineProperty<number | undefined>({
+    name: 'columnIndex',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /**
+   * How many rows a grid or table holds in all, header included, when
+   * not all of them are mounted; -1 when the count is not known. Set on
+   * the `grid`, `treegrid` or `table`. See `aria-rowcount`.
+   */
+  rowCount: defineProperty<number | undefined>({
+    name: 'rowCount',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
+  /**
+   * How many columns a grid or table holds in all, when not all of them
+   * are mounted; -1 when the count is not known. Set on the `grid`,
+   * `treegrid` or `table`. See `aria-colcount`.
+   */
+  columnCount: defineProperty<number | undefined>({
+    name: 'columnCount',
+    defaultValue: undefined,
+    inherited: false,
+    affects: S
+  }),
+
   // -------------------------------------------------------------------------
   // Transform
   // -------------------------------------------------------------------------

@@ -785,6 +785,8 @@ interface DataGridColumn {
   readonly key: string;
   readonly header: string;
   readonly width: number;
+  readonly minWidth?: number;
+  readonly resizable?: boolean;
   readonly editable?: boolean;
   readonly align?: 'start' | 'center' | 'end';
   readonly format?: (value: string) => string;
@@ -792,6 +794,10 @@ interface DataGridColumn {
 interface DataGridCell {
   readonly row: number;
   readonly column: string;
+}
+interface DataGridRange {
+  readonly from: DataGridCell;
+  readonly to: DataGridCell;
 }
 interface DataGridProps extends ControlLayoutProps {
   ref?: UiNodeRef;
@@ -801,9 +807,18 @@ interface DataGridProps extends ControlLayoutProps {
   onCellChange?: (row: number, column: string, value: string) => void;
   revision?: unknown;
   frozenColumns?: number;
+  frozenRows?: number;
+  rowHeader?: boolean | ((row: number) => string);
+  rowHeaderWidth?: number;
+  columnWidths?: Readonly<Record<string, number>>;
+  onColumnResize?: (column: string, width: number) => void;
+  formulas?: boolean;
   activeCell?: DataGridCell;
   defaultActiveCell?: DataGridCell;
   onActiveCellChange?: (cell: DataGridCell) => void;
+  selection?: DataGridRange;
+  defaultSelection?: DataGridRange;
+  onSelectionChange?: (range: DataGridRange) => void;
   rowHeight?: number;
   headerHeight?: number;
   readOnly?: boolean;
@@ -811,20 +826,52 @@ interface DataGridProps extends ControlLayoutProps {
   label?: string;
 }
 declare function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): UiChild;
+type FormulaErrorCode = '#DIV/0!' | '#REF!' | '#NAME?' | '#VALUE!' | '#NUM!' | '#CYCLE!' | '#ERROR!';
+interface FormulaError {
+  readonly error: FormulaErrorCode;
+}
+type FormulaValue = number | string | boolean | FormulaError | null;
+type FormulaResolver = (row: number, column: number) => string | undefined;
+interface FormulaEvaluator {
+  evaluate(row: number, column: number): FormulaValue;
+  display(row: number, column: number): string;
+  evaluateRaw(raw: string): FormulaValue;
+  invalidate(): void;
+}
+declare function formulaError(code: FormulaErrorCode): FormulaError;
+declare function isFormulaError(value: FormulaValue): value is FormulaError;
+declare function columnLetters(column: number): string;
+declare function columnIndex(letters: string): number;
+declare function cellName(row: number, column: number): string;
+declare function parseCellName(name: string): {
+  row: number;
+  column: number;
+} | null;
+declare function formatFormulaNumber(value: number): string;
+declare function formatFormulaValue(value: FormulaValue): string;
+declare function createFormulaEvaluator(resolve: FormulaResolver): FormulaEvaluator;
+type NavigationIcon = string | {
+  readonly path: string | readonly string[];
+  readonly style?: 'fill' | 'stroke';
+  readonly strokeWidth?: number;
+  readonly fillRule?: 'nonzero' | 'evenodd';
+};
 interface NavigationDestination {
   readonly key: string;
   readonly label: string;
-  readonly icon?: string;
+  readonly icon?: NavigationIcon;
   readonly badge?: number | string;
   readonly badgeLabel?: string;
   readonly disabled?: boolean;
+  readonly to?: string | RouteTarget;
 }
 interface NavigationGroup {
   readonly key: string;
   readonly label: string;
-  readonly icon?: string;
+  readonly icon?: NavigationIcon;
   readonly items: readonly NavigationItem[];
   readonly defaultExpanded?: boolean;
+  readonly disabled?: boolean;
 }
 type NavigationItem = NavigationDestination | NavigationGroup;
 interface NavigationRailProps extends ControlLayoutProps {
@@ -832,6 +879,7 @@ interface NavigationRailProps extends ControlLayoutProps {
   value?: string | null;
   defaultValue?: string | null;
   onChange?: (key: string) => void;
+  onOpenElsewhere?: (key: string) => void;
   expanded?: readonly string[];
   defaultExpanded?: readonly string[];
   onExpandedChange?: (expanded: readonly string[]) => void;
@@ -1186,17 +1234,21 @@ export {
   Button,
   Captions,
   Card,
+  cellName,
   Checkbox,
   Chip,
   clockTime,
   ColorPalette,
   ColorPicker,
+  columnIndex,
+  columnLetters,
   Combobox,
   comboboxRank,
   controlDescription,
   controlled,
   controlMessage,
   controlTokens,
+  createFormulaEvaluator,
   DataGrid,
   DataTable,
   DatePicker,
@@ -1211,10 +1263,14 @@ export {
   followTransport,
   form,
   formatDate,
+  formatFormulaNumber,
+  formatFormulaValue,
+  formulaError,
   hexOfHsv,
   hsvOfHex,
   Icon,
   Image,
+  isFormulaError,
   isoDate,
   keymap,
   LazyList,
@@ -1234,6 +1290,7 @@ export {
   NumberInput,
   Pagination,
   PALETTE,
+  parseCellName,
   parseIsoDate,
   pattern,
   plainNodeOf,
@@ -1303,6 +1360,7 @@ export {
   type DataGridCell,
   type DataGridColumn,
   type DataGridProps,
+  type DataGridRange,
   type DataTableProps,
   type DataTableSort,
   type DatePickerProps,
@@ -1322,6 +1380,11 @@ export {
   type FormMember,
   type FormMembers,
   type FormOptions,
+  type FormulaError,
+  type FormulaErrorCode,
+  type FormulaEvaluator,
+  type FormulaResolver,
+  type FormulaValue,
   type FormValidator,
   type FormValues,
   type Hsv,
@@ -1343,6 +1406,7 @@ export {
   type MeterProps,
   type NavigationDestination,
   type NavigationGroup,
+  type NavigationIcon,
   type NavigationItem,
   type NavigationRailProps,
   type NumberInputProps,

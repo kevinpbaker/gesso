@@ -825,6 +825,13 @@ export class UiGraph {
       // A string the scale does not carry provides nothing: the
       // subtree keeps the type it inherited, which is quieter than
       // every word under it falling back to a default size.
+      // A role keeps a reading direction an ancestor set for itself; see
+      // `UiEnvironmentKeys.textDirection`. A style written out whole is
+      // the caller's to say everything in, direction included.
+      const set = env.get(UiEnvironmentKeys.textDirection);
+      if (style !== undefined && set !== undefined && typeof textStyle === 'string' && style.textDirection !== set) {
+        style = { ...style, textDirection: set };
+      }
       if (style !== undefined) {
         env = env.set(UiEnvironmentKeys.textStyle as UiEnvironmentKey<unknown>, style);
         // A style carries a colour, and the nearer of a style and a
@@ -861,6 +868,10 @@ export class UiGraph {
         own ??= { ...env.get(UiEnvironmentKeys.textStyle) };
         own[field] = value;
       }
+    }
+    const direction = node.getProperty<unknown>('textDirection');
+    if (direction === 'ltr' || direction === 'rtl') {
+      env = env.set(UiEnvironmentKeys.textDirection as UiEnvironmentKey<unknown>, direction);
     }
     if (own !== null) {
       // The line-height rule of `resolveFont`, carried down: a node

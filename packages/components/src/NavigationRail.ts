@@ -4,10 +4,13 @@ import {
   createComponent,
   FocusService,
   input,
+  RouterService,
   ScrollService,
+  ShellService,
   type ComponentContext,
   type Inputs,
-  type OutputCell
+  type OutputCell,
+  type RouteTarget
 } from 'gesso-framework';
 import {
   Box,
@@ -22,12 +25,14 @@ import {
   type UiKeyboardEvent,
   type UiLength,
   type UiNode,
+  type UiPointerEvent,
   type UiSemanticState
 } from 'gesso-core';
 
 import { Badge } from './Badge';
 import { chevron, CHEVRON_DOWN } from './chevron';
 import { controlled } from './controlled';
+import { followRoute, middlePress, opensElsewhere } from './follow';
 import {
   CONTROL_FOCUS_RING,
   CONTROL_INTERACTION,
@@ -39,6 +44,28 @@ import {
 import { Icon } from './Media';
 import { movedBetween, NO_STATES, rowCells } from './rowCells';
 import { tooltip } from './Tooltip';
+
+/**
+ * A row's glyph: SVG path data on a 24 grid, or a description of how to
+ * draw it.
+ *
+ * A string is one filled path, which is what an icon always was here.
+ * The object form is for the icon sets drawn as lines, Heroicons'
+ * outline set, Lucide, Feather: `style: 'stroke'` draws the path as a
+ * line `strokeWidth` wide (in the grid's units, default 2), and `path`
+ * may be several paths, each drawn as `Icon` draws one and laid over
+ * the others in the same square, as an SVG's `<path>` elements are.
+ * `fillRule` is passed to a filled path as `Icon` takes it; Heroicons'
+ * solid set wants `'evenodd'`.
+ */
+export type NavigationIcon =
+  | string
+  | {
+      readonly path: string | readonly string[];
+      readonly style?: 'fill' | 'stroke';
+      readonly strokeWidth?: number;
+      readonly fillRule?: 'nonzero' | 'evenodd';
+    };
 
 /**
  * One place the rail can take the reader: a screen, a section, a
@@ -58,12 +85,13 @@ export interface NavigationDestination {
    */
   readonly label: string;
   /**
-   * SVG path data on a 24 grid, drawn as `Icon` draws one, filled in
-   * the row's text colour. A collapsed rail draws a destination without
-   * one as the first letter of its label, so it is never an empty
-   * square.
+   * Drawn as `Icon` draws one, in the row's text colour: a string is a
+   * filled path on a 24 grid, and the object form can stroke it or
+   * draw several (see `NavigationIcon`). A collapsed rail draws a
+   * destination without one as the first letter of its label, so it is
+   * never an empty square.
    */
-  readonly icon?: string;
+  readonly icon?: NavigationIcon;
   /**
    * A count or a short marker at the row's end: `3`, `New`. A number is
    * drawn through `Badge`, so 120 is `99+`. A collapsed rail draws it
@@ -78,6 +106,19 @@ export interface NavigationDestination {
   readonly badgeLabel?: string;
   /** Announced as unavailable, skipped by every key, and inert to the pointer. */
   readonly disabled?: boolean;
+  /**
+   * Where in this application the destination is, as `Link`'s `to`
+   * takes it: a url of the router's, or a `RouteTarget`.
+   *
+   * Optional, and what lets the rail open the destination somewhere
+   * new without the application wiring it. Pressed plainly, the rail
+   * reports the key through `onChange` and then the router navigates
+   * there. With Command or Control held, with the middle button, or
+   * with Command-Enter or Control-Enter, the rail reports it through
+   * `onOpenElsewhere` and the shell opens the app there somewhere new
+   * (`ShellService.openRoute`); the value does not move.
+   */
+  readonly to?: string | RouteTarget;
 }
 
 /**
@@ -91,7 +132,7 @@ export interface NavigationGroup {
   readonly key: string;
   readonly label: string;
   /** Drawn as a destination's is, and as the group's mark in a collapsed rail. */
-  readonly icon?: string;
+  readonly icon?: NavigationIcon;
   /** What it holds: destinations, and groups inside it. */
   readonly items: readonly NavigationItem[];
   /**
@@ -100,6 +141,13 @@ export interface NavigationGroup {
    * wins when it is given.
    */
   readonly defaultExpanded?: boolean;
+  /**
+   * The heading and everything under it, at any depth, announced as
+   * unavailable, drawn in the disabled ink, skipped by every key and
+   * inert to the pointer. The group neither opens nor closes from the
+   * rail; an open set that holds it still shows its rows, disabled.
+   */
+  readonly disabled?: boolean;
 }
 
 export type NavigationItem = NavigationDestination | NavigationGroup;
@@ -120,6 +168,17 @@ export interface NavigationRailProps extends ControlLayoutProps {
    * second press as "back to the top of this page".
    */
   onChange?: (key: string) => void;
+  /**
+   * Called with the key of the destination a modified activation asked
+   * to open somewhere new: a Command-click or Control-click, a middle
+   * click, or Command-Enter or Control-Enter. The value does not move
+   * and `onChange` is not called, so the screen the reader is on stays.
+   *
+   * Opt-in. Without it, and on a destination without `to`, a modified
+   * activation is a plain one, as it always was. A press on a group is
+   * always plain: a group has nowhere to open.
+   */
+  onOpenElsewhere?: (key: string) => void;
   /** The open groups, by key. Omit to let the rail manage them. */
   expanded?: readonly string[];
   defaultExpanded?: readonly string[];
@@ -233,6 +292,8 @@ export function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: Compone
   const expandedWidth = input(inputs.width, DEFAULT_WIDTH);
   const focusStore = ctx.inject(FocusService);
   const scroll = ctx.inject(ScrollService);
+  const router = ctx.inject(RouterService);
+  const shell = ctx.inject(ShellService);
 
   const value = controlled<string | null>({
     component: 'NavigationRail',
@@ -307,7 +368,7 @@ export function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: Compone
     }
   });
 
-  const focusable = (row: RailRow | undefined): boolean => row !== undefined && !isDisabled(row.item);
+  const focusable = (row: RailRow | undefined): boolean => row !== undefined && !row.disabled;
   /**
    * The row that is in the Tab order: the cursor, the active
    * destination, or the first row that can take focus, whichever is
@@ -367,15 +428,38 @@ export function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: Compone
     }
     expanded.change(open ? [...current, key] : current.filter(entry => entry !== key));
   };
-  /** A group opens or closes; a destination asks to become the value. */
-  const activate = (row: RailRow | undefined): void => {
-    if (row === undefined || isDisabled(row.item)) {
+  /**
+   * A group opens or closes; a destination asks to become the value, or,
+   * for `elsewhere`, to be opened somewhere new.
+   *
+   * A request for somewhere new is honoured only when something will
+   * act on it: an `onOpenElsewhere` on the rail or a `to` on the
+   * destination. Otherwise it is a plain activation, so a rail that
+   * never asked for this answers a Cmd-click exactly as it did before,
+   * rather than swallowing it. It never moves the value, because the
+   * page the reader is on is not the one that changed.
+   */
+  const activate = (row: RailRow | undefined, elsewhere = false): void => {
+    if (row === undefined || row.disabled) {
       return;
     }
-    if (isGroup(row.item)) {
-      setOpen(row.item.key, !expanded.current().includes(row.item.key));
-    } else {
-      value.change(row.item.key);
+    const item = row.item;
+    if (isGroup(item)) {
+      setOpen(item.key, !expanded.current().includes(item.key));
+      return;
+    }
+    if (elsewhere && (item.to !== undefined || inputs.onOpenElsewhere.value !== undefined)) {
+      // Reported first, as `Link` runs `onPress` first, so a handler
+      // that records the request has it before the shell is asked.
+      inputs.onOpenElsewhere.emit(item.key);
+      if (item.to !== undefined) {
+        followRoute(item.to, true, router, shell);
+      }
+      return;
+    }
+    value.change(item.key);
+    if (item.to !== undefined) {
+      followRoute(item.to, false, router, shell);
     }
   };
 
@@ -402,7 +486,7 @@ export function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: Compone
   /** Opens a shut group, and steps into an open one. ARIA's tree key. */
   const forward = (): void => {
     const row = here();
-    if (row === undefined || !isGroup(row.item)) {
+    if (row === undefined || row.disabled || !isGroup(row.item)) {
       return;
     }
     if (!expanded.current().includes(row.item.key)) {
@@ -425,7 +509,7 @@ export function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: Compone
     if (row === undefined) {
       return;
     }
-    if (isGroup(row.item) && expanded.current().includes(row.item.key)) {
+    if (isGroup(row.item) && !row.disabled && expanded.current().includes(row.item.key)) {
       setOpen(row.item.key, false);
       return;
     }
@@ -471,7 +555,10 @@ export function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: Compone
       End: () => focusRow(seek(visible().length - 1, -1)),
       ArrowRight: mirrored ? back : forward,
       ArrowLeft: mirrored ? forward : back,
-      Enter: () => activate(here()),
+      // Command-Enter or Control-Enter is the keyboard's Cmd-click. The
+      // row is a `treeitem`, which the runtime does not press for us, so
+      // the chord is read here with the key, as `Link` reads it.
+      Enter: event => activate(here(), opensElsewhere(event.modifiers)),
       ' ': () => activate(here())
     })(event);
     // A letter is spent only when a row starts with it, so an
@@ -586,7 +673,7 @@ interface RailContext {
   /** The label a key has now, for a tooltip asked for after `items` changed. */
   readonly labelOf: (key: string) => string;
   readonly track: (key: string, node: UiNode | null, previous: UiNode | null) => void;
-  readonly activate: (row: RailRow) => void;
+  readonly activate: (row: RailRow, elsewhere: boolean) => void;
 }
 
 interface RailItemProps {
@@ -609,7 +696,8 @@ function RailItem(inputs: Inputs<RailItemProps>, ctx: ComponentContext): UiChild
   const item = row.item;
   const key = item.key;
   const group = isGroup(item);
-  const disabled = isDisabled(item);
+  const disabled = row.disabled;
+  const middle = middlePress();
   const current = rail.isCurrent(key);
   const open = rail.expanded.pipe(
     map(keys => keys.includes(key)),
@@ -672,7 +760,10 @@ function RailItem(inputs: Inputs<RailItemProps>, ctx: ComponentContext): UiChild
       states: group
         ? open.pipe(map(isOpen => (isOpen ? EXPANDED : COLLAPSED)))
         : current.pipe(map(on => (on ? CURRENT : NO_STATES))),
-      onClick: () => rail.activate(row)
+      // A Click carries the keys held but not the button, so a middle
+      // press is noted on the way down; see `middlePress`.
+      onPointerDown: middle.onPointerDown,
+      onClick: (event: UiPointerEvent) => rail.activate(row, middle.take() || opensElsewhere(event.modifiers))
     },
     rail.collapsed.pipe(
       map((collapsed): UiChild[] =>
@@ -706,7 +797,7 @@ function wideContent(
 ): UiChild[] {
   return [
     ...(item.icon !== undefined
-      ? [createComponent(Icon, { path: item.icon, size: ICON, color: ink })]
+      ? [glyphOf(item.icon, ink, {})]
       : anyIcon
         ? [Box({ width: ICON, height: ICON, flexShrink: 0 })]
         : []),
@@ -744,7 +835,7 @@ function narrowContent(
 ): UiChild[] {
   const glyph =
     item.icon !== undefined
-      ? createComponent(Icon, { path: item.icon, size: ICON, color: ink, selfX: 'center', selfY: 'center' })
+      ? glyphOf(item.icon, ink, CENTRED)
       : Text({
           text: monogram(item.label),
           // A size rather than a role: the letter stands in for an icon
@@ -777,6 +868,39 @@ function narrowContent(
   ];
 }
 
+const CENTRED = { selfX: 'center', selfY: 'center' } as const;
+
+/**
+ * A row's icon, through `Icon`, so a string draws exactly as it always
+ * did. Several paths are laid over each other in one icon-sized box,
+ * one `Icon` each, because that is what an SVG of several `<path>`s
+ * means: joined into one path, two filled shapes wound opposite ways
+ * would cancel where they overlap.
+ */
+function glyphOf(
+  icon: NavigationIcon,
+  ink: Observable<UiColorValue>,
+  place: { readonly selfX?: 'center'; readonly selfY?: 'center' }
+): UiChild {
+  if (typeof icon === 'string') {
+    return createComponent(Icon, { path: icon, size: ICON, color: ink, ...place });
+  }
+  // Only what was given, so `Icon`'s own defaults apply to the rest.
+  const how = {
+    ...(icon.style === undefined ? {} : { style: icon.style }),
+    ...(icon.strokeWidth === undefined ? {} : { strokeWidth: icon.strokeWidth }),
+    ...(icon.fillRule === undefined ? {} : { fillRule: icon.fillRule })
+  };
+  const paths = typeof icon.path === 'string' ? [icon.path] : icon.path;
+  if (paths.length === 1) {
+    return createComponent(Icon, { path: paths[0], size: ICON, color: ink, ...how, ...place });
+  }
+  return Box(
+    { width: ICON, height: ICON, flexShrink: 0, ...place },
+    ...paths.map(path => createComponent(Icon, { path, size: ICON, color: ink, ...how }))
+  );
+}
+
 /** The first character a reader would see, capitalised, for a row with no icon. */
 function monogram(label: string): string {
   const first = Array.from(label.trim())[0] ?? '';
@@ -794,14 +918,12 @@ interface RailRow {
   readonly position: number;
   readonly siblings: number;
   readonly parent: string | null;
+  /** Its own `disabled`, or that of any group it sits in. */
+  readonly disabled: boolean;
 }
 
 function isGroup(item: NavigationItem): item is NavigationGroup {
   return (item as NavigationGroup).items !== undefined;
-}
-
-function isDisabled(item: NavigationItem): boolean {
-  return !isGroup(item) && item.disabled === true;
 }
 
 /**
@@ -814,8 +936,11 @@ function isDisabled(item: NavigationItem): boolean {
  */
 function flatten(items: readonly NavigationItem[], open: ReadonlySet<string> | null): RailRow[] {
   const rows: RailRow[] = [];
-  const stack: { siblings: readonly NavigationItem[]; next: number; parent: string | null }[] = [
-    { siblings: items, next: 0, parent: null }
+  // A group's `disabled` is carried down the stack, so a row inside a
+  // disabled group is disabled at any depth without each row having to
+  // look up its ancestors.
+  const stack: { siblings: readonly NavigationItem[]; next: number; parent: string | null; disabled: boolean }[] = [
+    { siblings: items, next: 0, parent: null, disabled: false }
   ];
   while (stack.length > 0) {
     const top = stack[stack.length - 1];
@@ -826,9 +951,10 @@ function flatten(items: readonly NavigationItem[], open: ReadonlySet<string> | n
     const position = top.next;
     const item = top.siblings[position];
     top.next += 1;
-    rows.push({ item, level: stack.length, position, siblings: top.siblings.length, parent: top.parent });
+    const disabled = top.disabled || item.disabled === true;
+    rows.push({ item, level: stack.length, position, siblings: top.siblings.length, parent: top.parent, disabled });
     if (isGroup(item) && (open === null || open.has(item.key))) {
-      stack.push({ siblings: item.items, next: 0, parent: item.key });
+      stack.push({ siblings: item.items, next: 0, parent: item.key, disabled });
     }
   }
   return rows;

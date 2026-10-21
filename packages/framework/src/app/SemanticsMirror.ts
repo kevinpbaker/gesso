@@ -109,6 +109,10 @@ const RECORD_ATTRIBUTES: readonly string[] = [
   'aria-posinset',
   'aria-setsize',
   'aria-level',
+  'aria-rowindex',
+  'aria-colindex',
+  'aria-rowcount',
+  'aria-colcount',
   'aria-checked',
   'aria-expanded',
   'aria-selected',
@@ -487,6 +491,10 @@ export class SemanticsMirror {
     setNumber(element, 'aria-posinset', record.posInSet);
     setNumber(element, 'aria-setsize', record.setSize);
     setNumber(element, 'aria-level', record.level);
+    setNumber(element, 'aria-rowindex', record.rowIndex);
+    setNumber(element, 'aria-colindex', record.columnIndex);
+    setNumber(element, 'aria-rowcount', record.rowCount);
+    setNumber(element, 'aria-colcount', record.columnCount);
     if (record.valueText !== undefined) {
       element.setAttribute('aria-valuetext', record.valueText);
     }

@@ -17,16 +17,20 @@ import {
 import { HOVER_CONTROL } from './interaction';
 
 /**
- * Filled glyphs on a 24 grid, drawn for this page. A rail draws an icon
- * filled in its row's text colour, so a hole is a second subpath wound
- * the other way.
+ * Glyphs on a 24 grid, drawn for this page. A string is filled in the
+ * row's text colour, so a hole is a second subpath wound the other way.
+ * Settings is an outline icon instead: two paths drawn as lines.
  */
 const ICONS = {
   inbox: 'M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v7h4l1 2h4l1-2h4V6z',
   drafts: 'M15.5 3.5l5 5L9 20H4v-5z',
   sent: 'M3 20l18-8L3 4v6l12 2-12 2z',
   labels: 'M3 3h9l9 9-9 9-9-9z',
-  settings: 'M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20zm0 6a4 4 0 1 1 0 8 4 4 0 1 1 0-8z'
+  settings: {
+    path: ['M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18z', 'M12 9a3 3 0 1 0 0 6 3 3 0 1 0 0-6z'],
+    style: 'stroke',
+    strokeWidth: 1.5
+  }
 } as const;
 
 /** One screen per destination: its title, and a line about it. */
@@ -60,33 +64,39 @@ export const RAIL_ROUTES = { routes: [Index, Inbox, Drafts, Sent, Work, Family, 
 // #region rail
 /**
  * The rail's model: keys, labels, icons, a badge, a disabled row and a
- * group. Declared once, because a fresh array is a fresh set of rows.
+ * group, and where each destination is. Declared once, because a fresh
+ * array is a fresh set of rows.
+ *
+ * `to` is what makes a press navigate, and what makes a Cmd-click, a
+ * middle click or Cmd-Enter open the page somewhere new through the
+ * shell while this one stays. `to(Inbox)` is typed from the route, so a
+ * destination whose path takes params cannot be named without them.
  */
 const ITEMS: readonly NavigationItem[] = [
-  { key: 'inbox', label: 'Inbox', icon: ICONS.inbox, badge: 12, badgeLabel: '12 unread' },
-  { key: 'drafts', label: 'Drafts', icon: ICONS.drafts },
-  { key: 'sent', label: 'Sent', icon: ICONS.sent, disabled: true },
+  { key: 'inbox', label: 'Inbox', icon: ICONS.inbox, badge: 12, badgeLabel: '12 unread', to: to(Inbox) },
+  { key: 'drafts', label: 'Drafts', icon: ICONS.drafts, to: to(Drafts) },
+  { key: 'sent', label: 'Sent', icon: ICONS.sent, disabled: true, to: to(Sent) },
   {
     key: 'labels',
     label: 'Labels',
     icon: ICONS.labels,
     defaultExpanded: true,
     items: [
-      { key: 'work', label: 'Work' },
-      { key: 'family', label: 'Family', badge: 'New' }
+      { key: 'work', label: 'Work', to: to(Work) },
+      { key: 'family', label: 'Family', badge: 'New', to: to(Family) }
     ]
   },
-  { key: 'settings', label: 'Settings', icon: ICONS.settings }
+  { key: 'settings', label: 'Settings', icon: ICONS.settings, to: to(Settings) }
 ];
 
-/** Each destination's key, its route, and how to go there, typed by the route. */
+/** Each destination's key and its route, for working out which is active. */
 const PAGES = [
-  { key: 'inbox', route: Inbox, go: (router: RouterService) => router.go(Inbox) },
-  { key: 'drafts', route: Drafts, go: (router: RouterService) => router.go(Drafts) },
-  { key: 'sent', route: Sent, go: (router: RouterService) => router.go(Sent) },
-  { key: 'work', route: Work, go: (router: RouterService) => router.go(Work) },
-  { key: 'family', route: Family, go: (router: RouterService) => router.go(Family) },
-  { key: 'settings', route: Settings, go: (router: RouterService) => router.go(Settings) }
+  { key: 'inbox', route: Inbox },
+  { key: 'drafts', route: Drafts },
+  { key: 'sent', route: Sent },
+  { key: 'work', route: Work },
+  { key: 'family', route: Family },
+  { key: 'settings', route: Settings }
 ];
 
 /**
@@ -94,7 +104,7 @@ const PAGES = [
  *
  * **The router owns where the application is, so the rail is
  * controlled.** Its `value` is worked out from `router.isActive`, one
- * cell per route, and a press asks the router to go there; the rail
+ * cell per route, and a press goes to the destination's `to`; the rail
  * moves when the url does, and not before. Back and Forward, a link
  * elsewhere on the screen, or a typed address all move it the same way,
  * because none of them goes through the rail.
@@ -129,7 +139,6 @@ export function MailRail(_inputs: Inputs<{}>, ctx: ComponentContext) {
           label="Mail"
           items={ITEMS}
           value={active}
-          onChange={key => PAGES.find(page => page.key === key)?.go(router)}
           collapsed={collapsed}
           width={200}
           flexGrow={1}

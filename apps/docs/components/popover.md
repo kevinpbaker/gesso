@@ -54,8 +54,8 @@ the panel in the overlay layer.
 ## Controlled and uncontrolled
 
 Given `open`, the application owns the state. Every way the popover
-closes, Escape, a press outside, Tab out of it, its anchor pressed
-again, is a request through `onOpenChange(false)`, and an application
+closes, Escape, a press outside, Tab out of it, focus moved away from
+it, its anchor pressed again, is a request through `onOpenChange(false)`, and an application
 that does not write the value back keeps it open: that is how a form
 with unsaved changes refuses to be put away. A press on the anchor of a
 closed popover is `onOpenChange(true)`, which is likewise only a request.
@@ -141,6 +141,24 @@ manager for the same reason: the manager walks the tree in order, and
 from the overlay layer Tab off the last control would wrap to the top of
 the page.
 
+**A control that takes Tab keeps it.** The panel acts only on a Tab
+nothing inside it used: a field of the application's own that indents on
+Tab cancels the key in its `onKeyDown`, and the panel then leaves focus
+where it is. A [TextArea](/components/text-input) is not such a field.
+Tab leaves a `TextArea` everywhere in the library, so that the keyboard
+is never caught in one, and inside a popover it goes on to the panel's
+next control like any other.
+
+**Focus leaving any other way closes it too.** Focus moved by code, by
+a shortcut that focuses another control, or by an assistive technology
+moving its own focus, is focus that left, and the popover asks to close
+through `onOpenChange(false)`, leaving focus where it went. Focus on the
+anchor, or in an overlay opened from inside the panel, does not count
+as leaving, by the same rule a press outside is judged by (see below).
+Focus that goes nowhere, as when the window loses focus, does not close
+it, and nor does focus that was elsewhere before the panel took it on
+opening.
+
 The page behind stays usable from the keyboard too, which is the point
 of a non-modal popover. Inside a modal [dialog](/components/dialog) it
 is the one exception: the dialog confines focus to itself, and the
@@ -181,7 +199,10 @@ together throwing, each placement side, the flip above an anchor at the
 window's bottom, the clamp beside one at its right edge, long content
 wrapping at 360 pixels, focus on open with and without `initialFocus`,
 Escape back to the anchor, Tab walking the panel and leaving it in both
-directions, a press outside closing it while reaching what was pressed,
+directions, Tab leaving a `TextArea` inside it and left alone for a
+field that cancels it, focus moved outside by code, by a shortcut and by
+an assistive technology's focus action closing it once, and focus in a
+nested popover or a select's list not closing it, a press outside closing it while reaching what was pressed,
 the wheel not closing it, a select and a nested popover inside it, the
 trigger's `expanded` and `controls`, `disabled`, right-to-left placement
 and content, and a popover inside a modal dialog.

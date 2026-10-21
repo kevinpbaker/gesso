@@ -1,4 +1,4 @@
-import { BehaviorSubject, combineLatest, map, type Observable } from 'rxjs';
+import { BehaviorSubject, combineLatest, map } from 'rxjs';
 import {
   type UiNodeRef,
   Box,
@@ -9,8 +9,7 @@ import {
   type UiPointerEvent,
   type LayoutBox,
   percent,
-  measure,
-  resolveString
+  measure
 } from 'gesso-core';
 
 import { input, type ComponentContext, type Inputs } from 'gesso-framework';
@@ -22,10 +21,10 @@ import {
   foregroundToken,
   keymap,
   layoutOf,
-  quantize,
   type ControlLayoutProps,
   modifiersOf
 } from './internals';
+import { fractionOf, pageStep, readsRightToLeft, snap, thumbLayer, trackFill, valueAt } from './sliderTrack';
 
 /**
  * A value chosen from a range.
@@ -108,54 +107,37 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
     if (disabled.value) {
       return;
     }
-    value.change(quantize(value.current() + by, min.value, max.value, step.value));
+    value.change(snap(value.current() + by, min.value, max.value, step.value));
   };
   const to = (next: number): void => {
     if (!disabled.value) {
-      value.change(quantize(next, min.value, max.value, step.value));
+      value.change(snap(next, min.value, max.value, step.value));
     }
   };
-  const page = (): number => Math.max(step.value, (max.value - min.value) / 10);
+  const page = (): number => pageStep(min.value, max.value, step.value);
 
   /**
    * Whether the slider reads right to left, asked at the moment a key or
-   * a press arrives.
-   *
-   * The layout already mirrors under `textDirection: 'rtl'`, so the fill
-   * grows from the right without anything here knowing; it is the two
-   * things that turn a position or a key into a value that have to be
-   * told. Without this a press near the right edge of a track filled
-   * from the right read as nearly the maximum, and Right made the fill
-   * longer by moving it left. Up and Down are not about reading
-   * direction and stay as they are.
+   * a press arrives; `readsRightToLeft` says why it has to be asked. Up
+   * and Down are not about reading direction and stay as they are.
    */
-  const rtl = (): boolean => {
-    const node = focus.node();
-    return node !== null && resolveString(node, 'textDirection') === 'rtl';
-  };
+  const rtl = (): boolean => readsRightToLeft(focus.node());
   /** Right is more left to right, and less right to left. */
   const across =
     (by: number): (() => void) =>
     () =>
       move(rtl() ? -by : by);
 
-  /** A pointer inside the track is a fraction of the range, from where the track starts. */
-  const toValue = (event: UiPointerEvent): number => {
-    const box = track.value;
-    if (box.width <= 0) {
-      return value.current();
-    }
-    const along = Math.min(1, Math.max(0, (event.x - box.x) / box.width));
-    const fraction = rtl() ? 1 - along : along;
-    return min.value + fraction * (max.value - min.value);
-  };
+  /** A pointer inside the track is a fraction of the range; before the track is measured it is the value as it stands. */
+  const toValue = (event: UiPointerEvent): number =>
+    valueAt(event.x, track.value, rtl(), min.value, max.value) ?? value.current();
   const seek = (event: UiPointerEvent): void => {
     event.stopPropagation();
     to(toValue(event));
   };
 
   const fraction = combineLatest([value.value, min, max]).pipe(
-    map(([current, low, high]) => (high === low ? 0 : Math.min(1, Math.max(0, (current - low) / (high - low)))))
+    map(([current, low, high]) => fractionOf(current, low, high))
   );
   const spoken = combineLatest([value.value, inputs.format]).pipe(
     map(([current, format]) => (format === undefined ? String(current) : format(current)))
@@ -244,45 +226,12 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
           height: 4,
           width: fraction.pipe(map(part => percent(part * 100))),
           borderRadius: 2,
-          backgroundColor: fill(disabled)
+          backgroundColor: trackFill(disabled)
         })
       ),
-      // A second layer over the track rather than a child of the fill,
-      // because the handle is four times the fill's height: inside it
-      // the handle would either be clipped or stretch the track it is
-      // supposed to sit on. The row is the track's own height and
-      // position, so centring within it puts the handle on the line,
-      // overhanging it evenly.
-      ...(inputs.thumb.value !== true
-        ? []
-        : [
-            Row(
-              { width: percent(100), height: 6, y: 'center', hitTestable: false },
-              // Measured from the same fraction the fill is, so the
-              // two cannot disagree about where the value is. Neither
-              // box may shrink: at the far end the thumb overhangs the
-              // row by half its width, and a row out of room shrinks
-              // its children to fit, which drew the thumb short of the
-              // end of the fill.
-              Box({ width: fraction.pipe(map(part => percent(part * 100))), height: 0, flexShrink: 0 }),
-              Box({
-                width: THUMB,
-                height: THUMB,
-                flexShrink: 0,
-                borderRadius: THUMB / 2,
-                // Half of it either side of the boundary, so the
-                // handle is centred on the value rather than starting
-                // at it. The start margin rather than the left one,
-                // because right to left the boundary is on its right.
-                marginStart: -THUMB / 2,
-                backgroundColor: fill(disabled)
-              })
-            )
-          ])
+      // A second layer over the track, measured from the same fraction
+      // the fill is, so the two cannot disagree about where the value is.
+      ...(inputs.thumb.value !== true ? [] : [thumbLayer(fraction, THUMB, { backgroundColor: trackFill(disabled) })])
     )
   );
-}
-
-function fill(disabled: Observable<boolean>): Observable<string> {
-  return disabled.pipe(map(off => (off ? 'controlForegroundDisabled' : 'controlAccent')));
 }
