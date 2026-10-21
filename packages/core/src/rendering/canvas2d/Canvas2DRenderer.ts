@@ -1097,8 +1097,36 @@ export class Canvas2DRenderer implements UiRenderer {
    * box does not, and leave a seam where a direct draw has none. What a
    * strip saves is raster, which is the cost it exists for; the walk
    * costs what a direct draw's walk would.
+   *
+   * Strips far apart are walked apart. A walk takes in everything
+   * between the strips it is given, and the two that come together most
+   * often are at opposite edges: a sticky header damaged at the top on
+   * every frame of a scroll, and the strip a scroll down exposes at the
+   * bottom. One walk over both drew every row on screen into a clip that
+   * kept almost none of it — each row's text one more copy for the GPU,
+   * which at 165Hz was more copies than it could take, so scrolling down
+   * a spreadsheet stuttered and scrolling up, its strip beside the
+   * header, did not. Strips whose walks would meet share one, so no
+   * pixel is painted twice.
    */
   private paintLayer(
+    layer: ScrollLayer,
+    strips: readonly LayerRect[] | null,
+    node: UiNode,
+    rec: LayoutRecord,
+    context: RenderContext
+  ): void {
+    if (strips === null) {
+      this.walkLayer(layer, null, node, rec, context);
+      return;
+    }
+    for (const group of walkGroups(strips, 2 * SPILL * layer.dpr)) {
+      this.walkLayer(layer, group, node, rec, context);
+    }
+  }
+
+  /** One walk of a layer's children, clipped to `strips` and culled to what reaches them. */
+  private walkLayer(
     layer: ScrollLayer,
     strips: readonly LayerRect[] | null,
     node: UiNode,
@@ -1110,8 +1138,8 @@ export class Canvas2DRenderer implements UiRenderer {
     const lctx = new PreciseContext(layer.frontContext);
     lctx.save();
     if (strips !== null) {
-      // Every strip in one walk: the strip a scroll exposed, and the items
-      // something changed (see \`ScrollLayerCache.damage\`).
+      // The strip a scroll exposed, the items something changed (see
+      // \`ScrollLayerCache.damage\`), or both where they lie together.
       lctx.setTransform(1, 0, 0, 1, 0, 0);
       lctx.beginPath();
       for (const strip of strips) {
@@ -1319,6 +1347,56 @@ function traceFrame(ctx: Canvas2DContext, x: number, y: number, width: number, h
   ctx.lineTo(x + width, y + height);
   ctx.lineTo(x + width, y);
   ctx.closePath();
+}
+
+/**
+ * Strips grouped so that each group is one walk of a layer.
+ *
+ * Two strips share a group when less than `reach` separates them, which
+ * is when their walks, each a spill wider than its strips, would meet.
+ * Strips in different groups therefore never overlap, and nothing is
+ * painted twice. A group keeps its strips in the order they came, and
+ * the groups go in the order of their first strip.
+ *
+ * Merged by repeated passes rather than one: joining two strips can
+ * bring the group within reach of a third that neither was near alone.
+ * A frame has a handful of strips, so the passes cost nothing.
+ */
+function walkGroups(strips: readonly LayerRect[], reach: number): LayerRect[][] {
+  const groups = strips.map(strip => ({ strips: [strip], box: { ...strip } }));
+  let merged = true;
+  while (merged) {
+    merged = false;
+    for (let i = 0; i < groups.length && !merged; i++) {
+      for (let j = i + 1; j < groups.length; j++) {
+        const a = groups[i].box;
+        const b = groups[j].box;
+        const apart =
+          b.x - (a.x + a.width) >= reach ||
+          a.x - (b.x + b.width) >= reach ||
+          b.y - (a.y + a.height) >= reach ||
+          a.y - (b.y + b.height) >= reach;
+        if (apart) {
+          continue;
+        }
+        const x = Math.min(a.x, b.x);
+        const y = Math.min(a.y, b.y);
+        groups[i] = {
+          strips: [...groups[i].strips, ...groups[j].strips],
+          box: {
+            x,
+            y,
+            width: Math.max(a.x + a.width, b.x + b.width) - x,
+            height: Math.max(a.y + a.height, b.y + b.height) - y
+          }
+        };
+        groups.splice(j, 1);
+        merged = true;
+        break;
+      }
+    }
+  }
+  return groups.map(group => group.strips);
 }
 
 /**

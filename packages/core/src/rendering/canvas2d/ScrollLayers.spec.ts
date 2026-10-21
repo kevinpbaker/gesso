@@ -288,6 +288,32 @@ describe('scroll layers', () => {
     ]);
   });
 
+  it('walks a sticky item and a strip at the far edge apart, not everything between them', () => {
+    // A spreadsheet scrolled down: its sticky header is damaged at the
+    // top on every frame and the strip comes in at the bottom. Walked as
+    // one box they took in every row on screen, each row's text copied
+    // and clipped away, and at a high refresh rate that many draws a
+    // frame saturated the GPU — on the way down only, since on the way
+    // up the strip comes in beside the header.
+    set(rows[0], 'position', 'sticky');
+    set(rows[0], 'top', 0);
+    set(rows[0], 'height', 10);
+    frame();
+    scrollTo(10);
+    scrollTo(25);
+
+    expect(renderer.scrollLayerStats.shifted).toBe(1);
+    // Under a header 10 high, row n is 10 + 30(n - 1) of the content.
+    // The strip's walk, first because the strip is, reaches row 4
+    // (100..130) and the header's reaches rows 1 and 2 (10..70); row 3
+    // (70..100) touches neither.
+    const painted = callArgs(layers[1].context, 'fillRect')
+      .filter(args => (args as number[])[3] === ROW)
+      .map(args => (args as number[])[1]);
+    expect(painted).toEqual([100, 10, 40]);
+    expect(callArgs(layers[1].context, 'clip').length).toBe(2);
+  });
+
   it('reuses the layer untouched on a frame that changed something beside it', () => {
     const other = graph.createNode('other', UiNodeType.Box);
     set(other, 'height', 20);
