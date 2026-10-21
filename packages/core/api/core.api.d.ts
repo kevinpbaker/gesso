@@ -4477,6 +4477,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private paintEditable;
   private renderScrolledThroughLayer;
   private paintLayer;
+  private walkLayer;
   private applyTransform;
   private intersectsCull;
   private paintScrollbars;
