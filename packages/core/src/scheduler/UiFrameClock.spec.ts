@@ -805,7 +805,7 @@ describe('UiHostFrameClock on the display beat', () => {
       vi.setSystemTime(100 + k * 15.4);
       callbacks.shift()?.(100 + k * 15.4);
     }
-    return { clock, frames, scroll: () => (continuous = true) };
+    return { clock, frames, callbacks, scroll: () => (continuous = true) };
   }
 
   afterEach(() => vi.useRealTimers());
@@ -840,6 +840,95 @@ describe('UiHostFrameClock on the display beat', () => {
     for (let k = 1; k < settled.length; k++) {
       expect(Math.round((settled[k]! - settled[k - 1]!) / INTERVAL)).toBe(1);
     }
+  });
+
+  it('passes over a tick that waited behind a slow frame, and draws on the next that did not', () => {
+    const { clock, frames } = lockedClock();
+    frames.length = 0;
+    clock.requestFrame();
+    // Three refreshes' ticks, handled together once a long frame let them through.
+    vi.setSystemTime(2000 + 3.5 * INTERVAL);
+    for (let k = 0; k < 3; k++) clock.tick(2000 + k * INTERVAL);
+    expect(frames).toEqual([]);
+    // The refresh after: handled as it comes.
+    clock.tick(2000 + 3 * INTERVAL);
+    expect(frames.length).toBe(1);
+  });
+
+  it('draws on a waiting tick in the end, when every tick has waited', () => {
+    const { clock, frames } = lockedClock();
+    frames.length = 0;
+    clock.requestFrame();
+    for (let k = 0; k < 8; k++) {
+      vi.setSystemTime(3000 + (k + 2) * INTERVAL);
+      clock.tick(3000 + k * INTERVAL);
+    }
+    expect(frames.length).toBe(1);
+  });
+
+  /** Cheap frames on the host's ticks until this thread's refreshes are timed again, which they then are, `gap` apart. */
+  function retried(gap: number) {
+    const { clock, callbacks, scroll } = lockedClock();
+    scroll();
+    clock.requestFrame();
+    let time = 4000;
+    for (let k = 0; k < 20; k++) {
+      time = 4000 + k * INTERVAL;
+      vi.setSystemTime(time + 0.2);
+      clock.tick(time);
+    }
+    expect(callbacks.length).toBeGreaterThan(0);
+    for (let k = 1; k <= 9; k++) {
+      vi.setSystemTime(time + k * gap);
+      callbacks.shift()?.(time + k * gap);
+    }
+    return clock;
+  }
+
+  it("takes its own refreshes back once they keep the display's time", () => {
+    // Chrome: given up while the worker was busy, a refresh apart once it is not.
+    const clock = retried(INTERVAL);
+    expect(clock.isLocal).toBe(true);
+    expect(clock.isDisplayLocked).toBe(false);
+  });
+
+  it("leaves them given up while they keep none", () => {
+    // WebKit: a timer near 65 Hz however idle the worker is.
+    const clock = retried(15.4);
+    expect(clock.isLocal).toBe(false);
+    expect(clock.isDisplayLocked).toBe(true);
+  });
+
+  it('keeps its own refreshes when its frames are what is slow', () => {
+    // Chrome at 165 Hz, a scroll whose frames take 8 ms: drawn on every other refresh.
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const callbacks: ((time: number) => void)[] = [];
+    const clock: UiHostFrameClock = new UiHostFrameClock(
+      () => {
+        vi.setSystemTime(Date.now() + 8);
+        clock.requestFrame();
+      },
+      () => {},
+      {
+        now: () => Date.now(),
+        timeOrigin: 0,
+        requestAnimationFrame: callback => {
+          callbacks.push(callback);
+          return callbacks.length;
+        }
+      }
+    );
+    clock.displayInterval(1000 / 165, 0);
+    clock.requestFrame();
+    for (let k = 0; k < 12; k++) {
+      // The next refresh after the frame ends.
+      const at = Math.ceil(Date.now() / (1000 / 165)) * (1000 / 165);
+      vi.setSystemTime(at);
+      callbacks.shift()?.(at);
+    }
+    expect(clock.isLocal).toBe(true);
+    expect(clock.isDisplayLocked).toBe(false);
   });
 
   it('keeps its own refreshes when they are faster than the display it was told of', () => {
