@@ -84,21 +84,20 @@ toggle the popover twice in one press, which is to say not at all.
 The node and not a wrapper around a child, as `Tooltip` takes, because
 the trigger's half of the semantics belongs on the button a screen
 reader is on. A popover cannot write properties onto a node it did not
-render, so the trigger says them itself, from cells it already has:
+render, so the trigger says them itself, from cells it already has.
+The library's [Button](/components/button#opening-a-popup) takes both:
+`expanded`, which it announces as expanded or collapsed, and `controls`,
+the panel's node as `panelRef` writes it.
 
 ```tsx
-<button
+<Button
   ref={node => (anchor.value = node)}
   label="Filters"
-  states={open.pipe(map(on => [on ? 'expanded' : 'collapsed']))}
-  controls={panel}>
-  …
-</button>
+  expanded={open}
+  controls={panel}
+/>
 <Popover open={open} anchor={anchor} panelRef={node => (panel.value = node)} … />
 ```
-
-The library's own `Button` takes neither `states` nor `controls` yet, so
-a trigger that announces its popover is a `<button>` element for now.
 
 ## Placement
 
@@ -113,8 +112,11 @@ it: a form half filled in should not vanish because the page moved.
 `start` and `end` are logical. Under `textDirection="rtl"` the start
 side is the anchor's right and the end side its left, and `align="start"`
 on the top or bottom lines the panel up with the anchor's right edge.
-The direction is read from the anchor as the popover opens, and the
-panel's own content lays out in it too.
+The direction is the anchor's: the popover hands its anchor to the
+overlay layer as the tree the panel belongs to, and the layer resolves
+`start` and `end` against it, as it does for every overlay, and lays
+the panel's own content out in it too. A direction that changes while
+the panel is open moves it to the other side.
 
 ## Keyboard
 
@@ -162,11 +164,11 @@ the popover open. A press in an outer popover closes a nested one.
 
 ## Semantics
 
-| What    | Value                                                                                           |
-| ------- | ----------------------------------------------------------------------------------------------- |
-| Panel   | `dialog`, named by `label`, with `description` when given, and no `modal` state                 |
-| Trigger | Whatever the caller gives it: `expanded` or `collapsed`, and `controls` set to the panel's node |
-| Content | Its own records, under the panel's                                                              |
+| What    | Value                                                                                                            |
+| ------- | ---------------------------------------------------------------------------------------------------------------- |
+| Panel   | `dialog`, named by `label`, with `description` when given, and no `modal` state                                  |
+| Trigger | Whatever the caller gives it: a `Button`'s `expanded` and `controls`, set from the popover's state and its panel |
+| Content | Its own records, under the panel's                                                                               |
 
 ## What this page has checked
 

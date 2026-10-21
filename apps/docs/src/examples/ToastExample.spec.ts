@@ -157,13 +157,15 @@ describe('the docs toast example', () => {
     expect(ui.getByRole('status')).toHaveSemantics({ name: 'Note saved' });
   });
 
-  it('is pinned to the bottom left corner rather than placed in the layout', () => {
+  it('is pinned to the bottom start corner rather than placed in the layout', () => {
     const ui = mount();
     ui.raise('Save the note');
 
+    // The start corner, which the overlay layer turns into the left one
+    // in this left-to-right page and the right one in a right-to-left one.
     const entry = ui.entries()[0];
     expect(entry.bottom).toBe(24);
-    expect(entry.left).toBe(24);
+    expect(entry.start).toBe(24);
     expect(entry.anchor).toBeUndefined();
     // The placeholder left where the component was declared is what
     // the overlay's content inherits its theme from.

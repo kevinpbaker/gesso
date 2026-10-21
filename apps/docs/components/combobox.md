@@ -53,6 +53,12 @@ answers to, and `disabled`. A label longer than the list is wide is cut
 short with an ellipsis inside the list, so it never runs past the edge
 or pushes the chosen option's tick out of its column.
 
+The list opens under the field, as wide as it is but never narrower than
+180 pixels, lined up with the field's start edge: its left in
+left-to-right text and its right under `textDirection="rtl"`, so a list
+wider than a narrow field grows the way the field's text runs. It flips
+above the field when there is no room below.
+
 ## Matching
 
 What was typed is matched against each label, case-insensitively, and

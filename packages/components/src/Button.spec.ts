@@ -1,9 +1,10 @@
+import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Row, Text, type UiNode } from 'gesso-core';
+import { Box, Row, Text, type UiNode } from 'gesso-core';
 import { Button } from './Button';
 
 function mount(root: Parameters<typeof renderTest>[0]) {
@@ -118,5 +119,45 @@ describe('Button', () => {
   it('keeps the label as the name when the content is something else', () => {
     const ui = mount(createComponent(Button, { label: 'Play', children: Text({ text: '\u25b6' }) }));
     expect(ui.getByRole('button')).toHaveSemantics({ name: 'Play' });
+  });
+  it('says nothing about a popup until it is given `expanded`', () => {
+    const ui = mount(createComponent(Button, { label: 'Filters' }));
+    const record = ui.getSemantics(ui.getByRole('button'));
+    expect(record.states ?? []).toEqual([]);
+    expect(record.controls).toBeUndefined();
+  });
+
+  it('announces the popup it opens: expanded or collapsed, and the node it controls', () => {
+    const open = new BehaviorSubject(false);
+    const panel = new BehaviorSubject<UiNode | null>(null);
+    let target: UiNode | null = null;
+    const ui = mount(
+      Row(
+        {},
+        createComponent(Button, { label: 'Filters', expanded: open, controls: panel }),
+        Box({ ref: (node: UiNode | null) => (target = node), role: 'dialog', label: 'Filter issues' })
+      )
+    );
+    const button = () => ui.getSemantics(ui.getByRole('button', { name: 'Filters' }));
+    expect(button().states).toEqual(['collapsed']);
+    expect(button().controls).toBeUndefined();
+
+    open.next(true);
+    panel.next(target);
+    ui.frame();
+    expect(button().states).toEqual(['expanded']);
+    expect(button().controls).toBe(ui.getSemantics(ui.getByRole('dialog')).id);
+
+    open.next(false);
+    panel.next(null);
+    ui.frame();
+    expect(button().states).toEqual(['collapsed']);
+    expect(button().controls).toBeUndefined();
+  });
+
+  it('says busy and expanded together', () => {
+    const ui = mount(createComponent(Button, { label: 'Filters', busy: true, expanded: true }));
+    // The record keeps states in its own order, so the order here is not the claim.
+    expect([...(ui.getSemantics(ui.getByRole('button')).states ?? [])].sort()).toEqual(['busy', 'expanded']);
   });
 });

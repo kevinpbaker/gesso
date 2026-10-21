@@ -3333,6 +3333,12 @@ export class GessoRuntime {
         // exists to prevent.
         this.smoothScroller.adjust(node, axis, adjust);
       }
+      // A row scrolled to before it was measured is put right once it
+      // has been, which takes the frame after this one: wake for it,
+      // since nothing else may.
+      if (window.holding) {
+        this.scheduler.wake();
+      }
     }
   }
 
@@ -3366,7 +3372,9 @@ export class GessoRuntime {
       scrollX: sign * (typeof x === 'number' ? x : rec.scrollX),
       scrollY: typeof y === 'number' ? y : rec.scrollY,
       width: rec.width,
-      height: rec.height
+      height: rec.height,
+      // So a point it is asked about is read from the right edge too.
+      fromRight: sign < 0
     });
   }
 

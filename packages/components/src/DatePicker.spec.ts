@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Column, Row, type UiNode } from 'gesso-core';
+import { Column, percent, Row, type UiNode } from 'gesso-core';
 import { DatePicker } from './DatePicker';
 
 let ui: Rendered;
@@ -208,5 +208,62 @@ describe('a date picker whose bounds move while it is open', () => {
     min.next('');
     await ui.settle();
     expect(day('Monday, October 5, 2026')).toBe(false);
+  });
+});
+
+describe('a date picker in right-to-left text', () => {
+  // The calendar is wider than the trigger, and lined up with its left
+  // edge it hung off the side a reader of the trigger does not start
+  // from.
+  it('lines its calendar up with the trigger’s start edge, which is its right', async () => {
+    ui = renderTest(
+      Column(
+        { textDirection: 'rtl', width: percent(100), height: percent(100), padding: 10, x: 'center' },
+        Row(
+          { width: 140 },
+          createComponent(DatePicker, { label: 'Due date', locale: 'en-US', today: '2026-10-02', defaultValue: '' })
+        )
+      ),
+      { width: 500, height: 520 }
+    );
+    ui.frame();
+    await open();
+    const calendar = ui.getLayout(ui.getByRole('dialog', { name: 'Due date' }));
+    const box = ui.getLayout(trigger());
+    expect(calendar.width).toBeGreaterThan(box.width);
+    expect(calendar.x + calendar.width).toBeCloseTo(box.x + box.width, 5);
+  });
+
+  it('moves the cursor toward the arrow, so Left is the next day', async () => {
+    // The week runs from the right, so tomorrow is to the left of today.
+    // Left and Right still meant yesterday and tomorrow, which moved the
+    // cursor away from the arrow pressed.
+    ui = renderTest(
+      Column(
+        { textDirection: 'rtl', width: percent(100), height: percent(100), padding: 10 },
+        createComponent(DatePicker, {
+          label: 'Due date',
+          locale: 'en-US',
+          today: '2026-10-02',
+          defaultValue: '2026-10-14'
+        })
+      ),
+      { width: 500, height: 520 }
+    );
+    ui.frame();
+    await open();
+    expect(cursor()).toBe('Wednesday, October 14, 2026');
+    const today = ui.getLayout(ui.getByRole('gridcell', { name: 'Wednesday, October 14, 2026' }));
+    const tomorrow = ui.getLayout(ui.getByRole('gridcell', { name: 'Thursday, October 15, 2026' }));
+    expect(tomorrow.x).toBeLessThan(today.x);
+
+    await press('ArrowLeft');
+    expect(cursor()).toBe('Thursday, October 15, 2026');
+    await press('ArrowRight');
+    await press('ArrowRight');
+    expect(cursor()).toBe('Tuesday, October 13, 2026');
+    // Up and Down are weeks, whatever the reading direction.
+    await press('ArrowDown');
+    expect(cursor()).toBe('Tuesday, October 20, 2026');
   });
 });

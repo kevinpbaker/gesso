@@ -238,8 +238,11 @@ export interface WorkerAppOptions {
    * predicate rather than a list so it can say "Ctrl or Cmd" in one
    * line.
    *
-   * Called for every keydown that reaches the shell, so it should be a
-   * comparison and nothing more.
+   * Called for every keydown and keyup that reaches the shell, so it
+   * should be a comparison and nothing more. The keyup matters for a key
+   * whose default comes on release: a lone Alt opens a Windows browser's
+   * menu when it comes up, so a `MenuBar` that answers to Alt claims
+   * both.
    */
   interceptKey?: (event: KeyboardEvent) => boolean;
   /**
@@ -748,6 +751,9 @@ export class WorkerApp {
       return;
     }
     this.flushPendingMove();
+    if (this.options.interceptKey?.(event) === true) {
+      event.preventDefault();
+    }
     this.post({
       type: 'keyUp',
       key: event.key,

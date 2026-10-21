@@ -37,13 +37,17 @@ is disabled, so the walk steps over it.
 | `placement`    | `OverlayPlacement`         | `'bottom-start'` | Which side of the anchor to prefer. Read when the menu opens.                     |
 | `label`        | `string`                   | `'Menu'`         | The menu's accessible name. Not drawn, so name it after what the commands act on. |
 
-A `MenuItem` is three fields:
+A `MenuItem` is these fields:
 
-| Field      | Type      | Default  | What it does                                                                              |
-| ---------- | --------- | -------- | ----------------------------------------------------------------------------------------- |
-| `value`    | `string`  | required | What `onSelect` reports. Also the row's key.                                              |
-| `label`    | `string`  | required | Drawn on the row, and the row's accessible name.                                          |
-| `disabled` | `boolean` | `false`  | Draws the label in the disabled foreground token, makes the row inert, and skips the keys |
+| Field       | Type                  | Default  | What it does                                                                              |
+| ----------- | --------------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `value`     | `string`              | required | What `onSelect` reports. Also the row's key.                                              |
+| `label`     | `string`              | required | Drawn on the row, and the row's accessible name.                                          |
+| `disabled`  | `boolean`             | `false`  | Draws the label in the disabled foreground token, makes the row inert, and skips the keys |
+| `separator` | `boolean`             | `false`  | Draws a rule above the item, starting a group. Ignored on the first item.                 |
+| `shortcut`  | `string`              | none     | The keys that do the same from anywhere, said at the row's end: `⌘C`.                     |
+| `danger`    | `boolean`             | `false`  | It cannot be undone: draws its label in the danger colour.                                |
+| `items`     | `readonly MenuItem[]` | none     | A submenu, opened beside the row instead of choosing it. See below.                       |
 
 `Menu` does not take the shared layout props the rest of the library
 takes, and it has no `rootModifiers`. Nothing is drawn where it is
@@ -100,8 +104,15 @@ An anchored menu is placed by the layout engine, not by this component.
 It takes the side `placement` asks for, flips to the opposite side when
 it would overflow the viewport, and shifts along the other axis to stay
 on screen. It follows its anchor when the content underneath scrolls.
-`placement` accepts `top`, `bottom`, `left` and `right`, each with a
-`-start` and `-end` variant, and defaults to `'bottom-start'`.
+`placement` accepts `top`, `bottom`, `left`, `right`, `start` and
+`end`, each with a `-start` and `-end` variant, and defaults to
+`'bottom-start'`.
+
+`start` and `end` are the reading edges, in the direction of the
+anchor's tree, or of where the menu is declared when it has no anchor.
+Under `textDirection="rtl"` the default lines the menu up with the
+anchor's right edge, and a context menu opens leftward from the
+pointer, as a native one does in that language.
 
 A menu longer than the room on the side it opens on is cut to that
 room, and its items scroll inside the frame: with the wheel, and with
@@ -128,10 +139,27 @@ and Enter arriving at the menu.
 | `Enter`  | Chooses the highlighted item and closes the menu      |
 | `Space`  | The same                                              |
 | `Escape` | Closes the menu without choosing                      |
+| `Right`  | Opens the highlighted item's submenu                  |
+| `Left`   | In a submenu, closes it, back to its item             |
 
-Every key in the table is consumed; anything else is left for whatever
+Under `textDirection="rtl"`, `Left` opens a submenu and `Right` goes
+back: the arrow that points the way the submenu opens is the one that
+opens it.
+
+Every key in the table is consumed, but `Left` in a menu that is not a
+submenu; anything else is left for whatever
 is listening above. There is no type-ahead here, unlike
 [Select](/components/select): a printed character does nothing.
+
+### Submenus
+
+An item with `items` of its own is a way to more commands rather than
+one: a press on it, the pointer resting on it, `Enter` or `Right` opens
+those as a menu beside its row, and one chosen there is the menu's
+`onSelect` value, closing both. The submenu opens toward the end of the
+row, which is the right in left-to-right text and the left under
+`textDirection="rtl"`, and flips to the other side when there is no
+room for it at that edge of the window.
 
 ### A disabled item can sit anywhere
 

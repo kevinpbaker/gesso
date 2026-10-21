@@ -58,7 +58,9 @@ same strings: `parseIsoDate`, `isoDate`, `todayIso`, `addDays`,
 
 On the trigger, `Enter`, `Space` or `Down` opens the calendar on the
 chosen date, or on today when there is none. The calendar is a dialog
-that traps focus, and focus starts in the grid of days.
+that traps focus, and focus starts in the grid of days. It opens under
+the trigger, lined up with the trigger's start edge: its left in
+left-to-right text and its right under `textDirection="rtl"`.
 
 | Key                  | What it does                                      |
 | -------------------- | ------------------------------------------------- |
@@ -70,6 +72,10 @@ that traps focus, and focus starts in the grid of days.
 | `Enter`, `Space`     | Chooses the day and closes                        |
 | `Escape`             | Closes without choosing                           |
 | `Tab`                | The month buttons, the grid, then Today and Clear |
+
+Left and Right follow where the days are drawn. Under
+`textDirection="rtl"` the week runs from the right, so Left is the day
+after and Right the day before; Up and Down are weeks either way.
 
 The cursor never leaves `min` and `max`; a move past either stops on it.
 Its ring is drawn in the focus ring's colour, so it still shows on the

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
-import { UiEventType, type UiPointerEvent } from './UiInputEvent';
+import { UiEventType, type UiKeyboardEvent, type UiPointerEvent } from './UiInputEvent';
 import { CanvasPlatformSurface, prepareInputSurface } from './UiPlatformAdapter';
 import { InputTestHarness, FakePlatformSurface } from './UiInputTestUtils';
 
@@ -218,6 +218,23 @@ describe('UiPlatformAdapter', () => {
     expect(down).toHaveBeenCalledTimes(1);
     expect(down.mock.calls[0]![0].key).toBe('Tab');
     expect(up).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels the browser default for a key release the application claimed', () => {
+    // A lone Alt is acted on when it is released, and on Windows the
+    // browser takes that release for its own menu. The press side
+    // already passed a claim on; the release did not.
+    const { h, surface } = setup();
+    h.dispatcher.addEventListener(h.root, UiEventType.KeyUp, event => {
+      if ((event as UiKeyboardEvent).key === 'Alt') {
+        event.preventDefault();
+      }
+    });
+    const prevented: string[] = [];
+    for (const key of ['Alt', 'a']) {
+      surface.keyboardTarget.emit('keyup', keyEvent({ type: 'keyup', key, preventDefault: () => prevented.push(key) }));
+    }
+    expect(prevented).toEqual(['Alt']);
   });
 
   it("leaves an IME's keys to the IME", () => {

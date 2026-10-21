@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
@@ -207,5 +207,134 @@ describe('the chosen option in an open select', () => {
     ui.fireEvent.press('ArrowUp');
     ui.frame();
     expect(ui.getAllByText('✓')).toHaveLength(1);
+  });
+});
+
+const FRUIT = [
+  { value: 'apple', label: 'Apple' },
+  { value: 'apricot', label: 'Apricot', disabled: true },
+  { value: 'avocado', label: 'Avocado' },
+  { value: 'banana', label: 'Banana' },
+  { value: 'blueberry', label: 'Blueberry' },
+  { value: 'cherry', label: 'Cherry' },
+  { value: 'new-york', label: 'New York' },
+  { value: 'new-zealand', label: 'New Zealand' }
+];
+
+/**
+ * Type-ahead was one character from the top of the list every time, so
+ * of two options sharing a first letter the second could only be
+ * reached with the arrows. It is ARIA's listbox type-ahead now: what is
+ * typed in quick succession is one search, and the same letter again
+ * walks the options starting with it.
+ */
+describe('type-ahead in a select', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function mountFruit(start = '') {
+    const value = new BehaviorSubject(start);
+    const ui = renderTest(
+      createComponent(Select, {
+        label: 'Fruit',
+        value,
+        onChange: (next: string) => value.next(next),
+        options: FRUIT
+      }),
+      { width: 400, height: 500 }
+    );
+    ui.fireEvent.focus(ui.getByRole('combobox', { name: 'Fruit' }));
+    ui.frame();
+    const type = (...keys: string[]) => {
+      for (const key of keys) {
+        ui.fireEvent.press(key);
+        ui.frame();
+      }
+    };
+    /** Opens the list, runs `keys`, and reports what Enter then chooses. */
+    const chosenAfter = (...keys: string[]): string => {
+      type('Enter', ...keys, 'Enter');
+      return value.value;
+    };
+    return { ...ui, value, type, chosenAfter };
+  }
+
+  it('reads letters typed in quick succession as one search', () => {
+    const ui = mountFruit();
+    // `b` alone is Banana; `bl` is Blueberry, the second of the two.
+    expect(ui.chosenAfter('b', 'l')).toBe('blueberry');
+  });
+
+  it('takes a space typed mid-search as part of it, rather than as a choice', () => {
+    const ui = mountFruit();
+    expect(ui.chosenAfter('n', 'e', 'w', ' ', 'z')).toBe('new-zealand');
+
+    // Closed, a space that carries a search on to nothing still opens
+    // the list, as it would have with no search running.
+    vi.advanceTimersByTime(600);
+    ui.type('b', ' ');
+    expect(ui.value.value).toBe('banana');
+    expect(ui.queryByRole('listbox')).not.toBeNull();
+  });
+
+  it('walks the options starting with a letter typed again and again, wrapping', () => {
+    const ui = mountFruit();
+    // Nothing is chosen, so the first `a` is Apple and the second the
+    // next option starting with it, past the disabled Apricot.
+    expect(ui.chosenAfter('a', 'a')).toBe('avocado');
+    vi.advanceTimersByTime(600);
+    // From Avocado, the last of them, the next `a` wraps to the first.
+    expect(ui.chosenAfter('a')).toBe('apple');
+  });
+
+  it('starts a new search once the keys have paused', () => {
+    const ui = mountFruit();
+    ui.type('Enter', 'b');
+    vi.advanceTimersByTime(499);
+    ui.type('l');
+    ui.type('Enter');
+    expect(ui.value.value).toBe('blueberry');
+
+    ui.type('Enter', 'b');
+    vi.advanceTimersByTime(600);
+    // A fresh `c`, not `bc`, which matches nothing.
+    ui.type('c', 'Enter');
+    expect(ui.value.value).toBe('cherry');
+  });
+
+  it('skips a disabled option, both when searching and when walking', () => {
+    const ui = mountFruit();
+    // Only Apricot starts with `apr`, and it cannot be chosen: the
+    // highlight stays on Apple, where `ap` left it.
+    expect(ui.chosenAfter('a', 'p', 'r')).toBe('apple');
+    vi.advanceTimersByTime(600);
+    // From Apple, `a` again lands on Avocado, not Apricot.
+    expect(ui.chosenAfter('a')).toBe('avocado');
+  });
+
+  it('changes the value without opening while closed, and only moves the highlight while open', () => {
+    const ui = mountFruit('cherry');
+    ui.type('b', 'l');
+    expect(ui.queryByRole('listbox')).toBeNull();
+    expect(ui.value.value).toBe('blueberry');
+
+    vi.advanceTimersByTime(600);
+    ui.type('Enter', 'a', 'v');
+    expect(ui.queryByRole('listbox')).not.toBeNull();
+    expect(ui.value.value).toBe('blueberry');
+    ui.type('Enter');
+    expect(ui.value.value).toBe('avocado');
+  });
+
+  it('cycles from the value while closed', () => {
+    const ui = mountFruit('banana');
+    ui.type('b');
+    expect(ui.value.value).toBe('blueberry');
+    ui.type('b');
+    expect(ui.value.value).toBe('banana');
   });
 });

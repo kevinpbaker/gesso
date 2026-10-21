@@ -1,7 +1,5 @@
-import { map } from 'rxjs/operators';
-
 import { Button, Checkbox, Popover, Select, TextInput, type PopoverAlign, type PopoverSide } from 'gesso-components';
-import type { UiChild, UiNode, UiSemanticState } from 'gesso-core';
+import type { UiChild, UiNode } from 'gesso-core';
 import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import type { WorkbenchFixture } from '../fixture';
 
@@ -15,9 +13,10 @@ function Said(inputs: Inputs<{ text: string }>) {
 }
 
 /**
- * A trigger that says what it opens: `expanded` or `collapsed` from the
- * popover's state, and `controls` from its panel. A `<button>` and not
- * the library's `Button`, which takes neither yet.
+ * A trigger that says what it opens: `expanded` from the popover's
+ * state, announced as expanded or collapsed, and `controls` from its
+ * panel. The library's `Button`, outlined, as a popover's trigger is
+ * usually a secondary action beside the page's main one.
  */
 function Trigger(
   inputs: Inputs<{
@@ -28,28 +27,16 @@ function Trigger(
     disabled?: boolean;
   }>
 ) {
-  const disabled = inputs.disabled.value === true;
   return (
-    <button
+    <Button
       ref={(node: UiNode | null) => inputs.onRef.value?.(node)}
       label={inputs.text.value}
-      disabled={disabled}
-      states={inputs.open.pipe(map((on): UiSemanticState[] => [on ? 'expanded' : 'collapsed']))}
+      variant="outlined"
+      size="small"
+      disabled={inputs.disabled.value === true}
+      expanded={inputs.open}
       controls={inputs.panel}
-      paddingX={12}
-      paddingY={8}
-      borderRadius={6}
-      backgroundColor="controlBackground"
-      borderWidth={1}
-      borderColor="controlBorder"
-      cursor="pointer">
-      <text
-        text={inputs.text.value}
-        textStyle="bodySmall"
-        color={disabled ? 'controlForegroundDisabled' : 'controlForeground'}
-        selectable={false}
-      />
-    </button>
+    />
   );
 }
 

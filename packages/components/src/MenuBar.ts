@@ -6,15 +6,27 @@ import {
   Column,
   Row,
   Text,
+  UiEventType,
   clickOutside,
+  defineModifier,
+  detectEditingPlatform,
   measureFlow,
+  resolveString,
   type LayoutBox,
   type UiChild,
+  type UiInputEvent,
   type UiKeyboardEvent,
   type UiNode
 } from 'gesso-core';
 
-import { MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarStep, type MenuBarMenu, type MenuBarState } from './menuBarModel';
+import {
+  MENU_BAR_CLOSED,
+  MENU_SEPARATOR,
+  menuBarStep,
+  type MenuBarMenu,
+  type MenuBarState,
+  type MenuBarStep
+} from './menuBarModel';
 import { useOverlay } from './overlay';
 
 export interface MenuBarProps<T> {
@@ -47,7 +59,28 @@ export interface MenuBarProps<T> {
   onChoose?: (item: T) => void;
   /** Called when the bar is done with the keyboard, so the page takes it back. */
   onDismiss?: () => void;
-  /** The bar itself, for an application that puts focus on it from a shortcut. */
+  /**
+   * Whether F10 brings the keyboard to the bar from anywhere in the
+   * application, and a second F10 hands it back to where it was.
+   * Default true.
+   *
+   * Off for an application that has its own use for the key (a
+   * debugger's Step over), and on all but one bar when a page has more
+   * than one, since the first bar to hear the key takes it.
+   */
+  f10Key?: boolean;
+  /**
+   * Whether Alt does the same: pressed and released with no other key
+   * between, it brings the keyboard to the bar and back, and held with
+   * a menu's mnemonic it opens that menu from anywhere.
+   *
+   * Default true everywhere but macOS, which is the Windows and Linux
+   * convention and not a Mac one: Option there types characters, and
+   * Option and a letter is how somebody writes "ø". Off for an
+   * application that gives Alt chords a meaning of its own.
+   */
+  altKey?: boolean;
+  /** The bar itself, for an application that puts focus on it some other way than F10 or Alt. */
   barRef?: (node: UiNode | null) => void;
   /** What a screen reader calls the bar. */
   label?: string;
@@ -73,6 +106,8 @@ export interface MenuBarProps<T> {
  */
 export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'Main menu');
+  const f10Key = input(inputs.f10Key, true);
+  const altKey = input(inputs.altKey, detectEditingPlatform() !== 'mac');
   const overlay = useOverlay(ctx, 'menubar');
   const scroll = ctx.inject(ScrollService);
   const state = new BehaviorSubject<MenuBarState>(MENU_BAR_CLOSED);
@@ -204,27 +239,84 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     });
   };
 
+  /**
+   * Where focus was when F10 or Alt brought it to the bar, so leaving
+   * can put it back; `entered` says the bar was reached that way at all.
+   *
+   * Two values and not one because "nothing had focus" is a place to go
+   * back to as well: the bar lets go of the keyboard rather than keep
+   * it. Both are forgotten the moment focus leaves the bar some other
+   * way, by Tab or by a click, since where it went is then the user's
+   * choice and putting it back later would undo it.
+   */
+  let entered = false;
+  let returnTo: UiNode | null = null;
+  ctx.effect(focus.focused, node => {
+    if (node !== barNode) {
+      entered = false;
+      returnTo = null;
+    }
+  });
+
+  /** Brings focus to the bar from wherever it is, or false when it could not go. */
+  const enter = (): boolean => {
+    if (barNode === null) {
+      return false;
+    }
+    const before = focus.focused.value;
+    focus.focus(barNode);
+    // A modal dialog's trap keeps focus out of the bar behind it, and
+    // then the key is not the bar's to spend.
+    if (focus.focused.value !== barNode) {
+      return false;
+    }
+    entered = true;
+    returnTo = before;
+    return true;
+  };
+
+  /**
+   * Puts focus back where F10 or Alt found it, when that is how the bar
+   * was reached. Run before `onDismiss`, so an application that moves
+   * focus there has the last word.
+   */
+  const giveBack = (): void => {
+    if (!entered) {
+      return;
+    }
+    const to = returnTo;
+    entered = false;
+    returnTo = null;
+    if (to !== null) {
+      focus.focus(to);
+    }
+    // The node it came from is gone, or there was none: let go rather
+    // than leave a bar that has said it is done holding the keyboard.
+    if (focus.focused.value === barNode) {
+      focus.blur();
+    }
+  };
+
   const choose = (item: T): void => {
     if (!context.enabled(item)) {
       return;
     }
     show({ ...state.value, open: false, active: -1 });
+    giveBack();
     inputs.onChoose.value?.(item);
     // A choice closes the bar, whichever way it was made, and the docs
     // promise `onDismiss` after it: the keys' choice has always said so.
     inputs.onDismiss.value?.();
   };
 
-  const onKeyDown = (event: UiKeyboardEvent): void => {
-    const step = menuBarStep(state.value, event.key, menus(), context);
-    if (step === null) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
+  /** Draws what a key did, and reports what it chose and whether the bar is done. */
+  const apply = (step: MenuBarStep<T>): void => {
     show(step.state);
     if (step.state.open && step.state.active !== -1) {
       revealed.next({ menu: step.state.focused, at: step.state.active });
+    }
+    if (step.dismiss === true) {
+      giveBack();
     }
     if (step.choose !== undefined) {
       inputs.onChoose.value?.(step.choose);
@@ -232,6 +324,108 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     if (step.dismiss === true) {
       inputs.onDismiss.value?.();
     }
+  };
+
+  /**
+   * The key as the model reads it, which is in reading order: next is
+   * Right. A bar reading right to left lays its titles out from the
+   * right, so the next title is to the left, and Left and Right trade
+   * places before the model sees them, as they do in `Menu`.
+   */
+  const readingKey = (key: string): string => {
+    if (key !== 'ArrowLeft' && key !== 'ArrowRight') {
+      return key;
+    }
+    const rtl = barNode !== null && resolveString(barNode, 'textDirection') === 'rtl';
+    return rtl ? (key === 'ArrowLeft' ? 'ArrowRight' : 'ArrowLeft') : key;
+  };
+
+  const onKeyDown = (event: UiKeyboardEvent): void => {
+    if (event.key === 'F10' && !f10Key.value) {
+      return;
+    }
+    const step = menuBarStep(state.value, readingKey(event.key), menus(), context);
+    if (step === null) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    apply(step);
+  };
+
+  /**
+   * True from an Alt pressed alone until the next key or press.
+   *
+   * Alt on its own means the bar only when nothing came between its
+   * press and its release: Alt and Left is the browser's Back, and Alt
+   * held through a click is a modified click, and neither may end with
+   * the menus taking the keyboard as the Alt comes up.
+   */
+  let altAlone = false;
+
+  /** Every key and press, before anything below can stop it, to keep `altAlone` honest. */
+  const watch = (event: UiInputEvent): void => {
+    if (event.type !== UiEventType.KeyDown) {
+      altAlone = false;
+      return;
+    }
+    const { key, modifiers } = event as UiKeyboardEvent;
+    altAlone = key === 'Alt' && !modifiers.ctrl && !modifiers.shift && !modifiers.meta;
+  };
+
+  /**
+   * F10, and Alt with a mnemonic, wherever focus is.
+   *
+   * Heard at the root after the focused node and everything above it
+   * have had the key, as an application's shortcuts are, so a control
+   * that binds one of them itself keeps it. With the bar focused they
+   * are left to its own `onKeyDown`, which reads the same keys through
+   * the model.
+   */
+  const heard = (event: UiInputEvent): void => {
+    const key = event as UiKeyboardEvent;
+    if (key.defaultPrevented || focus.focused.value === barNode || menus().length === 0) {
+      return;
+    }
+    const { ctrl, shift, alt, meta } = key.modifiers;
+    // Shift+F10 is a context menu's key and not this one.
+    if (key.key === 'F10' && !ctrl && !shift && !alt && !meta) {
+      if (f10Key.value && enter()) {
+        key.preventDefault();
+        key.stopPropagation();
+      }
+      return;
+    }
+    if (!alt || ctrl || meta || !altKey.value) {
+      return;
+    }
+    const letter = mnemonicOf(key);
+    if (letter === null || !menus().some(menu => menu.mnemonic === letter)) {
+      return;
+    }
+    const step = menuBarStep({ ...state.value, open: false, active: -1 }, letter, menus(), context);
+    if (step !== null && enter()) {
+      key.preventDefault();
+      key.stopPropagation();
+      apply(step);
+    }
+  };
+
+  /** Alt coming up with nothing pressed since it went down: in to the bar, or back out of it. */
+  const released = (event: UiInputEvent): void => {
+    const key = event as UiKeyboardEvent;
+    const alone = altAlone;
+    altAlone = false;
+    if (key.key !== 'Alt' || !alone || !altKey.value || key.defaultPrevented || menus().length === 0) {
+      return;
+    }
+    if (focus.focused.value === barNode) {
+      apply({ state: { ...state.value, open: false, active: -1 }, dismiss: true });
+    } else if (!enter()) {
+      return;
+    }
+    key.preventDefault();
+    key.stopPropagation();
   };
 
   /**
@@ -400,7 +594,8 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
               Text({
                 text: checked === true ? '✓' : '',
                 width: 12,
-                fontSize: 12,
+                // The tick is the size of the command beside it, so it takes the same role.
+                textStyle: 'bodySmall',
                 color: on ? 'controlForeground' : 'controlForegroundDisabled',
                 selectable: false
               })
@@ -409,14 +604,14 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
         Text({
           text,
           flex: 1,
-          fontSize: 12,
+          textStyle: 'bodySmall',
           color: on ? 'controlForeground' : 'controlForegroundDisabled',
           selectable: false
         })
       ),
       Text({
         text: accelerator,
-        fontSize: 11,
+        textStyle: 'bodySmall',
         color: 'textMuted',
         selectable: false
       })
@@ -442,7 +637,8 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
       focusable: true,
       role: 'menubar',
       label,
-      onKeyDown
+      onKeyDown,
+      modifiers: [applicationKeys({ watch, heard, released })]
     },
     ...menus().map((menu, index) =>
       Row(
@@ -496,11 +692,51 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
         },
         Text({
           text: menu.label,
-          fontSize: 12,
+          textStyle: 'bodySmall',
           color: 'text',
           selectable: false
         })
       )
     )
   );
+}
+
+/**
+ * The keys that reach a menu bar from anywhere in the application.
+ *
+ * At the root, as Tooltip's Escape is, because the point of them is
+ * that the bar does not have focus yet and a key goes to whatever does.
+ * `watch` listens in the capture phase so a control that spends a key
+ * cannot hide from it that Alt is no longer alone; `heard` and
+ * `released` listen in the bubble phase, after that control, and spend
+ * a key only when they acted on it, so with the bar not interested the
+ * key goes on to the page as before.
+ */
+const applicationKeys = defineModifier<{
+  readonly watch: (event: UiInputEvent) => void;
+  readonly heard: (event: UiInputEvent) => void;
+  readonly released: (event: UiInputEvent) => void;
+}>({
+  name: 'menuBarKeys',
+  attach(host, args) {
+    host.onRoot(UiEventType.KeyDown, args.watch);
+    host.onRoot(UiEventType.PointerDown, args.watch);
+    host.onRoot(UiEventType.KeyDown, args.heard, { capture: false });
+    host.onRoot(UiEventType.KeyUp, args.released, { capture: false });
+  }
+});
+
+/**
+ * The letter an Alt chord names, lower case.
+ *
+ * From the physical key where the event says which it was, because Alt
+ * changes the character on some layouts and the mnemonic is the letter
+ * printed on the key, not whatever the layout made of it.
+ */
+function mnemonicOf(event: UiKeyboardEvent): string | null {
+  const physical = /^(?:Key([A-Z])|Digit(\d))$/.exec(event.code);
+  if (physical !== null) {
+    return (physical[1] ?? physical[2]!).toLowerCase();
+  }
+  return [...event.key].length === 1 ? event.key.toLowerCase() : null;
 }

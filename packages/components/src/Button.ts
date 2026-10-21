@@ -5,6 +5,7 @@ import {
   interactive,
   type UiChild,
   type UiModifier,
+  type UiNode,
   type UiNodeRef,
   type UiSemanticState
 } from 'gesso-core';
@@ -87,6 +88,22 @@ export interface ButtonProps extends ControlLayoutProps {
    * about.
    */
   tabStop?: boolean;
+  /**
+   * Whether the popup this button opens is open, for a button that
+   * opens one: a popover's trigger, a disclosure's header. It is
+   * announced as `expanded` or `collapsed`.
+   *
+   * Left out, the button says neither, which is right for a button
+   * that opens nothing: `collapsed` on an ordinary button tells a
+   * screen reader there is something behind it to expand.
+   */
+  expanded?: boolean;
+  /**
+   * The node this button shows or changes, usually the popup it
+   * opens while that is open: a `Popover`'s `panelRef` written into a
+   * cell. See `aria-controls`.
+   */
+  controls?: UiNode | null;
   onClick?: () => void;
   /** Content instead of the label's text; `label` stays the name. */
   children?: UiChild;
@@ -98,6 +115,11 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
   const disabled = input(inputs.disabled, false);
   const busy = input(inputs.busy, false);
   const tabStop = input(inputs.tabStop, true);
+  // Neither is given a fallback: an absent `expanded` is a button
+  // with no popup, which is a different thing from one whose popup is
+  // closed, and has to stay distinguishable from `false`.
+  const expanded = inputs.expanded;
+  const controls = inputs.controls;
   const focus = trackFocus(ctx, inputs.ref);
 
   // Read once, as `Divider` reads its direction and `Card` its
@@ -147,7 +169,8 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
       label,
       description,
       role: 'button',
-      states: states(busy),
+      states: states(busy, expanded),
+      controls,
       onClick: press
     },
     followedChildren(inputs.children, () =>
@@ -175,12 +198,24 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
 /**
  * What an assistive technology is told, as it changes.
  *
- * Only `busy`: `disabled` is a property of its own on the element and
- * the mirror reads it there, so saying it twice would be the empty
- * `states` array the Inputs tier already had to fix once.
+ * `busy`, and `expanded` or `collapsed` once the caller says there is
+ * a popup. Not `disabled`: that is a property of its own on the
+ * element and the mirror reads it there, so saying it twice would be
+ * the empty `states` array the Inputs tier already had to fix once.
  */
-function states(busy: Observable<boolean>): Observable<UiSemanticState[]> {
-  return busy.pipe(map(working => (working ? ['busy' as UiSemanticState] : [])));
+function states(busy: Observable<boolean>, expanded: Observable<boolean | undefined>): Observable<UiSemanticState[]> {
+  return combineLatest([busy, expanded]).pipe(
+    map(([working, open]) => {
+      const result: UiSemanticState[] = [];
+      if (open !== undefined) {
+        result.push(open ? 'expanded' : 'collapsed');
+      }
+      if (working) {
+        result.push('busy');
+      }
+      return result;
+    })
+  );
 }
 
 /** The label's colour: the variant's, or the disabled token. */

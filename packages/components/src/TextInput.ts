@@ -122,7 +122,7 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       map(text =>
         text.length === 0 || labelHidden
           ? []
-          : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
+          : [Text({ text, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })]
       )
     ),
     EditableText({

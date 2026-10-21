@@ -25,8 +25,8 @@ a caller supplying its own would have to reproduce all three.
 <<< @/src/examples/SelectExample.tsx#select
 
 Tab onto either trigger and never touch the pointer: Enter, Space or an
-arrow opens the list, the arrows walk it, a letter jumps to the option
-it starts, Enter chooses, and Escape closes without choosing. Payment is
+arrow opens the list, the arrows walk it, typing a few letters jumps to
+the option they start, Enter chooses, and Escape closes without choosing. Payment is
 controlled and the application refuses `Invoice`, so choosing it leaves
 the trigger where it was. Delivery owns its own value and starts empty,
 so it shows its placeholder and reports itself invalid until something
@@ -111,26 +111,26 @@ hands the keyboard back to the trigger.
 
 While the list is closed, with focus on the trigger:
 
-| Key                 | What it does                                               |
-| ------------------- | ---------------------------------------------------------- |
-| `Enter`             | Opens the list                                             |
-| `Space`             | Opens the list                                             |
-| `Down`              | Opens the list                                             |
-| `Up`                | Opens the list                                             |
-| A printed character | Chooses the first option starting with it, without opening |
+| Key                 | What it does                                                         |
+| ------------------- | -------------------------------------------------------------------- |
+| `Enter`             | Opens the list                                                       |
+| `Space`             | Opens the list, or is part of a type-ahead search already under way  |
+| `Down`              | Opens the list                                                       |
+| `Up`                | Opens the list                                                       |
+| A printed character | Type-ahead: chooses the next option matching the search, not opening |
 
 While the list is open:
 
-| Key                 | What it does                                              |
-| ------------------- | --------------------------------------------------------- |
-| `Down`              | The next option that can be chosen, wrapping at the end   |
-| `Up`                | The previous one, wrapping at the start                   |
-| `Home`              | The first option that can be chosen                       |
-| `End`               | The last option that can be chosen                        |
-| `Enter`             | Chooses the highlighted option and closes                 |
-| `Space`             | The same                                                  |
-| `Escape`            | Closes without choosing, and returns focus to the trigger |
-| A printed character | Moves the highlight to the first option starting with it  |
+| Key                 | What it does                                               |
+| ------------------- | ---------------------------------------------------------- |
+| `Down`              | The next option that can be chosen, wrapping at the end    |
+| `Up`                | The previous one, wrapping at the start                    |
+| `Home`              | The first option that can be chosen                        |
+| `End`               | The last option that can be chosen                         |
+| `Enter`             | Chooses the highlighted option and closes                  |
+| `Space`             | The same, or part of a type-ahead search already under way |
+| `Escape`            | Closes without choosing, and returns focus to the trigger  |
+| A printed character | Type-ahead: moves the highlight to the next match          |
 
 Opening the list puts the highlight on whatever is already chosen, so
 the walk starts where the value is rather than at the top. The chosen
@@ -151,18 +151,39 @@ only a letter that picks an option; one that picks nothing goes on to
 the shortcuts. A key held with `Ctrl`, `Cmd` or `Alt` is never
 type-ahead, so `Mod+K` is a shortcut wherever focus is.
 
-### Type-ahead is one character
+### Type-ahead is a search
 
-It is a prefix match, case-insensitive, over the options that can be
-chosen, and it starts from the top of the list every time. There is no
-buffer and no timer: typing `b` then `a` looks for an option starting
-with `b`, and then for one starting with `a`, rather than for `ba`. Two
-options sharing a first letter therefore cannot be told apart by typing,
-and the second one needs the arrows.
+Type-ahead follows the WAI-ARIA listbox pattern. Characters typed less
+than half a second apart are one search, matched case-insensitively
+against the start of each label that can be chosen. A pause of half a
+second ends it, and the next character starts a new one. Opening or
+closing the list ends it too.
 
-Closed, a letter commits the value outright without ever drawing the
-list. Open, it only moves the highlight, and `Enter` still has to take
-it.
+The search runs from the current option onward and wraps at the end of
+the list. The current option is the highlight while the list is open
+and the value while it is closed. A search one character long starts
+after it, so typing the same letter again walks every option that
+starts with it: in Apple, Avocado and Banana, with Apple chosen, `a`
+moves to Avocado and `a` again back to Apple. A longer search starts on
+the current option, so typing `b` then `l` among Banana and Blueberry
+reaches Blueberry, and typing `b` then `a` stays on Banana rather than
+skipping past it. A letter repeated that no label starts with as typed,
+`aa` here, is still that walk. A list opened with nothing chosen
+counts from before its first option, so `a` lands on Apple, as it does
+while closed.
+
+While a search is under way a space is part of it, so typing
+`new z` reaches New Zealand past New York rather than choosing New
+York at the space. With no search running, `Space` opens the list or
+chooses as the tables above say. While closed, a space that would make
+a search match nothing opens the list after all.
+
+Closed, a search commits the value outright without ever drawing the
+list, a step at a time: `b` then `l` chooses Banana and then
+Blueberry. Open, it only moves the highlight, and `Enter` still has to
+take it. A character that matches nothing leaves the highlight or the
+value where it is; open it still becomes part of the search, closed it
+is left to the page's shortcuts, as described above.
 
 ### A disabled option can sit anywhere
 

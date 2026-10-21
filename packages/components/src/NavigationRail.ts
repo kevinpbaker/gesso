@@ -629,12 +629,13 @@ function RailItem(inputs: Inputs<RailItemProps>, ctx: ComponentContext): UiChild
   const badge = group ? undefined : item.badge;
   // Its label, while the rail is collapsed and draws none. Asked when
   // it opens, so an expanded rail, which draws the label already, gives
-  // it nothing to say and it stays shut. Beside the rail: the overlay
-  // flips at the viewport's edge, so a right-to-left rail at the right
-  // of the window shows it on the left.
+  // it nothing to say and it stays shut. Past the rail's end edge,
+  // toward what it serves: the right of a rail reading left to right,
+  // the left of one reading right to left. The overlay still flips it
+  // at the window's edge.
   let narrow = false;
   ctx.effect(rail.collapsed, value => (narrow = value));
-  const tip = tooltip(ctx, { text: () => (narrow ? rail.labelOf(key) : ''), placement: 'right' });
+  const tip = tooltip(ctx, { text: () => (narrow ? rail.labelOf(key) : ''), placement: 'end' });
   let mounted: UiNode | null = null;
 
   return Row(
@@ -711,7 +712,7 @@ function wideContent(
         : []),
     Text({
       text: item.label,
-      fontSize: 13,
+      textStyle: 'body',
       fontWeight: weight,
       color: ink,
       selectable: false,
@@ -746,6 +747,8 @@ function narrowContent(
       ? createComponent(Icon, { path: item.icon, size: ICON, color: ink, selfX: 'center', selfY: 'center' })
       : Text({
           text: monogram(item.label),
+          // A size rather than a role: the letter stands in for an icon
+          // in a fixed 26 by 24 box, so it is sized to the box.
           fontSize: 13,
           fontWeight: 600,
           color: ink,

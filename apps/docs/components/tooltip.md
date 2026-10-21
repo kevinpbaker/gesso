@@ -85,9 +85,19 @@ different.
 
 ### Placement
 
-`placement` takes any of `top`, `bottom`, `left`, `right`, each also
-with a `-start` or `-end` suffix: twelve values in all. The tooltip is
-placed six pixels off the anchor. Placement is a property of the
+`placement` takes a side, `top`, `bottom`, `left`, `right`, `start` or
+`end`, each also with a `-start` or `-end` suffix that lines it up with
+one edge of the anchor instead of centring it. The tooltip is placed
+six pixels off the anchor.
+
+`start` and `end` are the reading edges, in the direction of the
+anchor's tree. Under `textDirection="rtl"` the `start` side is the
+anchor's right and `end` its left, and `top-start` lines the tooltip up
+with the anchor's right edge. `left` and `right` stay where they say:
+a tooltip that should sit past the end of a control, beside a rail or
+a row of icons, wants `end`, and one that has to be on the left of
+the screen whatever the language wants `left`. The default, `top`,
+looks the same either way. Placement is a property of the
 overlay entry rather than something this component computes, so the
 engine tracks the anchor through a scroll and flips the tooltip at the
 edge of the viewport without anything here watching layout.
@@ -157,7 +167,9 @@ tooltip opened from a dark panel dark.
 The delay, the cancel, the focus path, the placement carried on the
 entry, the role and name, and that the modifier adds no node are all
 asserted in the spec beside the example, against the real runtime with
-a fake canvas. Where the box lands on screen is the layout engine's
+a fake canvas. `Tooltip.spec.ts` beside the component asserts the
+`start` and `end` sides and alignments under right-to-left text, and
+that a physical side stays put. Where the box lands on screen is the layout engine's
 anchored placement, and is covered by that engine's own fixtures rather
 than here.
 

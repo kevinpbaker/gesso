@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject, map } from 'rxjs';
 
-import { createComponent, OverlayService, type ComponentContext } from 'gesso-framework';
+import { createComponent, OverlayService, type ComponentContext, type OverlayPlacement } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Box, Button, Column, Text, type UiChild } from 'gesso-core';
+import { Box, Button, Column, percent, Row, Text, type UiChild } from 'gesso-core';
 import { Tooltip, tooltip } from './Tooltip';
 
 /**
@@ -350,6 +350,55 @@ describe('the Tooltip component', () => {
     ui.fireEvent.blur();
     ui.fireEvent.tab();
     expect(ui.entries()).toHaveLength(1);
+  });
+});
+
+describe('a tooltip in right-to-left text', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A trigger in the middle of a page that reads one way, with its tip open. */
+  function shown(direction: 'ltr' | 'rtl', placement: OverlayPlacement) {
+    const Tipped = (_props: Record<string, never>, ctx: ComponentContext): UiChild =>
+      Button({
+        text: 'Save',
+        label: 'Save',
+        modifiers: [tooltip(ctx, { text: 'Saves the note', placement, delay: 0 })]
+      });
+    const ui = mount(
+      Row(
+        { textDirection: direction, width: percent(100), height: percent(100), x: 'center', y: 'center' },
+        createComponent(Tipped, {})
+      )
+    );
+    ui.frame();
+    ui.hover('Save');
+    vi.advanceTimersByTime(0);
+    ui.frame();
+    return { trigger: ui.getLayout(ui.getByLabel('Save')), tip: ui.getLayout(ui.getByRole('tooltip')) };
+  }
+
+  it('lines a start alignment up with the trigger’s right edge', () => {
+    const { trigger, tip } = shown('rtl', 'top-start');
+    expect(tip.x + tip.width).toBeCloseTo(trigger.x + trigger.width, 5);
+    const ltr = shown('ltr', 'top-start');
+    expect(ltr.tip.x).toBeCloseTo(ltr.trigger.x, 5);
+  });
+
+  it('opens on the end side to the trigger’s left, and on the start side to its right', () => {
+    const end = shown('rtl', 'end');
+    expect(end.tip.x + end.tip.width).toBeCloseTo(end.trigger.x - 6, 5);
+    const start = shown('rtl', 'start');
+    expect(start.tip.x).toBeCloseTo(start.trigger.x + start.trigger.width + 6, 5);
+  });
+
+  it('keeps a physical side where it was asked for', () => {
+    const { trigger, tip } = shown('rtl', 'right');
+    expect(tip.x).toBeCloseTo(trigger.x + trigger.width + 6, 5);
   });
 });
 

@@ -413,6 +413,61 @@ describe('UiVirtualSheet.cellAt', () => {
     expect(sheet.cellAt(48, 22)).toEqual({ row: 0, column: 0 });
     expect(sheet.cellAt(48 + COLUMN, 22 + ROW)).toEqual({ row: 1, column: 1 });
   });
+
+  /**
+   * A frozen pane is held in place by sticky, so the cells under it
+   * are the frozen ones however far the sheet has scrolled. Measuring
+   * through the scroll there would answer with a cell hidden behind
+   * the pane, which is the one cell the point cannot be on.
+   */
+  it('finds a frozen column under a point over the pane, however far it has scrolled', () => {
+    const sheet = sheetOf({ gutterWidth: 48, frozenColumns: 2 });
+    sheet.update({ scrollX: COLUMN * 10, scrollY: 0, width: 500, height: 240 });
+    expect(sheet.cellAt(48 + 5, 5).column).toBe(0);
+    expect(sheet.cellAt(48 + COLUMN + 5, 5).column).toBe(1);
+    // Past the pane the columns scroll: the first one showing is the
+    // one the scroll offset reaches past the gutter and the pane.
+    expect(sheet.cellAt(48 + COLUMN * 2 + 5, 5).column).toBe(12);
+  });
+
+  it('finds a frozen row under a point over the pane, however far it has scrolled', () => {
+    const sheet = sheetOf({ headerHeight: 22, frozenRows: 1 });
+    sheet.update({ scrollX: 0, scrollY: ROW * 20, width: 500, height: 240 });
+    expect(sheet.cellAt(5, 22 + 5).row).toBe(0);
+    expect(sheet.cellAt(5, 22 + ROW + 5).row).toBe(21);
+  });
+
+  /**
+   * Under right to left a sheet starts at its right edge: column 0 is
+   * the rightmost, and the runtime hands the window its distance from
+   * that edge. A point still arrives in the container's own coordinates,
+   * measured from its left, as a pointer event's are, so the window
+   * turns it around before measuring.
+   */
+  describe('right to left', () => {
+    it('counts columns from the right edge', () => {
+      const sheet = sheetOf();
+      sheet.update({ scrollX: 0, scrollY: 0, width: 500, height: 240, fromRight: true });
+      expect(sheet.cellAt(500 - 5, 5)).toEqual({ row: 0, column: 0 });
+      expect(sheet.cellAt(500 - COLUMN * 2 - 5, ROW + 5)).toEqual({ row: 1, column: 2 });
+      expect(sheet.cellAt(5, 5).column).toBe(4);
+    });
+
+    it('measures the scroll from the right edge, as the runtime counts it', () => {
+      const sheet = sheetOf();
+      sheet.update({ scrollX: COLUMN * 10, scrollY: 0, width: 500, height: 240, fromRight: true });
+      expect(sheet.cellAt(500 - 5, 5).column).toBe(10);
+      expect(sheet.cellAt(500 - COLUMN - 5, 5).column).toBe(11);
+    });
+
+    it('holds the gutter and the frozen columns at the right edge', () => {
+      const sheet = sheetOf({ gutterWidth: 48, frozenColumns: 2 });
+      sheet.update({ scrollX: COLUMN * 10, scrollY: 0, width: 500, height: 240, fromRight: true });
+      expect(sheet.cellAt(500 - 48 - 5, 5).column).toBe(0);
+      expect(sheet.cellAt(500 - 48 - COLUMN - 5, 5).column).toBe(1);
+      expect(sheet.cellAt(500 - 48 - COLUMN * 2 - 5, 5).column).toBe(12);
+    });
+  });
 });
 
 /**

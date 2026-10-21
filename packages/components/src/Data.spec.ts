@@ -593,6 +593,125 @@ describe('DataTable', () => {
   });
 });
 
+describe('DataTable revealSelected', () => {
+  const MANY: readonly Person[] = Array.from({ length: 1000 }, (_, index) => ({
+    name: `Person ${String(index).padStart(4, '0')}`,
+    age: index % 90
+  }));
+
+  /** Whether the text is drawn wholly inside the table and below its sticky header. */
+  function shown(ui: ReturnType<typeof mount>, text: string): boolean {
+    const found = ui.queryByText(text);
+    if (found === null) return false;
+    const box = ui.getVisibleBox(found);
+    const table = ui.getVisibleBox(ui.getByRole('grid'));
+    const header = ui.getVisibleBox(ui.getAllByRole('row')[0]);
+    return box.y >= header.y + header.height - 0.5 && box.y + box.height <= table.y + table.height + 0.5;
+  }
+
+  function table(props: Record<string, unknown>) {
+    return mount(
+      createComponent(DataTable<Person>, {
+        label: 'People',
+        columns: COLUMNS,
+        rows: MANY,
+        width: 300,
+        height: 200,
+        // The height a row is drawn at: a reveal of a row never mounted
+        // goes by the estimate, and a wrong one lands it short.
+        rowHeight: 28,
+        ...props
+      })
+    );
+  }
+
+  it('lands a row it reveals in view when the estimate of a row is short of the real height', () => {
+    // Rows drawn at about 28 under an estimate of 24. A row that was
+    // never mounted is placed by the estimate, so the jump fell short
+    // and the row it was for ended up below the bottom edge. It is
+    // placed again once it has been measured.
+    const selected = new BehaviorSubject(0);
+    const ui = table({ selectedRow: selected, revealSelected: true, rowHeight: 24 });
+    ui.frame();
+    for (const row of [999, 500, 3]) {
+      selected.next(row);
+      for (let frame = 0; frame < 4; frame++) {
+        ui.frame();
+      }
+      expect(shown(ui, `Person ${String(row).padStart(4, '0')}`), `row ${row}`).toBe(true);
+    }
+
+    // The keyboard goes the same way.
+    ui.fireEvent.focus(ui.getByRole('grid'));
+    ui.fireEvent.keyDown('End');
+    for (let frame = 0; frame < 4; frame++) {
+      ui.frame();
+    }
+    expect(shown(ui, 'Person 0999')).toBe(true);
+  });
+
+  it('scrolls to a row the application chooses, mounted or not, clear of the header both ways', () => {
+    const selected = new BehaviorSubject(0);
+    const ui = table({ selectedRow: selected, revealSelected: true });
+    ui.frame();
+
+    // Far below the window: not mounted, so the reveal goes by the window's offsets.
+    selected.next(500);
+    ui.frame();
+    expect(shown(ui, 'Person 0500')).toBe(true);
+
+    // Above it: the row lands below the sticky header, not under it.
+    selected.next(480);
+    ui.frame();
+    expect(shown(ui, 'Person 0480')).toBe(true);
+  });
+
+  it('reveals a row chosen before the table has a height, once it has one', () => {
+    const ui = table({ defaultSelectedRow: 700, revealSelected: true });
+    ui.frame();
+    ui.frame();
+    expect(shown(ui, 'Person 0700')).toBe(true);
+  });
+
+  it('does not scroll after the chosen row again when a sort moves it', () => {
+    const selected = new BehaviorSubject(500);
+    const ui = table({ selectedRow: selected, revealSelected: true });
+    ui.frame();
+    ui.frame();
+    const grid = ui.getByRole('grid');
+    const scrolled = grid.properties.get('scrollY');
+    expect(shown(ui, 'Person 0500')).toBe(true);
+
+    // Age order puts Person 0500 somewhere else entirely; the reader's place is kept.
+    ui.fireEvent.click(ui.getAllByRole('columnheader')[1]);
+    ui.frame();
+    expect(grid.properties.get('scrollY')).toBe(scrolled);
+  });
+
+  it('leaves a written selection unscrolled without it', () => {
+    const selected = new BehaviorSubject(0);
+    const ui = table({ selectedRow: selected });
+    ui.frame();
+    selected.next(500);
+    ui.frame();
+    expect(ui.queryByText('Person 0500')).toBeNull();
+  });
+
+  it('still scrolls to a row the keyboard reaches, with or without it', () => {
+    for (const revealSelected of [true, false]) {
+      const ui = table({ defaultSelectedRow: 0, revealSelected });
+      ui.frame();
+      ui.fireEvent.focus(ui.getByRole('grid'));
+      ui.fireEvent.keyDown('End');
+      ui.frame();
+      expect(shown(ui, 'Person 0999')).toBe(true);
+      ui.fireEvent.keyDown('Home');
+      ui.frame();
+      expect(shown(ui, 'Person 0000')).toBe(true);
+    }
+  });
+});
+
 const FOLDERS: readonly TreeNode[] = [
   {
     key: 'src',

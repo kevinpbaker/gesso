@@ -84,6 +84,10 @@ in, so one `field` serves three controls. They are here rather than on
 and inventing one for a control's sake would put the library's taste in
 everybody's vocabulary.
 
+Type is not in the group at all. Every component's text names a role
+of the theme's own typography, so a scale that changes `body` or
+`bodySmall` restyles the library's text without a token.
+
 ### Remapping a variant
 
 `button.paint` is the table of palette names, so an application can

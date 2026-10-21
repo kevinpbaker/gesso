@@ -764,7 +764,7 @@ interface ComponentElement<P = Record<string, unknown>> {
 declare function isComponentElement(value: unknown): value is ComponentElement;
 type FrameworkChild = UiChild | ComponentElement;
 declare function createComponent<C extends ComponentType>(component: C, ...args: ComponentArgs<C>): ComponentElement<ComponentProps<C>>;
-type OverlayPlacement = 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end';
+type OverlayPlacement = 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end' | 'start' | 'start-start' | 'start-end' | 'end' | 'end-start' | 'end-end';
 interface OverlayRect {
   readonly x: number;
   readonly y: number;
@@ -782,6 +782,8 @@ interface OverlayEntry {
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  readonly start?: number;
+  readonly end?: number;
   readonly point?: {
     readonly x: number;
     readonly y: number;

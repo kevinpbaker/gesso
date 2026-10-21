@@ -131,7 +131,11 @@ export function menuBarStep<T>(
       case 'ArrowUp':
         return { state: opened(focused, menus, context, -1) };
       case 'Escape':
-        return { state: MENU_BAR_CLOSED, dismiss: true };
+      case 'F10':
+        // The bar keeps the title it is on as it lets go, so coming back
+        // with F10 or Alt lands where the last visit left off rather than
+        // on the first menu every time.
+        return { state: { focused, open: false, active: -1 }, dismiss: true };
       default: {
         // A bare letter opens the menu it names. With the bar focused
         // and nothing open there is nothing else a letter could mean,
@@ -178,7 +182,13 @@ export function menuBarStep<T>(
     case 'Tab':
       // Tab out of an open menu closes it rather than moving inside it.
       // A menu is not a set of tab stops.
-      return { state: MENU_BAR_CLOSED, dismiss: true };
+      return { state: { focused, open: false, active: -1 }, dismiss: true };
+    case 'F10':
+      // F10 is the key that came in, and it goes straight out again
+      // from wherever the bar is: one press, not Escape's two, because
+      // somebody pressing it is leaving the menus rather than backing
+      // out of one.
+      return { state: { focused, open: false, active: -1 }, dismiss: true };
     default: {
       if (!isPrintable(key)) {
         return null;

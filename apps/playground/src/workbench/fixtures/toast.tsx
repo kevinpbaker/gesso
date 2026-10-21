@@ -133,7 +133,7 @@ export const toastFixture: WorkbenchFixture = {
     },
     {
       name: 'Bottom, start, end',
-      try: 'Three toasts 48px up: one at the left, one centred, one at the right, none overlapping. Start is the left and end the right in right-to-left too (documented: the overlay layer places by physical edges). Hide closes all three.',
+      try: 'Three toasts 48px up: Pinned bottom-start at the left, one centred, Pinned bottom-end at the right, none overlapping. Switch the workbench to right to left: bottom-start moves to the right corner and bottom-end to the left, while they are up, and each reads from the right with its ✕ on the left. Hide closes all three.',
       render: () => <Places />
     },
     {

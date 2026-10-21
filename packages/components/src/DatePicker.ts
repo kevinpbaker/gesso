@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Column,
+  resolveString,
   Row,
   Text,
   type UiChild,
@@ -156,9 +157,15 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
   const gridKeys = (event: UiKeyboardEvent): void => {
     const day = cursor.value;
     const shift = event.modifiers.shift;
+    // The week runs from the right when the calendar reads right to
+    // left, so tomorrow is to the left: Left and Right follow where the
+    // days are drawn, not the order they are read in. Up and Down are
+    // weeks either way.
+    const grid = event.currentTarget ?? event.target;
+    const forward = grid !== null && resolveString(grid, 'textDirection') === 'rtl' ? -1 : 1;
     const bindings: Record<string, () => void> = {
-      ArrowLeft: () => moveTo(addDays(day, -1)),
-      ArrowRight: () => moveTo(addDays(day, 1)),
+      ArrowLeft: () => moveTo(addDays(day, -forward)),
+      ArrowRight: () => moveTo(addDays(day, forward)),
       ArrowUp: () => moveTo(addDays(day, -7)),
       ArrowDown: () => moveTo(addDays(day, 7)),
       Home: () => moveTo(startOfWeek(day, weekStart)),
@@ -244,7 +251,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
               text: name,
               role: 'columnheader',
               width: 34,
-              fontSize: 11,
+              textStyle: 'bodySmall',
               color: 'textMuted',
               textAlign: 'center',
               selectable: false
@@ -341,7 +348,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
       map(text =>
         text.length === 0 || labelHidden
           ? []
-          : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
+          : [Text({ text, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })]
       )
     ),
     Row(
@@ -476,7 +483,7 @@ function textButton(text: string, name: string, onClick: () => void): UiElement 
       borderRadius: 6,
       onClick
     },
-    Text({ text, fontSize: 12, color: 'controlForeground', selectable: false })
+    Text({ text, textStyle: 'bodySmall', color: 'controlForeground', selectable: false })
   );
 }
 

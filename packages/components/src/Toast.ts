@@ -40,8 +40,9 @@ export interface ToastProps {
   onAction?: () => void;
   /**
    * Which part of the bottom edge it's pinned to. `bottom-start` is the
-   * left corner and `bottom-end` the right, in right-to-left text as
-   * well: the overlay layer places by physical edges.
+   * corner a line of text starts from, and `bottom-end` the one it ends
+   * at: the left and the right in left-to-right text, the other way
+   * round in right-to-left text, read where the toast is declared.
    */
   placement?: ToastPlacement;
   /** Pixels between the toast and the viewport's edges. */
@@ -132,7 +133,7 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
       Text({
         text: message,
         color: tone.value === 'error' ? 'danger' : 'text',
-        fontSize: 13,
+        textStyle: 'body',
         flexGrow: 1,
         selectable: false
       }),
@@ -147,7 +148,7 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
             paddingTop: 4,
             paddingBottom: 4,
             borderRadius: 4,
-            fontSize: 13,
+            textStyle: 'body',
             fontWeight: 600,
             color: 'primary',
             role: 'button',
@@ -209,9 +210,9 @@ function pin(placement: ToastPlacement, offset: number) {
     case 'bottom':
       return { bottom: offset, center: 'x' as const };
     case 'bottom-end':
-      return { bottom: offset, right: offset };
+      return { bottom: offset, end: offset };
     default:
-      return { bottom: offset, left: offset };
+      return { bottom: offset, start: offset };
   }
 }
 

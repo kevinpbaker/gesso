@@ -29,6 +29,14 @@ import {
 } from './internals';
 import { useOverlay } from './overlay';
 
+/**
+ * How long a pause in typing ends one type-ahead search, in
+ * milliseconds. Half a second is what WAI-ARIA's listbox examples use,
+ * and long enough for "new z" typed at a normal pace to stay one
+ * search.
+ */
+const TYPE_AHEAD_PAUSE = 500;
+
 export interface SelectOption {
   readonly value: string;
   readonly label: string;
@@ -43,8 +51,9 @@ export interface SelectOption {
  * a caller supplying its own would have to reproduce all three.
  *
  * **Operable from the keyboard alone.** Closed: Enter, Space, Down and
- * Up open it; a printed character jumps to the first option starting
- * with it. Open: the arrows walk, Home and End jump, Enter chooses,
+ * Up open it; characters typed in quick succession choose the next
+ * option whose label starts with them. Open: the arrows walk, Home and
+ * End jump, the same characters move the highlight, Enter chooses,
  * Escape closes without choosing and puts focus back on the trigger —
  * which is `FocusService.releaseTrap` doing what it was built for.
  */
@@ -93,7 +102,9 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
   const required = input(inputs.required, false);
   const compact = inputs.compact?.value === true;
   const labelHidden = inputs.labelHidden?.value === true;
-  const fontSize = compact ? 12 : undefined;
+  // Compact text takes the small role; otherwise none is named and the
+  // select keeps the type of the surroundings it sits in, as it always has.
+  const textStyle = compact ? 'bodySmall' : undefined;
   const focusStore = ctx.inject(FocusService);
   const scroll = ctx.inject(ScrollService);
   const focus = trackFocus(ctx, inputs.ref);
@@ -103,6 +114,17 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
   const rows = new Map<number, UiNode>();
   const scrollerBox = new Subject<LayoutBox>();
   let trapped = false;
+  /** The type-ahead search so far, lower-cased, and when its last character came. */
+  let search = '';
+  let typedAt = -Infinity;
+  /**
+   * Whether the highlight marks a place in the list rather than only
+   * somewhere to start the walk. A list opened with nothing chosen
+   * highlights its first option, but a letter typed then should find
+   * the first option starting with it, as it does while closed, not the
+   * one after.
+   */
+  let anchored = true;
   const value = controlled<string>({
     component: 'Select',
     name: 'value',
@@ -136,6 +158,7 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
   const last = (): number => seek(inputs.options.value.length - 1, -1);
   const moveTo = (index: number): void => {
     if (index !== -1) {
+      anchored = true;
       active.next(index);
     }
   };
@@ -177,19 +200,59 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
 
   const step = (delta: number): void => moveTo(seek(active.value + delta, delta));
 
-  /** Type-ahead: the first option starting with the character typed. Whether there was one. */
-  const jumpTo = (character: string): boolean => {
-    const wanted = character.toLowerCase();
-    const index = inputs.options.value.findIndex(
-      option => option.disabled !== true && option.label.toLowerCase().startsWith(wanted)
-    );
+  /** Whether a type-ahead search is still running: typed into, and not paused. */
+  const searching = (): boolean => search !== '' && Date.now() - typedAt <= TYPE_AHEAD_PAUSE;
+
+  /** The first option that can be chosen whose label starts with `wanted`, at or after `start`, wrapping, or -1. */
+  const matching = (start: number, wanted: string): number => {
+    const options = inputs.options.value;
+    for (let moved = 0; moved < options.length; moved += 1) {
+      const index = (start + moved) % options.length;
+      const option = options[index];
+      if (option.disabled !== true && option.label.toLowerCase().startsWith(wanted)) {
+        return index;
+      }
+    }
+    return -1;
+  };
+
+  /**
+   * Type-ahead, as WAI-ARIA's listbox has it. Characters typed in quick
+   * succession are one search, matched from the current option onward:
+   * the highlight while open, the value while closed. A search one
+   * character long starts after the current option, so the same letter
+   * again walks the options starting with it; a longer one starts on it,
+   * so `b` then `l` keeps Blueberry rather than skipping past it. A
+   * letter repeated that matches nothing as written ("aa") is that walk
+   * too. Whether an option was found.
+   */
+  const typeAhead = (character: string): boolean => {
+    const isOpen = overlay.isOpen();
+    const options = inputs.options.value;
+    const current = isOpen
+      ? anchored
+        ? active.value
+        : -1
+      : options.findIndex(option => option.value === value.current());
+    const wanted = (searching() ? search : '') + character.toLowerCase();
+    let index = wanted.length === 1 ? matching(current + 1, wanted) : matching(Math.max(current, 0), wanted);
+    if (index === -1 && wanted.length > 1 && [...wanted].every(each => each === wanted[0])) {
+      index = matching(current + 1, wanted[0]);
+    }
+    // Open, every character is the list's and goes into the search.
+    // Closed, one that finds nothing goes on to the page's shortcuts, so
+    // it is not the select's to keep either.
+    if (isOpen || index !== -1) {
+      search = wanted;
+      typedAt = Date.now();
+    }
     if (index === -1) {
       return false;
     }
-    if (overlay.isOpen()) {
-      active.next(index);
+    if (isOpen) {
+      moveTo(index);
     } else {
-      choose(inputs.options.value[index].value);
+      choose(options[index].value);
     }
     return true;
   };
@@ -200,7 +263,9 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
    */
   const typed = (event: UiKeyboardEvent): boolean =>
     event.key.length === 1 &&
-    event.key !== ' ' &&
+    // Space chooses or opens, except in the middle of a search, where it
+    // is the space in "New Zealand".
+    (event.key !== ' ' || searching()) &&
     !event.modifiers.ctrl &&
     !event.modifiers.meta &&
     !event.modifiers.alt;
@@ -262,6 +327,15 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         role: 'listbox',
         label: label.value,
         onKeyDown: (event: UiKeyboardEvent) => {
+          // The open list has the keyboard to itself, so a character is
+          // its type-ahead whether or not an option starts with it, and
+          // never a page's single-letter shortcut acting behind the list.
+          // Asked first, so a space in a search is not also a choice.
+          if (typed(event)) {
+            typeAhead(event.key);
+            consume(event);
+            return;
+          }
           const bound = keymap({
             ArrowDown: () => step(1),
             ArrowUp: () => step(-1),
@@ -282,13 +356,6 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
             Escape: close
           });
           bound(event);
-          // The open list has the keyboard to itself, so a letter is its
-          // type-ahead whether or not an option starts with it, and never
-          // a page's single-letter shortcut acting behind the list.
-          if (typed(event)) {
-            jumpTo(event.key);
-            consume(event);
-          }
         }
       },
       Column(
@@ -310,16 +377,23 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
     const chosen = value.current();
     const index = inputs.options.value.findIndex(option => option.value === chosen && option.disabled !== true);
     // The walk starts on the value, or on the first option that can be
-    // chosen when the value matches nothing that can.
+    // chosen when the value matches nothing that can. A search typed
+    // before opening is over: the list starts its own.
     active.next(Math.max(0, index === -1 ? from(0) : index));
+    anchored = index !== -1;
+    search = '';
     overlay.show(list(), {
       anchor: focus.node(),
       placement: 'bottom-start',
       offset: 4,
       dismissOnOutsidePress: true,
       // Closing for any reason — a choice, Escape, a press outside —
-      // hands the keyboard back to the trigger.
-      onClose: release
+      // hands the keyboard back to the trigger, and ends the list's
+      // search, so a letter typed at the trigger next starts afresh.
+      onClose: () => {
+        search = '';
+        release();
+      }
     });
   };
 
@@ -333,7 +407,7 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
       map(text =>
         text.length === 0 || labelHidden
           ? []
-          : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
+          : [Text({ text, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })]
       )
     ),
     Row(
@@ -356,6 +430,20 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         states: states(overlay.open, invalid, required),
         onClick: () => (overlay.isOpen() ? close() : open()),
         onKeyDown: (event: UiKeyboardEvent) => {
+          // Closed, a character that picks an option is the select's; one
+          // that picks nothing goes on to the page's shortcuts. Asked
+          // first, so a space that carries a search on does not also open
+          // the list; one that finds nothing still opens it, as it would
+          // have with no search running.
+          if (!overlay.isOpen() && typed(event)) {
+            if (typeAhead(event.key)) {
+              consume(event);
+              return;
+            }
+            if (event.key !== ' ') {
+              return;
+            }
+          }
           const bound = keymap({
             Enter: open,
             ' ': open,
@@ -363,11 +451,6 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
             ArrowUp: open
           });
           bound(event);
-          // Closed, a letter that picks an option is the select's; one
-          // that picks nothing goes on to the page's shortcuts.
-          if (!overlay.isOpen() && typed(event) && jumpTo(event.key)) {
-            consume(event);
-          }
         }
       },
       Text({
@@ -383,7 +466,7 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         minWidth: 0,
         maxLines: 1,
         textOverflow: 'ellipsis',
-        fontSize,
+        textStyle,
         selectable: false
       }),
       chevron(CHEVRON_DOWN, foregroundToken(disabled))
@@ -441,7 +524,7 @@ function row(
       text: option.label,
       color: foreground,
       flexGrow: 1,
-      fontSize: compact ? 12 : undefined,
+      textStyle: compact ? 'bodySmall' : undefined,
       selectable: false
     }),
     // The chosen option is ticked, in the column `Combobox` and `Menu`
@@ -451,7 +534,9 @@ function row(
       text: selected.pipe(map(on => (on ? '✓' : ''))),
       color: foreground,
       width: 12,
-      fontSize: compact ? 12 : undefined,
+      // The tick follows the option's text rather than a box, so it takes
+      // the same role and stays the size of the words beside it.
+      textStyle: compact ? 'bodySmall' : undefined,
       selectable: false
     })
   );

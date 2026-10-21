@@ -5,10 +5,11 @@ import { Button, ColorPicker, hsvOfHex } from 'gesso-components';
 import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import type { WorkbenchFixture } from '../fixture';
 
-/** How a reported colour reads: its hex and its hue, saturation and value. */
+/** How a reported colour reads: its hex, its hue, saturation and value, and its opacity when it has one. */
 function describe(color: string, changes: number): string {
-  const { h, s, v } = hsvOfHex(color);
-  return `Value: ${color} (h ${Math.round(h)}, s ${Math.round(s * 100)}%, v ${Math.round(v * 100)}%). ${changes} changes.`;
+  const { h, s, v } = hsvOfHex(color.slice(0, 7));
+  const alpha = color.length === 9 ? `, a ${Math.round((Number.parseInt(color.slice(7), 16) / 255) * 100)}%` : '';
+  return `Value: ${color} (h ${Math.round(h)}, s ${Math.round(s * 100)}%, v ${Math.round(v * 100)}%${alpha}). ${changes} changes.`;
 }
 
 /**
@@ -17,7 +18,7 @@ function describe(color: string, changes: number): string {
  * preview can be checked against what it actually said.
  */
 function Harness(
-  inputs: Inputs<{ value: string; width?: number; presets?: readonly string[] }>,
+  inputs: Inputs<{ value: string; width?: number; alpha?: boolean; presets?: readonly string[] }>,
   _ctx: ComponentContext
 ) {
   const value = internalState(inputs.value.value);
@@ -28,6 +29,7 @@ function Harness(
       <ColorPicker
         value={value}
         width={inputs.width.value}
+        alpha={inputs.alpha.value}
         label="Fill"
         onChange={color => {
           value.value = color;
@@ -41,7 +43,9 @@ function Harness(
           borderRadius={4}
           borderWidth={1}
           borderColor="border"
-          backgroundColor={value.pipe(map(color => (/^#[0-9a-f]{6}$/i.test(color) ? color : 'transparent')))}
+          backgroundColor={value.pipe(
+            map(color => (/^#([0-9a-f]{6}|[0-9a-f]{8})$/i.test(color) ? color : 'transparent'))
+          )}
         />
         <text textStyle="bodySmall" color="textMuted" textWrap="word">
           {combineLatest([value, changes]).pipe(map(([color, count]) => describe(color, count)))}
@@ -117,11 +121,23 @@ export const colorPickerFixture: WorkbenchFixture = {
     },
     {
       name: 'Values it cannot show',
-      try: 'Press each preset. #ff000080 has alpha and transparent is a word: the picker has no alpha, so it keeps or falls back to a solid colour without a broken field. Empty and "nonsense" leave it where it was. #F0F reads as #ff00ff.',
+      try: 'Press each preset. #ff000080 has alpha and transparent is a word: this picker is not given `alpha`, so it keeps or falls back to a solid colour without a broken field. Empty and "nonsense" leave it where it was. #F0F reads as #ff00ff.',
       width: 300,
       render: () => (
         <Harness value="#00000000" presets={['#ff000080', 'transparent', '', 'nonsense', '#F0F', '#1155cc']} />
       )
+    },
+    {
+      name: 'Alpha',
+      try: 'An opacity strip sits under the hue bar, the colour fading into a checkerboard at its left end. Drag it: the picker’s swatch and the one beside the line show the checkerboard through the colour, and the field and line end in two more digits. Tab to the strip: Left and Right move 1%, Shift 10%, stopping at 0% and 100%. Move the square or the hue: the opacity stays.',
+      width: 300,
+      render: () => <Harness value="#3366cc80" alpha />
+    },
+    {
+      name: 'Alpha from hex',
+      try: 'Type #f008 in the field: it reads as #ff000088 and the strip’s ring moves to about 53%. Type #00ff00: it is solid green, reported as #00ff00ff. Press the presets: #1155cc becomes fully opaque, #ff000000 is fully see-through with the ring at the left, and nonsense leaves it where it was.',
+      width: 300,
+      render: () => <Harness value="#cc4125" alpha presets={['#1155cc', '#ff000000', '#0f08', 'nonsense']} />
     },
     {
       name: 'A grey keeps its hue',

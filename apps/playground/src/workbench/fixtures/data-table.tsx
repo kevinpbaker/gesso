@@ -205,6 +205,51 @@ function DrivenTable(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   );
 }
 
+const THOUSAND = people(1000);
+
+/**
+ * A choice written from outside with `revealSelected`, so the table
+ * scrolls to it: far below the window, back above it, and not again when
+ * a sort carries it away.
+ */
+function RevealTable(_inputs: Inputs<{}>, _ctx: ComponentContext) {
+  const sort = internalState<DataTableSort | null>(null);
+  const chosen = internalState(-1);
+  const line = combineLatest([sort, chosen]).pipe(
+    map(([order, row]) => `${describeSort(order)}. ${describeChoice(THOUSAND, row)}`)
+  );
+  return (
+    <column gap={8} width={percent(100)} height={percent(100)}>
+      <PersonTable
+        label="People"
+        columns={COLUMNS}
+        rows={THOUSAND}
+        flexGrow={1}
+        minHeight={0}
+        sort={sort}
+        onSortChange={next => (sort.value = next)}
+        selectedRow={chosen}
+        onSelect={index => (chosen.value = index)}
+        revealSelected
+      />
+      <row gap={6} flexWrap="wrap">
+        <Button label="Jump to row 500" size="small" variant="outlined" onClick={() => (chosen.value = 499)} />
+        <Button label="Jump to row 3" size="small" variant="outlined" onClick={() => (chosen.value = 2)} />
+        <Button label="Jump to row 1000" size="small" variant="outlined" onClick={() => (chosen.value = 999)} />
+        <Button
+          label="Best score first"
+          size="small"
+          variant="outlined"
+          onClick={() => (sort.value = { column: 'score', direction: 'descending' })}
+        />
+      </row>
+      <text textStyle="bodySmall" color="textMuted">
+        {line}
+      </text>
+    </column>
+  );
+}
+
 /** The data swapped under a chosen row, to a shorter list and to none. */
 function ShrinkingTable(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   const rows = internalState<readonly Person[]>(TWELVE);
@@ -311,6 +356,14 @@ export const dataTableFixture: WorkbenchFixture = {
       height: 380,
       stretch: true,
       render: () => <DrivenTable />
+    },
+    {
+      name: 'Reveal a row chosen from outside',
+      try: 'Press Jump to row 500: the table scrolls straight to it and row 500 is highlighted fully in view, under the header and not behind it. Jump to row 3 scrolls back up the same way, and Jump to row 1000 to the end. Then press Best score first: the rows reorder and the table stays where it is rather than chasing the chosen row. The arrows and End still scroll as they do in Keyboard.',
+      width: 560,
+      height: 380,
+      stretch: true,
+      render: () => <RevealTable />
     },
     {
       name: 'Data shrinks under the choice',

@@ -106,6 +106,8 @@ interface ButtonProps extends ControlLayoutProps {
   disabled?: boolean;
   busy?: boolean;
   tabStop?: boolean;
+  expanded?: boolean;
+  controls?: UiNode | null;
   onClick?: () => void;
   children?: UiChild;
 }
@@ -417,6 +419,8 @@ interface OverlayOptions {
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  readonly start?: number;
+  readonly end?: number;
   readonly point?: {
     readonly x: number;
     readonly y: number;
@@ -462,6 +466,7 @@ interface ColorPickerProps {
   onChange?: (color: string) => void;
   label?: string;
   width?: number;
+  alpha?: boolean;
 }
 declare function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentContext): UiChild;
 interface MenuItem {
@@ -520,6 +525,8 @@ interface MenuBarProps<T> {
   checkedOf?: (item: T) => boolean | undefined;
   onChoose?: (item: T) => void;
   onDismiss?: () => void;
+  f10Key?: boolean;
+  altKey?: boolean;
   barRef?: (node: UiNode | null) => void;
   label?: string;
 }
@@ -766,6 +773,7 @@ interface DataTableProps<T> extends ControlLayoutProps {
   onSortChange?: (sort: DataTableSort | null) => void;
   selectedRow?: number;
   defaultSelectedRow?: number;
+  revealSelected?: boolean;
   onSelect?: (index: number) => void;
   onActivate?: (index: number) => void;
   rowHeight?: number;

@@ -114,6 +114,7 @@ export function Checkbox(inputs: Inputs<CheckboxProps>, ctx: ComponentContext): 
         Text({
           text: value.value.pipe(map(on => (on ? '✓' : ''))),
           color: 'controlBackground',
+          // A size rather than a role: the tick is sized to its box.
           fontSize: 13,
           fontWeight: 600,
           selectable: false

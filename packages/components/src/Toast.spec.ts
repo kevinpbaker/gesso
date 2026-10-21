@@ -3,8 +3,8 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Column, darkTheme, UiEnvironmentKeys, type UiChild } from 'gesso-core';
-import { Toast, type ToastProps } from './Toast';
+import { Column, darkTheme, percent, UiEnvironmentKeys, type UiChild } from 'gesso-core';
+import { Toast, type ToastPlacement, type ToastProps } from './Toast';
 
 /**
  * The parts of a toast the docs example doesn't cover: an action, and
@@ -57,16 +57,16 @@ describe('a toast with an action', () => {
 });
 
 describe('where a toast is pinned', () => {
-  it('is 24 pixels off the bottom left corner by default', () => {
+  it('is 24 pixels off the bottom start corner by default', () => {
     const entry = mount({ message: 'Saved' }).entries()[0]!;
-    expect([entry.bottom, entry.left, entry.right, entry.center]).toEqual([24, 24, undefined, undefined]);
+    expect([entry.bottom, entry.start, entry.end, entry.center]).toEqual([24, 24, undefined, undefined]);
   });
 
   it('can sit in the middle of the bottom edge, or at its end, at any distance', () => {
     const middle = mount({ message: 'Saved', placement: 'bottom', offset: 72 }).entries()[0]!;
-    expect([middle.bottom, middle.left, middle.right, middle.center]).toEqual([72, undefined, undefined, 'x']);
+    expect([middle.bottom, middle.start, middle.end, middle.center]).toEqual([72, undefined, undefined, 'x']);
     const end = mount({ message: 'Saved', placement: 'bottom-end', offset: 16 }).entries()[0]!;
-    expect([end.bottom, end.left, end.right, end.center]).toEqual([16, undefined, 16, undefined]);
+    expect([end.bottom, end.start, end.end, end.center]).toEqual([16, undefined, 16, undefined]);
   });
 });
 
@@ -141,5 +141,34 @@ describe('a toast that is being read', () => {
     vi.advanceTimersByTime(1);
     ui.frame();
     expect(ui.entries()).toHaveLength(0);
+  });
+});
+
+describe('a toast in right-to-left text', () => {
+  // `start` and `end` are the reading edges. The start corner was the
+  // left one whatever the direction, so a toast in an Arabic interface
+  // came up in the corner a reader of it looks at last.
+  const pinned = (direction: 'ltr' | 'rtl', placement?: ToastPlacement) => {
+    const ui = renderTest(
+      Column(
+        { textDirection: direction, width: percent(100), height: percent(100) },
+        createComponent(Toast, { open: true, message: 'Saved', placement })
+      ),
+      { width: 600, height: 400 }
+    );
+    ui.frame();
+    return ui.getLayout(ui.getByRole('status'));
+  };
+
+  it('pins the start corner to the right', () => {
+    const box = pinned('rtl');
+    expect(box.x + box.width).toBe(600 - 24);
+    expect(pinned('ltr').x).toBe(24);
+  });
+
+  it('pins the end corner to the left', () => {
+    expect(pinned('rtl', 'bottom-end').x).toBe(24);
+    const box = pinned('ltr', 'bottom-end');
+    expect(box.x + box.width).toBe(600 - 24);
   });
 });

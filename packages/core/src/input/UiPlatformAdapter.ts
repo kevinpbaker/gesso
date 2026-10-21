@@ -173,7 +173,12 @@ export class UiPlatformAdapter {
       if (isImeKey(k)) {
         return;
       }
-      this.keyboard.keyUp(k.key, modifiersFromEvent(k), k.code ?? '');
+      const event = this.keyboard.keyUp(k.key, modifiersFromEvent(k), k.code ?? '');
+      // A release can have a default of its own: a lone Alt opens a
+      // Windows browser's menu when it comes up, not when it goes down.
+      if (event.defaultPrevented) {
+        k.preventDefault();
+      }
     };
 
     surface.pointerTarget.addEventListener('pointerdown', this.pointerDownHandler);

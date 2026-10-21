@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Button, Column } from 'gesso-core';
+import { Button, Column, PaintRecorder, type UiNode, type UiPaint } from 'gesso-core';
 import { ColorPalette } from './ColorPalette';
 import { ColorPicker, hexOfHsv, hsvOfHex } from './ColorPicker';
 
@@ -97,6 +97,145 @@ describe('ColorPicker', () => {
     expect(swatch.properties.get('backgroundColor')).toBe('#1a2b3c');
     // "#1a2" is a colour on the way to "#1a2b3c"; the field kept what was typed.
     expect(field.properties.get('value')).toBe('#1a2b3c');
+  });
+});
+
+/** Opacity, when it is asked for: a strip, its arrows, and eight-digit hex. */
+describe('ColorPicker with alpha', () => {
+  function mount(value: string, alpha = true) {
+    const changes: string[] = [];
+    const ui = renderTest(
+      createComponent(ColorPicker, {
+        value,
+        alpha,
+        label: 'Fill',
+        width: 200,
+        onChange: (hex: string) => changes.push(hex)
+      }),
+      { width: 400, height: 400 }
+    );
+    ui.frame();
+    return { ui, changes };
+  }
+
+  it('has no opacity strip unless it is asked for, and says #rrggbb as before', () => {
+    const { ui, changes } = mount('#ff0000', false);
+    expect(ui.queryByRole('slider', { name: 'Fill: opacity' })).toBeNull();
+    ui.fireEvent.focus(ui.getByRole('slider', { name: 'Fill: hue' }));
+    ui.fireEvent.keyDown('ArrowRight', { shift: true });
+    expect(changes.at(-1)).toMatch(/^#[0-9a-f]{6}$/);
+    // An eight-digit value is not a colour to a picker without alpha.
+    const field = ui.getByRole('textbox', { name: 'Fill as hex' });
+    ui.fireEvent.focus(field);
+    ui.fireEvent.press('a', { ctrl: true });
+    ui.fireEvent.type('#11223380');
+    expect(changes.at(-1)).not.toBe('#11223380');
+  });
+
+  it('reads a value with alpha, and names the opacity as a percentage', () => {
+    const { ui } = mount('#ff000080');
+    const strip = ui.getByRole('slider', { name: 'Fill: opacity' });
+    expect(ui.getSemantics(strip).valueText).toBe('50%');
+    expect(ui.getByRole('textbox', { name: 'Fill as hex' }).properties.get('value')).toBe('#ff000080');
+    expect(ui.getSemantics(ui.getByRole('image')).label).toBe('Fill: #ff000080');
+  });
+
+  it('takes a solid value as fully opaque, and says so in eight digits', () => {
+    const { ui, changes } = mount('#3366cc');
+    expect(ui.getSemantics(ui.getByRole('slider', { name: 'Fill: opacity' })).valueText).toBe('100%');
+    ui.fireEvent.focus(ui.getByRole('slider', { name: 'Fill: hue' }));
+    ui.fireEvent.keyDown('ArrowLeft');
+    expect(changes.at(-1)).toMatch(/^#[0-9a-f]{6}ff$/);
+  });
+
+  it('takes an opacity from where the strip is pressed, and keeps the colour', () => {
+    const { ui, changes } = mount('#00ff00');
+    const strip = ui.getVisibleBox(ui.getByRole('slider', { name: 'Fill: opacity' }));
+    ui.fireEvent.pointerDown(strip.x + 1e-9, strip.y + strip.height / 2);
+    ui.fireEvent.pointerUp(strip.x + 1e-9, strip.y + strip.height / 2);
+    expect(changes.at(-1)).toBe('#00ff0000');
+    ui.fireEvent.pointerDown(strip.x + strip.width / 2, strip.y + strip.height / 2);
+    ui.fireEvent.pointerUp(strip.x + strip.width / 2, strip.y + strip.height / 2);
+    expect(changes.at(-1)).toBe('#00ff0080');
+  });
+
+  it('walks the opacity with the arrows, and stops at the ends', () => {
+    const { ui, changes } = mount('#00ff00');
+    const strip = ui.getByRole('slider', { name: 'Fill: opacity' });
+    ui.fireEvent.focus(strip);
+    ui.fireEvent.keyDown('ArrowRight');
+    // Already opaque: nothing further to go.
+    expect(changes.at(-1)).toBe('#00ff00ff');
+    ui.fireEvent.keyDown('ArrowLeft', { shift: true });
+    expect(changes.at(-1)).toBe('#00ff00e6');
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    expect(ui.getSemantics(strip).valueText).toBe('89%');
+    for (let i = 0; i < 12; i++) {
+      ui.fireEvent.keyDown('ArrowLeft', { shift: true });
+    }
+    expect(changes.at(-1)).toBe('#00ff0000');
+  });
+
+  it('takes eight-digit hex and the four-digit shorthand typed in the field', () => {
+    const { ui, changes } = mount('#ff0000');
+    const field = ui.getByRole('textbox', { name: 'Fill as hex' });
+    ui.fireEvent.focus(field);
+    ui.fireEvent.press('a', { ctrl: true });
+    ui.fireEvent.type('#1A2B3C80');
+    expect(changes.at(-1)).toBe('#1a2b3c80');
+    ui.fireEvent.press('a', { ctrl: true });
+    ui.fireEvent.type('#f008');
+    expect(changes.at(-1)).toBe('#ff000088');
+    ui.frame();
+    expect(ui.getSemantics(ui.getByRole('slider', { name: 'Fill: opacity' })).valueText).toBe('53%');
+    // Six digits typed with alpha on is a solid colour.
+    ui.fireEvent.press('a', { ctrl: true });
+    ui.fireEvent.type('#123456');
+    expect(changes.at(-1)).toBe('#123456ff');
+  });
+
+  /** The fills a painted node makes, in order, as the colour each one is in. */
+  function fills(node: UiNode): unknown[] {
+    const recorder = new PaintRecorder();
+    const paint = node.properties.get('paint') as UiPaint;
+    paint.draw(recorder, {
+      width: 28,
+      height: 28,
+      paddingTop: 0,
+      paddingRight: 0,
+      paddingBottom: 0,
+      paddingLeft: 0,
+      scale: 1
+    });
+    const out: unknown[] = [];
+    let current: unknown;
+    for (const op of recorder.finish().ops) {
+      if (op.op === 'fillColor') {
+        current = op.color;
+      } else if (op.op === 'fillGradient') {
+        current = op.gradient;
+      } else if (op.op === 'fill') {
+        out.push(current);
+      }
+    }
+    return out;
+  }
+
+  it('draws the swatch and the strip over a checkerboard', () => {
+    const { ui } = mount('#3366cc80');
+    // The light squares, the dark ones, then the colour over them.
+    expect(fills(ui.getByRole('image'))).toEqual(['#ffffff', '#cccccc', '#3366cc80']);
+    const strip = fills(ui.getByRole('slider', { name: 'Fill: opacity' }));
+    expect(strip.slice(0, 2)).toEqual(['#ffffff', '#cccccc']);
+    expect(strip[2]).toMatchObject({ stops: [{ color: '#3366cc00' }, { color: '#3366cc' }] });
+  });
+
+  it('keeps the opacity when the colour moves', () => {
+    const { ui, changes } = mount('#ff000040');
+    ui.fireEvent.focus(ui.getByRole('slider', { name: 'Fill: saturation and brightness' }));
+    ui.fireEvent.keyDown('ArrowDown', { shift: true });
+    expect(changes.at(-1)).toMatch(/^#[0-9a-f]{6}40$/);
   });
 });
 

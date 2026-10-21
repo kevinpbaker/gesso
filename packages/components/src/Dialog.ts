@@ -178,16 +178,14 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
       // gives way on a short screen, so what the dialog is stays in view.
       title.pipe(
         map(text =>
-          text.length === 0
-            ? []
-            : [Text({ text, color: 'text', fontSize: 18, fontWeight: 600, paddingX: 4, flexShrink: 0 })]
+          text.length === 0 ? [] : [Text({ text, color: 'text', textStyle: 'title', paddingX: 4, flexShrink: 0 })]
         )
       ),
       description.pipe(
         map(text =>
           text.length === 0
             ? []
-            : [Text({ text, color: 'textMuted', fontSize: 13, paddingX: 4, paddingTop: 4, flexShrink: 0 })]
+            : [Text({ text, color: 'textMuted', textStyle: 'body', paddingX: 4, paddingTop: 4, flexShrink: 0 })]
         )
       ),
       Column(

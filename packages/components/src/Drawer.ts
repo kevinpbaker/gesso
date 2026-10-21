@@ -241,9 +241,10 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
     }
     opener = focus.focused.value;
     shownModal = modal.value;
-    // The overlay layer re-provides the declaring tree's theme but not
-    // its direction, so the direction is read here, where the drawer was
-    // declared, and both decides the edge and is set on the content.
+    // The direction is read where the drawer was declared, the same
+    // node the overlay layer takes its theme and direction from (it is
+    // the entry's `environment` below), and decides which physical edge
+    // `start` and `end` name.
     const rtl = placeholder !== null && resolveString(placeholder, 'textDirection') === 'rtl';
     const edge = edgeOf(side.value, rtl);
     // Reset before the tree is built, so the first frame is the panel
@@ -424,12 +425,10 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
       Column(
         { flexGrow: 1, flexShrink: 1, gap: 4, paddingTop: 4 },
         title.pipe(
-          map(text =>
-            text === '' ? [] : [Text({ text, color: 'text', fontSize: 18, fontWeight: 600, textWrap: 'word' })]
-          )
+          map(text => (text === '' ? [] : [Text({ text, color: 'text', textStyle: 'title', textWrap: 'word' })]))
         ),
         description.pipe(
-          map(text => (text === '' ? [] : [Text({ text, color: 'textMuted', fontSize: 13, textWrap: 'word' })]))
+          map(text => (text === '' ? [] : [Text({ text, color: 'textMuted', textStyle: 'body', textWrap: 'word' })]))
         )
       ),
       closable
@@ -440,6 +439,7 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
             variant: 'plain',
             size: 'small',
             onClick: requestClose,
+            // A size rather than a role: the ✕ is the button's icon.
             children: Text({ text: '✕', color: 'textMuted', fontSize: 14 })
           })
         : Row({ width: 0, height: 0 })

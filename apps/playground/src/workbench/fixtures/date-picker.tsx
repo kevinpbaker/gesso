@@ -139,7 +139,7 @@ export const datePickerFixture: WorkbenchFixture = {
     },
     {
       name: 'Against the right edge',
-      try: 'A narrow trigger flush right. Open it: the calendar (about 260px wide) stays inside the window rather than being cut off.',
+      try: 'A narrow trigger flush right. Open it: the calendar (about 260px wide) stays inside the window rather than being cut off. Switch the workbench to right to left: the trigger is flush left, the calendar lines up with its right edge and still stays inside the window.',
       stretch: true,
       render: () => (
         <row x="end">

@@ -30,12 +30,17 @@ export interface OverlayOptions {
   readonly anchor?: UiNode | null;
   /** The part of the anchor to open beside, such as a character in a field; see `OverlayEntry.anchorRect`. */
   readonly anchorRect?: Reactive<OverlayRect | undefined>;
+  /** `start` and `end` follow the reading direction of `environment`, or of the anchor; see `OverlayPlacement`. */
   readonly placement?: OverlayPlacement;
   readonly offset?: number;
   readonly top?: number;
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  /** The offset from the viewport's start edge, its right in right-to-left text; see `OverlayEntry.start`. */
+  readonly start?: number;
+  /** The offset from the viewport's end edge; see `OverlayEntry.end`. */
+  readonly end?: number;
   /** A point to open beside, kept on screen; see `OverlayEntry.point`. */
   readonly point?: { readonly x: number; readonly y: number };
   /** Keep the entry in the middle of the viewport along an axis. */

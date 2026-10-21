@@ -69,6 +69,19 @@ once and no call site forks the palette. A subtree that has to look
 different gets a different theme on a box around it, which is the
 mechanism [light and dark](/guide/appearance) already describes.
 
+Type works the same way. Every component's text takes its size, weight
+and line height from a role of the theme's
+[typography](/appearance/typography) rather than from a number of its
+own, so a theme that changes its type scale restyles the whole library.
+Field labels, helper and error text, tooltips, menu bar commands,
+compact menu and select rows, and table headers use `bodySmall` (headers
+as `label` at weight 600); cell values, tree and navigation rows, toast
+messages and dialog and drawer descriptions use `body`; a card's heading
+is `bodyLarge` at weight 600; and dialog and drawer titles use `title`.
+Only glyphs that are really icons, such as a tick, a sort arrow or a
+close cross, and an avatar's initials, which scale with the avatar,
+keep a size of their own.
+
 ### A keymap that is data
 
 A control that answers keys declares them as a table of key to handler

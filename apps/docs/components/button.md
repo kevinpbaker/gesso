@@ -80,19 +80,21 @@ change variant should change its `key`, which builds a new one.
 
 ## Props
 
-| Prop          | Type            | Default     | What it does                                                        |
-| ------------- | --------------- | ----------- | ------------------------------------------------------------------- |
-| `label`       | `string`        | `''`        | The words on it, and the accessible name                            |
-| `description` | `string`        | `''`        | Longer help, for a label that cannot say everything                 |
-| `variant`     | `ButtonVariant` | `'filled'`  | How much of the surface it claims                                   |
-| `tone`        | `ButtonTone`    | `'neutral'` | What the action means                                               |
-| `size`        | `ButtonSize`    | `'medium'`  | How big it is                                                       |
-| `disabled`    | `boolean`       | `false`     | Refuses presses and draws in the disabled foreground token          |
-| `busy`        | `boolean`       | `false`     | Refuses presses and announces `busy`, without looking disabled      |
-| `tabStop`     | `boolean`       | `true`      | Whether Tab stops on it; false leaves it pressable and focusable    |
-| `onClick`     | `() => void`    | none        | Fired on a press and on Enter or Space, which the element handles   |
-| `children`    | `UiChild`       | the label   | Content instead of the words; `label` stays the name                |
-| `ref`         | `UiNodeRef`     | none        | Receives the node that _is_ the button, for focus and for anchoring |
+| Prop          | Type             | Default     | What it does                                                           |
+| ------------- | ---------------- | ----------- | ---------------------------------------------------------------------- |
+| `label`       | `string`         | `''`        | The words on it, and the accessible name                               |
+| `description` | `string`         | `''`        | Longer help, for a label that cannot say everything                    |
+| `variant`     | `ButtonVariant`  | `'filled'`  | How much of the surface it claims                                      |
+| `tone`        | `ButtonTone`     | `'neutral'` | What the action means                                                  |
+| `size`        | `ButtonSize`     | `'medium'`  | How big it is                                                          |
+| `disabled`    | `boolean`        | `false`     | Refuses presses and draws in the disabled foreground token             |
+| `busy`        | `boolean`        | `false`     | Refuses presses and announces `busy`, without looking disabled         |
+| `tabStop`     | `boolean`        | `true`      | Whether Tab stops on it; false leaves it pressable and focusable       |
+| `expanded`    | `boolean`        | none        | Whether the popup it opens is open; announced as expanded or collapsed |
+| `controls`    | `UiNode \| null` | none        | The node it shows or changes, usually that popup while it is open      |
+| `onClick`     | `() => void`     | none        | Fired on a press and on Enter or Space, which the element handles      |
+| `children`    | `UiChild`        | the label   | Content instead of the words; `label` stays the name                   |
+| `ref`         | `UiNodeRef`      | none        | Receives the node that _is_ the button, for focus and for anchoring    |
 
 Layout props pass through, as they do for every control in the library:
 `width`, `flex`, `margin` and the rest go on the button itself, so a
@@ -110,6 +112,32 @@ reader and `focus()` all reach, and Tab goes past it, so the keys a
 page offers don't cost the keyboard two more stops on the way to what
 the page is about. A button whose action has no key of its own should
 keep its stop.
+
+## Opening a popup
+
+A button that opens something, a [popover](/components/popover), a
+panel of details under it, says so with two props. `expanded` is
+whether that thing is open, and the button announces it as expanded or
+collapsed as it changes. `controls` is the node it opens, which a
+screen reader offers to move to; pass a cell its `ref` writes, so it is
+the node while the popup is shown and `null` when it is not.
+
+```tsx
+const open = internalState(false);
+const anchor = internalState<UiNode | null>(null);
+const panel = internalState<UiNode | null>(null);
+
+<Button ref={node => (anchor.value = node)} label="Filters" expanded={open} controls={panel} />
+<Popover open={open} onOpenChange={next => (open.value = next)} anchor={anchor}
+  panelRef={node => (panel.value = node)} … />
+```
+
+Leave `expanded` out on a button that opens nothing. It is not the same
+as `false`: a button announced as collapsed tells a screen reader there
+is something behind it, so a button with no popup says neither. There
+is no `hasPopup`, because the semantics model has no `aria-haspopup`
+for it to reach; a popover's trigger is announced by its state and by
+what it controls.
 
 ## Hover, press and focus
 
@@ -157,8 +185,10 @@ controls](/components/restyling) is that group in full.
 `Button.spec.ts` mounts the component with `gesso-testing` and asserts
 the label as both the words and the name, that a press calls back and a
 disabled or busy one does not, that Tab goes past a button with
-`tabStop={false}` which a press and `focus()` still reach, that every one of the twelve variant and
-tone pairs names a palette entry rather than a colour, that the cursor
+`tabStop={false}` which a press and `focus()` still reach, that a
+button says neither expanded nor collapsed until it is given
+`expanded`, and then follows it and names the node in `controls`, that
+every one of the twelve variant and tone pairs names a palette entry rather than a colour, that the cursor
 is `pointer`, that hovering writes the hover token on a surfaced
 variant and the dimmed opacity on a filled one, that the size changes
 the padding, and that the words carry a type role rather than a size.

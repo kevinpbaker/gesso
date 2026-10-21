@@ -59,7 +59,13 @@ export function Card(inputs: Inputs<CardProps>, _ctx: ComponentContext): UiChild
     },
     title.pipe(
       map(text =>
-        text.length === 0 ? [] : [Text({ text, color: 'text', fontSize: 15, fontWeight: 600, selectable: false })]
+        text.length === 0
+          ? []
+          : [
+              // `bodyLarge` at the title's weight rather than `title`: a
+              // full title is too large for a heading inside a card surface.
+              Text({ text, color: 'text', textStyle: 'bodyLarge', fontWeight: 600, selectable: false })
+            ]
       )
     ),
     followedChildren(inputs.children, () => Row())
