@@ -1,5 +1,12 @@
 # gesso-testing
 
+## 0.6.28
+
+### Patch Changes
+
+- gesso-core@0.6.28
+  - gesso-framework@0.6.28
+
 ## 0.6.27
 
 ### Patch Changes
