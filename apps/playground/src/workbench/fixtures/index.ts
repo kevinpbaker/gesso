@@ -11,10 +11,12 @@ import { chipFixture } from './chip';
 import { colorPaletteFixture } from './color-palette';
 import { colorPickerFixture } from './color-picker';
 import { comboboxFixture } from './combobox';
+import { dataGridFixture } from './data-grid';
 import { dataTableFixture } from './data-table';
 import { datePickerFixture } from './date-picker';
 import { dialogFixture } from './dialog';
 import { dividerFixture } from './divider';
+import { drawerFixture } from './drawer';
 import { findBarFixture } from './find-bar';
 import { iconFixture } from './icon';
 import { imageFixture } from './image';
@@ -23,11 +25,14 @@ import { linkFixture } from './link';
 import { menuFixture } from './menu';
 import { menuBarFixture } from './menu-bar';
 import { meterFixture } from './meter';
+import { navigationRailFixture } from './navigation-rail';
 import { numberInputFixture } from './number-input';
 import { paginationFixture } from './pagination';
 import { plainViewFixture } from './plain-view';
+import { popoverFixture } from './popover';
 import { progressBarFixture } from './progress-bar';
 import { radioGroupFixture } from './radio-group';
+import { rangeSliderFixture } from './range-slider';
 import { segmentedControlFixture } from './segmented-control';
 import { selectFixture } from './select';
 import { skeletonFixture } from './skeleton';
@@ -53,6 +58,7 @@ export const FIXTURES: readonly WorkbenchFixture[] = [
   textInputFixture,
   numberInputFixture,
   sliderFixture,
+  rangeSliderFixture,
   segmentedControlFixture,
   selectFixture,
   comboboxFixture,
@@ -69,10 +75,12 @@ export const FIXTURES: readonly WorkbenchFixture[] = [
   imageFixture,
   linkFixture,
   breadcrumbFixture,
+  navigationRailFixture,
   paginationFixture,
   dividerFixture,
   cardFixture,
   dataTableFixture,
+  dataGridFixture,
   treeFixture,
   lazyListFixture,
   plainViewFixture,
@@ -85,9 +93,11 @@ export const FIXTURES: readonly WorkbenchFixture[] = [
   toolbarFixture,
   splitPaneFixture,
   dialogFixture,
+  drawerFixture,
   menuFixture,
   menuBarFixture,
   tooltipFixture,
+  popoverFixture,
   toastFixture,
   findBarFixture
 ];
