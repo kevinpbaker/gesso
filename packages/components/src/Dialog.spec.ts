@@ -417,3 +417,40 @@ describe('Dialog closed from code under something open over it', () => {
     expect(focusedLabel(ui)).toBe('After');
   });
 });
+
+describe('Dialog taking the keyboard as it opens', () => {
+  // The dialog's box is focusable, as the home of last resort, and the
+  // trap is taken from its ref, before its children exist. Focus has to
+  // settle on the first control once they do, not on the box, and that
+  // must not depend on the entrance: under reduced motion the box is
+  // visible from its first frame, which was suspected of letting it
+  // keep focus. It does not; these pin it.
+  function opened(reduced: boolean) {
+    const open = new BehaviorSubject(false);
+    const ui = renderTest(
+      Column(
+        Button({ text: 'Page', label: 'Page' }),
+        createComponent(Dialog, {
+          open,
+          title: 'Rename',
+          content: Column(Button({ text: 'a', label: 'a' }), Button({ text: 'b', label: 'b' }))
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    ui.runtime.services.get(AnimationService).applyReducedMotion(reduced);
+    ui.frame();
+    open.next(true);
+    ui.frame();
+    ui.frame(10_000);
+    return ui.runtime.input.focus.focusedNode?.properties.get('label');
+  }
+
+  it('puts focus on its first control', () => {
+    expect(opened(false)).toBe('a');
+  });
+
+  it('puts focus on its first control under reduced motion too', () => {
+    expect(opened(true)).toBe('a');
+  });
+});
