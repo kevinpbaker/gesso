@@ -338,6 +338,7 @@ export class UiGraphBuilder {
 
   private reconcile(parent: UiNode, definitions: readonly UiChild[]): { nodes: UiNode[]; changed: boolean } {
     const existing = this.collectChildren(parent);
+    const staying = this.inOrder(parent, existing, definitions);
     const matched = new Set<UiNode>();
     const unkeyed: UnkeyedMatchState = { existing, cursors: null };
     if (!this.warnedAboutIndexKeys && definitions.length > 1 && parent.type === UiNodeType.Fragment) {
@@ -414,7 +415,10 @@ export class UiGraphBuilder {
         }
       }
       this.reconciledFrom.set(node, definition);
-      if (this.moveBefore(parent, node, cursor)) {
+      // A node already in order with the others that stay is left where it
+      // is, and the cursor jumps to it: what lies between is moved or
+      // removed on its own turn. See `inOrder`.
+      if (!staying.has(node) && this.moveBefore(parent, node, cursor)) {
         changed = true;
       }
       cursor = node.nextSibling;
@@ -695,6 +699,52 @@ export class UiGraphBuilder {
     this.reconcileProps(node, definition.props, parent);
     this.reconcileChildren(node, definition.children);
     return node;
+  }
+
+  /**
+   * The keyed children that can stay where they are: the longest run of
+   * them whose old order is already their new order.
+   *
+   * The pass places children by moving each one in front of a cursor,
+   * which is fine for a child moved towards the front and ruinous for
+   * one moved to the back: everything it used to precede is moved in
+   * front of it, one at a time. A lazy sheet keeping its rows in slots
+   * moves the top row to the bottom on every row of a scroll down, so a
+   * scroll down moved every row on screen while a scroll up moved one,
+   * and the wheel lagged one way and not the other. Leaving this run
+   * alone moves exactly the children that are out of order, the way a
+   * keyed list diff does it everywhere else.
+   *
+   * Keyed elements only, matched as `matchNode` would match them. Others
+   * are placed as before.
+   */
+  private inOrder(parent: UiNode, existing: readonly UiNode[], definitions: readonly UiChild[]): ReadonlySet<UiNode> {
+    if (definitions.length < 3) {
+      return NO_NODES;
+    }
+    const at = new Map<UiNode, number>();
+    for (const [index, node] of existing.entries()) {
+      at.set(node, index);
+    }
+    const nodes: UiNode[] = [];
+    const positions: number[] = [];
+    for (const definition of definitions) {
+      if (isObservable(definition) || isComponentLikeElement(definition)) {
+        continue;
+      }
+      const key = this.elementKey(definition);
+      if (key === undefined) {
+        continue;
+      }
+      const candidate = this.graph.getNode(`${parent.id}:${key}`);
+      const position = candidate === undefined ? undefined : at.get(candidate);
+      if (candidate === undefined || position === undefined || candidate.type !== definition.type) {
+        continue;
+      }
+      nodes.push(candidate);
+      positions.push(position);
+    }
+    return new Set(longestIncreasing(positions).map(index => nodes[index]!));
   }
 
   /**
@@ -1100,4 +1150,37 @@ export class UiGraphBuilder {
     const key = element.key === undefined || element.key === null ? index : element.key;
     return `${parent.id}:component:${String(key)}`;
   }
+}
+
+const NO_NODES: ReadonlySet<UiNode> = new Set();
+
+/**
+ * The indices of a longest strictly increasing run in `values`, in order.
+ *
+ * Patience sorting: each value goes on the leftmost pile whose top is not
+ * smaller, and a back-link to the pile before recovers the run.
+ */
+function longestIncreasing(values: readonly number[]): number[] {
+  const tops: number[] = [];
+  const previous: number[] = new Array(values.length);
+  for (let index = 0; index < values.length; index++) {
+    const value = values[index]!;
+    let low = 0;
+    let high = tops.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (values[tops[middle]!]! < value) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    previous[index] = low > 0 ? tops[low - 1]! : -1;
+    tops[low] = index;
+  }
+  const run: number[] = [];
+  for (let index = tops.length > 0 ? tops[tops.length - 1]! : -1; index !== -1; index = previous[index]!) {
+    run.push(index);
+  }
+  return run.reverse();
 }

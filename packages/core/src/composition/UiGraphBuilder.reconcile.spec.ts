@@ -172,6 +172,39 @@ describe('UiGraphBuilder reconciliation', () => {
       expect(children[2]).toBe(original[1]);
     });
 
+    it('moves a keyed node to the back by moving that node alone', () => {
+      // A lazy sheet keeping its rows in slots does this on every row of a
+      // scroll down. Placed by moving each child in front of a cursor, every
+      // node the moved one used to precede was moved instead, one by one.
+      const { graph, builder } = createBuilder();
+      const keys = ['a', 'b', 'c', 'd', 'e', 'f'];
+      const root = builder.build(Column(...keys.map(key => Text({ text: key, key }))));
+      const original = getChildren(root);
+      const moved: string[] = [];
+      const moveWithin = graph.moveWithin.bind(graph);
+      graph.moveWithin = (child, reference) => {
+        moved.push(child.getProperty<string>('text') ?? '');
+        moveWithin(child, reference);
+      };
+      const rotated = [...keys.slice(1), keys[0]!];
+      const updated = builder.build(Column(...rotated.map(key => Text({ text: key, key }))));
+      expect(getChildren(updated)).toEqual([...original.slice(1), original[0]]);
+      expect(moved).toEqual(['a']);
+    });
+
+    it('keeps the order right when keyed nodes move both ways and new ones arrive', () => {
+      const { builder } = createBuilder();
+      const root = builder.build(Column(...['a', 'b', 'c', 'd', 'e'].map(key => Text({ text: key, key }))));
+      const before = new Map(getChildren(root).map(node => [node.getProperty<string>('text'), node]));
+      const next = ['e', 'b', 'x', 'd', 'a', 'y'];
+      const updated = builder.build(Column(...next.map(key => Text({ text: key, key }))));
+      const children = getChildren(updated);
+      expect(children.map(node => node.getProperty('text'))).toEqual(next);
+      for (const key of ['e', 'b', 'd', 'a']) {
+        expect(children[next.indexOf(key)]).toBe(before.get(key));
+      }
+    });
+
     it('inserts a keyed node between keyed siblings', () => {
       const { builder } = createBuilder();
       const root = builder.build(Column(Text({ text: 'A', key: 'a' }), Text({ text: 'C', key: 'c' })));
