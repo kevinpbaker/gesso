@@ -1,5 +1,13 @@
 # gesso-components
 
+## 0.6.28
+
+### Patch Changes
+
+- 6c4a7cc: Escape in a text field reaches the field when a tooltip is open over it. Since 0.6.27 an open tooltip took Escape for itself, so in a field whose focus opened its tooltip, cancelling an edit took two presses and the first only closed the tooltip. The tooltip still closes on that Escape; the field now hears it as well.
+- gesso-core@0.6.28
+  - gesso-framework@0.6.28
+
 ## 0.6.27
 
 ### Patch Changes

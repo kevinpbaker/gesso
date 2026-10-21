@@ -1,5 +1,7 @@
 # gesso-vite-plugin
 
+## 0.6.28
+
 ## 0.6.27
 
 ### Patch Changes
