@@ -248,7 +248,7 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
             }
           : { backgroundColor: 'background' })
       }),
-      Text({ text: color.name, fontSize: 12, color: 'controlForeground', selectable: false })
+      Text({ text: color.name, textStyle: 'bodySmall', color: 'controlForeground', selectable: false })
     );
   };
 

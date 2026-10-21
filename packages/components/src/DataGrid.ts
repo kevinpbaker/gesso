@@ -527,7 +527,7 @@ export function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): 
     const text = Text({
       text: shown,
       color: textColor,
-      fontSize: 13,
+      textStyle: 'body',
       maxLines: 1,
       textWrap: 'none',
       textOverflow: 'ellipsis',
@@ -594,7 +594,7 @@ export function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): 
       modifiers: [EDIT_IN_PLACE],
       width: Math.max(0, definition.width - 16),
       textWrap: 'none',
-      fontSize: 13,
+      textStyle: 'body',
       color: 'controlForeground',
       backgroundColor: 'controlBackground',
       onInput: (event: UiTextChangeEvent) => {
@@ -631,8 +631,8 @@ export function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): 
       Text({
         text: definition.header,
         color: textColor,
+        textStyle: 'label',
         fontWeight: 600,
-        fontSize: 12,
         maxLines: 1,
         textWrap: 'none',
         textOverflow: 'ellipsis',

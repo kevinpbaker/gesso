@@ -389,7 +389,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
       ...(inputs.leading.value === undefined ? [] : [inputs.leading.value(row.node, open)]),
       Text({
         text: row.node.label,
-        fontSize: 13,
+        textStyle: 'body',
         color: ink,
         selectable: false,
         maxLines: 1,
@@ -401,7 +401,7 @@ export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild 
         : [
             Text({
               text: decoration.pipe(map(marks => marks?.badge ?? '')),
-              fontSize: 12,
+              textStyle: 'bodySmall',
               color: ink,
               selectable: false,
               maxLines: 1,

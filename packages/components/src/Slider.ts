@@ -203,8 +203,8 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
         height: labelHidden.pipe(map(hidden => (hidden ? 0 : undefined))),
         overflow: 'hidden'
       },
-      Text({ text: label, color: foregroundToken(disabled), fontSize: 12, selectable: false }),
-      Text({ text: spoken, color: foregroundToken(disabled), fontSize: 12, selectable: false })
+      Text({ text: label, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false }),
+      Text({ text: spoken, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })
     ),
     // The filled part is a percentage of the track, so the thumb's
     // position is layout rather than an offset computed per frame.

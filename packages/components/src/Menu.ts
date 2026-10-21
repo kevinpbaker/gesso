@@ -8,7 +8,18 @@ import {
   FocusService,
   ScrollService
 } from 'gesso-framework';
-import { Column, Row, Text, measureFlow, type LayoutBox, type UiChild, type UiElement, type UiNode } from 'gesso-core';
+import {
+  Column,
+  Row,
+  Text,
+  measureFlow,
+  resolveString,
+  type LayoutBox,
+  type UiChild,
+  type UiElement,
+  type UiKeyboardEvent,
+  type UiNode
+} from 'gesso-core';
 import { CONTROL_INTERACTION, keymap } from './internals';
 import { useOverlay, type OverlayPlacement } from './overlay';
 
@@ -23,9 +34,11 @@ export interface MenuItem {
   /** It cannot be undone: its label in the danger colour. */
   readonly danger?: boolean;
   /**
-   * A submenu: the item opens these beside it rather than being chosen
-   * (on a press, the pointer resting on it, Enter or Right), and one of
-   * them chosen is `onSelect`'s value. Left or Escape goes back.
+   * A submenu: the item opens these beside it, toward the end of the
+   * row, rather than being chosen (on a press, the pointer resting on
+   * it, Enter or Right), and one of them chosen is `onSelect`'s value.
+   * Left or Escape goes back. In right-to-left text it opens to the left,
+   * and Left and Right trade places.
    */
   readonly items?: readonly MenuItem[];
 }
@@ -79,6 +92,8 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   const scrollerBox = new Subject<LayoutBox>();
   /** The menu's node while focus is trapped in it. */
   let trapped: UiNode | null = null;
+  /** The menu's node while it is open, which reads in the direction it was declared in. */
+  let frame: UiNode | null = null;
   let placeholder: UiNode | null = null;
 
   /**
@@ -212,6 +227,45 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
     }
   };
 
+  const keys = keymap({
+    ArrowDown: () => step(1),
+    ArrowUp: () => step(-1),
+    Home: () => moveTo(from(0)),
+    End: () => moveTo(last()),
+    Enter: () => choose(),
+    ' ': () => choose(),
+    Escape: close
+  });
+
+  /**
+   * Left and Right, which mean "into" and "back" rather than a
+   * direction: the arrow pointing toward where the rows end opens the
+   * highlighted item's submenu, which opens on that side, and the one
+   * pointing back closes a submenu, back to its item. In right-to-left
+   * text that is Left and Right, the other way round, as the APG asks.
+   * The direction is the menu's own, read as the key arrives, which is
+   * the direction of the tree it was declared in.
+   *
+   * Back in a menu that is not a submenu does nothing and is left to
+   * whatever is listening further up, as it always was.
+   */
+  const sideways = (event: UiKeyboardEvent): boolean => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') {
+      return false;
+    }
+    const rtl = frame !== null && resolveString(frame, 'textDirection') === 'rtl';
+    if ((event.key === 'ArrowRight') !== rtl) {
+      openSub(active.value);
+    } else if (inputs.submenu.value === true) {
+      close();
+    } else {
+      return true;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  };
+
   /**
    * A frame around a column that scrolls. The frame is the menu — its
    * role, its label, its keys and the focus trap — and keeps the border
@@ -225,6 +279,7 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
     Column(
       {
         ref: (node: UiNode | null) => {
+          frame = node;
           if (node !== null && trapped === null) {
             trapped = node;
             focus.trap(node);
@@ -239,17 +294,9 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
         borderRadius: 8,
         role: 'menu',
         label: label.value,
-        onKeyDown: keymap({
-          ArrowDown: () => step(1),
-          ArrowUp: () => step(-1),
-          Home: () => moveTo(from(0)),
-          End: () => moveTo(last()),
-          Enter: () => choose(),
-          ' ': () => choose(),
-          ArrowRight: () => openSub(active.value),
-          ...(inputs.submenu.value === true ? { ArrowLeft: close } : {}),
-          Escape: close
-        })
+        onKeyDown: (event: UiKeyboardEvent) => {
+          if (!sideways(event)) keys(event);
+        }
       },
       Column(
         { overflow: 'auto', minHeight: 0, gap: compact ? 0 : 2, modifiers: [measureFlow(scrollerBox)] },
@@ -265,7 +312,10 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
         anchor: sub.pipe(map(open => open?.node ?? null)),
         items: sub.pipe(map(open => open?.item.items ?? [])),
         label: sub.pipe(map(open => open?.item.label ?? 'Submenu')),
-        placement: 'right-start',
+        // Toward where the rows end, the right or, in right-to-left
+        // text, the left, and flipped by the engine to the other side
+        // when there is no room for it there.
+        placement: 'end-start',
         compact,
         submenu: true,
         onOpenChange: (isOpen: boolean) => {
@@ -385,7 +435,7 @@ function row(
         item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground',
       selectable: false,
       flex: 1,
-      ...(compact ? { fontSize: 12 } : {})
+      ...(compact ? { textStyle: 'bodySmall' } : {})
     }),
     ...(trailing === undefined
       ? []
@@ -395,7 +445,7 @@ function row(
             color: 'controlForegroundDisabled',
             selectable: false,
             flexShrink: 0,
-            ...(compact ? { fontSize: 12 } : {})
+            ...(compact ? { textStyle: 'bodySmall' } : {})
           })
         ])
   );

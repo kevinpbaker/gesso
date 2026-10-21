@@ -95,8 +95,16 @@ function Said(inputs: Inputs<{ text: string }>) {
 /**
  * A bar with a line under it. Ticks are kept for the View menu's first
  * three commands, so choosing one toggles it.
+ *
+ * F10 and Alt are off unless `keys` is given: every state is on one
+ * canvas, and the first bar to hear those keys takes them, so only the
+ * state about them listens. Alt is turned on outright there rather than
+ * left to the platform default, so it can be tried on a Mac too.
  */
-function Bar(inputs: Inputs<{ menus: readonly MenuBarMenu<string>[]; end?: boolean }>, _ctx: ComponentContext) {
+function Bar(
+  inputs: Inputs<{ menus: readonly MenuBarMenu<string>[]; end?: boolean; keys?: boolean }>,
+  _ctx: ComponentContext
+) {
   const said = internalState('Nothing chosen yet');
   const ticks = new Set<string>(['Word wrap']);
   const toggles = new Set(['Word wrap', 'Line numbers', 'Minimap']);
@@ -107,6 +115,8 @@ function Bar(inputs: Inputs<{ menus: readonly MenuBarMenu<string>[]; end?: boole
       <CommandBar
         menus={inputs.menus.value}
         label="Application"
+        f10Key={inputs.keys.value === true}
+        altKey={inputs.keys.value === true}
         labelOf={labelOf}
         acceleratorOf={acceleratorOf}
         enabled={enabled}
@@ -133,11 +143,11 @@ function Bar(inputs: Inputs<{ menus: readonly MenuBarMenu<string>[]; end?: boole
 }
 
 /** A button before the bar and one after, to Tab across it. */
-function Between(_inputs: Inputs<{}>, _ctx: ComponentContext) {
+function Between(inputs: Inputs<{ keys?: boolean }>, _ctx: ComponentContext) {
   return (
     <column gap={8} x="start">
       <Button label="Before" variant="outlined" />
-      <Bar menus={APP} />
+      <Bar menus={APP} keys={inputs.keys.value === true} />
       <Button label="After" variant="outlined" />
     </column>
   );
@@ -159,6 +169,12 @@ export const menuBarFixture: WorkbenchFixture = {
       try: 'Tab from Before: one stop lands on the bar with a visible focus ring. Left and Right move between titles and the focused title is visibly marked even while closed. Down opens on the first enabled command, Up on the last. Right while open moves to the next menu. Escape closes the menu and keeps the bar focused; a second Escape says the bar gave the keyboard back. Tab from the bar reaches After in one press.',
       width: 360,
       render: () => <Between />
+    },
+    {
+      name: 'From anywhere',
+      try: 'Click After, then press F10: the bar takes focus with File marked. Right, then F10 again: focus is back on After. F10 once more: the bar comes back on Edit, where it was left. Escape returns to After too. Press and release Alt alone: the same as F10. Alt then e: Edit opens from After; choose Cut and focus is back on After. Alt held while pressing Left does nothing to the bar. Tab into the bar from Before and Tab out: nothing jumps back later.',
+      width: 360,
+      render: () => <Between keys />
     },
     {
       name: 'Letters',

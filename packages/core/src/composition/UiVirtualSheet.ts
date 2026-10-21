@@ -34,7 +34,14 @@ import type { Reactive, ScrollViewProps } from './UiElementProps';
  * have to be sized at all.
  */
 export interface SheetViewport {
-  /** Horizontal scroll offset of the container. */
+  /**
+   * How far the container is scrolled from the sheet's start edge.
+   *
+   * Never negative. A sheet that reads right to left starts at its
+   * right edge and its container scrolls there with a negative offset,
+   * so the runtime hands over that offset negated: the window counts
+   * columns from the start whichever side the start is on.
+   */
   scrollX: number;
   /** Vertical scroll offset of the container. */
   scrollY: number;
@@ -42,6 +49,15 @@ export interface SheetViewport {
   width: number;
   /** Visible height. */
   height: number;
+  /**
+   * Whether the sheet starts at its right edge, as it does under right
+   * to left.
+   *
+   * The window itself never needs it, since everything it mounts is
+   * measured from the start. `cellAt` does, because a point arrives
+   * measured from the container's left.
+   */
+  fromRight?: boolean;
 }
 
 /** The cells the window has mounted, inclusive on both ends. */
@@ -512,11 +528,28 @@ export class UiVirtualSheet {
    * fill handle, a selection being stretched — is usually heading for
    * one that has not been mounted, so there is no node to hit-test and
    * arithmetic is the only answer available.
+   *
+   * The point is measured from the container's top left, as a pointer
+   * event's local position is, in either direction. A sheet that starts
+   * at its right edge has its columns measured from there, so the point
+   * is turned around first.
+   *
+   * A frozen pane does not scroll: it is held at the start edge by
+   * sticky, so a point over it is over a frozen row or column however
+   * far the sheet has scrolled, and is measured without the scroll.
+   * The header and the gutter are left out of that on purpose. They
+   * hold no cells, and a drag that strays onto them is heading for the
+   * cells scrolled out of view behind them, which measuring through
+   * the scroll finds.
    */
   cellAt(x: number, y: number): { row: number; column: number } {
+    const { scrollX, scrollY, width, fromRight } = this.viewport;
+    const along = fromRight === true ? width - x : x;
+    const overColumns = along >= this.gutterWidth && along < this.gutterWidth + this.frozenWidth;
+    const overRows = y >= this.headerHeight && y < this.headerHeight + this.rowOffsetOf(this.frozenRows);
     return {
-      row: this.rowAt(this.viewport.scrollY + y),
-      column: this.columnAt(this.viewport.scrollX + x)
+      row: this.rowAt(overRows ? y : scrollY + y),
+      column: this.columnAt(overColumns ? along : scrollX + along)
     };
   }
 

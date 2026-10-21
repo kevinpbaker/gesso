@@ -207,19 +207,32 @@ panel.hide();
 
 An entry takes either an anchor or its own placement in the viewport:
 
-| Option                  | What it does                                                                                   |
-| ----------------------- | ---------------------------------------------------------------------------------------------- |
-| `anchor`                | The node to be placed beside, with `placement` and `offset`.                                   |
-| `anchorRect`            | A part of the anchor to be placed beside; a plain value or an Observable, which moves it open. |
-| `top`, `right`, …       | Edge offsets against the viewport, for an entry with no anchor.                                |
-| `center`                | `'x'`, `'y'` or `'both'`: keep an unanchored entry in the middle of the viewport on that axis. |
-| `dismissOnOutsidePress` | Put a backdrop underneath that closes the entry.                                               |
-| `modal`                 | Put the backdrop underneath even when it doesn't close the entry, so the page takes no press.  |
-| `scrim`                 | Dim the page under the backdrop with the theme's `scrim`. On by default for a modal entry.     |
-| `environment`           | A node whose theme, text style and content colour the content should keep.                     |
-| `zIndex`                | Order among open entries. Later entries paint on top by default.                               |
+| Option                  | What it does                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| `anchor`                | The node to be placed beside, with `placement` and `offset`.                                      |
+| `anchorRect`            | A part of the anchor to be placed beside; a plain value or an Observable, which moves it open.    |
+| `placement`             | The side of the anchor, and the alignment along it. `start` and `end` follow reading direction.   |
+| `top`, `right`, …       | Edge offsets against the viewport, for an entry with no anchor.                                   |
+| `start`, `end`          | Edge offsets from the viewport's reading edges: `start` is the right under right-to-left text.    |
+| `center`                | `'x'`, `'y'` or `'both'`: keep an unanchored entry in the middle of the viewport on that axis.    |
+| `dismissOnOutsidePress` | Put a backdrop underneath that closes the entry.                                                  |
+| `modal`                 | Put the backdrop underneath even when it doesn't close the entry, so the page takes no press.     |
+| `scrim`                 | Dim the page under the backdrop with the theme's `scrim`. On by default for a modal entry.        |
+| `environment`           | A node whose theme, text style, colour and reading direction the entry keeps. Default the anchor. |
+| `zIndex`                | Order among open entries. Later entries paint on top by default.                                  |
 
-Three of those are worth spelling out.
+Four of those are worth spelling out.
+
+**`start` and `end` are the reading edges.** The engine's `placement`
+above is physical, but an entry's is not: along the top or the bottom,
+`-start` lines the entry up with the anchor's start edge, its right
+under `textDirection="rtl"`, and the sides `start` and `end` (with
+`start-start`, `end-end` and the rest) open beside the anchor toward
+those edges. `left` and `right` stay physical. The layer resolves them
+in the direction of the entry's `environment`, or of its anchor without
+one, which is the node its theme and text style come from too: the
+content reads one way and opens toward the same side, and both follow
+that tree if its direction changes while the entry is open.
 
 **A backdrop closes on the wheel as well as on a press.** A backdrop
 necessarily swallows the wheel, and a menu that swallowed scrolling

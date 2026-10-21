@@ -97,6 +97,15 @@ export interface DataTableProps<T> extends ControlLayoutProps {
   /** The chosen row, as its index in `rows` — so it survives a sort. */
   selectedRow?: number;
   defaultSelectedRow?: number;
+  /**
+   * Scroll to a row the application chooses through `selectedRow`, as
+   * the table does to one the keyboard reached: a record opened from a
+   * search, a link to one row of a long log. The row is followed, not
+   * its position, so a sort that moves the chosen row does not scroll
+   * after it. Off by default: a written row is drawn as chosen and
+   * nothing more. Read once, when the table mounts.
+   */
+  revealSelected?: boolean;
   onSelect?: (index: number) => void;
   /** Enter or Space on the chosen row. */
   onActivate?: (index: number) => void;
@@ -185,6 +194,36 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
     return row >= 0 && row < positionOf.length ? positionOf[row] : -1;
   };
   const step = (by: number): void => choose(stepIndex(positionOfSelected(), by, inputs.rows.value.length));
+
+  if (inputs.revealSelected.value === true) {
+    /**
+     * The row asked for and not shown yet. A reveal before the table has
+     * a height, or of a row the data does not have yet, cannot happen,
+     * so it waits for the layout or the rows that make it possible
+     * rather than being dropped, as `Tree`'s `revealKey` does.
+     */
+    let pending = -1;
+    // Followed by row, not by position: a sort keeps the selection and
+    // must not pull the reader back to it.
+    let revealed = -1;
+    const revealPending = (): void => {
+      if (pending < 0) return;
+      const position = positionOfSelected();
+      // The header is measured after the viewport, and until it is the
+      // reveal would keep the row clear of a header of no height: one
+      // below the window would land under the bottom edge by as much.
+      if (position >= 0 && headerBox.value.height > 0 && list.reveal(position)) {
+        pending = -1;
+      }
+    };
+    ctx.effect(selected.value, row => {
+      if (row === revealed) return;
+      revealed = row;
+      pending = row;
+      revealPending();
+    });
+    ctx.effect(combineLatest([revision, list.size, headerBox]), revealPending);
+  }
   const activate = (): void => {
     const row = selected.current();
     if (row >= 0) {
@@ -359,8 +398,8 @@ function headerCell<T>(column: DataColumn<T>, sort: Observable<DataTableSort | n
       Text({
         text: column.header,
         color: 'controlForeground',
+        textStyle: 'label',
         fontWeight: 600,
-        fontSize: 12,
         maxLines: 1,
         textWrap: 'none',
         textOverflow: 'ellipsis',
@@ -372,6 +411,7 @@ function headerCell<T>(column: DataColumn<T>, sort: Observable<DataTableSort | n
         // is the Media tier's `Icon`, and this does not wait for it.
         text: direction.pipe(map(value => (value === null ? '' : ARROWS[value]))),
         color: 'controlForeground',
+        // A size rather than a role: the arrow is an icon in a 9-wide slot.
         fontSize: 10,
         width: 9,
         flexShrink: 0,

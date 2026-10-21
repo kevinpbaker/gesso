@@ -49,6 +49,10 @@ focus a key put there. Left and Right then visibly move along a closed
 bar. A click on a title is not a reason to mark it, as it is not a
 reason to draw a ring.
 
+Left and Right move toward the arrow pressed. Under
+`textDirection="rtl"` the titles run from the right, so Left is the next
+menu and Right the one before, on a closed bar and an open one alike.
+
 ## Props
 
 | Prop            | What it is                                                                             |
@@ -60,7 +64,9 @@ reason to draw a ring.
 | `checkedOf`     | Whether a command that is a setting is on. Undefined for a plain action                |
 | `onChoose`      | Called with the command that was chosen                                                |
 | `onDismiss`     | Called when the bar is done with the keyboard                                          |
-| `barRef`        | The bar itself, for an application that focuses it from a shortcut                     |
+| `f10Key`        | Whether F10 reaches the bar from anywhere. Defaults to true                            |
+| `altKey`        | Whether Alt alone and Alt with a mnemonic do. Defaults to true, except on macOS        |
+| `barRef`        | The bar itself, for an application that focuses it some other way                      |
 | `label`         | What a screen reader calls the bar. Defaults to "Main menu"                            |
 
 The component is generic in the command type, so an application's own
@@ -99,17 +105,77 @@ same place will see the second overwrite the first.
 | `Home` `End`    | First or last menu     | First or last entry               |
 | `Enter` `Space` | Open                   | Choose, and close                 |
 | `Escape`        | Give the keyboard back | Close to the bar                  |
+| `F10`           | Give the keyboard back | Close, and give it back           |
+| `Alt` alone     | Give the keyboard back | Close, and give it back           |
 | A letter        | Open the menu it names | Jump to the entry it starts       |
 | `Tab`           | Leave the bar          | Close, and leave                  |
 
 Escape twice rather than once, and the order matters: the first closes
 the menu and leaves the bar focused, the second gives the keyboard
-back. Closing straight through loses the place of anybody who opened
+back. F10 and Alt leave in one press, because somebody pressing them is
+leaving the menus rather than backing out of one. Closing straight through loses the place of anybody who opened
 the wrong menu, which is most people, most of the time.
 
 A letter that names nothing is not claimed, and neither is Tab from the
 closed bar. A bar that swallowed every key would be a bar you cannot
 get out of.
+
+## Reaching the bar from anywhere
+
+A bar that can only be reached by tabbing to it is a bar at the far end
+of every form on the page. So three keys reach it from wherever focus
+is, the way they do in a Windows application:
+
+| Key, with focus elsewhere | What it does                                     |
+| ------------------------- | ------------------------------------------------ |
+| `F10`                     | Focus the bar, on the title it was last left on  |
+| `Alt`, pressed alone      | The same                                         |
+| `Alt` and a mnemonic      | Focus the bar and open the menu the letter names |
+
+Leaving puts focus back where it was. F10 or Alt again, Escape on the
+closed bar, or choosing a command all return it to the control that had
+it before, and to nothing if nothing did. Focus that left the bar some
+other way, by Tab or by a click, stays where it went.
+
+**Alone means alone.** Alt counts only when nothing came between its
+press and its release. Alt and Left, or Alt held through a click, are
+chords and leave the bar alone as Alt comes up. Shift+F10 is a context
+menu's key and is not taken either.
+
+**The page has first say.** The keys are heard at the root after the
+focused control and everything above it, as an application's shortcuts
+are, and taken only when the bar acted on them. A control that binds
+F10 or an Alt chord itself keeps it, and a modal dialog's focus trap
+keeps the bar behind it out of reach.
+
+**Turning them off.** `f10Key: false` and `altKey: false` leave those
+keys to the application: a debugger that steps with F10, or an editor
+whose Alt chords mean something else. A page with more than one bar
+should leave them on for one only, since the first bar to hear a key
+takes it.
+
+**On macOS, Alt is off by default.** There is no such convention on a
+Mac: the menus live in the system's bar, and Option and a letter is
+how somebody types "ø". The default follows the platform the runtime
+reports, and `altKey: true` turns it on anyway. F10 is on everywhere.
+
+**In a render worker, claim the keys on the main thread too.** The
+browser has defaults of its own for these keys: F10 and a lone Alt open
+a Windows browser's menu, and Alt and a letter opens one of its menus
+by that letter. A bar in a worker hears a key a message after the
+browser has acted on it, so its claim comes too late to stop it. Tell
+the shell which keys are the application's, and it cancels the
+browser's default on the spot, for the press and the release alike:
+
+```ts
+createApp({
+  renderWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
+  interceptKey: event => event.key === 'F10' || event.key === 'Alt' || (event.altKey && event.key.length === 1)
+});
+```
+
+An app on the main thread needs none of this: there, the bar's claim
+cancels the default directly.
 
 ## One highlight, not two
 

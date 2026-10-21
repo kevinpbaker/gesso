@@ -36,7 +36,7 @@ export function tooltipContent(text: string): UiChild {
       role: 'tooltip',
       label: text
     },
-    Text({ text, color: 'controlBackground', fontSize: 12, selectable: false })
+    Text({ text, color: 'controlBackground', textStyle: 'bodySmall', selectable: false })
   );
 }
 

@@ -175,13 +175,13 @@ export const selectFixture: WorkbenchFixture = {
     },
     {
       name: 'Disabled options and type-ahead',
-      try: 'Open it: Apricot and Cherry are dimmed and clicking them does nothing. Arrows skip them, End lands on Blackberry. Closed, press B: Banana is chosen; press A: Apple. Open, press B: the highlight moves to Banana without choosing.',
+      try: 'Open it: Apricot and Cherry are dimmed and clicking them does nothing. Arrows skip them, End lands on Blackberry. Closed, press B: Banana is chosen; B again: Blackberry; B again: back to Banana. Wait a moment and press A: Apple, A again: Avocado, never Apricot. Open, press B: the highlight moves without choosing.',
       stretch: true,
       render: () => <Echoed label="Fruit" start="avocado" options={WITH_GAPS} />
     },
     {
       name: 'Fifty options',
-      try: 'Open it: the list fits on screen and scrolls rather than running off the bottom of the window. Hold Down: the highlight stays in view as it walks. End shows Vietnam highlighted and visible.',
+      try: 'Open it: the list fits on screen and scrolls rather than running off the bottom of the window. Hold Down: the highlight stays in view as it walks. End shows Vietnam highlighted and visible. Type N, E, W, Space, Z quickly: the highlight lands on New Zealand, not Netherlands. Pause, then type S, W, I: Switzerland, scrolled into view.',
       stretch: true,
       render: () => <Echoed label="Country" start="germany" options={COUNTRIES} />
     },

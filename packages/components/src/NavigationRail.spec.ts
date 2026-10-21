@@ -461,6 +461,30 @@ describe('NavigationRail, collapsed', () => {
   });
 });
 
+describe('NavigationRail, collapsed under right to left', () => {
+  it('opens its labels toward the content, which is to its left', () => {
+    // A rail reading right to left sits at the right of what it serves,
+    // so its labels belong on its left. Asked for the right side, they
+    // went over whatever is beyond the rail whenever there was room
+    // there, and only came back when the window's edge flipped them.
+    const ui = renderTest(
+      Box(
+        { width: 600, height: 400, x: 'start', y: 'stretch' },
+        Box(
+          { width: 300, height: 400, textDirection: 'rtl', x: 'start', y: 'stretch' },
+          createComponent(NavigationRail, { items: ITEMS, label: 'Mail', collapsed: true, defaultValue: 'inbox' })
+        )
+      ),
+      { width: 600, height: 400 }
+    );
+    ui.fireEvent.tab();
+    ui.frame();
+    const tip = ui.getLayout(ui.getAllByRole('tooltip')[0]);
+    const focused = ui.getLayout(row(ui, 'Inbox'));
+    expect(tip.x + tip.width).toBeLessThanOrEqual(focused.x);
+  });
+});
+
 describe('NavigationRail, scrolling', () => {
   const MANY: NavigationItem[] = Array.from({ length: 40 }, (_, at) => ({
     key: `page-${at + 1}`,

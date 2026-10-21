@@ -35,7 +35,7 @@ export function controlMessage(
         Text({
           text,
           color: bad.length > 0 ? 'danger' : 'controlForegroundDisabled',
-          fontSize: 12,
+          textStyle: 'bodySmall',
           live: bad.length > 0 ? POLITE : undefined,
           selectable: false
         })

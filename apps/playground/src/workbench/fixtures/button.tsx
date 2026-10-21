@@ -1,7 +1,9 @@
+import { combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import { Button, type ButtonTone, type ButtonVariant } from 'gesso-components';
-import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
+import type { UiNode } from 'gesso-core';
+import { internalState, show, type ComponentContext, type Inputs } from 'gesso-framework';
 import type { WorkbenchFixture } from '../fixture';
 
 const VARIANTS: readonly ButtonVariant[] = ['filled', 'tonal', 'outlined', 'plain'];
@@ -28,6 +30,40 @@ function Busy(_inputs: Inputs<{}>, _ctx: ComponentContext) {
       <Button label="Saving" busy={busy} />
       <Button label="Toggle busy" variant="outlined" onClick={() => (busy.value = !busy.value)} />
     </row>
+  );
+}
+
+/**
+ * A button that shows and hides a panel under it, saying so: `expanded`
+ * from the same cell, and `controls` naming the panel while it is shown.
+ * Both cells are read for `controls` because the panel's `ref` and the
+ * open state change in either order.
+ */
+function Disclosure(_inputs: Inputs<{}>, _ctx: ComponentContext) {
+  const open = internalState(false);
+  const panel = internalState<UiNode | null>(null);
+  return (
+    <column gap={8} x="start">
+      <Button
+        label="Show details"
+        variant="outlined"
+        expanded={open}
+        controls={combineLatest([open, panel]).pipe(map(([on, node]) => (on ? node : null)))}
+        onClick={() => (open.value = !open.value)}
+      />
+      {show(open, () => (
+        <box
+          ref={(node: UiNode | null) => (panel.value = node)}
+          role="region"
+          label="Details"
+          padding={12}
+          borderRadius={6}
+          borderWidth={1}
+          borderColor="controlBorder">
+          <text textStyle="bodySmall">Shipped on the 3rd, by courier.</text>
+        </box>
+      ))}
+    </column>
   );
 }
 
@@ -88,6 +124,11 @@ export const buttonFixture: WorkbenchFixture = {
       try: 'The label is clipped or wrapped inside the button, never drawn past its edge.',
       width: 160,
       render: () => <Button label="Export every selected report as a spreadsheet" />
+    },
+    {
+      name: 'Opens something',
+      try: 'Press it: the details show under it. In the page inspector, the button’s mirror element has aria-expanded="false" before the press, "true" after, and aria-controls naming the details’ element while they show. Press again and both go back.',
+      render: () => <Disclosure />
     },
     {
       name: 'Out of the Tab order',

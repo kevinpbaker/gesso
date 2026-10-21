@@ -114,7 +114,7 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
           Escape: () => find.close()
         })(event)
     }),
-    Text({ text: counter, color: 'textMuted', fontSize: 12, selectable: false }),
+    Text({ text: counter, color: 'textMuted', textStyle: 'bodySmall', selectable: false }),
     step('‹', 'Previous match', () => find.previous()),
     step('›', 'Next match', () => find.next()),
     step('✕', 'Close find', () => find.close())

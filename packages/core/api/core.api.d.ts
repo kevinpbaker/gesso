@@ -1650,6 +1650,8 @@ declare class UiVirtualWindow {
   private leadExtent;
   private trailExtent;
   private readonly measured;
+  private held;
+  private heldLead;
   private readonly corrections;
   private readonly mountedItems;
   private viewport;
@@ -1668,7 +1670,11 @@ declare class UiVirtualWindow {
   offsetOf(index: number): number;
   totalExtent(): number;
   extentOf(index: number): number;
+  isMeasured(index: number): boolean;
+  holdInView(index: number, lead?: number): void;
+  get holding(): boolean;
   indexAt(offset: number): number;
+  private keepHeldInView;
   update(viewport: VirtualViewport, measures: Iterable<VirtualItemMeasure>): VirtualUpdate;
   private checkViewport;
   private refresh;
@@ -1696,6 +1702,7 @@ interface SheetViewport {
   scrollY: number;
   width: number;
   height: number;
+  fromRight?: boolean;
 }
 interface SheetRange {
   readonly firstRow: number;

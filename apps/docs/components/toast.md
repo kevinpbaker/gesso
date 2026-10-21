@@ -27,18 +27,18 @@ seconds; the second is an error, has no duration, and stays until the
 
 ## Props
 
-| Prop          | Type                                         | Default          | What it does                                                                    |
-| ------------- | -------------------------------------------- | ---------------- | ------------------------------------------------------------------------------- |
-| `open`        | `boolean`                                    | none             | Whether the notice is up. The application owns this.                            |
-| `onClose`     | `() => void`                                 | none             | Called when the timer expires or the ✕ is pressed. Write `open` back here.      |
-| `message`     | `string`                                     | `''`             | The text, and the accessible name of the box.                                   |
-| `tone`        | `'info' \| 'error'`                          | `'info'`         | `info` waits its turn; `error` interrupts. See the semantics below.             |
-| `duration`    | `number`                                     | `4000`           | Milliseconds before it dismisses itself, paused while hovered. `0` keeps it up. |
-| `dismissible` | `boolean`                                    | `true`           | Shows the ✕ that closes it.                                                     |
-| `action`      | `string`                                     | `''`             | The text of a button that acts on the notice: `Undo`, `Retry`. None when empty. |
-| `onAction`    | `() => void`                                 | none             | Called when the action is pressed. The toast then closes, through `onClose`.    |
-| `placement`   | `'bottom-start' \| 'bottom' \| 'bottom-end'` | `'bottom-start'` | Which part of the bottom edge it is pinned to.                                  |
-| `offset`      | `number`                                     | `24`             | Pixels between the toast and the viewport's edges.                              |
+| Prop          | Type                                         | Default          | What it does                                                                      |
+| ------------- | -------------------------------------------- | ---------------- | --------------------------------------------------------------------------------- |
+| `open`        | `boolean`                                    | none             | Whether the notice is up. The application owns this.                              |
+| `onClose`     | `() => void`                                 | none             | Called when the timer expires or the ✕ is pressed. Write `open` back here.        |
+| `message`     | `string`                                     | `''`             | The text, and the accessible name of the box.                                     |
+| `tone`        | `'info' \| 'error'`                          | `'info'`         | `info` waits its turn; `error` interrupts. See the semantics below.               |
+| `duration`    | `number`                                     | `4000`           | Milliseconds before it dismisses itself, paused while hovered. `0` keeps it up.   |
+| `dismissible` | `boolean`                                    | `true`           | Shows the ✕ that closes it.                                                       |
+| `action`      | `string`                                     | `''`             | The text of a button that acts on the notice: `Undo`, `Retry`. None when empty.   |
+| `onAction`    | `() => void`                                 | none             | Called when the action is pressed. The toast then closes, through `onClose`.      |
+| `placement`   | `'bottom-start' \| 'bottom' \| 'bottom-end'` | `'bottom-start'` | Which part of the bottom edge it is pinned to. `start` follows reading direction. |
+| `offset`      | `number`                                     | `24`             | Pixels between the toast and the viewport's edges.                                |
 
 Every prop takes a plain value or an Observable of one. `Toast` takes
 none of the shared layout props, because it is not placed in your
@@ -70,15 +70,20 @@ it.
 
 A `Toast` returns a zero-size, invisible placeholder where you declare
 it, and its box is drawn in the overlay layer the runtime mounts above
-the app root, pinned 24 pixels off the bottom left corner of the
+the app root, pinned 24 pixels off the bottom start corner of the
 viewport. Nothing in your layout moves when one opens, and nothing in
-your layout decides where it goes. `bottom-start` is the left corner in
-right-to-left text too, and `bottom-end` the right: the overlay layer
-places by the window's physical edges, not by reading direction.
+your layout decides where it goes.
+
+`start` and `end` are the reading edges. `bottom-start` is the corner a
+line of text starts from: the bottom left in left-to-right text and the
+bottom right under `textDirection="rtl"`, and `bottom-end` is the other
+one. The direction is the one where the toast is declared, so a toast
+raised from a right-to-left section of a left-to-right app comes up on
+the right.
 
 `placement` and `offset` move the pin, not the layout: `'bottom'`
 centres the toast along the bottom edge and `'bottom-end'` puts it in
-the right corner, `offset` pixels in from each edge. Raise it past
+the end corner, `offset` pixels in from each edge. Raise it past
 anything your app keeps along the bottom of the window, a toolbar or a
 panel, so the two never cover each other: `offset={72}` clears a
 52-pixel bar with room to spare.
@@ -151,8 +156,8 @@ other colour is named: the box is `surface` with a `border` border.
 
 The roles, the name, the auto-dismiss and its timer, `duration: 0`, the
 dismiss button, the tab order and the corner it is pinned to are
-asserted in the spec beside the example; the action and the other
-placements in `Toast.spec.ts` beside the component, driving the real runtime with
+asserted in the spec beside the example; the action, the other
+placements and the corners under right-to-left text in `Toast.spec.ts` beside the component, driving the real runtime with
 a fake canvas. No screen reader has been sat in front of the `alert`
 and `status` records, which is a different question from whether they
 are emitted.

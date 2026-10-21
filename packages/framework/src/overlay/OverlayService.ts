@@ -1,6 +1,27 @@
 import type { Reactive, UiChild, UiNode } from 'gesso-core';
 import { internalState } from '../InternalState';
 
+/**
+ * The side of the anchor an entry opens on and, after a dash, the edge
+ * of the anchor it lines up with along that side; the bare side
+ * centres.
+ *
+ * **`start` and `end` are the reading edges.** Along the top or the
+ * bottom, `-start` lines the entry up with the anchor's start edge,
+ * which is its left in left-to-right text and its right in
+ * right-to-left text: a list under a field begins where the field's
+ * text does. As a side, `start` and `end` open beside the anchor
+ * toward those edges, so a submenu given `end-start` opens past the
+ * end of its row whichever way the row reads. Along the left or right
+ * side the alignment is up and down, which no reading direction turns.
+ *
+ * `left` and `right` stay physical, for a side that is genuinely one
+ * edge of the screen whatever the language: an arrow drawn on a
+ * diagram, a tooltip on a panel that is always on the left.
+ *
+ * The direction is the entry's: the one its content reads in, which is
+ * where its theme comes from too. See `OverlayEntry.environment`.
+ */
 export type OverlayPlacement =
   | 'top'
   | 'top-start'
@@ -13,7 +34,42 @@ export type OverlayPlacement =
   | 'left-end'
   | 'right'
   | 'right-start'
-  | 'right-end';
+  | 'right-end'
+  | 'start'
+  | 'start-start'
+  | 'start-end'
+  | 'end'
+  | 'end-start'
+  | 'end-end';
+
+/** A placement the layout engine takes: the side named physically, and the alignment along top and bottom too. */
+export type OverlayPhysicalPlacement = Exclude<OverlayPlacement, `start${string}` | `end${string}`>;
+
+/**
+ * A placement turned into the physical one the layout engine places by,
+ * in a reading direction.
+ *
+ * The engine knows only screen edges: `bottom-start` to it is the
+ * anchor's left edge. Resolving here, rather than teaching the engine
+ * directions, keeps the engine's `placement` the plain property it is
+ * for any absolutely positioned node, and puts the decision where the
+ * direction is known: the overlay layer reads it from the tree that
+ * declared the entry.
+ */
+export function physicalPlacement(placement: OverlayPlacement, rtl: boolean): OverlayPhysicalPlacement {
+  const [side, align] = placement.split('-') as [string, string | undefined];
+  if (side === 'top' || side === 'bottom') {
+    if (align === undefined || !rtl) {
+      return placement as OverlayPhysicalPlacement;
+    }
+    return `${side}-${align === 'start' ? 'end' : 'start'}`;
+  }
+  if (side === 'left' || side === 'right') {
+    return placement as OverlayPhysicalPlacement;
+  }
+  const physical = (side === 'start') !== rtl ? 'left' : 'right';
+  return align === undefined ? physical : `${physical}-${align as 'start' | 'end'}`;
+}
 
 /** A rectangle inside an anchor, from its border box's top left. */
 export interface OverlayRect {
@@ -47,7 +103,7 @@ export interface OverlayEntry {
    * when it wraps to the next line, without being opened again.
    */
   readonly anchorRect?: Reactive<OverlayRect | undefined>;
-  /** Default 'bottom'. */
+  /** Default 'bottom'. `start` and `end` follow the reading direction; see `OverlayPlacement`. */
   readonly placement?: OverlayPlacement;
   /** Gap between content and anchor. */
   readonly offset?: number;
@@ -55,6 +111,16 @@ export interface OverlayEntry {
   readonly right?: number;
   readonly bottom?: number;
   readonly left?: number;
+  /**
+   * The offset from the viewport's start edge: its left in
+   * left-to-right text and its right in right-to-left text, in the
+   * entry's direction. For something pinned to a corner a reader looks
+   * for in a particular place, as a toast is. It wins over the physical
+   * offset on the same edge.
+   */
+  readonly start?: number;
+  /** The offset from the viewport's end edge, as `start` is from its start. */
+  readonly end?: number;
   /**
    * A point to open beside, relative to the viewport: where a context
    * menu was asked for. Placed as an anchor of no size would be, with

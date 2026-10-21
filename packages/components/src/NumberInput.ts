@@ -136,7 +136,7 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
       map(name =>
         name.length === 0 || labelHidden
           ? []
-          : [Text({ text: name, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
+          : [Text({ text: name, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })]
       )
     ),
     Row(
@@ -223,6 +223,8 @@ function stepper(
       label: glyph === '+' ? 'Increase' : 'Decrease',
       onClick: press
     },
+    // A size rather than a role: the − and + are the button's icon, sized
+    // to its box, not words that should follow the theme's type scale.
     Text({ text: glyph, color: foregroundToken(disabled), fontSize: 14, selectable: false })
   );
 }

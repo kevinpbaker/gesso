@@ -27,7 +27,7 @@ function Basic(_inputs: Inputs<{}>, ctx: ComponentContext) {
 
 /** One button per side. */
 function Sides(_inputs: Inputs<{}>, ctx: ComponentContext) {
-  const sides: readonly OverlayPlacement[] = ['top', 'right', 'bottom', 'left'];
+  const sides: readonly OverlayPlacement[] = ['top', 'right', 'bottom', 'left', 'start', 'end', 'top-start'];
   const tips = sides.map(side => tooltip(ctx, { text: `Placed ${side}`, placement: side, delay: 0 }));
   return (
     <row gap={8} flexWrap="wrap">
@@ -155,7 +155,7 @@ export const tooltipFixture: WorkbenchFixture = {
     },
     {
       name: 'Placements',
-      try: 'Each tooltip sits on the side its button names, 6px off, centred on the button. left at the card’s left edge has room on the page; scroll this card to the window’s top and top flips below.',
+      try: 'Each tooltip sits on the side its button names, 6px off, centred on the button but for top-start. left at the card’s left edge has room on the page; scroll this card to the window’s top and top flips below. start opens to its button’s left and end to its right, and top-start lines up with its button’s left edge. Switch the workbench to right to left: start and end trade sides and top-start lines up with the right edge, while top, right, bottom and left stay where they are.',
       width: 320,
       render: () => <Sides />
     },

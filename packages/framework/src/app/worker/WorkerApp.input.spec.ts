@@ -502,6 +502,27 @@ describe('hover coalescing', () => {
     expect(prevented).toEqual(['s']);
     expect(shell.posts.filter(message => message.type === 'keyDown')).toHaveLength(3);
   });
+
+  /**
+   * F10 and a lone Alt for a menu bar. A browser acts on Alt when it is
+   * released, so cancelling only the press left the release to open the
+   * browser's own menu over the application's.
+   */
+  it('cancels the browser default for a key release the application claims, too', () => {
+    const claimed = (event: KeyboardEvent): boolean => event.key === 'Alt' || event.key === 'F10';
+    const shell = setup({ interceptKey: claimed });
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    const prevented: string[] = [];
+    const release = (name: string) =>
+      ({ ...key(), key: name, preventDefault: () => prevented.push(name) }) as unknown as KeyboardEvent;
+
+    shell.canvas.dispatch('keyup', release('Alt'));
+    shell.canvas.dispatch('keyup', release('F10'));
+    shell.canvas.dispatch('keyup', release('a'));
+
+    expect(prevented).toEqual(['Alt', 'F10']);
+    expect(shell.posts.filter(message => message.type === 'keyUp')).toHaveLength(3);
+  });
 });
 
 describe('keys pressed on the page', () => {

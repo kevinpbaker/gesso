@@ -542,7 +542,7 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
       map(text =>
         text.length === 0 || labelHidden
           ? []
-          : [Text({ text, color: foregroundToken(disabled), fontSize: 12, selectable: false })]
+          : [Text({ text, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })]
       )
     ),
     multiple
@@ -632,7 +632,9 @@ function optionRow(
     }),
     ...(option.detail === undefined
       ? []
-      : [Text({ text: option.detail, color: 'textMuted', fontSize: 12, textWrap: 'none', selectable: false })]),
+      : [
+          Text({ text: option.detail, color: 'textMuted', textStyle: 'bodySmall', textWrap: 'none', selectable: false })
+        ]),
     Text({
       text: selected.pipe(map(on => (on ? '✓' : ''))),
       color: foreground,
@@ -660,7 +662,7 @@ function token(value: string, text: string, remove: (value: string) => void, dis
       borderWidth: 1,
       borderColor: 'controlBorder'
     },
-    Text({ text, fontSize: 12, color: foregroundToken(disabled), selectable: false }),
+    Text({ text, textStyle: 'bodySmall', color: foregroundToken(disabled), selectable: false }),
     Button(
       {
         label: `Remove ${text}`,
@@ -673,6 +675,7 @@ function token(value: string, text: string, remove: (value: string) => void, dis
         y: 'center',
         onClick: () => remove(value)
       },
+      // A size rather than a role: the × is an icon sized to its 16-pixel button.
       Text({ text: '×', fontSize: 12, color: foregroundToken(disabled), selectable: false })
     )
   );

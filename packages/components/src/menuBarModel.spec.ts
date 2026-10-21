@@ -238,3 +238,25 @@ describe('the edges', () => {
     expect(menuBarStep(MENU_BAR_CLOSED, 'ArrowDown', anonymous, everything)?.state.open).toBe(true);
   });
 });
+
+describe('leaving and coming back', () => {
+  it('gives the keyboard back on F10, open or closed, as a second F10 does on Windows', () => {
+    const closed = press(MENU_BAR_CLOSED, ['ArrowRight', 'F10']);
+    expect(closed.dismissed).toBe(true);
+    expect(closed.state).toMatchObject({ focused: 1, open: false });
+
+    const open = press(MENU_BAR_CLOSED, ['ArrowRight', 'ArrowDown', 'F10']);
+    expect(open.dismissed).toBe(true);
+    expect(open.state).toMatchObject({ focused: 1, open: false, active: -1 });
+  });
+
+  it('remembers the title it was left on, so F10 comes back to it', () => {
+    // Escape and Tab used to reset the bar to its first title, so the
+    // way back in always landed on File whatever had been in use.
+    expect(press(MENU_BAR_CLOSED, ['ArrowRight', 'ArrowRight', 'Escape']).state.focused).toBe(2);
+    expect(press(MENU_BAR_CLOSED, ['ArrowRight', 'ArrowDown', 'Tab']).state).toMatchObject({
+      focused: 1,
+      open: false
+    });
+  });
+});

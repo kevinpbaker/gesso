@@ -90,6 +90,10 @@ export function virtualList(): VirtualList {
       } else if (bottom > now + height) {
         scroll.next(Math.max(0, bottom - height));
       }
+      // Placed by the estimate, unless it has been measured: the window
+      // keeps it in view until it has, so a jump that landed short or
+      // long by the difference is put right on the next frame.
+      window.holdInView(index, lead);
       return true;
     }
   };

@@ -183,7 +183,7 @@ export const menuFixture: WorkbenchFixture = {
     },
     {
       name: 'Submenus',
-      try: 'Right on New from template opens its submenu beside it with focus inside; Right again on Reports opens a third. Left closes one level back to its item. Choosing Weekly report closes all three and the line says so. With the pointer, resting on Share opens it and moving to Close closes it. Open recent is disabled and opens nothing.',
+      try: 'Right on New from template opens its submenu to the right of it with focus inside; Right again on Reports opens a third. Left closes one level back to its item. Choosing Weekly report closes all three and the line says so. With the pointer, resting on Share opens it and moving to Close closes it. Open recent is disabled and opens nothing. Switch the workbench to right to left: the menu lines up with the button’s right edge, Left opens each submenu to the left of its item (to its right where the window has no room) and Right goes back.',
       width: 320,
       render: () => <Anchored trigger="File" items={NESTED} />
     },

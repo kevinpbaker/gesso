@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 import { Column } from 'gesso-core';
+import { Button } from './Button';
 import { MenuBar } from './MenuBar';
 import { MENU_SEPARATOR } from './menuBarModel';
 
@@ -177,13 +179,15 @@ describe('MenuBar in a short window', () => {
 });
 
 describe('MenuBar under the keyboard, with nothing open', () => {
-  function bar(said: string[] = []) {
+  function bar(said: string[] = [], direction: 'ltr' | 'rtl' = 'ltr') {
     const ui = renderTest(
       Column(
+        { textDirection: direction },
         createComponent(MenuBar<string>, {
           menus: [
             { label: 'File', entries: ['New', 'Open'] },
-            { label: 'Edit', entries: ['Undo', 'Redo'] }
+            { label: 'Edit', entries: ['Undo', 'Redo'] },
+            { label: 'View', entries: ['Zoom'] }
           ],
           labelOf: (item: string) => item,
           onChoose: (item: string) => said.push(`chose ${item}`),
@@ -193,7 +197,9 @@ describe('MenuBar under the keyboard, with nothing open', () => {
       { width: 400, height: 400 }
     );
     const ringed = () =>
-      ['File', 'Edit'].filter(title => ui.getByText(title).parent!.properties.get('borderColor') === 'focusRing');
+      ['File', 'Edit', 'View'].filter(
+        title => ui.getByText(title).parent!.properties.get('borderColor') === 'focusRing'
+      );
     return { ui, ringed };
   }
 
@@ -215,6 +221,29 @@ describe('MenuBar under the keyboard, with nothing open', () => {
     expect(ringed()).toEqual([]);
   });
 
+  it('walks toward the arrow under right to left, so Left is the next title', () => {
+    // The titles run from the right, so the next one is to the left.
+    // Left and Right still walked in reading order, which put the ring
+    // on the title away from the arrow.
+    const { ui, ringed } = bar([], 'rtl');
+    expect(ui.getLayout(ui.getByText('Edit')).x).toBeLessThan(ui.getLayout(ui.getByText('File')).x);
+    ui.fireEvent.tab();
+    ui.frame();
+    ui.fireEvent.keyDown('ArrowLeft');
+    ui.frame();
+    expect(ringed()).toEqual(['Edit']);
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.frame();
+    expect(ringed()).toEqual(['File']);
+
+    // Open, the same arrows walk from menu to menu.
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    ui.fireEvent.keyDown('ArrowLeft');
+    ui.frame();
+    expect(ui.getByRole('menuitem', { name: 'Undo' })).toBeTruthy();
+  });
+
   it('dismisses after a choice made with the pointer, as after one made with the keys', () => {
     // The docs say choosing is followed by `onDismiss`; a click on a row
     // reported the choice and never gave the keyboard back.
@@ -232,5 +261,155 @@ describe('MenuBar under the keyboard, with nothing open', () => {
     ui.fireEvent.keyDown('Enter');
     ui.frame();
     expect(said).toEqual(['chose Undo', 'dismissed']);
+  });
+});
+
+describe('MenuBar reached from elsewhere in the application', () => {
+  /**
+   * A button with focus, and a bar beside it. The bar's keys are heard
+   * at the root, so nothing here focuses the bar first: that is the gap
+   * these close. `altKey` is given outright in most of them so the
+   * result does not hang on which platform the test runner reports.
+   */
+  function app(options: { altKey?: boolean; f10Key?: boolean } = { altKey: true }) {
+    const said: string[] = [];
+    const ui = renderTest(
+      Column(
+        createComponent(Button, { label: 'Elsewhere' }),
+        createComponent(MenuBar<string>, {
+          menus: [
+            { label: 'File', mnemonic: 'f', entries: ['New', 'Open'] },
+            { label: 'Edit', mnemonic: 'e', entries: ['Undo', 'Redo'] }
+          ],
+          labelOf: (item: string) => item,
+          onChoose: (item: string) => said.push(`chose ${item}`),
+          onDismiss: () => said.push('dismissed'),
+          ...options
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    const elsewhere = ui.getByRole('button', { name: 'Elsewhere' });
+    const bar = ui.getByLabel('Main menu');
+    ui.fireEvent.focus(elsewhere);
+    ui.frame();
+    const ringed = () =>
+      ['File', 'Edit'].filter(title => ui.getByText(title).parent!.properties.get('borderColor') === 'focusRing');
+    const open = () => ui.queryByRole('menu');
+    return { ui, said, elsewhere, bar, ringed, open };
+  }
+
+  it('takes focus on F10 and gives it back on a second F10', () => {
+    const { ui, elsewhere, bar, ringed } = app();
+    ui.fireEvent.keyDown('F10');
+    ui.frame();
+    expect(bar).toHaveFocus();
+    expect(ringed()).toEqual(['File']);
+
+    ui.fireEvent.keyDown('F10');
+    ui.frame();
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it('gives focus back on Escape, after closing an open menu first', () => {
+    const { ui, elsewhere, bar, open } = app();
+    ui.fireEvent.keyDown('F10');
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    expect(open()).not.toBeNull();
+
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(open()).toBeNull();
+    expect(bar).toHaveFocus();
+
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it('comes back to the title it was left on', () => {
+    const { ui, ringed } = app();
+    ui.fireEvent.keyDown('F10');
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.fireEvent.keyDown('F10');
+    ui.fireEvent.keyDown('F10');
+    ui.frame();
+    expect(ringed()).toEqual(['Edit']);
+  });
+
+  it('gives focus back after a command is chosen', () => {
+    const { ui, said, elsewhere } = app();
+    ui.fireEvent.keyDown('F10');
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(said).toEqual(['chose New', 'dismissed']);
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it('takes and gives back focus on Alt pressed and released alone', () => {
+    const { ui, elsewhere, bar } = app();
+    ui.fireEvent.keyDown('Alt', { alt: true });
+    ui.fireEvent.keyUp('Alt');
+    ui.frame();
+    expect(bar).toHaveFocus();
+
+    ui.fireEvent.keyDown('Alt', { alt: true });
+    ui.fireEvent.keyUp('Alt');
+    ui.frame();
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it('leaves Alt alone when another key came between, which makes it a chord', () => {
+    const { ui, elsewhere } = app();
+    ui.fireEvent.keyDown('Alt', { alt: true });
+    ui.fireEvent.keyDown('ArrowLeft', { alt: true });
+    ui.fireEvent.keyUp('ArrowLeft', { alt: true });
+    ui.fireEvent.keyUp('Alt');
+    ui.frame();
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it('opens the menu a mnemonic names on Alt and its letter, from anywhere', () => {
+    const { ui, bar, open, said, elsewhere } = app();
+    ui.fireEvent.keyDown('Alt', { alt: true });
+    ui.fireEvent.keyDown('e', { alt: true }, { code: 'KeyE' });
+    ui.fireEvent.keyUp('e', { alt: true }, { code: 'KeyE' });
+    ui.fireEvent.keyUp('Alt');
+    ui.frame();
+    expect(bar).toHaveFocus();
+    expect(open()).not.toBeNull();
+    expect(ui.getSemantics(open()!).label).toBe('Edit');
+    expect(said).toEqual([]);
+
+    ui.fireEvent.keyDown('Escape');
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it('can be told to leave Alt to the application', () => {
+    const { ui, elsewhere, open } = app({ altKey: false });
+    ui.fireEvent.keyDown('Alt', { alt: true });
+    ui.fireEvent.keyUp('Alt');
+    ui.fireEvent.keyDown('e', { alt: true }, { code: 'KeyE' });
+    ui.frame();
+    expect(elsewhere).toHaveFocus();
+    expect(open()).toBeNull();
+  });
+
+  it('can be told to leave F10 to the application', () => {
+    const { ui, elsewhere } = app({ f10Key: false });
+    ui.fireEvent.keyDown('F10');
+    ui.frame();
+    expect(elsewhere).toHaveFocus();
+  });
+
+  it('leaves F10 with a modifier alone: Shift+F10 is a context menu', () => {
+    const { ui, elsewhere } = app();
+    ui.fireEvent.keyDown('F10', { shift: true });
+    ui.frame();
+    expect(elsewhere).toHaveFocus();
   });
 });

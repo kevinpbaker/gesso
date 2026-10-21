@@ -349,10 +349,14 @@ describe('Select', () => {
     ui.fireEvent.keyDown('b');
     expect(changes).toEqual(['bank']);
 
-    // Open: it moves the highlight, and Enter takes it.
+    // Open: it moves the highlight, and Enter takes it. One `c` from
+    // Bank would go on to the next option starting with it, Cash; typed
+    // quickly, `car` is one search, and it is Card.
     ui.fireEvent.keyDown('Enter');
     ui.frame();
     ui.fireEvent.keyDown('c');
+    ui.fireEvent.keyDown('a');
+    ui.fireEvent.keyDown('r');
     ui.fireEvent.keyDown('Enter');
     ui.frame();
     expect(changes).toEqual(['bank', 'card']);
@@ -800,5 +804,78 @@ describe('Menu with nothing it can choose', () => {
     expect(painted()).toEqual(['transparent', 'transparent']);
     expect(chosen).toEqual([]);
     expect(open.value).toBe(true);
+  });
+});
+
+/**
+ * A menu in an interface that reads right to left. Its submenus opened
+ * to the right, toward where its rows end rather than where they begin,
+ * Right opened them and Left closed them, and a context menu ran
+ * rightward from the pointer, as in left-to-right text.
+ */
+describe('Menu in right-to-left text', () => {
+  function rtlMenu(at: { readonly x: number; readonly y: number }) {
+    const open = new BehaviorSubject(false);
+    const ui = mount(
+      Column(
+        { textDirection: 'rtl', width: percent(100), height: percent(100) },
+        createComponent(Menu, {
+          open,
+          at,
+          items: [
+            { value: 'copy', label: 'Copy' },
+            {
+              value: 'reset',
+              label: 'Reset to Here',
+              items: [
+                { value: 'soft', label: 'Soft' },
+                { value: 'hard', label: 'Hard' }
+              ]
+            }
+          ],
+          onOpenChange: (next: boolean) => open.next(next)
+        })
+      )
+    );
+    open.next(true);
+    ui.frame();
+    return ui;
+  }
+
+  it('opens from the pointer toward the left', () => {
+    const ui = rtlMenu({ x: 300, y: 20 });
+    const menu = ui.getLayout(ui.getByRole('menu'));
+    expect(menu.x + menu.width).toBe(300);
+    expect(menu.y).toBe(20);
+  });
+
+  it('opens a submenu to the left of its item with Left, and goes back with Right', () => {
+    const ui = rtlMenu({ x: 390, y: 20 });
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.frame();
+    expect(ui.getAllByRole('menu')).toHaveLength(1);
+
+    ui.fireEvent.keyDown('ArrowLeft');
+    ui.frame();
+    const [menu, submenu] = ui.getAllByRole('menu').map(node => ui.getLayout(node));
+    expect(submenu).toBeDefined();
+    const item = ui.getLayout(ui.getByRole('menuitem', { name: 'Reset to Here' }));
+    expect(submenu.x + submenu.width).toBeCloseTo(item.x - 4, 5);
+    expect(submenu.x).toBeLessThan(menu.x);
+
+    ui.fireEvent.keyDown('ArrowRight');
+    ui.frame();
+    expect(ui.getAllByRole('menu')).toHaveLength(1);
+  });
+
+  it('opens a submenu to the right when there is no room on the left', () => {
+    const ui = rtlMenu({ x: 170, y: 20 });
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.fireEvent.keyDown('ArrowLeft');
+    ui.frame();
+    const submenu = ui.getLayout(ui.getAllByRole('menu')[1]);
+    const item = ui.getLayout(ui.getByRole('menuitem', { name: 'Reset to Here' }));
+    expect(submenu.x).toBeCloseTo(item.x + item.width + 4, 5);
   });
 });

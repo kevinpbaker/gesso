@@ -202,7 +202,7 @@ export const comboboxFixture: WorkbenchFixture = {
     },
     {
       name: 'Against the right edge',
-      try: 'A narrow field flush right. Open it: the 180px list stays inside the window rather than being cut off at the right.',
+      try: 'A narrow field flush right. Open it: the 180px list stays inside the window rather than being cut off at the right. Switch the workbench to right to left: the field is flush left, the list lines up with its right edge and reads from the right, and it still stays inside the window rather than being cut off at the left.',
       stretch: true,
       render: () => (
         <row x="end">

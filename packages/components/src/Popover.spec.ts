@@ -427,15 +427,13 @@ describe('Popover, right to left', () => {
     expect(ui.getLayout(ui.getByLabel('First')).x).toBeGreaterThan(ui.getLayout(ui.getByLabel('Second')).x);
   });
 
-  it('turns every logical placement the right way', () => {
-    expect(placementOf('bottom', 'start', false)).toBe('bottom-start');
-    expect(placementOf('bottom', 'start', true)).toBe('bottom-end');
-    expect(placementOf('top', 'end', true)).toBe('top-start');
-    expect(placementOf('top', 'center', true)).toBe('top');
-    expect(placementOf('start', 'start', false)).toBe('left-start');
-    expect(placementOf('start', 'start', true)).toBe('right-start');
-    expect(placementOf('end', 'end', false)).toBe('right-end');
-    expect(placementOf('end', 'center', true)).toBe('left');
+  it('names its side and alignment as the overlay layer does, which resolves them in the anchor’s direction', () => {
+    expect(placementOf('bottom', 'start')).toBe('bottom-start');
+    expect(placementOf('top', 'end')).toBe('top-end');
+    expect(placementOf('top', 'center')).toBe('top');
+    expect(placementOf('start', 'start')).toBe('start-start');
+    expect(placementOf('end', 'end')).toBe('end-end');
+    expect(placementOf('end', 'center')).toBe('end');
   });
 });
 

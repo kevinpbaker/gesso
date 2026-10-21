@@ -13,7 +13,7 @@ import {
 } from 'gesso-core';
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
-import { OverlayService, type OverlayEntry } from './OverlayService';
+import { OverlayService, physicalPlacement, type OverlayEntry, type OverlayPhysicalPlacement } from './OverlayService';
 
 /**
  * The layer every runtime mounts above the app root.
@@ -33,6 +33,12 @@ import { OverlayService, type OverlayEntry } from './OverlayService';
  *
  * Entries render in store order; a later entry is on top unless it
  * sets zIndex.
+ *
+ * `start` and `end`, in a placement or as edge offsets, are resolved to
+ * physical edges here, in the reading direction of the node the entry
+ * takes its environment from, and resolved again if that direction
+ * changes while the entry is open. See `OverlayEntry.environment` for
+ * why that node and not always the anchor.
  */
 @Define('gesso-overlay-layer')
 export class OverlayLayer extends Component {
@@ -50,13 +56,13 @@ export class OverlayLayer extends Component {
   private renderEntries(entries: readonly OverlayEntry[]): UiElement[] {
     const elements: UiElement[] = [];
     for (const entry of entries) {
+      const environment = entry.environment ?? entry.anchor ?? null;
       if (entry.dismissOnOutsidePress === true || entry.modal === true) {
         // A modal's backdrop is there whether or not it closes anything:
         // it is what keeps a press beside the dialog from reaching the
         // page under it. One that doesn't close takes the press and the
         // wheel and does nothing with them.
         const dismiss = entry.dismissOnOutsidePress === true;
-        const environment = entry.environment ?? entry.anchor ?? null;
         elements.push(
           Box(
             {
@@ -67,7 +73,7 @@ export class OverlayLayer extends Component {
               // The theme the entry's content has, so the scrim is the
               // colour of the palette the dialog was opened in.
               ...inheritedFrom(environment),
-              modifiers: followEnvironment(environment),
+              modifiers: followEnvironment(environment, null),
               ...(dismiss
                 ? {
                     onPointerDown: () => this.overlays.close(entry.id),
@@ -89,16 +95,14 @@ export class OverlayLayer extends Component {
             anchor: entry.anchor ?? undefined,
             anchorPoint: entry.anchor == null ? entry.point : undefined,
             anchorRect: entry.anchor == null ? undefined : entry.anchorRect,
-            placement: entry.placement,
             anchorOffset: entry.offset,
             top: entry.top,
-            right: entry.right,
             bottom: entry.bottom,
-            left: entry.left,
             zIndex: entry.zIndex,
             ...centering(entry),
-            ...inheritedFrom(entry.environment ?? entry.anchor ?? null),
-            modifiers: followEnvironment(entry.environment ?? entry.anchor ?? null)
+            ...physicalEdges(entry, readsRightToLeft(environment)),
+            ...inheritedFrom(environment),
+            modifiers: followEnvironment(environment, entry)
           },
           entry.content as UiChild
         )
@@ -134,7 +138,8 @@ function scrim(): UiElement {
  * across the viewport, and a Box is a Stack — so `x`/`y` centre the
  * content inside that span. The edges default to 0 but an entry that
  * gave one keeps it, which is what centres a toast horizontally
- * without lifting it off the bottom.
+ * without lifting it off the bottom. The horizontal edges are
+ * `physicalEdges`', since an entry may give them as `start` and `end`.
  *
  * The stretched box is `hitTestable: false`, since it is now much
  * bigger than what it holds: a press in the space beside a centred
@@ -150,8 +155,38 @@ function centering(entry: OverlayEntry): Record<string, unknown> {
   const y = entry.center === 'y' || entry.center === 'both';
   return {
     hitTestable: false,
-    ...(x ? { left: entry.left ?? 0, right: entry.right ?? 0, x: 'center' } : {}),
+    ...(x ? { x: 'center' } : {}),
     ...(y ? { top: entry.top ?? 0, bottom: entry.bottom ?? 0, y: 'center' } : {})
+  };
+}
+
+/** Whether the scoped text style at a node reads right to left, as the entry's content will. */
+function readsRightToLeft(node: UiNode | null): boolean {
+  return node?.environment?.get(UiEnvironmentKeys.textStyle).textDirection === 'rtl';
+}
+
+/**
+ * The entry's placement and horizontal edges, with `start` and `end`
+ * turned into the physical ones the layout engine takes.
+ *
+ * A logical edge wins over the physical one it lands on, so an entry
+ * that gives both says which it meant. A centred entry's edges are the
+ * span it centres in, and default to the viewport's.
+ */
+function physicalEdges(
+  entry: OverlayEntry,
+  rtl: boolean
+): { placement: OverlayPhysicalPlacement | undefined; left: number | undefined; right: number | undefined } {
+  let left = (rtl ? entry.end : entry.start) ?? entry.left;
+  let right = (rtl ? entry.start : entry.end) ?? entry.right;
+  if ((entry.center === 'x' || entry.center === 'both') && (entry.anchor ?? null) === null) {
+    left ??= 0;
+    right ??= 0;
+  }
+  return {
+    placement: entry.placement === undefined ? undefined : physicalPlacement(entry.placement, rtl),
+    left,
+    right
   };
 }
 
@@ -175,6 +210,12 @@ function inheritedFrom(node: UiNode | null): Record<string, unknown> {
   };
 }
 
+/** The node an entry's environment is read from, and the entry to place again when it changes (none for a backdrop). */
+interface Followed {
+  readonly from: UiNode;
+  readonly entry: OverlayEntry | null;
+}
+
 /**
  * The same values again whenever they change where the entry was
  * declared, for as long as it is open.
@@ -182,20 +223,31 @@ function inheritedFrom(node: UiNode | null): Record<string, unknown> {
  * Reading them once let a dialog open while the page went dark (the
  * system's setting changed, or the theme a person chose arrived from
  * another worker a moment after they opened it) stay light over a dark
- * page until it was closed.
+ * page until it was closed. The reading direction is one of them, and
+ * the edges it decides are placed again with it.
  */
-const followEnvironmentKind = defineModifier<UiNode>({
+const followEnvironmentKind = defineModifier<Followed>({
   name: 'overlayEnvironment',
-  attach(host, from) {
+  attach(host, { from, entry }) {
     host.onEnvironment(() => {
       host.set('theme', host.environment(UiEnvironmentKeys.theme, from));
-      host.set('textStyle', host.environment(UiEnvironmentKeys.textStyle, from));
+      const textStyle = host.environment(UiEnvironmentKeys.textStyle, from);
+      host.set('textStyle', textStyle);
       host.set('color', host.environment(UiEnvironmentKeys.color, from));
       host.set('contentColor', host.environment(UiEnvironmentKeys.contentColor, from));
+      // The direction comes with the text style, and an entry placed by
+      // `start` or `end` is placed again by it: one opened before its
+      // declaring tree was mounted read the default, left to right.
+      if (entry !== null) {
+        const edges = physicalEdges(entry, textStyle.textDirection === 'rtl');
+        host.set('placement', edges.placement);
+        host.set('left', edges.left);
+        host.set('right', edges.right);
+      }
     }, from);
   }
 });
 
-function followEnvironment(node: UiNode | null): UiModifier<UiNode>[] {
-  return node === null ? [] : [followEnvironmentKind(node)];
+function followEnvironment(node: UiNode | null, entry: OverlayEntry | null): UiModifier<Followed>[] {
+  return node === null ? [] : [followEnvironmentKind({ from: node, entry })];
 }

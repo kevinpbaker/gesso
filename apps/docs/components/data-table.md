@@ -45,6 +45,7 @@ const RunTable = DataTable<Run>;
 | `onSortChange`       | `(sort: DataTableSort \| null) => void` | none      | Called with the sort a header press asks for, including `null` for the third press.                 |
 | `selectedRow`        | `number`                                | none      | The chosen row, as its index in `rows`. Supplying it makes the selection controlled.                |
 | `defaultSelectedRow` | `number`                                | none      | The row to start on. `-1`, meaning nothing chosen, when neither prop is given.                      |
+| `revealSelected`     | `boolean`                               | `false`   | Scroll to a row the application chooses, as to one the keyboard reached. Read once.                 |
 | `onSelect`           | `(index: number) => void`               | none      | Called with the index in `rows` of the row a click or a key chose.                                  |
 | `onActivate`         | `(index: number) => void`               | none      | Called on Enter or Space, with the index of the chosen row. Nothing happens when nothing is chosen. |
 | `rowHeight`          | `number`                                | `28`      | The height the window expects of a row it has not measured yet.                                     |
@@ -140,6 +141,29 @@ The chosen row is an index into `rows`, deliberately, rather than a
 position in the sorted view. A selection that meant "the fourth row on
 screen" would name a different record after every sort.
 
+Writing `selectedRow` from the application marks that row chosen and
+does nothing else: the table scrolls to a row the keyboard or a click
+reached, not to one it was handed. To have it scroll to the rows the
+application chooses as well (a record opened from a search, a link to
+one line of a long log), pass `revealSelected`:
+
+```tsx
+<RunTable columns={COLUMNS} rows={RUNS} selectedRow={chosen} revealSelected />
+```
+
+The row is brought into view clear of the sticky header, whether or not
+it is mounted: the window knows where every row sits, measured or
+estimated, so row 50,000 is reached in one step. A row chosen before the
+table has been laid out, or one the data does not have yet, is revealed
+once it can be. It follows the row rather than its position, so a sort
+that carries the chosen row elsewhere leaves the reader where they were.
+
+A row the table has never mounted is placed by `rowHeight` at first,
+and put right on the next frame once it has been measured, so an
+estimate a few pixels off the real height costs a one-frame nudge and
+nothing more. The closer `rowHeight` is to the height a row is drawn at,
+the smaller that nudge.
+
 ## Keyboard
 
 The table is one tab stop, and every sortable header is another. Focus
@@ -196,7 +220,11 @@ The behaviour above is asserted by the spec beside the example, which
 drives the real runtime with a fake canvas: the sort cycle, the sort
 written from a button, the unsortable column that takes no press and no
 focus, the chosen row surviving a sort, every key in the table above,
-and the scroll that reveals the last row.
+and the scroll that reveals the last row. `revealSelected` is asserted
+in the component's own spec: a row written from outside and never
+mounted, scrolled to below the window and above it clear of the header,
+a row chosen before the table had a height, a sort that does not scroll,
+and the keyboard's scroll left as it was.
 
 The example above was also driven by hand in Chrome on Linux: a press on
 the Score header sorted the rows and drew the arrow, a press on a row

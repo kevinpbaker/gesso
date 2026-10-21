@@ -26,12 +26,12 @@ card is the part below.
 
 ## Props
 
-| Prop       | Type      | Default      | What it does                                                                                   |
-| ---------- | --------- | ------------ | ---------------------------------------------------------------------------------------------- |
-| `title`    | `string`  | `''`         | A heading drawn above the content at 15px and weight 600. An empty title draws nothing at all. |
-| `label`    | `string`  | `''`         | The group's accessible name. Falls back to `title`, so a card with a heading needs no label.   |
-| `padding`  | `number`  | `16`         | The inset between the card's border and everything inside it.                                  |
-| `children` | `UiChild` | an empty row | What the card holds.                                                                           |
+| Prop       | Type      | Default      | What it does                                                                                                  |
+| ---------- | --------- | ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `title`    | `string`  | `''`         | A heading drawn above the content in the `bodyLarge` role at weight 600. An empty title draws nothing at all. |
+| `label`    | `string`  | `''`         | The group's accessible name. Falls back to `title`, so a card with a heading needs no label.                  |
+| `padding`  | `number`  | `16`         | The inset between the card's border and everything inside it.                                                 |
+| `children` | `UiChild` | an empty row | What the card holds.                                                                                          |
 
 The gap between the heading and the content is 12 and is not a prop.
 Neither are the colours: the fill is the `surface` token and the border

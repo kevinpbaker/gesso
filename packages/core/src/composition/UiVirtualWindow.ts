@@ -169,6 +169,14 @@ export class UiVirtualWindow {
   private leadExtent = -1;
   private trailExtent = -1;
   private readonly measured = new Map<number, number>();
+  /** An item a caller scrolled to before it was measured; see `holdInView`. */
+  private held: number | null = null;
+  /**
+   * What covers the top of the viewport for the held item: a sticky
+   * header the caller measured itself, which the host's own `lead` may
+   * not count.
+   */
+  private heldLead = 0;
   /** Measured extent minus the estimate, per index; zero for one not measured. */
   private readonly corrections: CorrectionTree;
   /** Wrappers of the items currently mounted, so a row that stays is not re-rendered. */
@@ -277,12 +285,72 @@ export class UiVirtualWindow {
     return this.measured.get(index) ?? this.estimate;
   }
 
+  /** Whether an item's extent is its own, measured, rather than the estimate. */
+  isMeasured(index: number): boolean {
+    return this.measured.has(index);
+  }
+
+  /**
+   * Keeps an item in view until it has been measured.
+   *
+   * A caller that scrolls to an item that is not mounted places it by
+   * `offsetOf`, which goes by the estimate for every unmeasured item on
+   * the way. When the real items are taller or shorter the jump lands
+   * off by the difference, and the item it was for can end up outside
+   * the viewport. Held, the item is brought back into view by the
+   * correction the next update returns, once its own extent and those
+   * around it are known, and then let go. `lead` is the extent of a
+   * sticky header over the top of the viewport, which the item has to
+   * clear.
+   */
+  holdInView(index: number, lead = 0): void {
+    this.held = index >= 0 && index < this.count && !this.measured.has(index) ? index : null;
+    this.heldLead = lead;
+  }
+
+  /**
+   * Whether an item is held in view and not yet measured, so the host
+   * has to run another frame to hand this the measurements. A jump that
+   * mounts new items is otherwise the last frame until something else
+   * happens, and the item it was for stays where the estimate put it.
+   */
+  get holding(): boolean {
+    return this.held !== null;
+  }
+
   /** The item whose span contains `offset`; clamped to the list. */
   indexAt(offset: number): number {
     if (this.count === 0) {
       return 0;
     }
     return Math.min(this.count - 1, this.corrections.lastAtOrBefore(offset, this.estimate));
+  }
+
+  /**
+   * The correction that brings the held item inside the viewport, below
+   * the header, from where anchoring alone would leave the scroll; the
+   * held item is let go once it has been measured, when its place is
+   * exact.
+   */
+  private keepHeldInView(viewport: VirtualViewport, header: number, anchored: number): number {
+    const held = this.held!;
+    if (held >= this.count) {
+      this.held = null;
+      return anchored;
+    }
+    const top = header + this.offsetOf(held);
+    const bottom = top + this.extentOf(held);
+    const at = viewport.scroll + anchored;
+    let adjust = anchored;
+    if (top < at + header) {
+      adjust = top - header - viewport.scroll;
+    } else if (bottom > at + viewport.extent) {
+      adjust = bottom - viewport.extent - viewport.scroll;
+    }
+    if (this.measured.has(held)) {
+      this.held = null;
+    }
+    return adjust;
   }
 
   /**
@@ -298,10 +366,13 @@ export class UiVirtualWindow {
       this.record(measure.index, measure.extent);
     }
     const anchorAfter = this.last >= this.first ? this.offsetOf(this.first) : 0;
-    const scrollAdjust = anchorAfter - anchorBefore;
+    let scrollAdjust = anchorAfter - anchorBefore;
 
     const total = this.totalExtent();
     const header = viewport.lead ?? 0;
+    if (this.held !== null) {
+      scrollAdjust = this.keepHeldInView(viewport, Math.max(header, this.heldLead), scrollAdjust);
+    }
     this.checkViewport(viewport.extent, total + header);
     const scrolled = clamp(viewport.scroll + scrollAdjust, 0, Math.max(0, total + header - viewport.extent));
     // Offsets are measured from the first item, so a header above them

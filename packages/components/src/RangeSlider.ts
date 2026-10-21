@@ -401,8 +401,8 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
         height: labelHidden.pipe(map(hidden => (hidden ? 0 : undefined))),
         overflow: 'hidden'
       },
-      Text({ text: label, color: foregroundToken(disabled), fontSize: 12, selectable: false }),
-      Text({ text: spoken, color: foregroundToken(disabled), fontSize: 12, selectable: false })
+      Text({ text: label, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false }),
+      Text({ text: spoken, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })
     ),
     Box(
       {

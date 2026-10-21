@@ -4,7 +4,7 @@ import { BehaviorSubject } from 'rxjs';
 import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
-import { Column, editorFor, type UiNode } from 'gesso-core';
+import { Column, editorFor, percent, type UiNode } from 'gesso-core';
 import { Combobox, filterCombobox, type ComboboxOption } from './Combobox';
 
 const PEOPLE: readonly ComboboxOption[] = [
@@ -329,5 +329,27 @@ describe('a combobox option longer than its list', () => {
     expect(text.x + text.width).toBeLessThanOrEqual(list.x + list.width);
     const tick = ui.getLayout(ui.getByText('✓'));
     expect(tick.x + tick.width).toBeLessThanOrEqual(list.x + list.width);
+  });
+});
+
+describe('a combobox in right-to-left text', () => {
+  // The list is wider than a narrow field, and lined up with the field's
+  // left edge it hung off the side a reader of the field does not start
+  // from.
+  it('lines its list up with the field’s start edge, which is its right', async () => {
+    ui = renderTest(
+      Column(
+        { textDirection: 'rtl', width: percent(100), height: percent(100), padding: 10, x: 'center' },
+        createComponent(Combobox, { label: 'Assignee', options: PEOPLE, defaultValue: '', width: 120 })
+      ),
+      { width: 500, height: 500 }
+    );
+    ui.frame();
+    await focus();
+    await key('ArrowDown');
+    const list = ui.getLayout(ui.getByRole('listbox').parent!);
+    const box = ui.getLayout(field());
+    expect(list.width).toBeGreaterThan(box.width);
+    expect(list.x + list.width).toBeCloseTo(box.x + box.width, 5);
   });
 });

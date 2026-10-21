@@ -1,10 +1,6 @@
-import { map } from 'rxjs/operators';
-
-import { percent, type UiNode, type UiSemanticState } from 'gesso-core';
+import { percent, type UiNode } from 'gesso-core';
 import { Button, Checkbox, Popover, TextInput } from 'gesso-components';
 import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
-
-import { HOVER_CONTROL } from './interaction';
 
 // #region popover
 /**
@@ -13,11 +9,10 @@ import { HOVER_CONTROL } from './interaction';
  *
  * **Filters** is controlled. The application holds `open`, hears every
  * request through `onOpenChange`, and closes it itself when Apply is
- * pressed. Its trigger is a plain `<button>` because the trigger says
- * two things about the popover: `expanded` or `collapsed` from the same
- * cell, and `controls`, the panel's node, which `panelRef` writes into
- * a cell of its own. `initialFocus` puts the caret in the field as it
- * opens.
+ * pressed. Its trigger says two things about the popover: `expanded`,
+ * from the same cell, which it announces as expanded or collapsed, and
+ * `controls`, the panel's node, which `panelRef` writes into a cell of
+ * its own. `initialFocus` puts the caret in the field as it opens.
  *
  * **About filters** opens a note given `defaultOpen`: nothing but
  * the popover knows whether it is open. It opens on the end side of
@@ -48,32 +43,16 @@ export function Filters(_inputs: Inputs<{}>, _ctx: ComponentContext) {
   return (
     <column gap={12} padding={20} width={percent(100)} height={percent(100)}>
       <row gap={8} y="center">
-        <button
+        <Button
           ref={(node: UiNode | null) => (anchor.value = node)}
           label="Filters"
-          states={open.pipe(map((on): UiSemanticState[] => [on ? 'expanded' : 'collapsed']))}
+          variant="outlined"
+          expanded={open}
           controls={panel}
-          padding={10}
-          borderRadius={6}
-          backgroundColor="controlBackground"
-          borderWidth={1}
-          borderColor="controlBorder"
-          cursor="pointer"
-          modifiers={[HOVER_CONTROL]}>
-          <text text="Filters" fontSize={13} color="controlForeground" />
-        </button>
-        <button
-          ref={(node: UiNode | null) => (about.value = node)}
-          label="About filters"
-          padding={10}
-          borderRadius={6}
-          backgroundColor="controlBackground"
-          borderWidth={1}
-          borderColor="controlBorder"
-          cursor="pointer"
-          modifiers={[HOVER_CONTROL]}>
-          <text text="?" fontSize={13} color="controlForeground" />
-        </button>
+        />
+        <Button ref={(node: UiNode | null) => (about.value = node)} label="About filters" variant="outlined">
+          <text text="?" textStyle="body" fontWeight={600} color="controlForeground" selectable={false} />
+        </Button>
       </row>
       <text text={applied} fontSize={12} color="textMuted" />
 

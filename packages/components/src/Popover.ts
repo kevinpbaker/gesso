@@ -13,7 +13,6 @@ import {
   clickOutside,
   defineModifier,
   isNodeTabStop,
-  resolveString,
   type UiChild,
   type UiInputEvent,
   type UiKeyboardEvent,
@@ -321,12 +320,14 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
 
   const show = (): void => {
     const trigger = anchor();
-    const where = trigger ?? placeholder;
-    const rtl = where !== null && resolveString(where, 'textDirection') === 'rtl';
     overlay.show(body(focus.trapped.value), {
       anchor: trigger,
-      environment: where,
-      placement: placementOf(side.value, align.value, rtl),
+      // The anchor's tree, for the theme and for the reading direction
+      // `start` and `end` are resolved in: the panel lines up with the
+      // edge its anchor's text starts from. The placeholder only when
+      // there is no anchor yet.
+      environment: trigger ?? placeholder,
+      placement: placementOf(side.value, align.value),
       offset: offset.value,
       // No backdrop: a press outside reaches the page, and
       // `clickOutside` on the panel hears it on the way and closes.
@@ -392,24 +393,15 @@ export function Popover(inputs: Inputs<PopoverProps>, ctx: ComponentContext): Ui
 }
 
 /**
- * The overlay placement for a side and an alignment, in the direction
- * the anchor reads.
+ * The overlay placement for a side and an alignment.
  *
- * The layout engine places by physical side, so the logical names are
- * resolved here: `start` is the left of a left-to-right anchor and the
- * right of a right-to-left one, and an alignment along the top or the
- * bottom follows the same turn. An alignment along the start or end
- * side is up and down, which no reading direction changes.
+ * The overlay layer's placements name `start` and `end` as this does,
+ * and resolves them in the anchor's reading direction, so the two only
+ * have to be put together: the side, then the alignment unless it
+ * centres.
  */
-export function placementOf(side: PopoverSide, align: PopoverAlign, rtl: boolean): OverlayPlacement {
-  if (side === 'top' || side === 'bottom') {
-    if (align === 'center') {
-      return side;
-    }
-    return `${side}-${(align === 'start') !== rtl ? 'start' : 'end'}`;
-  }
-  const physical = (side === 'start') !== rtl ? 'left' : 'right';
-  return align === 'center' ? physical : `${physical}-${align}`;
+export function placementOf(side: PopoverSide, align: PopoverAlign): OverlayPlacement {
+  return align === 'center' ? side : `${side}-${align}`;
 }
 
 /**
