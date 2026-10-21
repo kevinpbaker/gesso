@@ -416,6 +416,69 @@ describe('UiWheelController', () => {
     });
   });
 
+  describe('a mouse whose notches do not look like detents', () => {
+    // Drivers, scroll settings and display scaling all change the legacy
+    // delta a notch reports, and a notch that failed the detent test
+    // landed in one frame while one that passed glided. A step's size and
+    // the stillness before it say "wheel" where the legacy delta cannot.
+    function mount() {
+      const { h, scroll } = setupVertical();
+      const clock = { now: 1000 };
+      const controller = new UiWheelController(
+        h.createHitTester(),
+        h.dispatcher,
+        h.scrollSink,
+        () => h.root,
+        () => clock.now
+      );
+      const step = (delta: number, legacy: number, gapMs: number): void => {
+        controller.wheel(50, 50, 0, delta, noKeyModifiers(), UiWheelDeltaMode.Pixel, legacy);
+        clock.now += gapMs;
+      };
+      const behaviors = (): string[] =>
+        h.scrollSink.calls.filter(call => call.node === scroll).map(call => call.behavior);
+      return { controller, clock, step, behaviors };
+    }
+
+    it('smooths a large step that starts a burst, whatever its legacy delta says', () => {
+      const { step, behaviors } = mount();
+      step(100, -100, 500);
+      step(-100, 100, 500);
+      expect(behaviors()).toEqual(['smooth', 'smooth']);
+    });
+
+    it('keeps a burst of large steps smooth, as a wheel spun quickly sends them', () => {
+      const { step, behaviors } = mount();
+      for (const delta of [60, 100, 80, 120, 70]) {
+        step(delta, -delta * 0.9, 20);
+      }
+      expect(behaviors()).toEqual(['smooth', 'smooth', 'smooth', 'smooth', 'smooth']);
+    });
+
+    it('keeps a trackpad flick precise, large steps and all, because it starts small', () => {
+      const { step, behaviors } = mount();
+      for (const delta of [2, 7, 18, 40, 66, 92, 80, 61, 44, 30, 19, 11, 6, 3, 1]) {
+        step(delta, -delta * 3 + 1, 16);
+      }
+      expect(behaviors().every(behavior => behavior === 'instant')).toBe(true);
+    });
+
+    it('keeps a large step precise when a trackpad was moving just before it', () => {
+      const { step, behaviors } = mount();
+      step(4, -11, 16);
+      step(9, -26, 200);
+      // Still enough to start a burst, but inside the trackpad's memory.
+      step(100, -100, 16);
+      expect(behaviors()).toEqual(['instant', 'instant', 'instant']);
+    });
+
+    it('takes a small step that starts a burst for a trackpad', () => {
+      const { step, behaviors } = mount();
+      step(30, -90, 16);
+      expect(behaviors()).toEqual(['instant']);
+    });
+  });
+
   it('carries the mode on the event, as the DOM does', () => {
     // The deltas stay in the unit they arrived in. A handler reading
     // them without checking the mode is the bug this exists to name.
