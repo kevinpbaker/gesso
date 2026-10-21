@@ -31,7 +31,7 @@ export const STILL_EPOCH = Date.UTC(2026, 8, 1, 12, 0, 0);
 export function isStill(): boolean {
   if (typeof document === 'undefined') {
     // A worker: whoever spawned it names it.
-    return typeof self !== 'undefined' && (self as { name?: string }).name === STILL;
+    return ownName().includes(STILL);
   }
   try {
     return new URLSearchParams(location.search).has(STILL);
@@ -40,9 +40,29 @@ export function isStill(): boolean {
   }
 }
 
-/** The `name` to give a worker, so `isStill` reads the same in it. */
-export function workerName(): string | undefined {
-  return isStill() ? STILL : undefined;
+/**
+ * The `name` to give a worker, so `isStill` reads the same in it.
+ *
+ * A live example's worker is also told which example to run, which
+ * travels the same way and for the same reason: the name is the only
+ * thing a page can hand a worker before it starts. The two are words
+ * of the one name, the example first.
+ */
+export function workerName(example?: string): string | undefined {
+  const words = [example, isStill() ? STILL : undefined].filter(word => word !== undefined);
+  return words.length > 0 ? words.join(' ') : undefined;
+}
+
+/** In a live example's worker, the example `workerName` named. */
+export function exampleOf(): string | undefined {
+  const [first] = ownName();
+  return first === undefined || first === STILL ? undefined : first;
+}
+
+/** A worker's own name, as the words `workerName` joined. */
+function ownName(): string[] {
+  const name = typeof self !== 'undefined' ? (self as { name?: string }).name : undefined;
+  return name ? name.split(' ') : [];
 }
 
 /**

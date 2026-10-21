@@ -1,3 +1,4 @@
+import { defaultClientConditions } from 'vite';
 import { defineConfig, type DefaultTheme } from 'vitepress';
 
 import { llmsFiles } from './llms';
@@ -223,7 +224,23 @@ export default defineConfig({
    * `llms-full.txt` and a `.md` beside every page. `llms.ts` says why
    * and what is in them.
    */
-  vite: { plugins: [llmsFiles(sidebar)] },
+  vite: {
+    plugins: [llmsFiles(sidebar)],
+    /**
+     * Module workers, because the live examples share one worker that
+     * imports the example it was asked for, and only an ES worker can
+     * split into chunks. `src/exampleWorker.ts` says why they share one.
+     */
+    worker: { format: 'es' },
+    /**
+     * `worker` ahead of Vite's defaults, as `gesso-vite-plugin` sets
+     * them for an application (its `workerConditions` says why). The
+     * rich text example's markdown parser has a browser build that
+     * reaches for `document` the moment its chunk loads, and in a
+     * worker there is none.
+     */
+    resolve: { conditions: ['worker', ...defaultClientConditions] }
+  },
   /**
    * Three faces, from Google Fonts: `Newsreader` sets the display line,
    * `Instrument Sans` the running text, `JetBrains Mono` the code.
