@@ -37,7 +37,7 @@ import {
 import { measure } from './worker/WorkerApp';
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
-import type { RouterRoutes } from '../router/RouterService';
+import { RouterService, type RouterRoutes } from '../router/RouterService';
 import type { MediaOptions } from './MediaService';
 import type { FontFamilyDeclaration } from './FontService';
 import type { UiHost } from '../agent/ui';
@@ -137,7 +137,6 @@ export class GessoApp {
   private readonly inputEnabled: boolean;
   private readonly accessibilityEnabled: boolean;
   private readonly adapter: UiPlatformAdapter;
-  private readonly historyOptions: ShellHistoryOptions | ShellHistory | undefined;
   private readonly onOpenRoute: ((url: string) => void) | undefined;
 
   private running = false;
@@ -173,9 +172,14 @@ export class GessoApp {
     this.canvas = options.canvas ?? createCanvasElement();
     this.inputEnabled = options.input ?? true;
     this.accessibilityEnabled = options.accessibility ?? true;
-    this.historyOptions = options.history;
     this.onOpenRoute = options.onOpenRoute;
     this.colorSchemePreference = options.colorScheme ?? 'auto';
+    // Here rather than at `mount`, because the runtime below builds its
+    // tree at once and has to know the address to build the right one;
+    // see `GessoRuntimeOptions.url`. Released in `dispose`, mounted or not.
+    const { history, owned } = resolveShellHistory(options.history);
+    this.history = history;
+    this.ownsHistory = owned;
 
     this.runtime = new GessoRuntime({
       root: options.root,
@@ -184,6 +188,7 @@ export class GessoApp {
       services: options.services,
       channels: options.channels,
       routes: options.routes,
+      url: history.url,
       media: options.media,
       fonts: options.fonts,
       clock: callback => {
@@ -542,12 +547,18 @@ export class GessoApp {
    * be a difference between the two hosts that nothing declared.
    */
   private attachHistory(): void {
-    const { history, owned } = resolveShellHistory(this.historyOptions);
-    this.history = history;
-    this.ownsHistory = owned;
+    const history = this.history;
+    if (history === null) {
+      return;
+    }
     this.runtime.onShellRequest(request => this.handleShellRequest(request, history));
     history.onChange(url => this.runtime.setUrl(url));
-    this.runtime.setUrl(history.url);
+    // The runtime started at this address. Reported again only if it
+    // moved between construction and mount, so a mount does not
+    // republish a match nothing changed.
+    if (history.url !== this.runtime.services.get(RouterService).url.value) {
+      this.runtime.setUrl(history.url);
+    }
   }
 
   /**

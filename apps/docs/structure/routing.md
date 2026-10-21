@@ -311,6 +311,12 @@ is at, once at start-up and again for every back, forward or typed
 address, and it performs the pushes the router asks for. It holds no
 routes and resolves nothing.
 
+The start-up url arrives before anything is built, so an application
+opened at `/mail/9` builds the mail screen first and never the home
+screen: nothing on `/` mounts, and no effect of its runs, for a window
+that was never there. A guard that refuses the start-up url redirects
+it as it would any other the shell reported, with a replace.
+
 | Mode     | Where the url lives                                  |
 | -------- | ---------------------------------------------------- |
 | `path`   | `pushState` against the document's path. The default |

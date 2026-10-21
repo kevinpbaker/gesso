@@ -308,6 +308,19 @@ export interface GessoRuntimeOptions {
    */
   routes?: RouterRoutes;
   /**
+   * The window's address at start-up, resolved before the tree is
+   * built.
+   *
+   * Without it the router starts at `/`, and the tree built in this
+   * constructor is the root route's — its screen constructed, its
+   * effects run — before the shell's `setUrl` moves it somewhere else.
+   * An app opened at `/d/42` would mount its home screen first, and a
+   * home screen that does something on mount (opens the last document,
+   * say) does it, for a url nobody asked for. Both hosts pass the
+   * address here; `setUrl` is for every one after.
+   */
+  url?: string;
+  /**
    * The channels this runtime's components may reach.
    *
    * Attached elsewhere and handed in, because where a channel's data
@@ -699,13 +712,7 @@ export class GessoRuntime {
     if (!this.services.has(ShellService)) {
       this.services.register(ShellService);
     }
-    this.services.get(ShellService).setHandler(request => {
-      if (this.shellListener !== null && this.shellListener !== undefined) {
-        this.shellListener(request);
-      } else if (this.heldShellRequests.length < HELD_SHELL_REQUESTS) {
-        this.heldShellRequests.push(request);
-      }
-    });
+    this.services.get(ShellService).setHandler(request => this.toShell(request));
     // And sound, which is the shell's element and this thread's client.
     if (!this.services.has(AudioService)) {
       this.services.register(AudioService);
@@ -790,12 +797,21 @@ export class GessoRuntime {
       this.services.register(RouterService);
     }
     const router = this.services.get(RouterService);
+    // Held like any other request when nobody is listening yet: a guard
+    // that redirects the address the runtime starts at does so in this
+    // constructor, and the shell's address bar still has to hear it.
     router.setHistory({
-      push: url => this.shellListener?.({ type: 'history', action: 'push', url }),
-      replace: url => this.shellListener?.({ type: 'history', action: 'replace', url }),
-      back: () => this.shellListener?.({ type: 'history', action: 'back' }),
-      forward: () => this.shellListener?.({ type: 'history', action: 'forward' })
+      push: url => this.toShell({ type: 'history', action: 'push', url }),
+      replace: url => this.toShell({ type: 'history', action: 'replace', url }),
+      back: () => this.toShell({ type: 'history', action: 'back' }),
+      forward: () => this.toShell({ type: 'history', action: 'forward' })
     });
+    // The address before the routes, so the routes resolve it rather
+    // than `/`: a guard on the root route has no business running, and
+    // redirecting the shell, for a window that was never there.
+    if (options.url !== undefined) {
+      router.applyUrl(options.url);
+    }
     if (options.routes !== undefined) {
       router.setRoutes(options.routes);
     }
@@ -1444,6 +1460,15 @@ export class GessoRuntime {
    * clipboard writes and URLs to open. Without a listener they are
    * dropped.
    */
+  /** A request for the shell: sent, or held until `onShellRequest` gives it somewhere to go. */
+  private toShell(request: ShellRequest): void {
+    if (this.shellListener !== null && this.shellListener !== undefined) {
+      this.shellListener(request);
+    } else if (this.heldShellRequests.length < HELD_SHELL_REQUESTS) {
+      this.heldShellRequests.push(request);
+    }
+  }
+
   onShellRequest(listener: ((request: ShellRequest) => void) | null): void {
     this.shellListener = listener;
     // What was asked before anyone was listening, handed over now. The

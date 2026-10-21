@@ -83,9 +83,9 @@ function AppRoot(): ReturnType<typeof Column> {
   return Column(Text({ text: 'App' }), createComponent(RouterOutlet));
 }
 
-function mount() {
+function mount(url?: string) {
   const requests: ShellRequest[] = [];
-  const mounted = mountRuntime(createComponent(AppRoot), { routes: ROUTES });
+  const mounted = mountRuntime(createComponent(AppRoot), { routes: ROUTES, ...(url === undefined ? {} : { url }) });
   mounted.runtime.onShellRequest(request => requests.push(request));
   const router = mounted.runtime.services.get(RouterService);
   return { ...mounted, requests, router };
@@ -182,6 +182,29 @@ describe('GessoRuntime routing', () => {
     frame();
     expect(texts(runtime.debugRoot())).toEqual(['App', 'Mail', 'Message 9']);
     expect(requests).toEqual([]);
+  });
+
+  /**
+   * An app opened at a deep link. Before `url` was an option the tree
+   * was built on `/` in the constructor and moved when the shell's
+   * `setUrl` arrived — by which time the home screen had mounted and
+   * run whatever it does on mount, for an address nobody opened.
+   */
+  it('starts at the url it is given, without ever building the root route', () => {
+    const { runtime, requests } = mount('/mail/9');
+    expect(texts(runtime.debugRoot())).toEqual(['App', 'Mail', 'Message 9']);
+    expect(renders.home).toBeUndefined();
+    expect(requests).toEqual([]);
+  });
+
+  it('guards the url it starts at, and tells the shell where it went', () => {
+    const { runtime, requests } = mount('/settings');
+    expect(texts(runtime.debugRoot())).toEqual(['App', 'Sign in']);
+    expect(renders.settings).toBeUndefined();
+    expect(renders.home).toBeUndefined();
+    // Redirected in the constructor, before anyone was listening, and
+    // handed over when somebody was.
+    expect(requests).toEqual([{ type: 'history', action: 'replace', url: '/sign-in' }]);
   });
 
   it('redirects a guarded url, and replaces rather than pushes it', () => {

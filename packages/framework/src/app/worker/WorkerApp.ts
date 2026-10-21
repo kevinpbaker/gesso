@@ -536,6 +536,8 @@ export class WorkerApp {
     // `contentRect` and so already agreed with this measurement; the
     // first frame was the only one that did not.
     const { width, height } = measure(canvas, element);
+    // Before `init`, which carries the address; see `attachHistory`.
+    const url = this.attachHistory();
     const transfer: Transferable[] = [offscreen];
     let appPort: MessagePort | undefined;
     if (this.options.appLogicWorker !== undefined) {
@@ -575,13 +577,13 @@ export class WorkerApp {
         // Text comes through the editing proxy below, IME and all.
         textInput: 'proxy',
         accessibility: this.options.accessibility !== false,
-        appPort
+        appPort,
+        url
       } as ShellToRuntimeMessage,
       transfer
     );
 
     this.observeResize(element);
-    this.attachHistory();
     this.detachInput = this.attachInput(canvas);
     // Sound. The element has to live here, and only here; the worker
     // tells it what to do and hears what it did.
@@ -1109,18 +1111,22 @@ export class WorkerApp {
   };
 
   /**
-   * Reports the window's address to the worker, and keeps reporting it.
+   * Keeps the worker told of the window's address, and answers the one
+   * it starts at.
    *
-   * Sent once at start-up as well as on change, for the same reason
-   * `reducedMotion` is: an app opened directly at a url must start on
-   * the screen that url names, not on its root.
+   * That first one is not posted from here: `mount` puts it on `init`,
+   * because an app opened directly at a url must start on the screen
+   * that url names. Posted after `init`, as it used to be, it reached a
+   * render worker that had already built its tree on the root route
+   * and run that screen's effects — an app that opened its last
+   * document on `/` did so for a tab opened at `/d/new`.
    */
-  private attachHistory(): void {
+  private attachHistory(): string {
     const { history, owned } = resolveShellHistory(this.options.history);
     this.history = history;
     this.ownsHistory = owned;
     history.onChange(url => this.post({ type: 'url', url }));
-    this.post({ type: 'url', url: history.url });
+    return history.url;
   }
 
   /**
