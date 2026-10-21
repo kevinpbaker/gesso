@@ -13,11 +13,13 @@ import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorke
  * two directions the shell carries a url between that object and the
  * render worker, without mounting: `attachHistory` is what `mount`
  * calls, and a `history` message is what the worker posts when the
- * router navigates.
+ * router navigates. The url the app starts at is what `attachHistory`
+ * answers, which `mount` puts on `init`; only the ones after it are
+ * `url` messages.
  */
 interface Internals {
   renderWorker: Pick<Worker, 'postMessage' | 'removeEventListener' | 'terminate'>;
-  attachHistory(): void;
+  attachHistory(): string;
   handleWorkerMessage(event: MessageEvent<RuntimeToShellMessage>): void;
 }
 
@@ -75,13 +77,12 @@ function shell(history: WorkerAppOptions['history'], extra: Partial<WorkerAppOpt
 }
 
 describe('WorkerApp with a history passed in', () => {
-  it('tells the worker the url the host is at, at start-up', () => {
+  it('starts the worker at the url the host is at, on init rather than after it', () => {
     const host = hostHistory('/issues/PROJ-1');
     const { internals, urls } = shell(host.history);
 
-    internals.attachHistory();
-
-    expect(urls()).toEqual(['/issues/PROJ-1']);
+    expect(internals.attachHistory()).toBe('/issues/PROJ-1');
+    expect(urls()).toEqual([]);
   });
 
   it('performs the navigation the worker asks for on the host', () => {
@@ -104,7 +105,7 @@ describe('WorkerApp with a history passed in', () => {
 
     host.report('/issues/PROJ-4');
 
-    expect(urls()).toEqual(['/', '/issues/PROJ-4']);
+    expect(urls()).toEqual(['/issues/PROJ-4']);
   });
 
   it('leaves it undisposed and stops listening when disposed, and a remount picks it up again', () => {
@@ -116,7 +117,7 @@ describe('WorkerApp with a history passed in', () => {
     host.report('/issues/PROJ-5');
 
     expect(host.calls).not.toContain('dispose');
-    expect(urls()).toEqual(['/']);
+    expect(urls()).toEqual([]);
 
     const after: string[] = [];
     // A remount spawns a new render worker and attaches again, around
@@ -126,18 +127,16 @@ describe('WorkerApp with a history passed in', () => {
         after.push(message.url);
       }
     });
-    internals.attachHistory();
+    expect(internals.attachHistory()).toBe('/issues/PROJ-5');
     host.report('/issues/PROJ-6');
 
-    expect(after).toEqual(['/issues/PROJ-5', '/issues/PROJ-6']);
+    expect(after).toEqual(['/issues/PROJ-6']);
   });
 
   it('still makes its own from options', () => {
-    const { internals, urls } = shell({ mode: 'memory', initialUrl: '/issues' });
+    const { internals } = shell({ mode: 'memory', initialUrl: '/issues' });
 
-    internals.attachHistory();
-
-    expect(urls()).toEqual(['/issues']);
+    expect(internals.attachHistory()).toBe('/issues');
   });
 });
 
@@ -176,7 +175,7 @@ describe('WorkerApp opening a route somewhere new', () => {
     expect(opens).toEqual([]);
     // The current screen stays where it is.
     expect(host.calls).toEqual([]);
-    expect(urls()).toEqual(['/']);
+    expect(urls()).toEqual([]);
   });
 
   it('opens a new tab at the address the history gives, keeping the opener out of it', () => {
@@ -200,6 +199,6 @@ describe('WorkerApp opening a route somewhere new', () => {
     fromWorker({ type: 'openRoute', url: '/epic/BUD-12' });
 
     expect(opens).toEqual([]);
-    expect(urls()).toEqual(['/', '/epic/BUD-12']);
+    expect(urls()).toEqual(['/epic/BUD-12']);
   });
 });

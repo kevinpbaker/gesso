@@ -401,7 +401,8 @@ export class RenderWorkerApp {
         message.height,
         message.dpr,
         message.renderer,
-        message.accessibility !== false
+        message.accessibility !== false,
+        message.url
       );
       this.runtime!.setTextInputSource(message.textInput ?? 'keys');
       return;
@@ -604,7 +605,8 @@ export class RenderWorkerApp {
     height: number,
     dpr: number,
     renderer: RendererChoice | undefined,
-    accessibility: boolean
+    accessibility: boolean,
+    url: string | undefined
   ): void {
     this.runtime?.dispose();
     this.channels?.dispose();
@@ -635,6 +637,7 @@ export class RenderWorkerApp {
       root: this.root,
       services,
       routes: this.routes,
+      url,
       media: this.media,
       fonts: this.fonts,
       canvas,

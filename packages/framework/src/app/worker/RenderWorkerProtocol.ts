@@ -58,6 +58,13 @@ export type ShellToRuntimeMessage =
        * is the only per-frame cost the mirror has in here.
        */
       accessibility?: boolean;
+      /**
+       * The window's address at start-up, so the first tree is built on
+       * the screen it names. Optional for a shell that predates it,
+       * which reports the address in a `url` message after this one
+       * and so starts on the root route for a frame, as it always did.
+       */
+      url?: string;
     }
   | { type: 'resize'; width: number; height: number; dpr: number }
   /**
