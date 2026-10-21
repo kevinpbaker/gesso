@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { isStill, STILL, STILL_EPOCH, stillNow, workerName } from './still';
+import { exampleOf, isStill, STILL, STILL_EPOCH, stillNow, workerName } from './still';
 
 /**
  * A documentation page: a `document`, so the flag is read from the url
@@ -78,6 +78,25 @@ describe('still mode', () => {
 
     worker(name);
     expect(isStill()).toBe(true);
+  });
+
+  it('names the example alongside the flag, and each reads back on its own', () => {
+    page('?still');
+    const name = workerName('counter');
+
+    worker(name);
+    expect(isStill()).toBe(true);
+    expect(exampleOf()).toBe('counter');
+
+    page('');
+    worker(workerName('counter'));
+    expect(isStill()).toBe(false);
+    expect(exampleOf()).toBe('counter');
+  });
+
+  it('names no example in a worker that was only told it is still', () => {
+    worker(STILL);
+    expect(exampleOf()).toBeUndefined();
   });
 
   it('names nothing when the page is not still, so an ordinary worker keeps the default name', () => {
