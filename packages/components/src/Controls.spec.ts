@@ -359,6 +359,37 @@ describe('Slider', () => {
     expect(changes).toEqual([75, 50]);
   });
 
+  it('follows a press held still before it moves, which arrives as a Drag', () => {
+    // A careful hand presses, waits, and then moves a few pixels at a
+    // time. Past the long-press delay that is a Drag rather than a Pan,
+    // and the thumb stood still under a pointer plainly dragging it.
+    vi.useFakeTimers();
+    try {
+      const changes: number[] = [];
+      const ui = mount(
+        createComponent(Slider, {
+          label: 'Volume',
+          min: 0,
+          max: 100,
+          step: 1,
+          defaultValue: 50,
+          onChange: v => changes.push(v)
+        })
+      );
+      ui.frame();
+      const box = ui.getVisibleBox(trackOf(ui));
+      const y = box.y + box.height / 2;
+      ui.fireEvent.pointerDown(box.x + box.width / 2, y, { buttons: 1 });
+      vi.advanceTimersByTime(800);
+      ui.fireEvent.pointerMove(box.x + box.width * 0.7, y, { buttons: 1 });
+      ui.fireEvent.pointerMove(box.x + box.width * 0.8, y, { buttons: 1 });
+      ui.fireEvent.pointerUp(box.x + box.width * 0.8, y);
+      expect(changes.slice(-2)).toEqual([70, 80]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('turns a press into a value where a panned, zoomed parent draws the track', () => {
     // A slider on a card under a camera box that pans and zooms by its
     // transform. The track's measured box was its record, which no

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
@@ -296,6 +296,30 @@ describe('SplitPane', () => {
 
     // The track is the full 400, so the pointer at 300 is 0.75 along.
     expect(changes.at(-1)).toBeCloseTo(0.75, 5);
+  });
+
+  it('follows a divider pressed and held still before it moved', () => {
+    vi.useFakeTimers();
+    try {
+      const changes: number[] = [];
+      const ui = mount(
+        createComponent(SplitPane, {
+          defaultSplit: 0.5,
+          first: Box({}),
+          second: Box({}),
+          onSplitChange: (value: number) => changes.push(value)
+        })
+      );
+      ui.frame();
+      ui.fireEvent.pointerDown(202, 150);
+      // Past the long-press delay the move is a Drag, not a Pan.
+      vi.advanceTimersByTime(800);
+      ui.fireEvent.pointerMove(300, 150, { buttons: 1 });
+      ui.fireEvent.pointerUp(300, 150);
+      expect(changes.at(-1)).toBeCloseTo(0.75, 5);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the second pane still when its content changes width', async () => {

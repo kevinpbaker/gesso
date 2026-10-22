@@ -1,5 +1,5 @@
 import { BehaviorSubject, type Observable } from 'rxjs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
@@ -241,6 +241,22 @@ describe('RangeSlider, pointer', () => {
     ui.frame();
     expect(values()).toEqual([80, 80]);
     ui.fireEvent.pointerUp(xOf(95), yMid());
+  });
+
+  it('drags a thumb pressed and held still before it moved', () => {
+    vi.useFakeTimers();
+    try {
+      const { ui, xOf, yMid, values } = mount('ltr');
+      ui.fireEvent.pointerDown(xOf(20), yMid());
+      // Past the long-press delay the move is a Drag, not a Pan.
+      vi.advanceTimersByTime(800);
+      ui.fireEvent.pointerMove(xOf(40), yMid());
+      ui.frame();
+      expect(values()).toEqual([40, 80]);
+      ui.fireEvent.pointerUp(xOf(40), yMid());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('lets the drag direction choose between two thumbs that sit together', () => {

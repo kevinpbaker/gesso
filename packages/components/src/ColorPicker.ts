@@ -279,6 +279,9 @@ export function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentCon
         onPointerDown: inSquare,
         onPanStart: inSquare,
         onPanMove: inSquare,
+        // Held still before it moved, a press arrives as a Drag; see `Slider`.
+        onDragStart: inSquare,
+        onDragMove: inSquare,
         onKeyDown: squareKeys
       },
       Box({
@@ -320,6 +323,9 @@ export function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentCon
         onPointerDown: inBar,
         onPanStart: inBar,
         onPanMove: inBar,
+        // Held still before it moved, a press arrives as a Drag; see `Slider`.
+        onDragStart: inBar,
+        onDragMove: inBar,
         onKeyDown: barKeys
       },
       hsv.pipe(map(at => marker((at.h / 360) * width, 7)))
@@ -363,6 +369,9 @@ export function ColorPicker(inputs: Inputs<ColorPickerProps>, _ctx: ComponentCon
               onPointerDown: inStrip,
               onPanStart: inStrip,
               onPanMove: inStrip,
+              // Held still before it moved, a press arrives as a Drag; see `Slider`.
+              onDragStart: inStrip,
+              onDragMove: inStrip,
               onKeyDown: stripKeys
             },
             opacity.pipe(map(at => marker(at * width, 7)))

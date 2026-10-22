@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
@@ -55,6 +55,23 @@ describe('ColorPicker', () => {
     // A third of the way along is green.
     ui.fireEvent.pointerDown(bar.x + bar.width / 3, bar.y + bar.height / 2);
     expect(changes.at(-1)).toBe('#00ff00');
+  });
+
+  it('follows a hue dragged after the press was held still', () => {
+    vi.useFakeTimers();
+    try {
+      const { ui, changes, box } = mount('#ff0000');
+      const bar = box('Fill: hue');
+      const y = bar.y + bar.height / 2;
+      ui.fireEvent.pointerDown(bar.x + 1, y);
+      // Past the long-press delay the move is a Drag, not a Pan.
+      vi.advanceTimersByTime(800);
+      ui.fireEvent.pointerMove(bar.x + bar.width / 3, y, { buttons: 1 });
+      ui.fireEvent.pointerUp(bar.x + bar.width / 3, y);
+      expect(changes.at(-1)).toBe('#00ff00');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('walks with the arrows', () => {
