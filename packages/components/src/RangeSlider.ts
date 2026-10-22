@@ -377,9 +377,12 @@ export function RangeSlider(inputs: Inputs<RangeSliderProps>, ctx: ComponentCont
         y: 'center',
         borderRadius: 4,
         // Pan rather than Drag, as in `Slider`: a thumb has to follow
-        // the pointer from the first pixel, not after a long press.
+        // the pointer from the first pixel, not after a long press. And
+        // Drag too, as there, for a press held still before it moves.
         onPanStart: follow,
         onPanMove: follow,
+        onDragStart: follow,
+        onDragMove: follow,
         onPointerDown: press
       },
       Box(

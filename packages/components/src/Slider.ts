@@ -204,8 +204,16 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
         // followed by a move, and a thumb has to follow the pointer
         // from the first pixel. Stopping propagation keeps a scroll
         // container above from panning at the same time.
+        //
+        // And Drag as well, for the press that is held still past the
+        // long-press delay before it moves. That is a careful hand
+        // aiming at one value, not somebody picking the track up, and a
+        // thumb that ignored it stood still under a pointer that was
+        // plainly dragging it.
         onPanStart: seek,
         onPanMove: seek,
+        onDragStart: seek,
+        onDragMove: seek,
         onPointerDown: (event: UiPointerEvent) => {
           focus.focus();
           seek(event);

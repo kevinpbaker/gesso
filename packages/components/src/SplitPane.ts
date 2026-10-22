@@ -131,6 +131,12 @@ export function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext)
         split.change(toFraction(event));
       },
       onPanStart: (event: UiPointerEvent) => event.stopPropagation(),
+      // A divider held still before it moves arrives as a Drag; see `Slider`.
+      onDragMove: (event: UiPointerEvent) => {
+        event.stopPropagation();
+        split.change(toFraction(event));
+      },
+      onDragStart: (event: UiPointerEvent) => event.stopPropagation(),
       onKeyDown: keymap({
         ArrowLeft: () => move(horizontal() ? -0.02 : 0),
         ArrowRight: () => move(horizontal() ? 0.02 : 0),
