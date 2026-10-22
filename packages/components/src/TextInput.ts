@@ -154,10 +154,11 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       // multiline one it belongs to the text, and the app has it only
       // with Command or Control held. Without that a TextArea, whose
       // props carry `onSubmit` like any field's, never called it.
+      // A multiline field with no `onSubmit` leaves Command- and
+      // Control-Enter to what holds it, which may submit it itself.
       onKeyDown: (event: UiKeyboardEvent) => {
-        if (!lines.value || secret.value || event.modifiers.meta || event.modifiers.ctrl) {
-          submit(event);
-        }
+        if (!lines.value || secret.value) submit(event);
+        else if ((event.modifiers.meta || event.modifiers.ctrl) && inputs.onSubmit.value !== undefined) submit(event);
       }
     }),
     controlMessage(error, description)

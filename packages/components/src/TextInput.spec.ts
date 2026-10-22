@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createComponent } from 'gesso-framework';
+import { Column, type UiKeyboardEvent } from 'gesso-core';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
 
@@ -47,6 +48,34 @@ describe('TextArea, submitting', () => {
     ui.fireEvent.keyDown('Enter');
     ui.fireEvent.keyDown('Enter', { ctrl: true });
     expect(submits).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves Command- and Control-Enter to what holds it when it has no onSubmit', () => {
+    // A form that submits from its own key handler, as a commit message's box does.
+    const heard: string[] = [];
+    const changes: string[] = [];
+    const ui = renderTest(
+      Column(
+        {
+          onKeyDown: (event: UiKeyboardEvent) => {
+            if (event.key !== 'Enter' || !(event.modifiers.meta || event.modifiers.ctrl)) return;
+            heard.push(event.modifiers.meta ? 'Meta+Enter' : 'Ctrl+Enter');
+            event.preventDefault();
+          }
+        },
+        createComponent(TextArea, { label: 'Message', defaultValue: '', onChange: v => changes.push(v) })
+      ),
+      { width: 400, height: 300 }
+    );
+    ui.fireEvent.focus(ui.getByRole('textbox'));
+    ui.fireEvent.type('Hi');
+
+    ui.fireEvent.keyDown('Enter', { meta: true });
+    ui.fireEvent.keyDown('Enter', { ctrl: true });
+    ui.frame();
+    expect(heard).toContain('Meta+Enter');
+    expect(heard).toContain('Ctrl+Enter');
+    expect(changes.at(-1)).toBe('Hi');
   });
 
   it('submits a single-line field on Enter with or without the modifier', () => {
