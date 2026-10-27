@@ -106,6 +106,53 @@ describe('serveDesktopAgent', () => {
   });
 });
 
+describe('serveDesktopAgent, with the catalog', () => {
+  const rpc = (method: string, params: object = {}) =>
+    new Request('http://127.0.0.1:7310/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
+    });
+  /** What `openCatalog` gives, as far as the server can tell. */
+  const catalog = {
+    instructions: 'Read the components first.',
+    tools: () => [
+      {
+        name: 'library_overview',
+        description: 'Every component.',
+        inputSchema: { type: 'object', properties: {} },
+        annotations: { readOnlyHint: true, openWorldHint: false as const }
+      }
+    ],
+    call: async (name: string) => ({ content: [{ type: 'text' as const, text: `${name}, answered` }], isError: false }),
+    resources: () => [],
+    read: () => undefined
+  };
+
+  it("offers the project's components after the channels, and tells the agent to read them", async () => {
+    const server = fakeServe();
+    serveDesktopAgent([counter().served], { serve: server.serve, instructions: 'A counter.', catalog });
+    const { fetch } = server.started[0];
+
+    const hello = (await (await fetch(rpc('initialize', { protocolVersion: '2025-06-18' }))).json()) as {
+      result: { instructions: string };
+    };
+    const listed = (await (await fetch(rpc('tools/list'))).json()) as { result: { tools: { name: string }[] } };
+    const answered = (await (await fetch(call('library_overview', {}))).json()) as {
+      result: { content: { text: string }[] };
+    };
+
+    expect(hello.result.instructions).toBe('A counter.\n\nRead the components first.');
+    expect(listed.result.tools.map(tool => tool.name)).toEqual([
+      'counter_view',
+      'counter_add',
+      'counter_reset',
+      'library_overview'
+    ]);
+    expect(answered.result.content[0]!.text).toBe('library_overview, answered');
+  });
+});
+
 describe('messageBoxConfirm', () => {
   const request = {
     channel: 'notes',

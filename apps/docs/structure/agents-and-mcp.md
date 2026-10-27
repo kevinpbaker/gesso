@@ -321,6 +321,30 @@ project from `create-gesso-app --template electrobun` has all of this
 wired: every script that builds runs `gesso-channels` first, and
 `hutch run typecheck` checks the module is current.
 
+### The project's components, on the desktop
+
+The catalog of
+[Designing with what the project has](#designing-with-what-the-project-has)
+can be served from the main process too. `gesso-vite-plugin/catalog`
+carries it without Vite, and `serveDesktopAgent` offers it after the
+channels and the screen, with its instructions added to the app's:
+
+```ts
+import * as fs from 'node:fs';
+import { openCatalog } from 'gesso-vite-plugin/catalog';
+
+const catalog = await openCatalog({ root: projectRoot, fs });
+const agent = serveDesktopAgent(channels, { screen: screen.surface, catalog: catalog ?? undefined });
+// on quit: catalog?.dispose();
+```
+
+`openCatalog` answers null when TypeScript 7 is not installed, because
+the checker is what reads the components. Given `fs`, it watches
+`root`, so a component saved in a new file is in the next answer;
+without it, the catalog is read once. Like the screen tools, it belongs
+in development or in a tool that works on a project on the person's
+own machine: a packaged app has no TypeScript in it to read with.
+
 ## The server
 
 `mcpHandler` is MCP's Streamable HTTP transport as a `fetch` handler,
