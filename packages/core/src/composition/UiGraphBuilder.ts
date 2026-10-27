@@ -19,6 +19,7 @@ import {
   type ComponentLikeElement,
   type UiChild,
   type UiElement,
+  type UiSourceLocation,
   isComponentLikeElement,
   isObservable
 } from './UiElement';
@@ -969,6 +970,20 @@ export class UiGraphBuilder {
   /** The modifiers attached to a node, for the inspector and for tests. */
   modifiersFor(node: UiNode): UiModifierSet | undefined {
     return this.modifiers.get(node);
+  }
+
+  /**
+   * Where the element a node was last reconciled from was written, for
+   * the inspector and for tools that edit the source. For a component's
+   * anchor it is where the component was used, so walking up from a
+   * node gives the line that made it and then each place it was used.
+   *
+   * Read off the definition the builder already keeps for each node
+   * rather than stored on the node, so it costs a tree nothing when no
+   * element carries one, which is every element in production.
+   */
+  sourceOf(node: UiNode): UiSourceLocation | undefined {
+    return this.reconciledFrom.get(node)?.source;
   }
 
   /**

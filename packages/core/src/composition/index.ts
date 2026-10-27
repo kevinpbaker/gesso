@@ -1,5 +1,5 @@
 export type { UiDefinition } from './UiDefinition';
-export type { ComponentLikeElement, UiChild, UiElement } from './UiElement';
+export type { ComponentLikeElement, UiChild, UiElement, UiSourceLocation } from './UiElement';
 export { isComponentLikeElement, isObservable, isUiChild, isUiElement } from './UiElement';
 export type { ComponentResolver } from './ComponentResolver';
 export type { UiPropValue, UiProps } from './UiProps';

@@ -515,6 +515,7 @@ import {
   UiSemanticState,
   UiSemanticsUpdate,
   UiShortcutRegistry,
+  UiSourceLocation,
   UiSpringSpec,
   UiSpringToken,
   UiTextPosition,
@@ -760,6 +761,7 @@ interface ComponentElement<P = Record<string, unknown>> {
   readonly component: ComponentType;
   readonly props: P;
   readonly key?: string | number;
+  readonly source?: UiSourceLocation;
 }
 declare function isComponentElement(value: unknown): value is ComponentElement;
 type FrameworkChild = UiChild | ComponentElement;
@@ -867,6 +869,7 @@ interface UiNodeReport {
   readonly beneath: readonly UiBeneathReport[];
   readonly semantics?: UiSemanticsReport;
   readonly explanation: string;
+  readonly source?: UiSourceLocation;
 }
 interface UiBeneathReport {
   readonly id: string;
@@ -877,6 +880,7 @@ interface UiBeneathReport {
 interface UiOwnerReport {
   readonly name: string;
   readonly anchorId: string;
+  readonly usedAt?: UiSourceLocation;
 }
 interface NodePathTarget {
   readonly type: string;
@@ -923,6 +927,7 @@ interface UiSemanticsReport {
   readonly states?: readonly string[];
 }
 declare function printPropValue(value: unknown): string;
+declare function formatSourceLocation(source: UiSourceLocation): string;
 declare function formatNodeReport(report: UiNodeReport): string;
 type ColorScheme = 'light' | 'dark';
 type ColorSchemePreference = ColorScheme | 'auto';
@@ -1592,6 +1597,7 @@ declare class GessoRuntime {
   inspectNode(node: UiNode): UiNodeReport;
   private beneathAtPointer;
   private pathOf;
+  private sourceReport;
   private ownersOf;
   private propsOf;
   private environmentOf;
@@ -2913,6 +2919,7 @@ export {
   formatAge,
   formatNodePath,
   formatNodeReport,
+  formatSourceLocation,
   formatStream,
   formatUrl,
   FrameEntry,
@@ -3222,6 +3229,7 @@ import {
   formatAge,
   formatNodePath,
   formatNodeReport,
+  formatSourceLocation,
   formatStream,
   formatUrl,
   FrameEntry,
@@ -3429,6 +3437,7 @@ export {
   formatAge,
   formatNodePath,
   formatNodeReport,
+  formatSourceLocation,
   formatStream,
   formatUrl,
   FrameService,
@@ -3722,7 +3731,8 @@ import {
   TextProps,
   UiChild,
   UiElement,
-  UiNodeType
+  UiNodeType,
+  UiSourceLocation
 } from "gesso-core";
 type JsxChild = UiChild | string | number | boolean | null | undefined;
 type JsxChildren = JsxChild | readonly JsxChildren[];
@@ -3776,7 +3786,7 @@ type JsxProps = Record<string, unknown> & {
 };
 declare function jsx(type: JSX.ElementType, props: JsxProps | null, key?: string | number): JSX.Element;
 declare const jsxs: typeof jsx;
-declare function jsxDEV(type: JSX.ElementType, props: JsxProps | null, key?: string | number): JSX.Element;
+declare function jsxDEV(type: JSX.ElementType, props: JsxProps | null, key?: string | number, _isStaticChildren?: boolean, source?: UiSourceLocation): JSX.Element;
 declare function Fragment(_props: {
   children?: JsxChildren;
 }): never;

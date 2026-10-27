@@ -86,6 +86,7 @@ import {
   dropIndexShifts,
   LayoutNotifier,
   type UiSemanticsAction,
+  type UiSourceLocation,
   type UiFileDropMessage,
   dragSessionFor,
   type UiSemanticsBox,
@@ -1775,7 +1776,8 @@ export class GessoRuntime {
       listens: this.dispatcher.listenerTypes(node),
       beneath: this.beneathAtPointer(node),
       semantics: this.semanticsOf(node),
-      explanation: formatExplanation(this.engine.explain(node))
+      explanation: formatExplanation(this.engine.explain(node)),
+      ...this.sourceReport(node)
     };
   }
 
@@ -1829,6 +1831,11 @@ export class GessoRuntime {
   }
 
   /** The components that rendered a node, nearest first. */
+  private sourceReport(node: UiNode): { source?: UiSourceLocation } {
+    const source = this.builder.sourceOf(node);
+    return source === undefined ? {} : { source };
+  }
+
   private ownersOf(node: UiNode): UiOwnerReport[] {
     const owners: UiOwnerReport[] = [];
     for (let current: UiNode | null = node; current !== null; current = current.parent) {
@@ -1838,7 +1845,12 @@ export class GessoRuntime {
       // string test.
       const host = this.resolver.hostFor(current.id);
       if (host !== undefined) {
-        owners.push({ name: getComponentMetadata(host.component).tag, anchorId: current.id });
+        const usedAt = this.builder.sourceOf(current);
+        owners.push({
+          name: getComponentMetadata(host.component).tag,
+          anchorId: current.id,
+          ...(usedAt === undefined ? {} : { usedAt })
+        });
       }
     }
     return owners;

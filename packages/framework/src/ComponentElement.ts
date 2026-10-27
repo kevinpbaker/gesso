@@ -1,4 +1,4 @@
-import type { UiChild } from 'gesso-core';
+import type { UiChild, UiSourceLocation } from 'gesso-core';
 import type { ComponentType } from './FunctionComponent';
 
 /**
@@ -14,6 +14,8 @@ export interface ComponentElement<P = Record<string, unknown>> {
   readonly component: ComponentType;
   readonly props: P;
   readonly key?: string | number;
+  /** Where the component was used, in development; see `UiSourceLocation`. */
+  readonly source?: UiSourceLocation;
 }
 
 export function isComponentElement(value: unknown): value is ComponentElement {
