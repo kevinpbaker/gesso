@@ -216,10 +216,14 @@ export class ErrorOverlay {
       return () => {};
     }
     const onError = (event: ErrorEvent): void => {
-      this.reportError(event.error ?? event.message, 'window');
+      if (!isClaimedError(event.error)) {
+        this.reportError(event.error ?? event.message, 'window');
+      }
     };
     const onRejection = (event: PromiseRejectionEvent): void => {
-      this.reportError(event.reason, 'window');
+      if (!isClaimedError(event.reason)) {
+        this.reportError(event.reason, 'window');
+      }
     };
     target.addEventListener('error', onError);
     target.addEventListener('unhandledrejection', onRejection);
@@ -563,3 +567,21 @@ ol.stack .raw { color: #6f6f7a; }
 pre.stack { margin: 0; white-space: pre-wrap; color: #8b8b96; }
 footer { margin-top: 12px; color: #6f6f7a; }
 `;
+
+/**
+ * Whether work in progress said this error is its own: a frame an agent
+ * asked `gesso-framework` to draw, which reports its failure to the
+ * agent rather than over the person's screen. Read from the key the
+ * framework keeps its claims under, so this package does not import it.
+ */
+function isClaimedError(error: unknown): boolean {
+  const claims = (globalThis as Record<symbol, Set<(error: unknown) => boolean> | undefined>)[
+    Symbol.for('gesso.claimedErrors')
+  ];
+  for (const test of claims ?? []) {
+    if (test(error)) {
+      return true;
+    }
+  }
+  return false;
+}

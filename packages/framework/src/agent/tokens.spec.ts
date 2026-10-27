@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Button, Column, colorToHex, darkColors, darkTheme, lightTheme, rgb8, type UiTheme } from 'gesso-core';
 import { mountRuntime } from '../app/RuntimeTestUtils';
+import { resultText } from './AgentSurface';
 import type { ThemeTokens } from './tokens';
 import { uiSurface, type UiHost } from './ui';
 
@@ -44,9 +45,9 @@ describe('tokens_view', () => {
     expect(tokens.colors.primary).toBe(colorToHex(orange));
     expect(tokens.typography.title?.fontSize).toBe(lightTheme.typography.title.fontSize);
     expect(tokens.shapes.medium).toBe(8);
-    expect(result.content[0]!.text).toContain("The theme in force at the application's outermost content.");
-    expect(result.content[0]!.text).toContain(`  primary ${colorToHex(orange)}`);
-    expect(result.content[0]!.text).toContain('borderRadius takes the name');
+    expect(resultText(result)).toContain("The theme in force at the application's outermost content.");
+    expect(resultText(result)).toContain(`  primary ${colorToHex(orange)}`);
+    expect(resultText(result)).toContain('borderRadius takes the name');
   });
 
   it('reads the theme where a control is, when part of the screen has its own', async () => {
@@ -55,7 +56,7 @@ describe('tokens_view', () => {
 
     expect(result.isError).toBe(false);
     expect(tokens.colors.background).toBe(colorToHex(darkColors.background));
-    expect(result.content[0]!.text).toContain('The theme in force at button "In the dark".');
+    expect(resultText(result)).toContain('The theme in force at button "In the dark".');
   });
 
   it('says so when the control named is not on the screen', async () => {
@@ -66,6 +67,6 @@ describe('tokens_view', () => {
   it('says so when the host cannot report a theme', async () => {
     const result = await screen(false).call('tokens_view', {});
     expect(result.isError).toBe(true);
-    expect(result.content[0]!.text).toBe('This application does not report its theme to agents.');
+    expect(resultText(result)).toBe('This application does not report its theme to agents.');
   });
 });

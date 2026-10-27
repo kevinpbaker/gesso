@@ -6,6 +6,7 @@ import { Define } from '../../decorators';
 import { internalState } from '../../InternalState';
 import { createComponent } from '../../createComponent';
 import { Box, Column, Text, UiInsetRegistry, type CanvasHost } from 'gesso-core';
+import { claimErrors } from '../claimedErrors';
 import { RenderWorkerApp } from './renderRoot';
 import { channel } from '../../channel/ChannelToken';
 import type { ComponentContext, Inputs } from '../../FunctionComponent';
@@ -359,6 +360,22 @@ describe('RenderWorkerApp', () => {
     const error = sent.find(m => m.type === 'error');
     expect(error && 'message' in error && error.message).toBe('load failed');
     expect(error && 'source' in error && error.source).toBe('uncaught');
+  });
+
+  it('leaves an error a frame drawn for an agent claimed to that frame', () => {
+    const { host, sent, emit } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+    const draft = new Error('the draft read an input it was not given');
+    const release = claimErrors(error => error === draft);
+
+    emit('error', { error: draft, message: 'Uncaught Error: the draft read an input it was not given' });
+    emit('unhandledrejection', { reason: draft });
+    release();
+    emit('error', { error: draft, message: 'Uncaught Error: the draft read an input it was not given' });
+
+    // Claimed, the two are the frame's to report; released, it is the
+    // application's again.
+    expect(sent.filter(m => m.type === 'error')).toHaveLength(1);
   });
 
   it('ignores input that arrives before init', () => {

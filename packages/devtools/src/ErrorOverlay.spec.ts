@@ -329,6 +329,25 @@ describe('ErrorOverlay', () => {
     expect(overlay.count).toBe(1);
   });
 
+  it('leaves alone an error a frame drawn for an agent has claimed', () => {
+    const { doc, overlay } = mount();
+    const draft = new Error('the draft read an input it was not given');
+    const claims = new Set([(error: unknown) => error === draft]);
+    const key = Symbol.for('gesso.claimedErrors');
+    (globalThis as Record<symbol, unknown>)[key] = claims;
+    try {
+      overlay.captureWindowErrors(doc.defaultView as unknown as Window);
+      doc.defaultView.dispatch('error', { error: draft });
+      doc.defaultView.dispatch('unhandledrejection', { reason: draft });
+      expect(overlay.count).toBe(0);
+
+      doc.defaultView.dispatch('error', { error: new Error('the application broke') });
+      expect(overlay.count).toBe(1);
+    } finally {
+      delete (globalThis as Record<symbol, unknown>)[key];
+    }
+  });
+
   it('puts the host back the way it found it', () => {
     const { host, overlay } = mount();
 

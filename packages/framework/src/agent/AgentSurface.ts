@@ -67,9 +67,22 @@ export interface AgentResource {
   readonly mimeType: 'application/json';
 }
 
+/** One part of a tool's answer: text, or a picture, as `render_frame` returns. */
+export type AgentContent =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly data: string; readonly mimeType: string };
+
+/** A result's text parts, joined: what a reader that shows no pictures shows. */
+export function resultText(result: AgentToolResult): string {
+  return result.content
+    .map(part => (part.type === 'text' ? part.text : ''))
+    .filter(Boolean)
+    .join('\n');
+}
+
 /** What a tool call returned, in the shape MCP's `tools/call` returns. */
 export interface AgentToolResult {
-  readonly content: readonly { readonly type: 'text'; readonly text: string }[];
+  readonly content: readonly AgentContent[];
   readonly structuredContent?: Record<string, unknown>;
   readonly isError: boolean;
 }

@@ -2,6 +2,7 @@ import type { UiKeyModifiers, UiSemanticsAction, UiSemanticsMap, UiSemanticsReco
 
 import type { JsonSchema } from '../channel/ChannelSchema';
 import type { AgentSurface, AgentTool, AgentToolResult } from './AgentSurface';
+import type { RenderRequest } from './render';
 import { formatThemeTokens, themeTokens } from './tokens';
 
 /**
@@ -28,6 +29,7 @@ import { formatThemeTokens, themeTokens } from './tokens';
  *   ui_focus      move focus to a control
  *   ui_key        press a key where focus is: Enter, Escape, Tab, ArrowDown
  *   tokens_view   the theme's colours, type, radii and spacing, by name
+ *   render_frame  a module of the project drawn to a PNG, at a width
  *
  * Each action answers with the outline as it is afterwards.
  */
@@ -51,6 +53,8 @@ export interface UiHost {
    * `tokens_view` says it cannot answer.
    */
   theme?(at?: string): UiTheme | undefined;
+  /** Draws a module of the project to a PNG; see `renderModule`. Optional, as `theme` is. */
+  render?(request: RenderRequest): Promise<AgentToolResult>;
 }
 
 export interface UiSurfaceOptions {
@@ -135,6 +139,41 @@ const TOOLS: readonly AgentTool[] = [
       'draws them. Read it before designing, and write the names rather than raw values. Name a control, by ref or ' +
       'by role and name, to read the theme where it is: part of a screen may have a theme of its own.',
     inputSchema: { type: 'object', properties: TARGET, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false }
+  },
+  {
+    name: 'render_frame',
+    title: 'Draw a frame',
+    description:
+      'Draws a module of the project to a PNG you can look at: a mock, or a component with inputs, at the width ' +
+      "you ask for, in the running application's theme. The pixels are the application's own: the same layout, " +
+      'text and paint. Draw what you build, at a phone width and a desktop one, and look before you call it done. ' +
+      'Without a height it is as tall as its content, which suits a component or a section; give one for a whole ' +
+      'screen, which then fills it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module: {
+          type: 'string',
+          description: 'The module, from the project root, as library_overview gives it: "src/mocks/Settings".'
+        },
+        export: {
+          type: 'string',
+          description:
+            "The export to draw: a component or an element. By default the module's default, else its only component."
+        },
+        inputs: { type: 'object', description: 'Inputs for a component, by name, as library_get lists them.' },
+        width: { type: 'number', description: 'In logical pixels: 390 for a phone, 1280 for a desktop.' },
+        height: { type: 'number', description: 'In logical pixels. Leave it out to fit the content.' },
+        scale: { type: 'number', description: 'Device pixels per logical pixel, 1 to 3 (default 1).' },
+        theme: {
+          enum: ['app', 'light', 'dark'],
+          description: "The application's theme (default), or the light or dark one."
+        }
+      },
+      required: ['module', 'width'],
+      additionalProperties: false
+    },
     annotations: { readOnlyHint: true, openWorldHint: false }
   }
 ];
@@ -282,6 +321,24 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
             structuredContent: tokens as unknown as Record<string, unknown>,
             isError: false
           };
+        }
+        case 'render_frame': {
+          const ui = host();
+          if (ui === undefined) {
+            return failure('The application has not started yet.');
+          }
+          if (ui.render === undefined) {
+            return failure('This application cannot draw frames for agents.');
+          }
+          if (typeof args.module !== 'string' || args.module === '') {
+            return failure(
+              'render_frame needs module: the module, from the project root, such as "src/mocks/Settings".'
+            );
+          }
+          if (typeof args.width !== 'number' || !(args.width > 0)) {
+            return failure('render_frame needs width: a number of logical pixels above zero, such as 390.');
+          }
+          return ui.render(args as unknown as RenderRequest);
         }
         default:
           return failure(`There is no tool called ${name}.`);

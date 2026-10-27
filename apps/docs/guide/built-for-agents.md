@@ -101,7 +101,9 @@ its theme's names, not redraw them. In development the same endpoint
 lists the components, read from the source: `library_overview`,
 `library_search` and `library_get` give each one's purpose, its inputs
 and where it is used, and `tokens_view` gives the theme's colours, type,
-radii and spacing by name.
+radii and spacing by name. `render_frame` draws a module of the project
+to a PNG at any width, in the application's own pixels, so an agent
+looks at what it built before calling it done.
 [Designing with what the project has](/structure/agents-and-mcp#designing-with-what-the-project-has)
 has the detail.
 

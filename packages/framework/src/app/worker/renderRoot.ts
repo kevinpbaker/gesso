@@ -4,6 +4,8 @@ import type { ComponentType } from '../../FunctionComponent';
 import { APPLICATION_WORKER, portHandle, servePorts, type PortHost, type WorkerHandle } from '../../worker/WorkerPorts';
 import { AGENT_PORT } from '../../agent/remote';
 import { serveApplicationAgent } from '../../agent/app';
+import { renderModule } from '../../agent/render';
+import { isClaimedError } from '../claimedErrors';
 import type { ServedChannel } from '../../channel/serveChannels';
 import { captureConsole } from '../../worker/captureConsole';
 import {
@@ -128,6 +130,10 @@ export class RenderWorkerApp {
     // right thread in devtools. These two listeners are what make a
     // render worker's failures reach the shell at all.
     this.host.addEventListener('error', event => {
+      // A frame an agent asked for, failing; it tells the agent.
+      if (isClaimedError(event.error)) {
+        return;
+      }
       // The location only when the engine kept no Error: with one, the
       // stack says where it was in more detail and the event's
       // `filename` is whichever bundle chunk the frame landed in,
@@ -139,6 +145,9 @@ export class RenderWorkerApp {
       );
     });
     this.host.addEventListener('unhandledrejection', event => {
+      if (isClaimedError(event.reason)) {
+        return;
+      }
       this.reportUncaught(event.reason ?? 'Unhandled rejection');
     });
   }
@@ -373,7 +382,14 @@ export class RenderWorkerApp {
             runtime.input.keyboard.keyUp(key, modifiers);
           },
           flush: () => this.clock?.tick(performance.now()),
-          theme: at => runtime.themeAt(at)
+          theme: at => runtime.themeAt(at),
+          render: request =>
+            renderModule(request, {
+              load: path => import(/* @vite-ignore */ path),
+              appTheme: () => runtime.themeAt(),
+              channels: runtime.channels,
+              services: runtime.services
+            })
         };
       }
     });
