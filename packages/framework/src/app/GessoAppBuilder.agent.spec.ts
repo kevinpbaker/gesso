@@ -84,7 +84,8 @@ describe('a single-thread app, asked by an agent', () => {
       'ui_press',
       'ui_type',
       'ui_focus',
-      'ui_key'
+      'ui_key',
+      'tokens_view'
     ]);
 
     expect((await agent.call('counter_add', { arguments: [2] })).structuredContent).toEqual({ count: 2 });
@@ -117,7 +118,7 @@ describe('a single-thread app, asked by an agent', () => {
 
     const { builder } = counterApp();
     const unmount = builder.useWebMcp().mountSync(mockHost());
-    await vi.waitFor(() => expect(tools.size).toBe(7));
+    await vi.waitFor(() => expect(tools.size).toBe(8));
     unmount();
     expect(tools.size).toBe(0);
   });

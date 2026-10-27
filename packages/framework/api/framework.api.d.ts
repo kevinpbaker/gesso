@@ -519,6 +519,7 @@ import {
   UiSpringSpec,
   UiSpringToken,
   UiTextPosition,
+  UiTheme,
   UiThemeExtension,
   UiTouchScroller,
   UiWheelController,
@@ -1561,6 +1562,7 @@ declare class GessoRuntime {
   private writeInspectedProperty;
   snapshotTree(): UiTreeSnapshot;
   private sendTree;
+  themeAt(id?: string): UiTheme | undefined;
   inspectNodeById(id: string): UiNodeReport | null;
   setHighlightedNode(id: string | null): void;
   onCursor(listener: ((cursor: string | null) => void) | null): void;
@@ -3890,7 +3892,8 @@ import {
   UiKeyModifiers,
   UiSemanticsAction,
   UiSemanticsMap,
-  UiSemanticsRecord
+  UiSemanticsRecord,
+  UiTheme
 } from "gesso-core";
 type JsonSchema = {
   readonly [keyword: string]: unknown;
@@ -4053,6 +4056,7 @@ interface UiHost {
   applySemanticsAction(action: UiSemanticsAction): void;
   key(key: string, modifiers: UiKeyModifiers): void;
   flush(): void;
+  theme?(at?: string): UiTheme | undefined;
 }
 interface UiSurfaceOptions {
   quietMs?: number;

@@ -76,7 +76,8 @@ describe('the render worker, asked by an agent', () => {
       'ui_press',
       'ui_type',
       'ui_focus',
-      'ui_key'
+      'ui_key',
+      'tokens_view'
     ]);
     expect((await agent.call('counter_add', { arguments: [3] })).structuredContent).toEqual({ count: 3 });
     expect(count.value).toBe(3);

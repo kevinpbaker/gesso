@@ -17,6 +17,11 @@
  * Several tabs may be open. The newest to announce itself answers,
  * which is the one a person most likely means, and a tab that closes
  * hands back to the one before it.
+ *
+ * A few tools are the server's own: the component catalog, which the
+ * checker reads here and which an agent should be able to read before
+ * any page is open. Those are answered here, and listed alongside the
+ * page's; everything else still goes to the page.
  */
 
 /** The path an agent is pointed at. */
@@ -62,6 +67,18 @@ export interface AgentBridgeOptions {
    * for a person, and people are slow.
    */
   timeoutMs?: number;
+  /** Tools the server answers itself, page or no page. */
+  local?: LocalTools;
+}
+
+/** Tools the dev server answers without the page: see the file's comment. */
+export interface LocalTools {
+  /** Each in the shape MCP's `tools/list` returns. */
+  readonly tools: readonly { readonly name: string }[];
+  /** Answers one, in the shape MCP's `tools/call` returns. */
+  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<unknown>;
+  /** Added to what the page tells an agent when it connects. */
+  readonly instructions?: string;
 }
 
 export interface AgentBridge {
@@ -73,6 +90,8 @@ export interface AgentBridge {
 
 export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOptions = {}): AgentBridge {
   const timeoutMs = options.timeoutMs ?? 130_000;
+  const local = options.local;
+  const localNames = new Set(local?.tools.map(tool => tool.name) ?? []);
   /** Pages that announced themselves, newest last. */
   const pages: BridgeClient[] = [];
   const pending = new Map<number, (response: unknown) => void>();
@@ -98,6 +117,50 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
       resolve(data.response);
     }
   });
+
+  /**
+   * The answer the server gives itself, or undefined to relay. A call
+   * to one of its own tools is always answered here; with no page open,
+   * so are the handshake and the listings, so an agent connected before
+   * the page still reads the catalog.
+   */
+  const answerWithLocal = (message: unknown): Promise<unknown> | undefined => {
+    const request = asRequest(message);
+    if (request === undefined || local === undefined) {
+      return undefined;
+    }
+    const { id, method, params } = request;
+    if (method === 'tools/call' && typeof params.name === 'string' && localNames.has(params.name)) {
+      const args = params.arguments as Readonly<Record<string, unknown>> | undefined;
+      return local.call(params.name, args).then(result => ({ jsonrpc: '2.0', id, result }));
+    }
+    if (pages.length > 0) {
+      return undefined;
+    }
+    switch (method) {
+      case 'initialize':
+        return Promise.resolve({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            protocolVersion: typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-06-18',
+            capabilities: { tools: {}, resources: {} },
+            serverInfo: { name: 'gesso', version: '0.0.0' },
+            ...(local.instructions === undefined ? {} : { instructions: local.instructions })
+          }
+        });
+      case 'tools/list':
+        return Promise.resolve({ jsonrpc: '2.0', id, result: { tools: local.tools } });
+      case 'ping':
+        return Promise.resolve({ jsonrpc: '2.0', id, result: {} });
+      case 'resources/list':
+        return Promise.resolve({ jsonrpc: '2.0', id, result: { resources: [] } });
+      case 'resources/templates/list':
+        return Promise.resolve({ jsonrpc: '2.0', id, result: { resourceTemplates: [] } });
+      default:
+        return undefined;
+    }
+  };
 
   const relay = (message: unknown): Promise<unknown> => {
     const page = pages[pages.length - 1];
@@ -149,6 +212,11 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           return;
         }
         const notification = typeof message === 'object' && message !== null && !('id' in message);
+        const own = local === undefined ? undefined : answerWithLocal(message);
+        if (own !== undefined) {
+          void own.then(answer => send(response, 200, 'application/json', JSON.stringify(answer)));
+          return;
+        }
         if (pages.length === 0) {
           if (notification) {
             send(response, 202);
@@ -169,13 +237,15 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           );
           return;
         }
-        void relay(message).then(answer => {
-          if (answer === null || answer === undefined) {
-            send(response, 202);
-          } else {
-            send(response, 200, 'application/json', JSON.stringify(answer));
-          }
-        });
+        void relay(message)
+          .then(answer => (local === undefined ? answer : mergeLocal(message, answer, local)))
+          .then(answer => {
+            if (answer === null || answer === undefined) {
+              send(response, 202);
+            } else {
+              send(response, 200, 'application/json', JSON.stringify(answer));
+            }
+          });
       });
     }
   };
@@ -215,3 +285,43 @@ export const SHELL_BRIDGE = `function __gessoAgent(app) {
   return app;
 }
 `;
+
+/** A JSON-RPC request, with an id and params, or undefined for anything else. */
+function asRequest(
+  message: unknown
+): { id: string | number; method: string; params: Record<string, unknown> } | undefined {
+  if (typeof message !== 'object' || message === null || Array.isArray(message)) {
+    return undefined;
+  }
+  const { id, method, params } = message as { id?: unknown; method?: unknown; params?: unknown };
+  if ((typeof id !== 'string' && typeof id !== 'number') || typeof method !== 'string') {
+    return undefined;
+  }
+  return {
+    id,
+    method,
+    params: typeof params === 'object' && params !== null ? (params as Record<string, unknown>) : {}
+  };
+}
+
+/**
+ * The page's answer with the server's own tools in it: listed after the
+ * page's, and the instructions joined, so an agent sees one server.
+ */
+function mergeLocal(message: unknown, answer: unknown, local: LocalTools): unknown {
+  const method = asRequest(message)?.method;
+  const result = (answer as { result?: Record<string, unknown> } | null)?.result;
+  if (result === undefined || (method !== 'tools/list' && method !== 'initialize')) {
+    return answer;
+  }
+  if (method === 'tools/list' && Array.isArray(result.tools)) {
+    const taken = new Set((result.tools as { name?: unknown }[]).map(tool => tool.name));
+    const added = local.tools.filter(tool => !taken.has(tool.name));
+    return { ...(answer as object), result: { ...result, tools: [...result.tools, ...added] } };
+  }
+  if (method === 'initialize' && local.instructions !== undefined) {
+    const given = typeof result.instructions === 'string' ? `${result.instructions}\n\n` : '';
+    return { ...(answer as object), result: { ...result, instructions: `${given}${local.instructions}` } };
+  }
+  return answer;
+}
