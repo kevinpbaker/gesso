@@ -105,7 +105,7 @@ export const Notes = defineChannel('notes', {
 });
 ```
 
-From that, an agent gets `notes_view`, `notes_open` and `notes_remove`, described from the JSDoc and checked against the types, and `remove` is put to the person before it is sent. For anything no channel covers, `ui_snapshot`, `ui_press`, `ui_type` and `ui_key` read and operate the screen the way a screen reader does.
+From that, an agent gets `notes_view`, `notes_open` and `notes_remove`, described from the JSDoc and checked against the types, and `remove` is put to the person before it is sent. For anything no channel covers, `ui_snapshot`, `ui_press`, `ui_type` and `ui_key` read and operate the screen the way a screen reader does. And to design with what the project already has, `library_overview`, `library_search` and `library_get` list its own components with every input they take, and `tokens_view` gives the theme's names.
 
 - **While you develop**, `pnpm dev` serves MCP at `/__gesso/mcp` and prints the `claude mcp add` line to connect.
 - **In the browser**, `createApp({ webmcp: true })` registers the same tools with WebMCP.

@@ -63,6 +63,73 @@ function request(
 
 const ping = JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'ping' });
 
+describe("the server's own tools", () => {
+  const local = {
+    tools: [{ name: 'library_overview' }],
+    call: async (name: string) => ({ content: [{ type: 'text', text: `answered ${name} here` }], isError: false }),
+    instructions: 'Read the components first.'
+  };
+  const rpc = (id: number, method: string, params: Record<string, unknown> = {}) =>
+    JSON.stringify({ jsonrpc: '2.0', id, method, params });
+
+  it('answers the handshake, the listing and its own calls with no page open', async () => {
+    const bridge = createAgentBridge(fakeSocket().socket, { local });
+
+    const hello = JSON.parse(
+      (await request(bridge, { body: rpc(1, 'initialize', { protocolVersion: '2025-06-18' }) })).body!
+    );
+    const listed = JSON.parse((await request(bridge, { body: rpc(2, 'tools/list') })).body!);
+    const called = JSON.parse(
+      (await request(bridge, { body: rpc(3, 'tools/call', { name: 'library_overview', arguments: {} }) })).body!
+    );
+
+    expect(hello.result.protocolVersion).toBe('2025-06-18');
+    expect(hello.result.instructions).toBe('Read the components first.');
+    expect(listed.result.tools).toEqual([{ name: 'library_overview' }]);
+    expect(called).toEqual({
+      jsonrpc: '2.0',
+      id: 3,
+      result: { content: [{ type: 'text', text: 'answered library_overview here' }], isError: false }
+    });
+  });
+
+  it("lists its tools after the page's and joins the instructions, and sends the page everything else", async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket, { local });
+    const seen: string[] = [];
+    emit(
+      EVENTS.ready,
+      {},
+      fakePage(emit, message => {
+        const { id, method } = message as { id: number; method: string };
+        seen.push(method);
+        if (method === 'initialize') {
+          return { jsonrpc: '2.0', id, result: { instructions: 'The page.' } };
+        }
+        if (method === 'tools/list') {
+          return { jsonrpc: '2.0', id, result: { tools: [{ name: 'ui_snapshot' }] } };
+        }
+        return { jsonrpc: '2.0', id, result: { content: [], isError: false } };
+      })
+    );
+
+    const hello = JSON.parse((await request(bridge, { body: rpc(1, 'initialize') })).body!);
+    const listed = JSON.parse((await request(bridge, { body: rpc(2, 'tools/list') })).body!);
+    await request(bridge, { body: rpc(3, 'tools/call', { name: 'ui_snapshot' }) });
+    await request(bridge, { body: rpc(4, 'tools/call', { name: 'library_overview' }) });
+
+    expect(hello.result.instructions).toBe('The page.\n\nRead the components first.');
+    expect(listed.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['ui_snapshot', 'library_overview']);
+    expect(seen).toEqual(['initialize', 'tools/list', 'tools/call']);
+  });
+
+  it('still says no page is open for what only a page can answer', async () => {
+    const bridge = createAgentBridge(fakeSocket().socket, { local });
+    const answer = JSON.parse((await request(bridge, { body: rpc(1, 'tools/call', { name: 'ui_snapshot' }) })).body!);
+    expect(answer.error.message).toContain('No page is running the application.');
+  });
+});
+
 describe('the agent endpoint', () => {
   it('relays a message to the page that announced itself, and answers with what the page said', async () => {
     const { socket, emit } = fakeSocket();

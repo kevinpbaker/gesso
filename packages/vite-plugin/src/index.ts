@@ -7,6 +7,7 @@ import {
 } from 'vite';
 
 import { AGENT_PATH, createAgentBridge, type BridgeRequest, type BridgeResponse, type BridgeSocket } from './agent.ts';
+import { CATALOG_INSTRUCTIONS, CATALOG_TOOLS, ComponentCatalog, type CatalogLibrary } from './catalog.ts';
 import { ContractReader, declaresChannel, describeCalls, type TypeScriptApi } from './contracts.ts';
 import { transformRenderWorker } from './render.ts';
 import { findShellCall, transformShell, transformSyncShell, type WorkerEntries } from './shell.ts';
@@ -18,6 +19,13 @@ export {
   type ComponentSchemaOut,
   type ContractReading
 } from './contracts.ts';
+export {
+  ComponentCatalog,
+  mayDeclareComponent,
+  type CatalogEntry,
+  type CatalogLibrary,
+  type ComponentCatalogOptions
+} from './catalog.ts';
 export { transformRenderWorker, type RenderWiring } from './render.ts';
 export {
   findShellCall,
@@ -113,6 +121,21 @@ export interface GessoPluginOptions {
    * (default true). Development only: a build carries none of it.
    */
   readonly agent?: boolean;
+  /**
+   * Offer the project's components to an agent over the same endpoint,
+   * as `library_overview`, `library_search` and `library_get` (default
+   * true while `agent` is on). The components are the project's own,
+   * read from the files its tsconfig includes; name a library in
+   * `libraries` to offer its components too, such as `gesso-components`.
+   */
+  readonly catalog?:
+    | boolean
+    | {
+        /** The tsconfig whose files are the project's source (default `tsconfig.json` in the root). */
+        readonly tsconfig?: string;
+        /** Packages whose components join the project's own, by the name they are imported by. */
+        readonly libraries?: readonly string[];
+      };
 }
 
 /**
@@ -167,6 +190,8 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
   /** The checker, started by the first contract, or null once it is known to be unavailable. */
   let contracts: Promise<ContractReader | null> | undefined;
   let root = '';
+  /** The project's components, offered to an agent while the dev server runs. */
+  let catalog: ComponentCatalog | null = null;
   const readerFor = (warn: (message: string) => void): Promise<ContractReader | null> =>
     (contracts ??= import('typescript/unstable/sync').then(
       ts => new ContractReader(ts as TypeScriptApi, root),
@@ -263,7 +288,25 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
       if (options.agent === false) {
         return;
       }
-      const bridge = createAgentBridge(server.ws as unknown as BridgeSocket);
+      const catalogOptions = typeof options.catalog === 'object' ? options.catalog : {};
+      catalog =
+        options.catalog === false
+          ? null
+          : new ComponentCatalog(() => readerFor(message => server.config.logger.warn(message)), root, {
+              tsconfig: absolute(root, catalogOptions.tsconfig ?? 'tsconfig.json'),
+              libraries: () => resolveLibraries(server, root, catalogOptions.libraries ?? [])
+            });
+      const bridge = createAgentBridge(server.ws as unknown as BridgeSocket, {
+        ...(catalog === null
+          ? {}
+          : {
+              local: {
+                tools: CATALOG_TOOLS,
+                call: (name, args) => catalog!.call(name, args),
+                instructions: CATALOG_INSTRUCTIONS
+              }
+            })
+      });
       server.middlewares.use((request, response, next) =>
         bridge.middleware(request as unknown as BridgeRequest, response as unknown as BridgeResponse, next)
       );
@@ -278,8 +321,9 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
       });
     },
 
-    watchChange(id) {
-      void contracts?.then(reader => reader?.invalidate(id));
+    watchChange(id, change) {
+      void contracts?.then(reader => reader?.invalidate(id, change.event));
+      catalog?.invalidate();
     },
 
     /**
@@ -413,6 +457,38 @@ function scanShell(options: GessoPluginOptions) {
       return { code: `${shell}\n${workers.map(entry => `import ${JSON.stringify(entry)};`).join('\n')}\n`, map: null };
     }
   };
+}
+
+/** A path from the root, made absolute; an absolute one is kept. */
+function absolute(root: string, path: string): string {
+  return path.startsWith('/') ? path : `${root.replace(/\/+$/, '')}/${path.replace(/^\.\//, '')}`;
+}
+
+/**
+ * Where each named library's components are declared: the module Vite
+ * resolves its name to, or the declaration file beside it when that is
+ * built JavaScript, which says nothing about types. A name that does
+ * not resolve is reported and left out.
+ */
+async function resolveLibraries(
+  server: { pluginContainer: { resolveId(id: string, importer?: string): Promise<{ id: string } | null> } } & {
+    config: { logger: { warn(message: string): void } };
+  },
+  root: string,
+  names: readonly string[]
+): Promise<CatalogLibrary[]> {
+  const out: CatalogLibrary[] = [];
+  for (const name of names) {
+    const resolved = await server.pluginContainer.resolveId(name, absolute(root, 'index.html'));
+    if (resolved === null) {
+      server.config.logger.warn(
+        `[gesso] The catalog library ${name} does not resolve from ${root}, so it is left out.`
+      );
+      continue;
+    }
+    out.push({ name, file: resolved.id.replace(/\?.*$/, '').replace(/\.([cm]?)js$/, '.d.$1ts') });
+  }
+  return out;
 }
 
 /** A name for the MCP server: the project's directory, which is what a person calls the app. */

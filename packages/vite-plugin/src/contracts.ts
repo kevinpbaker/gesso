@@ -213,6 +213,8 @@ function importPath(fromDir: string, file: string): string {
 export class ContractReader {
   private api: TsApi.API | null = null;
   private readonly changed = new Set<string>();
+  private readonly created = new Set<string>();
+  private readonly deleted = new Set<string>();
   /** Each contract's tsconfig, found once. */
   private readonly configs = new Map<string, string>();
 
@@ -232,9 +234,22 @@ export class ContractReader {
     this.fs = fs;
   }
 
-  /** A file changed on disk since the last read. */
-  invalidate(file: string): void {
-    this.changed.add(file);
+  /**
+   * A file changed on disk since the last read. A new or deleted one is
+   * said so, because a program's list of files only changes for those:
+   * a component in a new file is otherwise not in the catalog.
+   */
+  invalidate(file: string, event: 'update' | 'create' | 'delete' = 'update'): void {
+    (event === 'create' ? this.created : event === 'delete' ? this.deleted : this.changed).add(file);
+  }
+
+  /** What changed since the last snapshot, emptied for the next. */
+  private takeChanges(): { changed: string[]; created: string[]; deleted: string[] } {
+    const changes = { changed: [...this.changed], created: [...this.created], deleted: [...this.deleted] };
+    this.changed.clear();
+    this.created.clear();
+    this.deleted.clear();
+    return changes;
   }
 
   /** Every channel `file` exports, described. */
@@ -282,6 +297,32 @@ export class ContractReader {
     return { components, warnings: describer.warnings };
   }
 
+  /**
+   * The source files of the project `config` describes, with their
+   * text: what the project itself wrote, so neither its dependencies
+   * nor declaration files. The project's own tsconfig decides what that
+   * is, which is the answer the person already gave their editor.
+   */
+  sources(config: string): { readonly file: string; readonly text: string }[] {
+    const api = (this.api ??= new this.ts.API({ cwd: this.cwd, ...(this.fs === undefined ? {} : { fs: this.fs }) }));
+    const snapshot = api.updateSnapshot({ openProjects: [config], fileChanges: this.takeChanges() });
+    const program = snapshot.getProject(config)?.program;
+    if (program === undefined) {
+      return [];
+    }
+    const out: { file: string; text: string }[] = [];
+    for (const file of program.getSourceFileNames()) {
+      if (file.includes('/node_modules/') || /\.d\.[cm]?ts$/.test(file)) {
+        continue;
+      }
+      const text = program.getSourceFile(file)?.text;
+      if (text !== undefined) {
+        out.push({ file, text });
+      }
+    }
+    return out;
+  }
+
   /** The inputs a component's type declares, or undefined when it is not a component. */
   private inputsOf(checker: TsApi.Checker, type: TsApi.Type): ComponentInputs | undefined {
     const { Call, Construct } = this.ts.SignatureKind;
@@ -289,7 +330,10 @@ export class ContractReader {
     const first = call?.getParameters()[0];
     if (first !== undefined) {
       const parameter = checker.getTypeOfSymbol(first);
-      if (parameter?.getAliasSymbol()?.name === 'Inputs') {
+      // A helper may take a component's inputs too (`layoutOf(inputs)`);
+      // what makes a component is that it gives back something to draw.
+      const returns = checker.getReturnTypeOfSignature(call!);
+      if (parameter?.getAliasSymbol()?.name === 'Inputs' && returns !== undefined && this.drawable(returns)) {
         const [props] = parameter.getAliasTypeArguments();
         return props === undefined ? undefined : { kind: 'props', type: props };
       }
@@ -313,6 +357,15 @@ export class ContractReader {
     return { kind: 'cells', cells };
   }
 
+  /** Whether a function returning `type` returns a child: `UiChild`, an element, or a union of them. */
+  private drawable(type: TsApi.Type): boolean {
+    if (type.getAliasSymbol()?.name === 'UiChild') {
+      return true;
+    }
+    const members = type.isUnionType() ? (type.getTypes() ?? []) : [type];
+    return members.some(member => CHILD.has(member.getSymbol()?.name ?? ''));
+  }
+
   private extendsComponent(type: TsApi.Type): boolean {
     for (let depth = 0, current: TsApi.Type | undefined = type; current !== undefined && depth < 16; depth++) {
       if (current.getSymbol()?.name === 'Component') {
@@ -329,8 +382,7 @@ export class ContractReader {
   private open(file: string): { checker: TsApi.Checker; exports: readonly TsApi.Symbol[] } | string {
     const api = (this.api ??= new this.ts.API({ cwd: this.cwd, ...(this.fs === undefined ? {} : { fs: this.fs }) }));
     this.changed.add(file);
-    let snapshot = api.updateSnapshot({ fileChanges: { changed: [...this.changed] } });
-    this.changed.clear();
+    let snapshot = api.updateSnapshot({ fileChanges: this.takeChanges() });
     let config = this.configs.get(file);
     if (config === undefined) {
       // A file opened through the API is an editor's buffer: the server

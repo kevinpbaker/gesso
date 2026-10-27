@@ -372,7 +372,8 @@ export class RenderWorkerApp {
             runtime.input.keyboard.keyDown(key, modifiers);
             runtime.input.keyboard.keyUp(key, modifiers);
           },
-          flush: () => this.clock?.tick(performance.now())
+          flush: () => this.clock?.tick(performance.now()),
+          theme: at => runtime.themeAt(at)
         };
       }
     });

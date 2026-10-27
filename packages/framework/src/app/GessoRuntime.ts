@@ -87,6 +87,7 @@ import {
   LayoutNotifier,
   type UiSemanticsAction,
   type UiSourceLocation,
+  type UiTheme,
   type UiFileDropMessage,
   dragSessionFor,
   type UiSemanticsBox,
@@ -1385,6 +1386,26 @@ export class GessoRuntime {
     const tree = this.snapshotTree();
     this.lastSubscriptions = tree.subscriptions;
     this.devtoolsListener?.({ kind: 'tree', tree });
+  }
+
+  /**
+   * The theme a node sees, by id, or with none named the theme the
+   * application's outermost content sees: from the application's root,
+   * down through every node with exactly one child, which passes the
+   * wrappers an application usually puts its theme on. Undefined before
+   * the root is built, or for an id the tree does not hold.
+   */
+  themeAt(id?: string): UiTheme | undefined {
+    let node = id === undefined ? this.appRoot : this.graph.getNode(id);
+    if (node === undefined) {
+      return undefined;
+    }
+    if (id === undefined) {
+      while (node.firstChild !== null && node.firstChild === node.lastChild) {
+        node = node.firstChild;
+      }
+    }
+    return (node.environment ?? this.graph.buildNodeEnvironment(node)).get(UiEnvironmentKeys.theme);
   }
 
   /** `inspectNode` for a node named by id, or null when the tree has no such node. */

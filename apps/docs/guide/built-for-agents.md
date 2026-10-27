@@ -94,6 +94,17 @@ This is the same tree `gesso-testing` queries, so a control a test can
 find by role and name is a control an agent can use. Accessibility, the
 test suite and agents are one investment rather than three.
 
+## And what the project already has
+
+An agent building a screen should use the project's own components and
+its theme's names, not redraw them. In development the same endpoint
+lists the components, read from the source: `library_overview`,
+`library_search` and `library_get` give each one's purpose, its inputs
+and where it is used, and `tokens_view` gives the theme's colours, type,
+radii and spacing by name.
+[Designing with what the project has](/structure/agents-and-mcp#designing-with-what-the-project-has)
+has the detail.
+
 ## Where an agent connects
 
 **While you develop**, the dev server is an MCP server. `pnpm dev`

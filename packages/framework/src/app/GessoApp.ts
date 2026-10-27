@@ -242,7 +242,8 @@ export class GessoApp {
           this.clock.cancelFrame();
           this.frameCallback(performance.now());
         }
-      }
+      },
+      theme: at => runtime.themeAt(at)
     };
   }
 

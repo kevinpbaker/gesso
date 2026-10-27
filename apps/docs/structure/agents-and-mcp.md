@@ -159,6 +159,41 @@ to the one before. With none open, the agent is told to open one. The
 endpoint refuses any request from a browser page, so a site you have
 open cannot reach it, and a build carries none of it.
 
+## Designing with what the project has
+
+An agent asked for a screen draws it from boxes unless it knows the
+project already has a `PageHeader`, a `StatusPill` and an `EmptyState`,
+what each takes, and how the project writes them. Those are the
+project's own, made by its designers and its agents, so the dev server
+reads them from the project's source with the checker that describes
+its channels, and offers them beside the channel and screen tools:
+
+| Tool               | Gives                                                                            |
+| ------------------ | -------------------------------------------------------------------------------- |
+| `library_overview` | Every component, one line each: what it is for, where it is from, how often used |
+| `library_search`   | The components a few words find, best first                                      |
+| `library_get`      | One in full: each input's type, default and meaning, and the files that use it   |
+| `tokens_view`      | The theme's colours, type styles, radii, spacing and shadows, by name and value  |
+
+A component is a function whose first parameter is `Inputs<P>` and that
+returns a child, or a class extending `Component`. What it is for is
+its JSDoc, else its props type's, and an input's meaning is the JSDoc
+on that prop, with `@default`, `@example` and `@deprecated` read too.
+Inputs every control shares, such as a layout props type, are folded
+into one line, so an agent reads the inputs that make the component
+what it is. A component saved in a new file is in the next answer.
+
+The three `library_` tools are answered on the dev server, where the
+checker runs, so an agent can read them before any page is open, and
+the instructions an agent gets when it connects tell it to. `tokens_view`
+is answered in the page, because a theme is a value in the running
+application: it reads the theme in force at a control, or at the
+application's outermost content when none is named, and tells the agent
+to write `backgroundColor="surface"` rather than the colour.
+
+A library's components join the project's only when the plugin names
+it: `gesso({ catalog: { libraries: ['gesso-components'] } })`.
+
 ## In the browser, with WebMCP
 
 [WebMCP](https://webmachinelearning.github.io/webmcp/) is the other

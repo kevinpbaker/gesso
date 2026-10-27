@@ -1,7 +1,8 @@
-import type { UiKeyModifiers, UiSemanticsAction, UiSemanticsMap, UiSemanticsRecord } from 'gesso-core';
+import type { UiKeyModifiers, UiSemanticsAction, UiSemanticsMap, UiSemanticsRecord, UiTheme } from 'gesso-core';
 
 import type { JsonSchema } from '../channel/ChannelSchema';
 import type { AgentSurface, AgentTool, AgentToolResult } from './AgentSurface';
+import { formatThemeTokens, themeTokens } from './tokens';
 
 /**
  * The screen, as tools an agent can use.
@@ -26,6 +27,7 @@ import type { AgentSurface, AgentTool, AgentToolResult } from './AgentSurface';
  *   ui_type       replace a field's text
  *   ui_focus      move focus to a control
  *   ui_key        press a key where focus is: Enter, Escape, Tab, ArrowDown
+ *   tokens_view   the theme's colours, type, radii and spacing, by name
  *
  * Each action answers with the outline as it is afterwards.
  */
@@ -42,6 +44,13 @@ export interface UiHost {
    * this reads back.
    */
   flush(): void;
+  /**
+   * The theme in force at a node, by semantics record id, or at the
+   * application's outermost content when none is named. Optional, so a
+   * host written before it still serves the other tools; without it,
+   * `tokens_view` says it cannot answer.
+   */
+  theme?(at?: string): UiTheme | undefined;
 }
 
 export interface UiSurfaceOptions {
@@ -117,6 +126,16 @@ const TOOLS: readonly AgentTool[] = [
       additionalProperties: false
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+  },
+  {
+    name: 'tokens_view',
+    title: 'Read the design tokens',
+    description:
+      "The theme's colours, type styles, corner radii, spacing scale and shadows, by name and value, as the screen " +
+      'draws them. Read it before designing, and write the names rather than raw values. Name a control, by ref or ' +
+      'by role and name, to read the theme where it is: part of a screen may have a theme of its own.',
+    inputSchema: { type: 'object', properties: TARGET, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false }
   }
 ];
 
@@ -234,6 +253,35 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
             meta: args.meta === true
           });
           return success(await settled(ui));
+        }
+        case 'tokens_view': {
+          const ui = host();
+          if (ui === undefined) {
+            return failure('The application has not started yet.');
+          }
+          if (ui.theme === undefined) {
+            return failure('This application does not report its theme to agents.');
+          }
+          let at: UiSemanticsRecord | undefined;
+          if (args.ref !== undefined || args.role !== undefined || args.name !== undefined) {
+            ui.flush();
+            const found = resolveTarget(ui.semanticsTree(), args, refs);
+            if (typeof found === 'string') {
+              return failure(found);
+            }
+            at = found;
+          }
+          const theme = ui.theme(at?.id);
+          if (theme === undefined) {
+            return failure('The application has not drawn anything yet, so no theme is in force.');
+          }
+          const tokens = themeTokens(theme);
+          const where = at === undefined ? "the application's outermost content" : describe(at);
+          return {
+            content: [{ type: 'text', text: formatThemeTokens(tokens, where) }],
+            structuredContent: tokens as unknown as Record<string, unknown>,
+            isError: false
+          };
         }
         default:
           return failure(`There is no tool called ${name}.`);
