@@ -1,7 +1,8 @@
 import { defineConfig } from 'tsdown';
 
 /**
- * Two builds: the plugin, and the `gesso-channels` command.
+ * Two builds: the plugin with its Vite-free catalog entry
+ * (`gesso-vite-plugin/catalog`), and the `gesso-channels` command.
  *
  * The plugin keeps `vite` external: this package runs inside a bundler
  * rather than beside one, so the `Plugin` type it implements has to be
@@ -22,7 +23,7 @@ import { defineConfig } from 'tsdown';
  */
 export default defineConfig([
   {
-    entry: ['src/index.ts'],
+    entry: ['src/index.ts', 'src/library.ts'],
     format: 'esm',
     dts: true,
     platform: 'neutral',

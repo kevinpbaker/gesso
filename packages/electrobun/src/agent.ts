@@ -29,7 +29,8 @@ import {
  * What it offers is the channel tools, and the screen tools of a window
  * when it is given `screen`: the screen is in each window's render
  * worker, out of the main process's reach, so the window relays it
- * (`createScreenAgent`).
+ * (`createScreenAgent`). Given `catalog`, it offers the project's own
+ * components too, so an agent designing in the app builds with them.
  *
  * The descriptions come from `channelSchema`. A main process is bundled
  * by Electrobun's own build, which `gesso-vite-plugin` never sees, so
@@ -67,6 +68,14 @@ export interface DesktopAgentOptions extends Omit<McpHandlerOptions, 'allowedOri
    * everything the person can do, so offer it in development.
    */
   screen?: AgentSurfaceLike;
+  /**
+   * The project's components, offered after the channels and the
+   * screen: `openCatalog` from `gesso-vite-plugin/catalog`. Its
+   * instructions, which tell an agent to read the catalog before it
+   * builds anything, are added to `instructions`. The caller made it and
+   * disposes of it; `stop` leaves it running.
+   */
+  catalog?: AgentSurfaceLike & { readonly instructions?: string };
 }
 
 export interface DesktopAgent {
@@ -88,8 +97,11 @@ export function serveDesktopAgent(channels: readonly ServedChannel[], options: D
   // A desktop app has no browser pages of its own to let in, so every
   // request carrying an Origin is refused: that is a web page the person
   // has open, reaching for their machine.
-  const fetch = mcpHandler(options.screen === undefined ? surface : combineSurfaces([surface, options.screen]), {
+  const offered = [surface, options.screen, options.catalog].filter(part => part !== undefined);
+  const instructions = [options.instructions, options.catalog?.instructions].filter(part => part !== undefined);
+  const fetch = mcpHandler(offered.length === 1 ? surface : combineSurfaces(offered), {
     ...options,
+    ...(instructions.length === 0 ? {} : { instructions: instructions.join('\n\n') }),
     allowedOrigins: []
   });
 

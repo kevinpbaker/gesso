@@ -30,13 +30,18 @@
     "gesso-channels": "./dist/gesso-channels.mjs"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./catalog": "./src/library.ts"
   },
   "publishConfig": {
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./catalog": {
+        "types": "./dist/library.d.ts",
+        "default": "./dist/library.js"
       }
     },
     "access": "public"

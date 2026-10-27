@@ -323,7 +323,10 @@ gesso({ catalog: { libraries: ['gesso-components'] } });
 ```
 
 `catalog: false` leaves them out, and `catalog: { tsconfig }` names a
-tsconfig other than the root's.
+tsconfig other than the root's. A host that is not a dev server, such as
+a desktop app's main process, opens the same catalog from
+`gesso-vite-plugin/catalog`, which imports nothing from Vite:
+[on the desktop](/structure/agents-and-mcp#the-project-s-components-on-the-desktop).
 
 ## Options
 

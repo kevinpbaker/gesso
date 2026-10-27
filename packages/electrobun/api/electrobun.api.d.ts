@@ -46,6 +46,9 @@ interface DesktopAgentOptions extends Omit<McpHandlerOptions, 'allowedOrigins'> 
   confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
   serve?: DesktopServe;
   screen?: AgentSurfaceLike;
+  catalog?: AgentSurfaceLike & {
+    readonly instructions?: string;
+  };
 }
 interface DesktopAgent {
   readonly url: string;
