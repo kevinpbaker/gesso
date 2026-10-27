@@ -528,7 +528,11 @@ export class UiHostFrameClock implements UiFrameClock {
         .slice(1)
         .map((value, index) => value - times[index]!)
         .sort((a, b) => a - b);
-      if (this.givenUp === null || this.display === null || gaps[Math.floor(gaps.length / 2)]! / this.display.interval > 1 + OFF_BEAT) {
+      if (
+        this.givenUp === null ||
+        this.display === null ||
+        gaps[Math.floor(gaps.length / 2)]! / this.display.interval > 1 + OFF_BEAT
+      ) {
         return;
       }
       this.local = this.givenUp;

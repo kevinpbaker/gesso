@@ -275,7 +275,10 @@ describe('GessoRuntime cursor', () => {
     let clock!: UiManualFrameClock;
     // An editor's shape: a text area that asks for the I-beam, scrolling far more than it shows.
     const runtime = new GessoRuntime({
-      root: Box({ width: 200, height: 200, cursor: 'text' }, ScrollView({ width: 200, height: 200 }, Column({ height: 4000 }))),
+      root: Box(
+        { width: 200, height: 200, cursor: 'text' },
+        ScrollView({ width: 200, height: 200 }, Column({ height: 4000 }))
+      ),
       canvas: mockCanvas(800, 600),
       width: 800,
       height: 600,
