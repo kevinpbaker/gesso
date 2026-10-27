@@ -573,6 +573,10 @@ function following<T>(
   return { value: merge(field(node$, of), changed), next: value => changed.next(value) };
 }
 
+/**
+ * A screen described as plain data, drawn with the library's controls,
+ * for code that cannot run in the render worker.
+ */
 export function PlainView(inputs: Inputs<PlainViewProps>, ctx: ComponentContext): UiChild {
   const limits = inputs.limits?.value ?? {};
   const checked = (raw: unknown) => {

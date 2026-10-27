@@ -145,6 +145,7 @@ export interface BadgeProps extends ControlLayoutProps {
   live?: boolean;
 }
 
+/** A badge: a count or a short status marker attached to something else. */
 export function Badge(inputs: Inputs<BadgeProps>, _ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
   const count = input(inputs.count, undefined);

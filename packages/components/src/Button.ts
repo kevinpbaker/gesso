@@ -109,6 +109,7 @@ export interface ButtonProps extends ControlLayoutProps {
   children?: UiChild;
 }
 
+/** A button, themed. */
 export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
   const description = input(inputs.description, '');

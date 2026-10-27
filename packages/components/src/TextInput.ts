@@ -85,6 +85,7 @@ export function TextInput(inputs: Inputs<TextInputProps>, ctx: ComponentContext)
 
 export type TextAreaProps = Omit<TextInputProps, 'multiline' | 'secret'>;
 
+/** A text field several lines tall: `TextInput` with `multiline` always on, and never `secret`. */
 export function TextArea(inputs: Inputs<TextAreaProps>, ctx: ComponentContext): UiChild {
   return textField(inputs as Inputs<TextInputProps>, ctx, true);
 }

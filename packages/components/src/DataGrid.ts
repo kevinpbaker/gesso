@@ -293,6 +293,7 @@ const RESIZE_STEP = 10;
 /** The grip at a header's end edge, wide enough to find with a mouse. */
 const EDGE_GRIP = 6;
 
+/** An editable grid of any size, windowed on both axes. */
 export function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'Grid');
   const readOnly = input(inputs.readOnly, false);

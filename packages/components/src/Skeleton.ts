@@ -119,6 +119,8 @@ export interface SkeletonProps extends ControlLayoutProps {
 }
 
 /**
+ * A grey stand-in with the same box as the content it is waiting for.
+ *
  * Announcing, and why it is a prop rather than a fact.
  *
  * A `status` is a live region: an assistive technology reads it when it

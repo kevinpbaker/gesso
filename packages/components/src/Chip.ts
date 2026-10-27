@@ -119,6 +119,7 @@ export interface ChipProps extends ControlLayoutProps {
   onPress?: (selected: boolean) => void;
 }
 
+/** A chip: a pill that is on or off. */
 export function Chip(inputs: Inputs<ChipProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
   const description = input(inputs.description, '');
