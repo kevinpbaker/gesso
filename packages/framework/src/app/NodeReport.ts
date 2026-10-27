@@ -1,3 +1,5 @@
+import type { UiSourceLocation } from 'gesso-core';
+
 /**
  * What a node is, as plain data (the inspector).
  *
@@ -48,6 +50,13 @@ export interface UiNodeReport {
   readonly semantics?: UiSemanticsReport;
   /** `formatExplanation` of the node's layout, which is L8's answer. */
   readonly explanation: string;
+  /**
+   * Where the element was written, when it was compiled for
+   * development. The one part of the report that is a handle after
+   * all: it names a line an editor can open, and an owner's `usedAt`
+   * names the line that used the component around it.
+   */
+  readonly source?: UiSourceLocation;
 }
 
 /** A node under the inspected one at the pointer. */
@@ -64,6 +73,8 @@ export interface UiOwnerReport {
   /** The `@Define` tag, else the class or function name. */
   readonly name: string;
   readonly anchorId: string;
+  /** Where the component was used, when compiled for development. */
+  readonly usedAt?: UiSourceLocation;
 }
 
 /** As much of a node as a one-line path needs. */
@@ -275,10 +286,24 @@ export function printPropValue(value: unknown): string {
 }
 
 /** The report as text, for a console or a test failure. */
+/** `file:line:column`, the form editors and terminals turn into a link. */
+export function formatSourceLocation(source: UiSourceLocation): string {
+  return `${source.fileName}:${source.lineNumber}:${source.columnNumber}`;
+}
+
 export function formatNodeReport(report: UiNodeReport): string {
   const lines: string[] = [`${report.type} '${report.id}'`];
+  if (report.source !== undefined) {
+    lines.push(`written at ${formatSourceLocation(report.source)}`);
+  }
   if (report.owners.length > 0) {
-    lines.push(`rendered by ${report.owners.map(owner => owner.name).join(' inside ')}`);
+    lines.push(
+      `rendered by ${report.owners
+        .map(owner =>
+          owner.usedAt === undefined ? owner.name : `${owner.name} (used at ${formatSourceLocation(owner.usedAt)})`
+        )
+        .join(' inside ')}`
+    );
   }
   if (report.modifiers.length > 0) {
     lines.push(`modifiers: ${report.modifiers.join(', ')}`);

@@ -27,6 +27,21 @@ import { input } from '../Input';
 import { ServiceRegistry } from '../service/ServiceRegistry';
 import { Fragment } from './jsx-runtime';
 
+/**
+ * The element without the location `jsxDEV` adds, which a factory call
+ * has no way to be given. These specs compile for development, so every
+ * tag carries one; `source.spec.tsx` is where it is asserted.
+ */
+function withoutSources(element: UiElement): UiElement {
+  const { source: _source, ...rest } = element;
+  return {
+    ...rest,
+    children: rest.children.map(child =>
+      typeof child === 'object' && child !== null && 'type' in child ? withoutSources(child as UiElement) : child
+    )
+  };
+}
+
 @Define('greeting')
 class Greeting extends Component {
   @Input() name = input('World');
@@ -91,7 +106,7 @@ describe('jsx runtime', () => {
       props: { width: 10, height: 10, backgroundColor: '#fff' },
       children: []
     });
-    expect(viaJsx).toEqual(viaFactory);
+    expect(withoutSources(viaJsx as UiElement)).toEqual(viaFactory);
   });
 
   it('makes a <paint> the way the Paint factory does, children stacked over the picture', () => {
@@ -111,7 +126,7 @@ describe('jsx runtime', () => {
       { width: 120, height: 32, paint: painter, clipPath: 'M0 0 H120 V32 H0 Z' },
       Text({ text: '72%' })
     );
-    expect(viaJsx).toEqual(viaFactory);
+    expect(withoutSources(viaJsx as UiElement)).toEqual(viaFactory);
     expect((viaJsx as UiElement).type).toBe(UiNodeType.Paint);
     expect((<paint path={{ d: 'M0 0 L1 1', fill: 'primary' }} />).props.path).toEqual({
       d: 'M0 0 L1 1',

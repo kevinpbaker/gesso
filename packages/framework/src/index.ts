@@ -78,6 +78,7 @@ export {
   formatAge,
   formatNodePath,
   formatNodeReport,
+  formatSourceLocation,
   formatStream,
   printPropValue,
   type BoundStream,

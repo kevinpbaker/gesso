@@ -4,6 +4,23 @@ import { UiNodeType } from '../graph/UiNodeType';
 import type { UiProps } from './UiProps';
 
 /**
+ * Where an element was written: the location the JSX compiler passes
+ * `jsxDEV` in development.
+ *
+ * Kept so a tool can go from a node on screen back to the line that
+ * made it, which a canvas otherwise cannot do: there is no DOM for a
+ * browser's own inspector to point at. A production build compiles to
+ * `jsx`, which is given none, so it costs nothing there.
+ */
+export interface UiSourceLocation {
+  readonly fileName: string;
+  /** One-based, as the compiler gives it. */
+  readonly lineNumber: number;
+  /** One-based, as the compiler gives it. */
+  readonly columnNumber: number;
+}
+
+/**
  * Opaque marker for component definitions.
  *
  * The runtime does not know how to mount components; it only
@@ -18,6 +35,8 @@ export interface ComponentLikeElement {
   readonly component: Function;
   readonly props: Record<string, unknown>;
   readonly key?: string | number;
+  /** Where the component was used, in development; see `UiSourceLocation`. */
+  readonly source?: UiSourceLocation;
 }
 
 /**
@@ -54,6 +73,9 @@ export interface UiElement {
    * definitions.
    */
   readonly children: readonly UiChild[];
+
+  /** Where the element was written, in development; see `UiSourceLocation`. */
+  readonly source?: UiSourceLocation;
 }
 
 /**

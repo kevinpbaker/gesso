@@ -15,6 +15,7 @@ import {
   type UiChild,
   type UiElement,
   type UiProps,
+  type UiSourceLocation,
   Box,
   Button,
   Column,
@@ -25,7 +26,8 @@ import {
   ScrollView,
   Stack,
   Text,
-  UiNodeType
+  UiNodeType,
+  isObservable
 } from 'gesso-core';
 import type { Component } from '../Component';
 import type { InputCell } from '../Input';
@@ -227,11 +229,26 @@ function componentName(type: JSX.ElementType): string {
 export const jsxs = jsx;
 
 /**
- * Development-mode entry (`jsxDEV`), used by Vite in dev. The extra
- * arguments describe the source location and are not needed.
+ * Development-mode entry (`jsxDEV`), used by Vite in dev. The compiler
+ * passes where the tag was written, and the element keeps it, so the
+ * inspector and an editor can go from a node on screen back to its
+ * line; see `UiSourceLocation`. The last argument, `this` at the call
+ * site, is not needed.
  */
-export function jsxDEV(type: JSX.ElementType, props: JsxProps | null, key?: string | number): JSX.Element {
-  return jsx(type, props, key);
+export function jsxDEV(
+  type: JSX.ElementType,
+  props: JsxProps | null,
+  key?: string | number,
+  _isStaticChildren?: boolean,
+  source?: UiSourceLocation
+): JSX.Element {
+  const element = jsx(type, props, key);
+  // `<Each>` and `<Show>` give back the observable their parent binds,
+  // which is not an element and has nowhere to keep a location.
+  if (source === undefined || isObservable(element)) {
+    return element;
+  }
+  return { ...element, source };
 }
 
 /**

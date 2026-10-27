@@ -976,18 +976,25 @@ declare class UiInputDispatcher {
 }
 type UiPropValue = unknown | Observable<unknown>;
 type UiProps = Record<string, UiPropValue>;
+interface UiSourceLocation {
+  readonly fileName: string;
+  readonly lineNumber: number;
+  readonly columnNumber: number;
+}
 interface ComponentLikeElement {
   readonly kind: 'component';
   readonly tag: string;
   readonly component: Function;
   readonly props: Record<string, unknown>;
   readonly key?: string | number;
+  readonly source?: UiSourceLocation;
 }
 type UiChild = UiElement | ComponentLikeElement | Observable<UiChild | readonly UiChild[]>;
 interface UiElement {
   readonly type: UiNodeType;
   readonly props: UiProps;
   readonly children: readonly UiChild[];
+  readonly source?: UiSourceLocation;
 }
 declare function isComponentLikeElement(value: unknown): value is ComponentLikeElement;
 declare function isObservable$1(value: unknown): value is Observable<unknown>;
@@ -2188,6 +2195,7 @@ declare class UiGraphBuilder {
   private reconcileTransitions;
   private warnMissingAnimations;
   modifiersFor(node: UiNode): UiModifierSet | undefined;
+  sourceOf(node: UiNode): UiSourceLocation | undefined;
   private assertKnownProp;
   private assertValidValue;
   private reconcileEventProp;
@@ -3080,11 +3088,13 @@ declare class UiPointerController {
     readonly y: number;
   } | null;
   private lastPosition;
+  private hoverOnScrollbar;
   private downPath;
   get hoveredNode(): UiNode | null;
   get pressedNode(): UiNode | null;
   private captured;
   get draggingScrollbarOf(): UiNode | null;
+  get overScrollbar(): boolean;
   pointerDown(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent;
   pointerMove(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;
   pointerUp(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;
@@ -3495,8 +3505,12 @@ declare class UiHostFrameClock implements UiFrameClock {
   private readonly timeOrigin;
   private readonly localIntervals;
   private lastLocalTime;
+  private lastLocalCost;
   private display;
   private locked;
+  private givenUp;
+  private lastRetry;
+  private retrying;
   private readonly refreshes;
   private refreshesSinceFrame;
   private lastLocked;
@@ -3511,6 +3525,7 @@ declare class UiHostFrameClock implements UiFrameClock {
   get isDisplayLocked(): boolean;
   private recordLocal;
   private compareLocal;
+  private retryLocal;
   private toLocal;
   private beat;
   private refineInterval;
@@ -4477,6 +4492,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private paintEditable;
   private renderScrolledThroughLayer;
   private paintLayer;
+  private walkLayer;
   private applyTransform;
   private intersectsCull;
   private paintScrollbars;
@@ -6220,6 +6236,7 @@ export {
   UiShortcutBinding,
   UiShortcutRegistry,
   UiShortcutStep,
+  UiSourceLocation,
   UiSpacing,
   UiSpannedText,
   UiSpring,
@@ -7145,6 +7162,7 @@ import {
   UiShortcutBinding,
   UiShortcutRegistry,
   UiShortcutStep,
+  UiSourceLocation,
   UiSpacing,
   UiSpannedText,
   UiSpring,
@@ -7965,6 +7983,7 @@ export {
   type UiShortcut,
   type UiShortcutBinding,
   type UiShortcutStep,
+  type UiSourceLocation,
   type UiSpringOptions,
   type UiTextInput,
   type UiTextInputState,
