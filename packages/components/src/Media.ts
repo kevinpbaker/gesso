@@ -658,6 +658,8 @@ const SPINNER_STEP_MS = 110;
 const SPINNER_BLADES = 8;
 
 /**
+ * A turning wheel: work is happening, and how much is not known.
+ *
  * The library's first animation, now driven by F4's `ticks` phase.
  *
  * Eight blades of fixed, decreasing opacity sit in a container, and

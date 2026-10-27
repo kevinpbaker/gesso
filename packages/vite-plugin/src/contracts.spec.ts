@@ -2,7 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import * as ts from 'typescript/unstable/sync';
 
-import { ContractReader, declaresChannel, describeCalls, describedModule, type ContractReading } from './contracts.ts';
+import {
+  ContractReader,
+  declaresChannel,
+  describeCalls,
+  describedModule,
+  type ComponentReading,
+  type ContractReading
+} from './contracts.ts';
 
 /**
  * The real checker against a project held in memory: a directory that
@@ -12,6 +19,7 @@ import { ContractReader, declaresChannel, describeCalls, describedModule, type C
  * the disk.
  */
 const framework = new URL('../../framework/src/index.ts', import.meta.url).pathname;
+const core = new URL('../../core/src/index.ts', import.meta.url).pathname;
 const dir = new URL('./__contracts__', import.meta.url).pathname;
 const files = new Map<string, string>();
 
@@ -102,9 +110,90 @@ export const Counter = channel<CounterView, CounterCommands>('counter', { count:
 export const Plumbing = channel<{ memory: number }, { poke(): void }>('plumbing', { memory: 0 });
 `;
 
+const CONTROLS = `
+import type { ComponentContext, Inputs } from 'gesso-framework';
+import type { UiChild } from 'gesso-core';
+
+export type Tone = 'neutral' | 'accent' | 'danger';
+
+/** A length: points, or a share of the parent. */
+export type Length = number | { readonly percent: number };
+
+export interface LayoutProps {
+  /** How wide. */
+  width?: Length;
+  height?: Length;
+}
+
+export interface PillProps extends LayoutProps {
+  /** The word on it. */
+  label: string;
+  /**
+   * Which ground it is painted on.
+   * @default 'neutral'
+   */
+  tone?: Tone;
+  /** @default 99 */
+  max?: number;
+  note?: string | null;
+  onPress?: (count: number) => void;
+  children?: UiChild;
+  when?: Date;
+}
+
+/**
+ * A pill: a word on a ground.
+ *
+ * The long note about pills.
+ * @example <Pill label="Live" tone="accent" />
+ */
+export function Pill(inputs: Inputs<PillProps>, _ctx: ComponentContext): UiChild {
+  return inputs.children.value!;
+}
+
+/** What a ticker shows. */
+export interface TickerProps {
+  readonly symbol: string;
+}
+
+/** @deprecated Use Pill. */
+export function Ticker(inputs: Inputs<TickerProps>): UiChild {
+  return inputs as unknown as UiChild;
+}
+
+export function formatCount(count: number): string {
+  return String(count);
+}
+
+export const NOT_A_COMPONENT = 3;
+`;
+
+const COUNTER_VIEW = `
+import { Component, input } from 'gesso-framework';
+import type { UiChild } from 'gesso-core';
+
+/** A count, with a label. */
+export class CounterView extends Component {
+  /** What it counts. */
+  label = input('Count');
+  step = input<number | undefined>(undefined);
+  helper = 3;
+  override render(): UiChild {
+    return this as unknown as UiChild;
+  }
+}
+`;
+
+const LIBRARY = `
+export { Pill, Ticker } from './controls';
+export { CounterView } from './counterView';
+export type { Tone } from './controls';
+`;
+
 let reader: ContractReader;
 let catalog: ContractReading;
 let legacy: ContractReading;
+let library: ComponentReading;
 
 beforeAll(() => {
   files.set(
@@ -117,7 +206,7 @@ beforeAll(() => {
         moduleResolution: 'bundler',
         noEmit: true,
         skipLibCheck: true,
-        paths: { 'gesso-framework': [framework] }
+        paths: { 'gesso-framework': [framework], 'gesso-core': [core] }
       },
       include: ['*.ts']
     })
@@ -125,9 +214,13 @@ beforeAll(() => {
   files.set(`${dir}/catalog.ts`, CATALOG);
   files.set(`${dir}/rows.ts`, ROWS);
   files.set(`${dir}/counter.ts`, LEGACY);
+  files.set(`${dir}/controls.ts`, CONTROLS);
+  files.set(`${dir}/counterView.ts`, COUNTER_VIEW);
+  files.set(`${dir}/library.ts`, LIBRARY);
   reader = new ContractReader(ts, dir, memory);
   catalog = reader.read(`${dir}/catalog.ts`);
   legacy = reader.read(`${dir}/counter.ts`);
+  library = reader.readComponents(`${dir}/library.ts`);
 });
 
 afterAll(() => {
@@ -270,6 +363,86 @@ describe('a contract, read by the checker', () => {
     reader.invalidate(file);
     const view = reader.read(file).channels.get('Counter')!.view as { properties: Record<string, unknown> };
     expect(Object.keys(view.properties)).toEqual(['count', 'dark', 'label', 'layout']);
+  });
+});
+
+describe('components, read by the checker', () => {
+  type Inputs = {
+    properties: Record<string, Record<string, unknown>>;
+    required?: string[];
+    $defs?: Record<string, unknown>;
+  };
+  const inputsOf = (name: string) => library.components.get(name)!.inputs as Inputs;
+
+  it('finds the components a library re-exports, and nothing else it exports', () => {
+    expect([...library.components.keys()]).toEqual(['Pill', 'Ticker', 'CounterView']);
+    expect(library.warnings).toEqual([]);
+  });
+
+  it('says what a component is for, from its JSDoc, with its examples', () => {
+    const pill = library.components.get('Pill')!;
+    expect(pill.summary).toBe('A pill: a word on a ground.');
+    expect(pill.description).toContain('The long note about pills.');
+    expect(pill.examples).toEqual(['<Pill label="Live" tone="accent" />']);
+  });
+
+  it("falls back to the props type's JSDoc, and says when a component is deprecated", () => {
+    const ticker = library.components.get('Ticker')!;
+    expect(ticker.summary).toBe('What a ticker shows.');
+    expect(ticker.deprecated).toBe('Use Pill.');
+  });
+
+  it('describes each input with its type as TypeScript writes it, its JSDoc and its default', () => {
+    const inputs = inputsOf('Pill');
+    expect(inputs.required).toEqual(['label']);
+    expect(inputs.properties.label).toEqual({
+      type: 'string',
+      'x-gesso-type': 'string',
+      description: 'The word on it.'
+    });
+    expect(inputs.properties.tone).toEqual({
+      enum: ['accent', 'danger', 'neutral'],
+      'x-gesso-type': 'Tone',
+      description: 'Which ground it is painted on.',
+      default: 'neutral'
+    });
+    expect(inputs.properties.max).toEqual({ type: 'number', 'x-gesso-type': 'number', default: 99 });
+    expect(inputs.properties.note).toEqual({
+      anyOf: [{ type: 'string' }, { type: 'null' }],
+      'x-gesso-type': 'string | null'
+    });
+  });
+
+  it('names callbacks, children and what only code can make, rather than rejecting them', () => {
+    const { properties } = inputsOf('Pill');
+    expect(properties.onPress).toEqual({ 'x-gesso-callback': true, 'x-gesso-type': '(count: number) => void' });
+    expect(properties.children).toEqual({ 'x-gesso-child': true, 'x-gesso-type': 'UiChild' });
+    expect(properties.when).toEqual({ 'x-gesso-type': 'Date' });
+  });
+
+  it('describes a shared type once, and says which props type an inherited input came from', () => {
+    const inputs = inputsOf('Pill');
+    expect(inputs.properties.width).toEqual({
+      $ref: '#/$defs/Length',
+      'x-gesso-type': 'Length',
+      description: 'How wide.',
+      'x-gesso-from': 'LayoutProps'
+    });
+    expect(inputs.properties.height!.$ref).toBe('#/$defs/Length');
+    expect(Object.keys(inputs.$defs!)).toEqual(['Length']);
+  });
+
+  it("reads a class component's input cells as its inputs, all of them optional", () => {
+    const counter = library.components.get('CounterView')!;
+    const inputs = counter.inputs as Inputs;
+    expect(counter.summary).toBe('A count, with a label.');
+    expect(Object.keys(inputs.properties)).toEqual(['label', 'step']);
+    expect(inputs.properties.label).toEqual({
+      type: 'string',
+      'x-gesso-type': 'string',
+      description: 'What it counts.'
+    });
+    expect(inputs.required).toBeUndefined();
   });
 });
 

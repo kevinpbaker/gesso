@@ -201,6 +201,7 @@ export interface AlertProps extends ControlLayoutProps {
   children?: UiChild;
 }
 
+/** An alert: a banner that stays where it was put. */
 export function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChild {
   const title = input(inputs.title, '');
   const message = input(inputs.message, '');

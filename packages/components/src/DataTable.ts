@@ -116,6 +116,7 @@ export interface DataTableProps<T> extends ControlLayoutProps {
   label?: string;
 }
 
+/** A table of any length whose rows share their columns with the header. */
 export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'Table');
   const rowHeight = input(inputs.rowHeight, 28);

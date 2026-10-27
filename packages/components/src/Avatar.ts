@@ -186,6 +186,7 @@ const MAX_INITIALS = 2;
 const PERSON =
   'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z';
 
+/** A person or an entity, as a picture. */
 export function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiChild {
   const source = input(inputs.src, '' as string | readonly string[]).pipe(map(candidatesOf));
   // Which sources failed, as one key, so that a `src` which changes is

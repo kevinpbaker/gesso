@@ -316,6 +316,7 @@ export interface AccordionProps extends ControlLayoutProps {
   exclusive?: boolean;
 }
 
+/** Sections under headers, each opened and closed by its header; `exclusive` keeps one open at a time. */
 export function Accordion(inputs: Inputs<AccordionProps>, _ctx: ComponentContext): UiChild {
   const exclusive = input(inputs.exclusive, false);
   const open = controlled<readonly string[]>({

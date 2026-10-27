@@ -147,6 +147,7 @@ interface TreeRow {
   readonly parent: string | null;
 }
 
+/** A tree, rendered as the flat list it has to be to be virtualized. */
 export function Tree(inputs: Inputs<TreeProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'Tree');
   const flush = inputs.flush.value === true;

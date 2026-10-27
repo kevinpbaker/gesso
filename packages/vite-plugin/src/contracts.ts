@@ -64,6 +64,37 @@ interface CommandSchemaOut {
 
 type JsonSchema = Record<string, unknown>;
 
+/**
+ * A component's description: what it is for, and what each of its
+ * inputs takes. The catalog an agent designing with the library reads,
+ * so that it uses `Badge` rather than drawing one from boxes.
+ */
+export interface ComponentSchemaOut {
+  /** The first paragraph of its JSDoc: what it is, for a list of many. */
+  summary?: string;
+  /** The whole JSDoc, for the one component being used. */
+  description?: string;
+  /**
+   * Its inputs, as an object schema. Each input says its TypeScript
+   * type as `x-gesso-type`, which an agent writing TSX reads more
+   * readily than the schema; an input declared on a shared props type
+   * (`ControlLayoutProps`) says which as `x-gesso-from`; a callback is
+   * `x-gesso-callback` and a child `x-gesso-child`.
+   */
+  inputs: JsonSchema;
+  /** The `@example` blocks, as written. */
+  examples?: string[];
+  /** The `@deprecated` text, or true when it gives none. */
+  deprecated?: string | true;
+}
+
+/** Every component a module exports, and what could not be described. */
+export interface ComponentReading {
+  /** Export name to schema, in declaration order. */
+  readonly components: ReadonlyMap<string, ComponentSchemaOut>;
+  readonly warnings: readonly string[];
+}
+
 /** Every channel a module exports, and what could not be described. */
 export interface ContractReading {
   /** Export name to schema, in declaration order. */
@@ -208,6 +239,94 @@ export class ContractReader {
 
   /** Every channel `file` exports, described. */
   read(file: string): ContractReading {
+    const opened = this.open(file);
+    if (typeof opened === 'string') {
+      return { channels: new Map(), warnings: [opened] };
+    }
+    const { checker, exports } = opened;
+    const describer = new Describer(this.ts, checker);
+    const channels = new Map<string, ChannelSchemaOut>();
+    for (const exported of exports) {
+      const type = checker.getTypeOfSymbol(exported);
+      if (type === undefined || type.getSymbol()?.name !== 'ChannelToken') {
+        continue;
+      }
+      const [view, commands] = checker.getTypeArguments(type as TsApi.TypeReference);
+      channels.set(exported.name, describer.channel(exported, view, commands));
+    }
+    return { channels, warnings: describer.warnings };
+  }
+
+  /**
+   * Every component `file` exports, described: a function whose first
+   * parameter is `Inputs<P>`, or a class extending `Component`, whose
+   * inputs are its `InputCell` fields. A library's index re-exports its
+   * components, and reading it reads all of them.
+   */
+  readComponents(file: string): ComponentReading {
+    const opened = this.open(file);
+    if (typeof opened === 'string') {
+      return { components: new Map(), warnings: [opened] };
+    }
+    const { checker, exports } = opened;
+    const describer = new Describer(this.ts, checker, 'component');
+    const components = new Map<string, ComponentSchemaOut>();
+    for (const exported of exports) {
+      const symbol = exported.flags & this.ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported;
+      const type = checker.getTypeOfSymbol(symbol);
+      const inputs = type === undefined ? undefined : this.inputsOf(checker, type);
+      if (inputs !== undefined) {
+        components.set(exported.name, describer.component(symbol, inputs));
+      }
+    }
+    return { components, warnings: describer.warnings };
+  }
+
+  /** The inputs a component's type declares, or undefined when it is not a component. */
+  private inputsOf(checker: TsApi.Checker, type: TsApi.Type): ComponentInputs | undefined {
+    const { Call, Construct } = this.ts.SignatureKind;
+    const [call] = checker.getSignaturesOfType(type, Call);
+    const first = call?.getParameters()[0];
+    if (first !== undefined) {
+      const parameter = checker.getTypeOfSymbol(first);
+      if (parameter?.getAliasSymbol()?.name === 'Inputs') {
+        const [props] = parameter.getAliasTypeArguments();
+        return props === undefined ? undefined : { kind: 'props', type: props };
+      }
+      return undefined;
+    }
+    const [construct] = checker.getSignaturesOfType(type, Construct);
+    const instance = construct === undefined ? undefined : checker.getReturnTypeOfSignature(construct);
+    if (instance === undefined || !this.extendsComponent(instance)) {
+      return undefined;
+    }
+    const cells: { symbol: TsApi.Symbol; type: TsApi.Type }[] = [];
+    for (const property of checker.getPropertiesOfType(instance)) {
+      const propertyType = checker.getTypeOfSymbol(property);
+      if (propertyType?.getSymbol()?.name === 'InputCell') {
+        const [value] = checker.getTypeArguments(propertyType as TsApi.TypeReference);
+        if (value !== undefined) {
+          cells.push({ symbol: property, type: value });
+        }
+      }
+    }
+    return { kind: 'cells', cells };
+  }
+
+  private extendsComponent(type: TsApi.Type): boolean {
+    for (let depth = 0, current: TsApi.Type | undefined = type; current !== undefined && depth < 16; depth++) {
+      if (current.getSymbol()?.name === 'Component') {
+        return true;
+      }
+      current = current.isClassOrInterface() ? current.getBaseTypes()?.[0] : undefined;
+    }
+    return false;
+  }
+
+  /**
+   * The checker and the module's exports, or why there are none.
+   */
+  private open(file: string): { checker: TsApi.Checker; exports: readonly TsApi.Symbol[] } | string {
     const api = (this.api ??= new this.ts.API({ cwd: this.cwd, ...(this.fs === undefined ? {} : { fs: this.fs }) }));
     this.changed.add(file);
     let snapshot = api.updateSnapshot({ fileChanges: { changed: [...this.changed] } });
@@ -230,21 +349,11 @@ export class ContractReader {
     const project = config === undefined ? undefined : snapshot.getProject(config);
     const source = project?.program.getSourceFile(file);
     if (project === undefined || source === undefined) {
-      return { channels: new Map(), warnings: [`TypeScript has no project that includes ${file}.`] };
+      return `TypeScript has no project that includes ${file}.`;
     }
     const checker = project.checker;
     const module = checker.getSymbolAtLocation(source);
-    const describer = new Describer(this.ts, checker);
-    const channels = new Map<string, ChannelSchemaOut>();
-    for (const exported of module === undefined ? [] : checker.getExportsOfModule(module)) {
-      const type = checker.getTypeOfSymbol(exported);
-      if (type === undefined || type.getSymbol()?.name !== 'ChannelToken') {
-        continue;
-      }
-      const [view, commands] = checker.getTypeArguments(type as TsApi.TypeReference);
-      channels.set(exported.name, describer.channel(exported, view, commands));
-    }
-    return { channels, warnings: describer.warnings };
+    return { checker, exports: module === undefined ? [] : checker.getExportsOfModule(module) };
   }
 
   close(): void {
@@ -316,7 +425,32 @@ export const BINARY = new Set([
   'BigUint64Array'
 ]);
 
-/** Turns checker types into JSON Schema for one module's channels. */
+/**
+ * What a component takes: a function's `P` in `Inputs<P>`, or a class's
+ * `InputCell` fields with the type each holds.
+ */
+type ComponentInputs =
+  | { readonly kind: 'props'; readonly type: TsApi.Type }
+  | { readonly kind: 'cells'; readonly cells: readonly { symbol: TsApi.Symbol; type: TsApi.Type }[] };
+
+/**
+ * The types a component takes as a child. `UiChild` is a union of
+ * these and an Observable of them, and describing its members would
+ * describe the element records a tag compiles to, which nobody writes.
+ */
+const CHILD = new Set(['UiElement', 'ComponentLikeElement', 'ComponentElement']);
+
+/**
+ * Turns checker types into JSON Schema for one module's channels or
+ * components.
+ *
+ * The two differ in what is allowed. A channel's values cross a thread
+ * as plain data, so a function or a class instance in one is a mistake,
+ * and is reported. A component's inputs stay on the render thread, where
+ * a callback is how a component talks back and a child is how it is
+ * composed, so there they are described for what they are and nothing
+ * is reported.
+ */
 class Describer {
   readonly warnings: string[] = [];
   private readonly flags: TypeScriptApi['TypeFlags'];
@@ -329,14 +463,126 @@ class Describer {
   /** `$defs` for the schema being built. Reset per root, so each schema stands alone. */
   private defs = new Map<string, JsonSchema>();
   private readonly defNames = new Map<number, string>();
+  /** In a component, each named type's `$defs` entry, or null when it is small enough to repeat. */
+  private shared = new Map<number, string | null>();
 
   private readonly ts: TypeScriptApi;
   private readonly checker: TsApi.Checker;
 
-  constructor(ts: TypeScriptApi, checker: TsApi.Checker) {
+  private readonly mode: 'channel' | 'component';
+
+  constructor(ts: TypeScriptApi, checker: TsApi.Checker, mode: 'channel' | 'component' = 'channel') {
     this.ts = ts;
     this.checker = checker;
     this.flags = ts.TypeFlags;
+    this.mode = mode;
+  }
+
+  component(symbol: TsApi.Symbol, inputs: ComponentInputs): ComponentSchemaOut {
+    this.defs = new Map();
+    this.shared = new Map();
+    const checker = this.checker;
+    const properties: Record<string, JsonSchema> = {};
+    const required: string[] = [];
+    const entries =
+      inputs.kind === 'cells'
+        ? inputs.cells
+        : checker.getPropertiesOfType(inputs.type).map(property => ({
+            symbol: property,
+            type: checker.getTypeOfSymbol(property)
+          }));
+    const own = inputs.kind === 'props' ? (inputs.type.getAliasSymbol() ?? inputs.type.getSymbol())?.name : undefined;
+    for (const { symbol: property, type: given } of entries) {
+      const path = `${symbol.name}.${property.name}`;
+      // `width?: UiLength` reads as `UiLength | undefined`, a union with
+      // no name, and the name is what lets `UiLength` be described once.
+      // Optionality is said by `required`, so the `undefined` can go.
+      const type =
+        given !== undefined && this.includesUndefined(given) && !this.includesNull(given)
+          ? (checker.getNonNullableType(given) ?? given)
+          : given;
+      let schema: JsonSchema = type === undefined ? {} : this.describe(type, path);
+      if (type !== undefined) {
+        schema = { ...schema, 'x-gesso-type': this.typeText(type) };
+      }
+      const description = checker.getDocumentationCommentOfSymbol(property);
+      if (description !== '') {
+        schema.description = description;
+      }
+      const fallback = checker.getJsDocTagsOfSymbol(property).find(tag => tag.name === 'default');
+      if (fallback?.text !== undefined) {
+        schema.default = parseDefault(fallback.text);
+      }
+      const from = property.getParent()?.name;
+      if (own !== undefined && from !== undefined && from !== own && !from.startsWith('__')) {
+        schema['x-gesso-from'] = from;
+      }
+      properties[property.name] = schema;
+      // A class's cells are all optional to the parent, as
+      // `ComponentProps` makes them.
+      const optional =
+        inputs.kind === 'cells' ||
+        (property.flags & this.ts.SymbolFlags.Optional) !== 0 ||
+        (given !== undefined && this.includesUndefined(given));
+      if (!optional) {
+        required.push(property.name);
+      }
+    }
+    const schema: JsonSchema = { type: 'object', properties, additionalProperties: false };
+    if (required.length > 0) {
+      schema.required = required;
+    }
+    if (this.defs.size > 0) {
+      schema.$defs = Object.fromEntries(this.defs);
+    }
+
+    const out: ComponentSchemaOut = { inputs: schema };
+    const description = this.componentDocumentation(symbol, inputs);
+    if (description !== '') {
+      out.summary = description
+        .split(/\n\s*\n/)[0]!
+        .replace(/\s+/g, ' ')
+        .trim();
+      out.description = description;
+    }
+    const tags = checker.getJsDocTagsOfSymbol(symbol);
+    const examples = tags.filter(tag => tag.name === 'example' && tag.text !== undefined).map(tag => tag.text!);
+    if (examples.length > 0) {
+      out.examples = examples;
+    }
+    const deprecated = tags.find(tag => tag.name === 'deprecated');
+    if (deprecated !== undefined) {
+      out.deprecated = deprecated.text === undefined || deprecated.text.trim() === '' ? true : deprecated.text.trim();
+    }
+    return out;
+  }
+
+  /**
+   * What a component is for: its own JSDoc, else its props type's. A
+   * comment elsewhere in its file is not read: no rule about which one
+   * describes the component holds across files, and a summary that is
+   * sometimes about something else is worse to an agent than none.
+   */
+  private componentDocumentation(symbol: TsApi.Symbol, inputs: ComponentInputs): string {
+    const own = this.checker.getDocumentationCommentOfSymbol(symbol);
+    if (own !== '') {
+      return own;
+    }
+    const props = inputs.kind === 'props' ? (inputs.type.getAliasSymbol() ?? inputs.type.getSymbol()) : undefined;
+    return props === undefined ? '' : this.checker.getDocumentationCommentOfSymbol(props);
+  }
+
+  /** The type as TypeScript writes it, without the `undefined` an optional input carries. */
+  private typeText(type: TsApi.Type): string {
+    const defined = this.includesUndefined(type) ? this.checker.getNonNullableType(type) : type;
+    const text = this.checker.typeToString(defined ?? type);
+    // `getNonNullableType` takes `null` too, which an input may mean.
+    return this.includesNull(type) && !/\bnull\b/.test(text) ? `${text} | null` : text;
+  }
+
+  private includesNull(type: TsApi.Type): boolean {
+    const isNull = (member: TsApi.Type) => (member.flags & this.flags.Null) !== 0;
+    return type.isUnionType() ? (type.getTypes() ?? []).some(isNull) : isNull(type);
   }
 
   channel(token: TsApi.Symbol, view: TsApi.Type, commands: TsApi.Type | undefined): ChannelSchemaOut {
@@ -460,7 +706,37 @@ class Describer {
     return (type.flags & (Undefined | Void)) !== 0;
   }
 
+  /**
+   * In a component, a named type an input uses (`UiLength`, a props
+   * interface) is described once, in `$defs`, and referred to after.
+   * Every control takes the same layout inputs, and spelled out at each
+   * use they were most of each component's description: an agent reads
+   * these, and pays for every repetition.
+   */
   private describe(type: TsApi.Type, path: string): JsonSchema {
+    if (this.mode !== 'component') {
+      return this.describeType(type, path);
+    }
+    const known = this.shared.get(type.id);
+    if (known !== undefined) {
+      return known === null ? this.describeType(type, path) : { $ref: `#/$defs/${known}` };
+    }
+    const name = (type.getAliasSymbol() ?? type.getSymbol())?.name;
+    if (name === undefined || name.startsWith('__') || name === 'Array' || name === 'ReadonlyArray') {
+      return this.describeType(type, path);
+    }
+    const schema = this.describeType(type, path);
+    if (schema.$ref !== undefined || isSmall(schema)) {
+      this.shared.set(type.id, null);
+      return schema;
+    }
+    const defName = this.defName(type);
+    this.defs.set(defName, schema);
+    this.shared.set(type.id, defName);
+    return { $ref: `#/$defs/${defName}` };
+  }
+
+  private describeType(type: TsApi.Type, path: string): JsonSchema {
     const f = this.flags;
     const flags = type.flags;
 
@@ -529,6 +805,9 @@ class Describer {
   private union(type: TsApi.UnionType, path: string): JsonSchema {
     const f = this.flags;
     let members = (type.getTypes() ?? []).filter(member => (member.flags & (f.Undefined | f.Void)) === 0);
+    if (this.mode === 'component' && members.some(member => CHILD.has(member.getSymbol()?.name ?? ''))) {
+      return { 'x-gesso-child': true };
+    }
     const booleans = members.filter(member => member.flags & f.BooleanLiteral);
     const schemas: JsonSchema[] = [];
     if (booleans.length === 2) {
@@ -583,6 +862,25 @@ class Describer {
   private object(type: TsApi.Type, path: string): JsonSchema {
     const checker = this.checker;
     const symbolName = type.getSymbol()?.name;
+    if (this.mode === 'component') {
+      if (symbolName !== undefined && CHILD.has(symbolName)) {
+        return { 'x-gesso-child': true };
+      }
+      if (checker.getSignaturesOfType(type, this.ts.SignatureKind.Call).length > 0) {
+        return { 'x-gesso-callback': true };
+      }
+      // A generic class's instance, `Observable<string>`, is a reference
+      // to the class rather than the class, so it is the symbol that
+      // says what it is.
+      if (
+        (symbolName !== undefined && NOT_PLAIN.has(symbolName)) ||
+        ((type.getSymbol()?.flags ?? 0) & this.ts.SymbolFlags.Class) !== 0
+      ) {
+        // Something only code can make, such as a `UiColor`: an agent
+        // has the type's name to go on and nothing to fill in.
+        return { 'x-gesso-type': checker.typeToString(type) };
+      }
+    }
     if (symbolName !== undefined && this.inCommand && BINARY.has(symbolName)) {
       return { type: 'string', contentEncoding: 'base64', 'x-gesso-binary': symbolName };
     }
@@ -653,7 +951,37 @@ class Describer {
   }
 
   private unplain(path: string, what: string): JsonSchema {
+    if (this.mode === 'component') {
+      // Plain data is a channel's rule; see the class's comment.
+      return {};
+    }
     this.warnings.push(`${path} is ${what}, which is not plain data and cannot cross a channel.`);
     return {};
   }
+}
+
+/**
+ * A `@default` tag's value: JSON when it is JSON (`99`, `'neutral'`
+ * written with double quotes, `true`), a single-quoted string unquoted,
+ * and otherwise the text as written.
+ */
+function parseDefault(text: string): unknown {
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const quoted = /^'(.*)'$/.exec(trimmed) ?? /^`(.*)`$/.exec(trimmed);
+    return quoted === null ? trimmed : quoted[1];
+  }
+}
+
+/** Whether a schema is as short as a reference to it would be. */
+function isSmall(schema: JsonSchema): boolean {
+  if (schema.enum !== undefined || schema.const !== undefined) {
+    return true;
+  }
+  const keys = Object.keys(schema);
+  return (
+    keys.length === 0 || (keys.length === 1 && (typeof schema.type === 'string' || keys[0]!.startsWith('x-gesso-')))
+  );
 }

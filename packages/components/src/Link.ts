@@ -248,6 +248,7 @@ export interface LinkProps extends ControlLayoutProps {
   children?: UiChild;
 }
 
+/** A link: a control whose press takes you somewhere else. */
 export function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
   const disabled = input(inputs.disabled, false);
