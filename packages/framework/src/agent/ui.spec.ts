@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { Box, Button, Column, EditableText, Text, type UiTextChangeEvent } from 'gesso-core';
 import { mountRuntime } from '../app/RuntimeTestUtils';
+import { resultText } from './AgentSurface';
 import { uiSurface, type UiHost } from './ui';
 
 /**
@@ -48,7 +49,7 @@ function form() {
   const surface = uiSurface(() => host, { quietMs: 1, settleMs: 100 });
   const text = async (name: string, args: Record<string, unknown> = {}) => {
     const result = await surface.call(name, args);
-    return { error: result.isError, text: result.content[0].text };
+    return { error: result.isError, text: resultText(result) };
   };
   return { surface, text, presses, wrap, name };
 }

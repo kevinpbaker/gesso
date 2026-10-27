@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { describeChannel } from '../channel/ChannelSchema';
 import { defineChannel } from '../channel/ChannelToken';
 import { serve } from '../channel/serveChannels';
-import { agentSurface, type AgentConfirmation } from './AgentSurface';
+import { agentSurface, resultText, type AgentConfirmation } from './AgentSurface';
 import { combineSurfaces, remoteSurface, serveAgentPort } from './remote';
 
 const Counter = defineChannel('counter', { view: { count: 0 }, commands: {} as { add(by: number): void } });
@@ -86,7 +86,7 @@ describe('a command that needs a person, across a port', () => {
   it('takes no way to ask as a no', async () => {
     const app = lists();
     const result = await across([app.served]).call('lists_clear', {});
-    expect(result.content[0].text).toContain('The person declined');
+    expect(resultText(result)).toContain('The person declined');
     expect(app.size.value).toBe(3);
   });
 });
@@ -110,7 +110,7 @@ describe('combined surfaces', () => {
   it('keeps the first of two tools with one name, and names a tool that is nowhere', async () => {
     const combined = combineSurfaces([across([counter()]), across([counter()])]);
     expect((await combined.tools()).map(tool => tool.name)).toEqual(['counter_view', 'counter_add']);
-    expect((await combined.call('counter_fly', {})).content[0].text).toBe(
+    expect(resultText(await combined.call('counter_fly', {}))).toBe(
       'There is no tool called counter_fly. The tools are counter_view, counter_add.'
     );
   });

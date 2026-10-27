@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Button, Column, Text, type CanvasHost } from 'gesso-core';
 
 import { defineChannel } from '../channel/ChannelToken';
+import { resultText } from '../agent/AgentSurface';
 import { AGENT_PORT, remoteSurface } from '../agent/remote';
 import { createSyncApp } from './createSyncApp';
 import type { ModelContextLike } from '../agent/webmcp';
@@ -85,7 +86,8 @@ describe('a single-thread app, asked by an agent', () => {
       'ui_type',
       'ui_focus',
       'ui_key',
-      'tokens_view'
+      'tokens_view',
+      'render_frame'
     ]);
 
     expect((await agent.call('counter_add', { arguments: [2] })).structuredContent).toEqual({ count: 2 });
@@ -94,7 +96,7 @@ describe('a single-thread app, asked by an agent', () => {
     // because the tool ran the pending frame itself.
     const pressed = await agent.call('ui_press', { role: 'button', name: 'Add one' });
     expect(count.value).toBe(3);
-    expect(pressed.content[0].text).toContain('text "Count 3"');
+    expect(resultText(pressed)).toContain('text "Count 3"');
 
     unmount();
   });
@@ -118,7 +120,7 @@ describe('a single-thread app, asked by an agent', () => {
 
     const { builder } = counterApp();
     const unmount = builder.useWebMcp().mountSync(mockHost());
-    await vi.waitFor(() => expect(tools.size).toBe(8));
+    await vi.waitFor(() => expect(tools.size).toBe(9));
     unmount();
     expect(tools.size).toBe(0);
   });

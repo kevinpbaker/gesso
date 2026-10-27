@@ -40,6 +40,7 @@ import type { ServiceRegistry } from '../service/ServiceRegistry';
 import { RouterService, type RouterRoutes } from '../router/RouterService';
 import type { MediaOptions } from './MediaService';
 import type { FontFamilyDeclaration } from './FontService';
+import { renderModule } from '../agent/render';
 import type { UiHost } from '../agent/ui';
 import { watchPixelRatio } from './pixelRatio';
 
@@ -243,7 +244,14 @@ export class GessoApp {
           this.frameCallback(performance.now());
         }
       },
-      theme: at => runtime.themeAt(at)
+      theme: at => runtime.themeAt(at),
+      render: request =>
+        renderModule(request, {
+          load: path => import(/* @vite-ignore */ path),
+          appTheme: () => runtime.themeAt(),
+          channels: runtime.channels,
+          services: runtime.services
+        })
     };
   }
 

@@ -1,7 +1,9 @@
 export {
   agentSurface,
   resourceUri,
+  resultText,
   type AgentConfirmation,
+  type AgentContent,
   type AgentResource,
   type AgentSurface,
   type AgentSurfaceLike,
@@ -45,3 +47,5 @@ export {
 } from './webmcp';
 export { outline, resolveTarget, UiRefs, uiSurface, type UiHost, type UiSurfaceOptions } from './ui';
 export { serveApplicationAgent, type ApplicationAgentParts } from './app';
+export { renderModule, type RenderDependencies, type RenderRequest } from './render';
+export { formatThemeTokens, themeTokens, type TextStyleToken, type ThemeTokens } from './tokens';

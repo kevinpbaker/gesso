@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { describeChannel } from '../channel/ChannelSchema';
 import { defineChannel } from '../channel/ChannelToken';
 import { serve } from '../channel/serveChannels';
-import { agentSurface, resourceUri, type AgentConfirmation } from './AgentSurface';
+import { agentSurface, resourceUri, resultText, type AgentConfirmation } from './AgentSurface';
 
 interface Row {
   id: string;
@@ -156,7 +156,7 @@ describe('an agent surface', () => {
     expect(result.isError).toBe(false);
     expect(app.calls).toEqual([['create', 'Groceries', undefined]]);
     expect(result.structuredContent).toEqual({ rows: [{ id: '1', title: 'Groceries' }], status: 'ready' });
-    expect(result.content[0].text).toContain('Sent create to notes');
+    expect(resultText(result)).toContain('Sent create to notes');
   });
 
   it('waits for the effect of a command that answers after a request, rather than the first quiet moment', async () => {
@@ -239,12 +239,12 @@ describe('an agent surface', () => {
 
     const wrong = await surface.call('notes_create', { title: 3 });
     expect(wrong.isError).toBe(true);
-    expect(wrong.content[0].text).toBe('input.title must be a string, not number 3.');
+    expect(resultText(wrong)).toBe('input.title must be a string, not number 3.');
 
     const extra = await surface.call('notes_create', { title: 'x', colour: 'red' });
-    expect(extra.content[0].text).toBe('input.colour is not expected; the fields are title, pinned.');
+    expect(resultText(extra)).toBe('input.colour is not expected; the fields are title, pinned.');
 
-    expect((await surface.call('notes_create', {})).content[0].text).toBe('input.title is required.');
+    expect(resultText(await surface.call('notes_create', {}))).toBe('input.title is required.');
     expect(app.calls).toEqual([]);
   });
 
@@ -281,7 +281,7 @@ describe('an agent surface', () => {
     const app = notesApp();
     app.rows.next([{ id: '7', title: 'Old' }]);
     const result = await agentSurface([app.served], fast).call('notes_remove', { id: '7' });
-    expect(result.content[0].text).toContain('no way to ask');
+    expect(resultText(result)).toContain('no way to ask');
     expect(app.rows.value).toHaveLength(1);
   });
 
@@ -357,7 +357,7 @@ describe('an agent surface', () => {
     expect(bump.outputSchema).toEqual(view.outputSchema);
     const result = await surface.call('board_bump', {});
     expect(result.structuredContent).toEqual({ score: 1 });
-    expect(result.content[0]!.text).toBe('Sent bump to board. The view afterwards:\n{"score":1}');
+    expect(resultText(result)).toBe('Sent bump to board. The view afterwards:\n{"score":1}');
     expect(surface.read(resourceUri('board'))).toEqual({ score: 1 });
   });
 
@@ -410,7 +410,7 @@ describe('an agent surface', () => {
 
   it('names a tool that does not exist, and the ones that do', async () => {
     const result = await agentSurface([notesApp().served], fast).call('notes_fly', {});
-    expect(result.content[0].text).toBe(
+    expect(resultText(result)).toBe(
       'There is no tool called notes_fly. The tools are notes_view, notes_create, notes_remove, notes_tag, notes_attach.'
     );
   });

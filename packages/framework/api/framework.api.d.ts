@@ -7,6 +7,7 @@
 // ==== agent/index.d.ts ====
 import {
   AgentConfirmation,
+  AgentContent,
   AgentResource,
   agentSurface,
   AgentSurface,
@@ -16,8 +17,12 @@ import {
   AgentToolResult,
   JsonSchema,
   outline,
+  RenderDependencies,
+  renderModule,
+  RenderRequest,
   resolveTarget,
   resourceUri,
+  resultText,
   ServedChannel,
   UiHost,
   UiRefs,
@@ -25,6 +30,9 @@ import {
   UiSurfaceOptions,
   WorkerHandle
 } from "../ui.js";
+import {
+  UiTheme
+} from "gesso-core";
 declare const MCP_PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26'];
 interface McpServerInfo {
   name?: string;
@@ -146,6 +154,25 @@ interface ApplicationAgentParts {
   readonly ui: () => UiHost | undefined;
 }
 declare function serveApplicationAgent(port: MessagePort, parts: ApplicationAgentParts): () => void;
+interface ThemeTokens {
+  readonly colors: Readonly<Record<string, string>>;
+  readonly typography: Readonly<Record<string, TextStyleToken>>;
+  readonly spacing: Readonly<Record<string, number>>;
+  readonly shapes: Readonly<Record<string, unknown>>;
+  readonly shadows: Readonly<Record<string, string>>;
+  readonly density: string;
+  readonly contrast: string;
+  readonly extensions: Readonly<Record<string, unknown>>;
+}
+interface TextStyleToken {
+  readonly fontFamily: string;
+  readonly fontSize: number;
+  readonly fontWeight: string | number;
+  readonly lineHeight: number;
+  readonly letterSpacing: number;
+}
+declare function themeTokens(theme: UiTheme): ThemeTokens;
+declare function formatThemeTokens(tokens: ThemeTokens, where: string): string;
 export {
   AGENT_PORT,
   agentSurface,
@@ -154,6 +181,7 @@ export {
   connectDevAgent,
   connectWebMcp,
   DEV_AGENT_EVENTS,
+  formatThemeTokens,
   handleMcpMessage,
   MCP_PROTOCOL_VERSIONS,
   mcpHandler,
@@ -161,11 +189,15 @@ export {
   pageModelContext,
   registerWebMcpTools,
   remoteSurface,
+  renderModule,
   resolveTarget,
   resourceUri,
+  resultText,
   serveAgentPort,
   serveApplicationAgent,
+  themeTokens,
   type AgentConfirmation,
+  type AgentContent,
   type AgentPortRequest,
   type AgentPortResponse,
   type AgentResource,
@@ -184,6 +216,10 @@ export {
   type McpHandlerOptions,
   type McpServerInfo,
   type ModelContextLike,
+  type RenderDependencies,
+  type RenderRequest,
+  type TextStyleToken,
+  type ThemeTokens,
   type UiHost,
   type UiSurfaceOptions,
   type WebMcpOptions,
@@ -191,7 +227,19 @@ export {
   uiSurface,
   validate
 };
-// ==== ChannelProtocol.d.ts ====
+// ==== FunctionComponent.d.ts ====
+import {
+  BehaviorSubject,
+  Observable,
+  Subject,
+  Subscription
+} from "rxjs";
+import {
+  LayoutBox,
+  Reactive,
+  UiChild,
+  UiModifier
+} from "gesso-core";
 type Command = (...args: never[]) => void;
 type CommandMap = Record<string, Command>;
 interface ChannelToken<View extends object, Commands extends object = Record<string, never>> {
@@ -255,57 +303,6 @@ type ChannelHostMessage = {
 };
 declare function isChannelClientMessage(value: unknown): value is ChannelClientMessage;
 declare function isChannelHostMessage(value: unknown): value is ChannelHostMessage;
-export {
-  applyPatch,
-  applyPatches,
-  channel,
-  ChannelClientMessage,
-  ChannelHostMessage,
-  ChannelPort,
-  ChannelSpec,
-  ChannelToken,
-  Command,
-  CommandMap,
-  CommandsOf,
-  defineChannel,
-  diffProjection,
-  isChannelClientMessage,
-  isChannelHostMessage,
-  Patch,
-  PatchPath,
-  viewKeys,
-  ViewOf
-};
-// ==== FunctionComponent.d.ts ====
-import {
-  ChannelPort,
-  ChannelToken,
-  Patch
-} from "./ChannelProtocol.js";
-import {
-  BehaviorSubject,
-  Observable,
-  Subject,
-  Subscription
-} from "rxjs";
-import {
-  LayoutBox,
-  Reactive,
-  UiChild,
-  UiModifier
-} from "gesso-core";
-declare abstract class Component {
-  onMount?(): void;
-  onUnmount?(): void;
-  abstract render(): UiChild;
-}
-declare class InternalState<T> extends BehaviorSubject<T> {
-  label: string | undefined;
-  constructor(initialValue: T);
-  get value(): T;
-  set value(next: T);
-}
-declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
 declare class InputCell<T> extends BehaviorSubject<T> {
   label: string | undefined;
   private snapshotBy;
@@ -336,12 +333,6 @@ declare function into<V>(target: {
   next(value: V): void;
 }): OutputTarget<V>;
 declare function isOutputTarget(value: unknown): value is OutputTarget<unknown>;
-declare class BoundsCell extends InternalState<LayoutBox> {
-  readonly modifier: UiModifier<Subject<LayoutBox>>;
-  constructor();
-  next(box: LayoutBox): void;
-}
-declare function bounds(label?: string): BoundsCell;
 declare class ChannelReplica<View extends object, Commands extends object> {
   private readonly token;
   private readonly port;
@@ -364,6 +355,24 @@ declare class ChannelReplica<View extends object, Commands extends object> {
   applyPatches(patches: readonly Patch[]): void;
   private post;
   dispose(): void;
+}
+declare class InternalState<T> extends BehaviorSubject<T> {
+  label: string | undefined;
+  constructor(initialValue: T);
+  get value(): T;
+  set value(next: T);
+}
+declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
+declare class BoundsCell extends InternalState<LayoutBox> {
+  readonly modifier: UiModifier<Subject<LayoutBox>>;
+  constructor();
+  next(box: LayoutBox): void;
+}
+declare function bounds(label?: string): BoundsCell;
+declare abstract class Component {
+  onMount?(): void;
+  onUnmount?(): void;
+  abstract render(): UiChild;
 }
 interface ComponentContext {
   inject<S extends object>(ServiceClass: new () => S): S;
@@ -392,15 +401,28 @@ type RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K; }[
 type ComponentArgs<C> = RequiredKeys<ComponentProps<C>> extends never ? [inputs?: ComponentProps<C>, key?: string | number] : [inputs: ComponentProps<C>, key?: string | number];
 declare function isClassComponent(component: ComponentType): component is ClassComponent;
 export {
+  applyPatch,
+  applyPatches,
   bounds,
   BoundsCell,
+  channel,
+  ChannelClientMessage,
+  ChannelHostMessage,
+  ChannelPort,
   ChannelReplica,
+  ChannelSpec,
+  ChannelToken,
   ClassComponent,
+  Command,
+  CommandMap,
+  CommandsOf,
   Component,
   ComponentArgs,
   ComponentContext,
   ComponentProps,
   ComponentType,
+  defineChannel,
+  diffProjection,
   EmitArgs,
   EmitValue,
   FunctionComponent,
@@ -411,29 +433,23 @@ export {
   internalState,
   InternalState,
   into,
+  isChannelClientMessage,
+  isChannelHostMessage,
   isClassComponent,
   isOutputTarget,
   output,
   OutputCell,
   OutputTarget,
-  ReadableCell
+  Patch,
+  PatchPath,
+  ReadableCell,
+  viewKeys,
+  ViewOf
 };
 // ==== index.d.ts ====
 import {
-  ChannelPort,
   ChannelToken,
   Command,
-  CommandMap,
-  Patch
-} from "./ChannelProtocol.js";
-import {
-  AgentConfirmation,
-  ChannelSource,
-  UiHost,
-  WorkerHandle
-} from "./ui.js";
-import {
-  ChannelReplica,
   Component,
   ComponentArgs,
   ComponentContext,
@@ -443,8 +459,19 @@ import {
   Inputs,
   InternalState,
   OutputCell,
+  Patch,
   ReadableCell
 } from "./FunctionComponent.js";
+import {
+  AgentConfirmation,
+  ChannelRegistry,
+  ChannelSource,
+  ComponentElement,
+  FrameworkChild,
+  ServiceRegistry,
+  UiHost,
+  WorkerHandle
+} from "./ui.js";
 import {
   BehaviorSubject,
   Observable,
@@ -526,13 +553,6 @@ import {
   VideoClock,
   VideoResolver
 } from "gesso-core";
-declare class ServiceRegistry {
-  private readonly services;
-  register<T extends object>(ServiceClass: new () => T): T;
-  adopt(ServiceClass: new () => object): boolean;
-  get<T extends object>(ServiceClass: new () => T): T;
-  has(ServiceClass: Function): boolean;
-}
 type Equality<T> = 'reference' | 'structural' | ((a: T, b: T) => boolean);
 interface DeriveOptions<T> {
   readonly equal?: Equality<T>;
@@ -726,14 +746,6 @@ declare function Inject<T extends Function>(StoreClass: T): PropertyDecorator;
 declare function Channel(token: {
   name: string;
 }): PropertyDecorator;
-declare class ChannelRegistry {
-  private readonly replicas;
-  attach<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, port: ChannelPort): ChannelReplica<View, Commands>;
-  get<View extends object, Commands extends object>(token: ChannelToken<View, Commands>): ChannelReplica<View, Commands>;
-  has(token: ChannelToken<object, CommandMap>): boolean;
-  all(): ChannelReplica<object, CommandMap>[];
-  dispose(): void;
-}
 declare function findUnplainPath(value: unknown, path?: readonly (string | number)[]): string | null;
 declare function requirePlainData(channelName: string, key: string, value: unknown): void;
 interface ChannelRegistration {
@@ -756,16 +768,6 @@ declare function createChannelRegistry(registrations: readonly ChannelRegistrati
 declare function pick<T, K extends keyof T>(source: Observable<T>, key: K): Observable<T[K]>;
 declare function pickKeys<T extends object, K extends keyof T>(source: Observable<T>, keys: readonly K[]): { readonly [P in K]: Observable<T[P]>; };
 declare function structurallyEqual<T>(a: T, b: T): boolean;
-interface ComponentElement<P = Record<string, unknown>> {
-  readonly kind: 'component';
-  readonly tag: string;
-  readonly component: ComponentType;
-  readonly props: P;
-  readonly key?: string | number;
-  readonly source?: UiSourceLocation;
-}
-declare function isComponentElement(value: unknown): value is ComponentElement;
-type FrameworkChild = UiChild | ComponentElement;
 declare function createComponent<C extends ComponentType>(component: C, ...args: ComponentArgs<C>): ComponentElement<ComponentProps<C>>;
 type OverlayPlacement = 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end' | 'start' | 'start-start' | 'start-end' | 'end' | 'end-start' | 'end-end';
 interface OverlayRect {
@@ -2865,13 +2867,11 @@ export {
   Channel,
   ChannelErrorEntry,
   ChannelRegistration,
-  ChannelRegistry,
   ChannelRegistryHandle,
   classifyStorageError,
   ColorScheme,
   ColorSchemePreference,
   CommandEntry,
-  ComponentElement,
   ComponentHost,
   ComponentHostResolver,
   computed,
@@ -2928,7 +2928,6 @@ export {
   FrameMetrics,
   FramePhaseTimings,
   FrameService,
-  FrameworkChild,
   GessoApp,
   GessoAppBuilder,
   GessoAppOptions,
@@ -2938,7 +2937,6 @@ export {
   IndexedDbStorageOptions,
   Inject,
   Input,
-  isComponentElement,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -3012,7 +3010,6 @@ export {
   SelectOptions,
   SemanticsMirror,
   SemanticsMirrorSink,
-  ServiceRegistry,
   setPerformanceMarks$1,
   ShellFile,
   ShellFileRequest,
@@ -3083,57 +3080,25 @@ export {
 import {
   applyPatch,
   applyPatches,
+  bounds,
+  BoundsCell,
   channel,
   ChannelClientMessage,
   ChannelHostMessage,
   ChannelPort,
+  ChannelReplica,
   ChannelSpec,
   ChannelToken,
+  ClassComponent,
   Command,
   CommandMap,
   CommandsOf,
-  defineChannel,
-  diffProjection,
-  isChannelClientMessage,
-  isChannelHostMessage,
-  Patch,
-  PatchPath,
-  viewKeys,
-  ViewOf
-} from "./ChannelProtocol.js";
-import {
-  APPLICATION_WORKER,
-  channelSchema,
-  ChannelSchema,
-  ChannelSource,
-  CommandSchema,
-  describeChannel,
-  isHubMessage,
-  isPortErrorMessage,
-  isPortHandshake,
-  JsonSchema,
-  MessageEndpoint,
-  portHandle,
-  PortHandshake,
-  PortHost,
-  provide,
-  ProvidedChannel,
-  serve,
-  serveChannels,
-  ServedChannel,
-  servePorts,
-  workerHandle,
-  WorkerHandle
-} from "./ui.js";
-import {
-  bounds,
-  BoundsCell,
-  ChannelReplica,
-  ClassComponent,
   Component,
   ComponentContext,
   ComponentProps,
   ComponentType,
+  defineChannel,
+  diffProjection,
   EmitArgs,
   EmitValue,
   FunctionComponent,
@@ -3144,13 +3109,52 @@ import {
   internalState,
   InternalState,
   into,
+  isChannelClientMessage,
+  isChannelHostMessage,
   isClassComponent,
   isOutputTarget,
   output,
   OutputCell,
   OutputTarget,
-  ReadableCell
+  Patch,
+  PatchPath,
+  ReadableCell,
+  viewKeys,
+  ViewOf
 } from "./FunctionComponent.js";
+import {
+  APPLICATION_WORKER,
+  ChannelRegistry,
+  channelSchema,
+  ChannelSchema,
+  ChannelSource,
+  CommandSchema,
+  ComponentElement,
+  describeChannel,
+  FrameworkChild,
+  isComponentElement,
+  isHubMessage,
+  isPortErrorMessage,
+  isPortHandshake,
+  JsonSchema,
+  MessageEndpoint,
+  PictureCanvas,
+  portHandle,
+  PortHandshake,
+  PortHost,
+  provide,
+  ProvidedChannel,
+  RenderedFrame,
+  renderFrame,
+  RenderFrameOptions,
+  serve,
+  serveChannels,
+  ServedChannel,
+  servePorts,
+  ServiceRegistry,
+  workerHandle,
+  WorkerHandle
+} from "./ui.js";
 import {
   ActionCause,
   ActionEntry,
@@ -3175,13 +3179,11 @@ import {
   Channel,
   ChannelErrorEntry,
   ChannelRegistration,
-  ChannelRegistry,
   ChannelRegistryHandle,
   classifyStorageError,
   ColorScheme,
   ColorSchemePreference,
   CommandEntry,
-  ComponentElement,
   ComponentHost,
   ComponentHostResolver,
   computed,
@@ -3238,7 +3240,6 @@ import {
   FrameMetrics,
   FramePhaseTimings,
   FrameService,
-  FrameworkChild,
   GessoApp,
   GessoAppBuilder,
   GessoAppOptions,
@@ -3248,7 +3249,6 @@ import {
   IndexedDbStorageOptions,
   Inject,
   Input,
-  isComponentElement,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -3322,7 +3322,6 @@ import {
   SelectOptions,
   SemanticsMirror,
   SemanticsMirrorSink,
-  ServiceRegistry,
   setPerformanceMarks,
   ShellFile,
   ShellFileRequest,
@@ -3491,6 +3490,7 @@ export {
   ProvidedChannel,
   registerUndoShortcuts,
   rememberedDirectory,
+  renderFrame,
   renderRoot,
   RenderWorkerApp,
   requirePlainData,
@@ -3613,12 +3613,15 @@ export {
   type PatchEntry,
   type PatchPath,
   type PersistedOptions,
+  type PictureCanvas,
   type PortHandshake,
   type PortHost,
   type PresenceProps,
   type ReadableCell,
   type ReadSource,
+  type RenderedFrame,
   type RendererChoice,
+  type RenderFrameOptions,
   type ResourceOptions,
   type ResourceState,
   type ResourceStatus,
@@ -3881,18 +3884,23 @@ export {
 // ==== ui.d.ts ====
 import {
   ChannelPort,
+  ChannelReplica,
   ChannelToken,
   Command,
-  CommandMap
-} from "./ChannelProtocol.js";
+  CommandMap,
+  ComponentType
+} from "./FunctionComponent.js";
 import {
   Observable
 } from "rxjs";
 import {
+  CanvasHost,
+  UiChild,
   UiKeyModifiers,
   UiSemanticsAction,
   UiSemanticsMap,
   UiSemanticsRecord,
+  UiSourceLocation,
   UiTheme
 } from "gesso-core";
 type JsonSchema = {
@@ -4014,11 +4022,17 @@ interface AgentResource {
   readonly description?: string;
   readonly mimeType: 'application/json';
 }
+type AgentContent = {
+  readonly type: 'text';
+  readonly text: string;
+} | {
+  readonly type: 'image';
+  readonly data: string;
+  readonly mimeType: string;
+};
+declare function resultText(result: AgentToolResult): string;
 interface AgentToolResult {
-  readonly content: readonly {
-    readonly type: 'text';
-    readonly text: string;
-  }[];
+  readonly content: readonly AgentContent[];
   readonly structuredContent?: Record<string, unknown>;
   readonly isError: boolean;
 }
@@ -4050,6 +4064,76 @@ interface AgentSurface extends AgentSurfaceLike {
 }
 declare function agentSurface(channels: readonly ServedChannel[], options?: AgentSurfaceOptions): AgentSurface;
 declare function resourceUri(channel: string): string;
+declare class ChannelRegistry {
+  private readonly replicas;
+  attach<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, port: ChannelPort): ChannelReplica<View, Commands>;
+  get<View extends object, Commands extends object>(token: ChannelToken<View, Commands>): ChannelReplica<View, Commands>;
+  has(token: ChannelToken<object, CommandMap>): boolean;
+  all(): ChannelReplica<object, CommandMap>[];
+  dispose(): void;
+}
+declare class ServiceRegistry {
+  private readonly services;
+  private readonly parent;
+  constructor(parent?: ServiceRegistry);
+  register<T extends object>(ServiceClass: new () => T): T;
+  adopt(ServiceClass: new () => object): boolean;
+  get<T extends object>(ServiceClass: new () => T): T;
+  has(ServiceClass: Function): boolean;
+}
+interface ComponentElement<P = Record<string, unknown>> {
+  readonly kind: 'component';
+  readonly tag: string;
+  readonly component: ComponentType;
+  readonly props: P;
+  readonly key?: string | number;
+  readonly source?: UiSourceLocation;
+}
+declare function isComponentElement(value: unknown): value is ComponentElement;
+type FrameworkChild = UiChild | ComponentElement;
+interface PictureCanvas extends CanvasHost {
+  convertToBlob(options?: {
+    type?: string;
+  }): Promise<Blob>;
+}
+interface RenderFrameOptions {
+  readonly width: number;
+  readonly height?: number;
+  readonly scale?: number;
+  readonly theme?: UiTheme;
+  readonly maxHeight?: number;
+  readonly channels?: ChannelRegistry;
+  readonly services?: ServiceRegistry;
+  readonly settleMs?: number;
+  readonly claims?: (error: unknown) => boolean;
+  readonly createCanvas?: (width: number, height: number) => PictureCanvas;
+}
+interface RenderedFrame {
+  readonly png: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+  readonly clipped: boolean;
+  readonly empty: boolean;
+  readonly errors: readonly string[];
+}
+declare function renderFrame(root: FrameworkChild, options: RenderFrameOptions): Promise<RenderedFrame>;
+interface RenderRequest {
+  readonly module: string;
+  readonly export?: string;
+  readonly inputs?: Readonly<Record<string, unknown>>;
+  readonly width: number;
+  readonly height?: number;
+  readonly scale?: number;
+  readonly theme?: 'app' | 'light' | 'dark';
+}
+interface RenderDependencies {
+  load(path: string): Promise<Record<string, unknown>>;
+  appTheme(): UiTheme | undefined;
+  readonly channels?: ChannelRegistry;
+  readonly services?: ServiceRegistry;
+  readonly frame?: Pick<RenderFrameOptions, 'createCanvas' | 'settleMs'>;
+}
+declare function renderModule(request: RenderRequest, deps: RenderDependencies): Promise<AgentToolResult>;
 interface UiHost {
   semanticsTree(): UiSemanticsMap;
   focusedNodeId(): string | null;
@@ -4057,6 +4141,7 @@ interface UiHost {
   key(key: string, modifiers: UiKeyModifiers): void;
   flush(): void;
   theme?(at?: string): UiTheme | undefined;
+  render?(request: RenderRequest): Promise<AgentToolResult>;
 }
 interface UiSurfaceOptions {
   quietMs?: number;
@@ -4073,6 +4158,7 @@ declare function outline(tree: UiSemanticsMap, focused: string | null, refs?: Ui
 declare function resolveTarget(tree: UiSemanticsMap, args: Readonly<Record<string, unknown>>, refs?: UiRefs): UiSemanticsRecord | string;
 export {
   AgentConfirmation,
+  AgentContent,
   AgentResource,
   agentSurface,
   AgentSurface,
@@ -4081,28 +4167,41 @@ export {
   AgentTool,
   AgentToolResult,
   APPLICATION_WORKER,
+  ChannelRegistry,
   channelSchema,
   ChannelSchema,
   ChannelSource,
   CommandSchema,
+  ComponentElement,
   describeChannel,
+  FrameworkChild,
+  isComponentElement,
   isHubMessage,
   isPortErrorMessage,
   isPortHandshake,
   JsonSchema,
   MessageEndpoint,
   outline,
+  PictureCanvas,
   portHandle,
   PortHandshake,
   PortHost,
   provide,
   ProvidedChannel,
+  RenderDependencies,
+  RenderedFrame,
+  renderFrame,
+  RenderFrameOptions,
+  renderModule,
+  RenderRequest,
   resolveTarget,
   resourceUri,
+  resultText,
   serve,
   serveChannels,
   ServedChannel,
   servePorts,
+  ServiceRegistry,
   UiHost,
   UiRefs,
   uiSurface,
@@ -4122,11 +4221,14 @@ import {
   CommandMap,
   CommandsOf,
   defineChannel,
+  internalState,
+  InternalState,
   isChannelClientMessage,
   isChannelHostMessage,
+  ReadableCell,
   viewKeys,
   ViewOf
-} from "../ChannelProtocol.js";
+} from "../FunctionComponent.js";
 import {
   APPLICATION_WORKER,
   ChannelSource,
@@ -4142,11 +4244,6 @@ import {
   ServedChannel,
   servePorts
 } from "../ui.js";
-import {
-  internalState,
-  InternalState,
-  ReadableCell
-} from "../FunctionComponent.js";
 import {
   classifyStorageError,
   computed,

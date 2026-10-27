@@ -174,6 +174,7 @@ its channels, and offers them beside the channel and screen tools:
 | `library_search`   | The components a few words find, best first                                      |
 | `library_get`      | One in full: each input's type, default and meaning, and the files that use it   |
 | `tokens_view`      | The theme's colours, type styles, radii, spacing and shadows, by name and value  |
+| `render_frame`     | A module drawn to a PNG at a width, in the app's own pixels                      |
 
 A component is a function whose first parameter is `Inputs<P>` and that
 returns a child, or a class extending `Component`. What it is for is
@@ -193,6 +194,32 @@ to write `backgroundColor="surface"` rather than the colour.
 
 A library's components join the project's only when the plugin names
 it: `gesso({ catalog: { libraries: ['gesso-components'] } })`.
+
+### Seeing what it built
+
+`render_frame` is how an agent looks at what it wrote. It names a module
+from the project root, as `library_overview` gives it, and a width, and
+gets back a PNG as an MCP image: the module's default export, or its
+only component, or the export it names, given the inputs it passes. The
+page draws it with a runtime of its own on a canvas nobody sees, through
+the same layout, text and paint as the application, so the picture is
+the application's pixels rather than a likeness of them, in the
+application's theme unless `light` or `dark` is asked for.
+
+```json
+{ "module": "src/mocks/Settings", "width": 390, "scale": 2 }
+```
+
+Without a height a frame is as tall as its content, which suits a
+component or a section; a whole screen is given one, and fills it. The
+answer says when nothing was drawn (a dialog closed until an input opens
+it) and what was thrown while it was drawn, and an error the frame
+caused is reported to the agent instead of over the person's screen.
+
+A frame shares the running application's channels and services, so a
+screen shows the application's real data, and a command the frame
+sends reaches the application as one from the screen would. A mock with
+no logic sends none.
 
 ## In the browser, with WebMCP
 

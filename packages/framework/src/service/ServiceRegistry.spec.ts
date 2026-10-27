@@ -85,3 +85,23 @@ describe('ServiceRegistry', () => {
     expect(() => registry.get(replacementFor('Counter'))).toThrow(/hot-replaced/);
   });
 });
+
+describe('a registry over a parent', () => {
+  it("finds the parent's services, holds its own, and never registers into the parent", () => {
+    class Window {}
+    const parent = new ServiceRegistry();
+    const shared = parent.register(Counter);
+    const parentWindow = parent.register(Window);
+    const child = new ServiceRegistry(parent);
+
+    expect(child.get(Counter)).toBe(shared);
+    // `has` is this registry alone, which is how a runtime over the
+    // child knows to register a window service of its own.
+    expect(child.has(Window)).toBe(false);
+    const own = child.register(Window);
+
+    expect(child.get(Window)).toBe(own);
+    expect(parent.get(Window)).toBe(parentWindow);
+    expect(() => child.get(replacementFor('Missing'))).toThrow("Service 'Missing' is not registered.");
+  });
+});

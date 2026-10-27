@@ -91,6 +91,7 @@ export {
   type UiSemanticsReport,
   type UiStreamReport
 } from './app/NodeReport';
+export { renderFrame, type PictureCanvas, type RenderFrameOptions, type RenderedFrame } from './app/renderFrame';
 export { WorkerApp, type WorkerAppOptions, type AppLogicEndpoint } from './app/worker/WorkerApp';
 export {
   treeText,

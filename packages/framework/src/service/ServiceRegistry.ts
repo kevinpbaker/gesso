@@ -15,6 +15,18 @@
  */
 export class ServiceRegistry {
   private readonly services = new Map<Function, object>();
+  private readonly parent: ServiceRegistry | undefined;
+
+  /**
+   * @param parent Where `get` looks for a service this registry does not
+   *   hold. A runtime drawing a frame off screen (`renderFrame`) gets one
+   *   of these over the application's registry: the services the
+   *   application registered are found there, and the runtime's own,
+   *   which it registers wherever `has` says none is, are its own.
+   */
+  constructor(parent?: ServiceRegistry) {
+    this.parent = parent;
+  }
 
   /** Constructs and registers a service, once. */
   register<T extends object>(ServiceClass: new () => T): T {
@@ -71,6 +83,9 @@ export class ServiceRegistry {
 
   get<T extends object>(ServiceClass: new () => T): T {
     const service = this.services.get(ServiceClass);
+    if (service === undefined && this.parent?.has(ServiceClass) === true) {
+      return this.parent.get(ServiceClass);
+    }
     if (service === undefined) {
       const names = [...this.services.keys()]
         .map(key => (key as { name?: string }).name ?? '?')
@@ -92,6 +107,7 @@ export class ServiceRegistry {
     return service as T;
   }
 
+  /** Whether this registry holds the service: not its parent, which `get` also asks. */
   has(ServiceClass: Function): boolean {
     return this.services.has(ServiceClass);
   }

@@ -1,4 +1,4 @@
-import type { AgentConfirmation, AgentSurfaceLike, AgentToolResult } from './AgentSurface';
+import { resultText, type AgentConfirmation, type AgentSurfaceLike, type AgentToolResult } from './AgentSurface';
 import { AGENT_PORT, remoteSurface, type AgentConfirm } from './remote';
 
 /**
@@ -147,7 +147,8 @@ export function confirmInWindow(request: AgentConfirmation): boolean {
 
 /** What a call hands back to WebMCP: the view it left, or a rejection that says why. */
 function answerOf(result: AgentToolResult): unknown {
-  const text = result.content.map(part => part.text).join('\n');
+  // A picture goes as structured content; see `render_frame`.
+  const text = resultText(result);
   if (result.isError) {
     throw new Error(text);
   }
