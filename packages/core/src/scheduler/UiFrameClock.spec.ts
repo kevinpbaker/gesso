@@ -892,7 +892,7 @@ describe('UiHostFrameClock on the display beat', () => {
     expect(clock.isDisplayLocked).toBe(false);
   });
 
-  it("leaves them given up while they keep none", () => {
+  it('leaves them given up while they keep none', () => {
     // WebKit: a timer near 65 Hz however idle the worker is.
     const clock = retried(15.4);
     expect(clock.isLocal).toBe(false);
