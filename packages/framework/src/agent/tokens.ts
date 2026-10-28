@@ -70,10 +70,14 @@ export function themeTokens(theme: UiTheme): ThemeTokens {
   };
 }
 
-/** The tokens as text, a few lines per group, for an agent to read. */
-export function formatThemeTokens(tokens: ThemeTokens, where: string): string {
+/**
+ * The tokens as text, a few lines per group, for an agent to read.
+ * `which` says which theme they are: "The theme in force at the
+ * application's outermost content".
+ */
+export function formatThemeTokens(tokens: ThemeTokens, which: string): string {
   const lines = [
-    `The theme in force at ${where}. Write these names rather than their values, so a screen follows the theme ` +
+    `${which}. Write these names rather than their values, so a screen follows the theme ` +
       'into dark mode, high contrast and a rebrand.',
     '',
     'colors: any color prop takes the name (backgroundColor="surface", color="primary").'

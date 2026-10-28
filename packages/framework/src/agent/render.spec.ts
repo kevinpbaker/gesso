@@ -103,6 +103,29 @@ describe('renderModule', () => {
     expect(await probe('light')).toBe(lightTheme);
   });
 
+  it('draws in the theme being designed in when asked for none, and in its own when asked for app', async () => {
+    const designed = { ...lightTheme, density: 'compact' as const };
+    const app = { ...darkTheme, density: 'spacious' as const };
+    let seen: unknown;
+    function Probe(): UiChild {
+      return Box({ height: 10, ref: node => (seen = node?.environment?.get(UiEnvironmentKeys.theme)) });
+    }
+    const { deps } = project({});
+    const designing: RenderDependencies = {
+      ...deps,
+      load: async () => ({ Probe }),
+      appTheme: () => app,
+      themes: () => ({ light: designed })
+    };
+
+    const drawn = await renderModule({ module: 'src/Probe', width: 100 }, designing);
+    expect(seen).toBe(designed);
+    expect(resultText(drawn)).toContain('in the light theme.');
+
+    await renderModule({ module: 'src/Probe', width: 100, theme: 'app' }, designing);
+    expect(seen).toBe(app);
+  });
+
   it('says which export to choose, and what loaded nothing', async () => {
     const { deps } = project({ '/src/ui/Two.tsx': { Pill, Other: Pill } });
 

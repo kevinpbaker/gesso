@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Button, Column, colorToHex, darkColors, darkTheme, lightTheme, rgb8, type UiTheme } from 'gesso-core';
 import { mountRuntime } from '../app/RuntimeTestUtils';
 import { resultText } from './AgentSurface';
+import type { DesignThemes } from './designedTheme';
 import type { ThemeTokens } from './tokens';
 import { uiSurface, type UiHost } from './ui';
 
@@ -15,7 +16,7 @@ import { uiSurface, type UiHost } from './ui';
 const orange = rgb8(255, 85, 0);
 const brand: UiTheme = { ...lightTheme, colors: { ...lightTheme.colors, primary: orange } };
 
-function screen(withTheme = true) {
+function screen(withTheme = true, designThemes?: () => DesignThemes) {
   // The application's theme sits on a wrapper below the runtime's own
   // root, as an application's usually does, and one panel is dark.
   const mounted = mountRuntime(
@@ -31,7 +32,8 @@ function screen(withTheme = true) {
     applySemanticsAction: action => mounted.runtime.applySemanticsAction(action),
     key: () => {},
     flush: () => mounted.frame(),
-    ...(withTheme ? { theme: (at?: string) => mounted.runtime.themeAt(at) } : {})
+    ...(withTheme ? { theme: (at?: string) => mounted.runtime.themeAt(at) } : {}),
+    ...(designThemes === undefined ? {} : { designThemes })
   };
   return uiSurface(() => host, { quietMs: 1, settleMs: 100 });
 }
@@ -59,6 +61,22 @@ describe('tokens_view', () => {
     expect(result.isError).toBe(false);
     expect(tokens.colors.background).toBe(colorToHex(darkColors.background));
     expect(resultText(result)).toContain('The theme in force at button "In the dark".');
+  });
+
+  it('reads the theme being designed in, where the application designs in themes of its own', async () => {
+    // A design editor: drawn in its own theme, designing a project in another.
+    const project: UiTheme = { ...lightTheme, colors: { ...lightTheme.colors, primary: rgb8(0, 128, 96) } };
+    const projectDark: UiTheme = { ...darkTheme, colors: { ...darkTheme.colors, primary: rgb8(0, 200, 150) } };
+    const surface = screen(true, () => ({ light: project, dark: projectDark }));
+
+    const light = await surface.call('tokens_view', {});
+    const dark = await surface.call('tokens_view', { theme: 'dark' });
+    const own = await surface.call('tokens_view', { theme: 'app' });
+
+    expect((light.structuredContent as unknown as ThemeTokens).colors.primary).toBe(colorToHex(rgb8(0, 128, 96)));
+    expect(resultText(light)).toContain('The light theme being designed in. Write these names');
+    expect((dark.structuredContent as unknown as ThemeTokens).colors.primary).toBe(colorToHex(rgb8(0, 200, 150)));
+    expect((own.structuredContent as unknown as ThemeTokens).colors.primary).toBe(colorToHex(orange));
   });
 
   it('says so when the control named is not on the screen', async () => {

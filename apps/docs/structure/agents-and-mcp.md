@@ -192,6 +192,13 @@ application: it reads the theme in force at a control, or at the
 application's outermost content when none is named, and tells the agent
 to write `backgroundColor="surface"` rather than the colour.
 
+An application that designs something other than itself, as a design
+editor designs its project, names the themes it designs in with
+`renderThemesWith` on its render root. Then `tokens_view` and
+`render_frame` mean those when asked for no theme, the light one before
+the dark, because the editor's own chrome is not what the agent is
+designing; `theme: "app"` still asks for the application's own.
+
 A library's components join the project's only when the plugin names
 it: `gesso({ catalog: { libraries: ['gesso-components'] } })`.
 
@@ -204,7 +211,7 @@ only component, or the export it names, given the inputs it passes. The
 page draws it with a runtime of its own on a canvas nobody sees, through
 the same layout, text and paint as the application, so the picture is
 the application's pixels rather than a likeness of them, in the
-application's theme unless `light` or `dark` is asked for.
+theme being designed in unless `light`, `dark` or `app` is asked for.
 
 ```json
 { "module": "src/mocks/Settings", "width": 390, "scale": 2 }
