@@ -226,7 +226,7 @@ export {
   performanceMarksEnabled,
   setPerformanceMarks
 } from 'gesso-core';
-export { renderRoot, RenderWorkerApp } from './app/worker/renderRoot';
+export { renderRoot, RenderWorkerApp, type RenderWorkerError } from './app/worker/renderRoot';
 export type {
   ShellToRuntimeMessage,
   RuntimeToShellMessage,

@@ -32,6 +32,27 @@ describe('UiGraphBuilder', () => {
       expect(graph.getNode(node.id)).toBe(node);
     });
 
+    it('refuses a length that is not one where it is written, naming the element, so layout never meets it', () => {
+      // A fresh builder for each: one that threw mid-build is not reused.
+      expect(() => createBuilder().builder.build(Column({}, Box({ key: 'card', width: '100%' as never })))).toThrow(
+        /Invalid 'width' on node '.*card'.*'100%'.*percent\(n\)/
+      );
+      expect(() => createBuilder().builder.build(Box({ width: Number.NaN }))).toThrow(
+        /'width' must be a finite number/
+      );
+      // A builder that refused one builds the element again once it is right,
+      // rather than finding the half-built one's id taken.
+      const { builder } = createBuilder();
+      expect(() => builder.build(Box({ key: 'card', width: '100%' as never }))).toThrow(/Invalid 'width'/);
+      expect(() => builder.build(Box({ key: 'card', width: 100 }))).not.toThrow();
+      // A good one, a percentage and auto all pass.
+      expect(() =>
+        createBuilder().builder.build(
+          Box({ width: 40, height: 'auto' as never, minWidth: { unit: 'percent', value: 50 } as never })
+        )
+      ).not.toThrow();
+    });
+
     it('keeps a key with a colon in it to one segment of the id, so it cannot spell another node’s', () => {
       const { graph, builder } = createBuilder();
       // Keyed by node ids, as a layers panel keys its rows: `a:0` would

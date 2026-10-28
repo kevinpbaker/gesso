@@ -697,8 +697,16 @@ export class UiGraphBuilder {
   private createNode(parent: UiNode, definition: UiElement, index: number): UiNode {
     const id = this.createNodeId(parent, definition, index);
     const node = this.graph.createNode(id, definition.type);
-    this.reconcileProps(node, definition.props, parent);
-    this.reconcileChildren(node, definition.children);
+    try {
+      this.reconcileProps(node, definition.props, parent);
+      this.reconcileChildren(node, definition.children);
+    } catch (error) {
+      // A value refused partway through (a length that is not one): the
+      // half-built node goes, or the next build of the same element
+      // would find its id taken and fail on that instead.
+      this.removeSubtree(node);
+      throw error;
+    }
     return node;
   }
 

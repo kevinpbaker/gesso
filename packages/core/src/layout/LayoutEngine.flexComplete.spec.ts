@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
@@ -271,12 +271,23 @@ describe('LayoutEngine flex completeness', () => {
       expect(h.box(item).width).toBe(0);
     });
 
-    it('throws on a string length, naming the property', () => {
+    it('says a string length once, naming the property, and lays the rest out rather than throwing', () => {
+      // Throwing here abandoned the whole frame: one element's bad width
+      // stopped everything else drawing. A plain value is refused when it
+      // is written; this is one that got here anyway, as a bound one does.
       const h = new LayoutHarness();
       const root = column(h, 'top');
       const bad = box(h, 'bad', { width: '100%', height: 20 });
+      const good = box(h, 'good', { width: 50, height: 10 });
       h.append(root, bad);
-      expect(() => h.layout(root, Constraints.unbounded())).toThrow(/'width'/);
+      h.append(root, good);
+      const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+      expect(() => h.layout(root, Constraints.unbounded())).not.toThrow();
+      h.layout(root, Constraints.unbounded());
+      expect(said).toHaveBeenCalledTimes(1);
+      expect(String(said.mock.calls[0]![0])).toMatch(/'width'.*'100%'/);
+      expect(h.box(good).width).toBe(50);
+      said.mockRestore();
     });
 
     it('derives the undecided axis from aspectRatio', () => {

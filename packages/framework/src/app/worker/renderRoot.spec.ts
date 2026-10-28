@@ -323,6 +323,21 @@ describe('RenderWorkerApp', () => {
     expect(error && 'stack' in error && typeof error.stack).toBe('string');
   });
 
+  it("tells the application's onError what it tells the shell, so an app can show errors itself", () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    const heard: unknown[] = [];
+    new RenderWorkerApp(createComponent(BrokenListenerRoot), host).onError(error => heard.push(error));
+    send(initMessage(createMockCanvas()));
+
+    send({ type: 'pointerDown', x: 40, y: 40, buttons: 1, modifiers: noKeyModifiers });
+    send({ type: 'pointerUp', x: 40, y: 40, buttons: 0, modifiers: noKeyModifiers });
+
+    expect(sent.filter(m => m.type === 'error')).toHaveLength(1);
+    expect(heard).toEqual([
+      expect.objectContaining({ message: expect.stringContaining('handler exploded'), source: 'listener' })
+    ]);
+  });
+
   it('keeps the location when the engine did not keep the error', () => {
     const { host, sent, emit } = createFakeWorkerGlobal();
     new RenderWorkerApp(createComponent(WorkerRoot), host);

@@ -27,7 +27,8 @@ import {
   isDiscreteInputMessage,
   isInputMessage,
   type RuntimeToShellMessage,
-  type ShellToRuntimeMessage
+  type ShellToRuntimeMessage,
+  type RuntimeErrorSource
 } from './RenderWorkerProtocol';
 
 /**
@@ -79,6 +80,14 @@ interface WorkerGlobal {
  * useChannel() calls always land before the shell's init message is
  * processed.
  */
+/** An error the render worker reported, as an application's `onError` hears it. */
+export interface RenderWorkerError {
+  readonly message: string;
+  readonly stack?: string;
+  /** Where it came from: a frame, a listener, the renderer, a channel, a message, or nothing that caught it. */
+  readonly source: RuntimeErrorSource;
+}
+
 export function renderRoot(root: FrameworkChild | ComponentType): RenderWorkerApp {
   return new RenderWorkerApp(root);
 }
@@ -99,6 +108,8 @@ export class RenderWorkerApp {
   private loadModule: (path: string) => Promise<Record<string, unknown>> = path => import(/* @vite-ignore */ path);
   /** The application's own agent tools (`useAgentTools`). */
   private readonly agentTools: AgentToolDefinition[] = [];
+  /** What the application asked to hear of the errors this worker reports (`onError`). */
+  private readonly errorListeners: ((error: RenderWorkerError) => void)[] = [];
   /** Held so forwarded display refreshes can be handed to it. */
   private clock: UiHostFrameClock | undefined;
   private channels: ChannelRegistryHandle | undefined;
@@ -171,12 +182,22 @@ export class RenderWorkerApp {
   private reportUncaught(value: unknown, where?: string): void {
     const error = value instanceof Error ? value : undefined;
     const message = error !== undefined ? error.message : String(value);
-    this.host.postMessage({
-      type: 'error',
-      message: where === undefined ? message : `${message} (${where})`,
-      stack: error?.stack,
-      source: 'uncaught'
-    });
+    this.reportError(where === undefined ? message : `${message} (${where})`, error?.stack, 'uncaught');
+  }
+
+  /**
+   * Tells the shell about an error, which shows it (the development
+   * overlay), and every listener the application gave `onError`.
+   */
+  private reportError(message: string, stack: string | undefined, source: RuntimeErrorSource): void {
+    this.host.postMessage({ type: 'error', message, ...(stack === undefined ? {} : { stack }), source });
+    for (const listener of this.errorListeners) {
+      try {
+        listener({ message, ...(stack === undefined ? {} : { stack }), source });
+      } catch {
+        // A listener that throws is not reported through itself.
+      }
+    }
   }
 
   /**
@@ -297,6 +318,18 @@ export class RenderWorkerApp {
   }
 
   /**
+   * Hears every error this worker reports to the shell: a frame that
+   * threw, a listener, the renderer, a channel, anything uncaught. For
+   * an application that shows errors itself, where they happen: a design
+   * editor listing what is wrong with a mock rather than an overlay over
+   * the editor, with the plugin's `overlay: false`.
+   */
+  onError(listener: (error: RenderWorkerError) => void): this {
+    this.errorListeners.push(listener);
+    return this;
+  }
+
+  /**
    * Declares the app's routes, which is all it takes to make a
    * `RouterOutlet` in the tree resolve them.
    *
@@ -377,12 +410,11 @@ export class RenderWorkerApp {
     try {
       this.dispatch(message);
     } catch (error) {
-      this.host.postMessage({
-        type: 'error',
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        source: 'message'
-      });
+      this.reportError(
+        error instanceof Error ? error.message : String(error),
+        error instanceof Error ? error.stack : undefined,
+        'message'
+      );
     }
   }
 
@@ -688,12 +720,7 @@ export class RenderWorkerApp {
           : this.resolveWorker(registration)
       ),
       (channelName, message, stack) => {
-        this.host.postMessage({
-          type: 'error',
-          message: `channel ${channelName}: ${message}`,
-          stack,
-          source: 'channel'
-        });
+        this.reportError(`channel ${channelName}: ${message}`, stack, 'channel');
       }
     );
     const services = new ServiceRegistry();
@@ -789,10 +816,10 @@ export class RenderWorkerApp {
       }
     });
     this.runtime.onRendererError(message => {
-      this.host.postMessage({ type: 'error', message, source: 'renderer' });
+      this.reportError(message, undefined, 'renderer');
     });
     this.runtime.onListenerError((message, stack) => {
-      this.host.postMessage({ type: 'error', message, stack, source: 'listener' });
+      this.reportError(message, stack, 'listener');
     });
     /**
      * A frame that threw, which the shell has to hear about.
@@ -806,7 +833,7 @@ export class RenderWorkerApp {
      * forwarding the tick.
      */
     this.runtime.onFrameError((message, stack) => {
-      this.host.postMessage({ type: 'error', message, stack, source: 'frame' });
+      this.reportError(message, stack, 'frame');
     });
     this.runtime.onFrame(metrics => {
       this.host.postMessage({

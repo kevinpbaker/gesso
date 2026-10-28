@@ -28,7 +28,7 @@ import type {
 import { defaultTextStyle, spansDifferOnlyInPaint, textSpansEqual } from './UiTextStyle';
 import type { UiVisualStateSet } from './UiVisualState';
 import type { UiLayoutProtocol } from '../layout/CustomLayout';
-import type { UiLength, UiTrackSize } from '../layout/UiLength';
+import { lengthProblem, type UiLength, type UiTrackSize } from '../layout/UiLength';
 import type { UiNode } from '../graph/UiNode';
 import type { UiTheme } from '../environment/UiTheme';
 import type { UiTypographyRole } from '../environment/UiTypography';
@@ -77,9 +77,15 @@ const S = DirtyFlags.Semantics;
 // Layout
 // ---------------------------------------------------------------------------
 
+/** A length property's check, run when a plain value is written: see `lengthProblem`. */
+function lengthValidator(property: string): (value: unknown) => string | undefined {
+  return value => lengthProblem(value, property);
+}
+
 export const UiProperties = {
   width: defineProperty<UiLength | undefined>({
     name: 'width',
+    validate: lengthValidator('width'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -87,6 +93,7 @@ export const UiProperties = {
 
   height: defineProperty<UiLength | undefined>({
     name: 'height',
+    validate: lengthValidator('height'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -94,6 +101,7 @@ export const UiProperties = {
 
   minWidth: defineProperty<UiLength | undefined>({
     name: 'minWidth',
+    validate: lengthValidator('minWidth'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -101,6 +109,7 @@ export const UiProperties = {
 
   maxWidth: defineProperty<UiLength | undefined>({
     name: 'maxWidth',
+    validate: lengthValidator('maxWidth'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -108,6 +117,7 @@ export const UiProperties = {
 
   minHeight: defineProperty<UiLength | undefined>({
     name: 'minHeight',
+    validate: lengthValidator('minHeight'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -115,6 +125,7 @@ export const UiProperties = {
 
   maxHeight: defineProperty<UiLength | undefined>({
     name: 'maxHeight',
+    validate: lengthValidator('maxHeight'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -230,6 +241,7 @@ export const UiProperties = {
 
   margin: defineProperty<UiLength | undefined>({
     name: 'margin',
+    validate: lengthValidator('margin'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -238,6 +250,7 @@ export const UiProperties = {
   /** Space outside the box, left and right. See `paddingX`. */
   marginX: defineProperty<UiLength | undefined>({
     name: 'marginX',
+    validate: lengthValidator('marginX'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -246,6 +259,7 @@ export const UiProperties = {
   /** Space outside the box, top and bottom. See `paddingX`. */
   marginY: defineProperty<UiLength | undefined>({
     name: 'marginY',
+    validate: lengthValidator('marginY'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -253,6 +267,7 @@ export const UiProperties = {
 
   marginTop: defineProperty<UiLength | undefined>({
     name: 'marginTop',
+    validate: lengthValidator('marginTop'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -260,6 +275,7 @@ export const UiProperties = {
 
   marginRight: defineProperty<UiLength | undefined>({
     name: 'marginRight',
+    validate: lengthValidator('marginRight'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -267,6 +283,7 @@ export const UiProperties = {
 
   marginBottom: defineProperty<UiLength | undefined>({
     name: 'marginBottom',
+    validate: lengthValidator('marginBottom'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -274,6 +291,7 @@ export const UiProperties = {
 
   marginLeft: defineProperty<UiLength | undefined>({
     name: 'marginLeft',
+    validate: lengthValidator('marginLeft'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -282,6 +300,7 @@ export const UiProperties = {
   /** Space outside the box on the edge the reading starts at. See `paddingStart`. */
   marginStart: defineProperty<UiLength | undefined>({
     name: 'marginStart',
+    validate: lengthValidator('marginStart'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -290,6 +309,7 @@ export const UiProperties = {
   /** Space outside the box on the edge the reading ends at. See `paddingStart`. */
   marginEnd: defineProperty<UiLength | undefined>({
     name: 'marginEnd',
+    validate: lengthValidator('marginEnd'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -496,6 +516,7 @@ export const UiProperties = {
 
   flexBasis: defineProperty<UiLength | undefined>({
     name: 'flexBasis',
+    validate: lengthValidator('flexBasis'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -567,6 +588,7 @@ export const UiProperties = {
 
   top: defineProperty<UiLength | undefined>({
     name: 'top',
+    validate: lengthValidator('top'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -574,6 +596,7 @@ export const UiProperties = {
 
   right: defineProperty<UiLength | undefined>({
     name: 'right',
+    validate: lengthValidator('right'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -581,6 +604,7 @@ export const UiProperties = {
 
   bottom: defineProperty<UiLength | undefined>({
     name: 'bottom',
+    validate: lengthValidator('bottom'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -588,6 +612,7 @@ export const UiProperties = {
 
   left: defineProperty<UiLength | undefined>({
     name: 'left',
+    validate: lengthValidator('left'),
     defaultValue: undefined,
     inherited: false,
     affects: L
@@ -779,6 +804,7 @@ export const UiProperties = {
 
   inset: defineProperty<UiLength | undefined>({
     name: 'inset',
+    validate: lengthValidator('inset'),
     defaultValue: undefined,
     inherited: false,
     affects: L
