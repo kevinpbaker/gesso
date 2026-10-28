@@ -43,6 +43,12 @@ export interface TexturedPipeline {
   textSampler: GPUSampler;
   /** Linear sampling: images are scaled by objectFit. */
   imageSampler: GPUSampler;
+  /**
+   * The same quads, blending a premultiplied opacity-group layer rather
+   * than a straight-alpha texture; bound with `textSampler`, since a
+   * layer is drawn one texel to a pixel.
+   */
+  layerPipeline: GPURenderPipeline;
 }
 
 const QUAD_VERTICES = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
@@ -66,6 +72,12 @@ const usage = {
  */
 const STRAIGHT_ALPHA_BLEND: GPUBlendState = {
   color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
+};
+
+/** Source-over for a premultiplied source: an opacity group's layer. */
+const PREMULTIPLIED_BLEND: GPUBlendState = {
+  color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
   alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }
 };
 
@@ -136,13 +148,20 @@ export function createTexturedPipeline(
     ]
   });
 
+  const layout = device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout, frameLayout] });
   const pipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout, frameLayout] }),
+    layout,
     vertex: { module, entryPoint: 'vs', buffers: [quadVertexLayout(), texturedInstanceLayout()] },
     fragment: { module, entryPoint: 'fs', targets: [{ format, blend: STRAIGHT_ALPHA_BLEND }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }
   });
-  if (pipeline === undefined) {
+  const layerPipeline = device.createRenderPipeline({
+    layout,
+    vertex: { module, entryPoint: 'vs', buffers: [quadVertexLayout(), texturedInstanceLayout()] },
+    fragment: { module, entryPoint: 'fsLayer', targets: [{ format, blend: PREMULTIPLIED_BLEND }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' }
+  });
+  if (pipeline === undefined || layerPipeline === undefined) {
     throw new WebGPUError('Failed to create textured render pipeline.', 'pipeline');
   }
 
@@ -160,7 +179,8 @@ export function createTexturedPipeline(
     uniformBuffer,
     bindGroupLayout,
     textSampler: device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' }),
-    imageSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' })
+    imageSampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
+    layerPipeline
   };
 }
 

@@ -3,7 +3,8 @@ import { snapScroll } from '../ScrollSnap';
 import type { UiNode } from '../../graph/UiNode';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { Canvas2DContext, Canvas2DGradient } from './Canvas2DContext';
-import type { CanvasSurface } from './CanvasSurface';
+import type { CanvasHost, CanvasSurface } from './CanvasSurface';
+import type { DeviceRect } from '../GroupOpacity';
 import type { ResolvedGradient } from '../../properties/UiGradient';
 import { gradientPaint } from '../../properties/UiGradient';
 import { colorToCss, computeObjectFitRect, createPaintState, isPaintVisible, resolvePaintState } from '../PaintState';
@@ -37,6 +38,7 @@ import type { PaintContext2D } from '../PaintTarget';
 import { PreciseContext } from './PreciseContext';
 import { offscreenLayerCanvas, placeLayer, ScrollLayerCache, SPILL } from './ScrollLayers';
 import { TextRasterCache } from './TextRasterCache';
+import { layerRegion, opacityNeedsLayer } from '../GroupOpacity';
 import type { LayerCanvasFactory, LayerRect, ScrollLayer, ScrollLayerStats } from './ScrollLayers';
 
 export interface Canvas2DRendererOptions {
@@ -60,8 +62,10 @@ export interface Canvas2DRendererOptions {
    */
   scrollLayers?: boolean;
   /**
-   * Makes the canvases scroll layers and kept text are held in. Defaults
-   * to an `OffscreenCanvas`; a spec passes a double.
+   * Makes the canvases scroll layers, kept text and opacity groups are
+   * held in. Defaults to an `OffscreenCanvas`; a spec passes a double.
+   * Where none can be had, a group's opacity is multiplied into each of
+   * its draws instead (see `GroupOpacity.ts`).
    */
   createLayerCanvas?: LayerCanvasFactory;
   /**
@@ -76,6 +80,13 @@ export interface Canvas2DRendererOptions {
    * the layers themselves passes 1.
    */
   scrollLayerSettleFrames?: number;
+}
+
+/** An opacity group's canvas; see `Canvas2DRenderer.groups`. */
+interface GroupLayer {
+  host: CanvasHost;
+  ctx: PreciseContext;
+  raw: Canvas2DContext;
 }
 
 /**
@@ -102,6 +113,12 @@ export interface Canvas2DRendererOptions {
  * All geometry is absolute layout-root coordinates. Scroll
  * containers clip to their viewport and translate by
  * (-scrollX, -scrollY); node transforms compose on the current CTM.
+ *
+ * Opacity groups: a node at `opacity < 1` whose subtree paints more
+ * than one draw is drawn into an offscreen layer and blended onto the
+ * frame once, as CSS composites it (`GroupOpacity.ts`). One that
+ * paints a single draw multiplies `globalAlpha` instead, which is the
+ * same picture for nothing.
  *
  * State isolation: save()/restore() are used exactly when a node
  * introduces opacity, a transform, or a scroll viewport. Flat style
@@ -180,6 +197,14 @@ export class Canvas2DRenderer implements UiRenderer {
    * not keep what it drew if it moved.
    */
   private volatileDraws = 0;
+  /**
+   * The canvases opacity groups are drawn in, one per depth of nesting,
+   * so a group inside a group never draws over what holds it. Each
+   * group sizes the one at its depth to its region (`layerRegion`).
+   */
+  private readonly groups: GroupLayer[] = [];
+  /** How many groups the walk is inside. */
+  private groupDepth = 0;
 
   constructor(private readonly options: Canvas2DRendererOptions) {
     this.layers = new ScrollLayerCache(
@@ -229,6 +254,7 @@ export class Canvas2DRenderer implements UiRenderer {
   surfaceRestored(): void {
     this.layers.dropAll();
     this.textCache?.dropAll();
+    this.groups.length = 0;
   }
 
   dispose(): void {
@@ -236,6 +262,7 @@ export class Canvas2DRenderer implements UiRenderer {
     this.scaledImages.dispose();
     this.layers.dropAll();
     this.textCache?.dropAll();
+    this.groups.length = 0;
   }
 
   render(root: UiNode, context: RenderContext): void {
@@ -258,6 +285,7 @@ export class Canvas2DRenderer implements UiRenderer {
     // a true statement about the wrong frame.
     this.paintOwner = null;
     this.layerDepth = 0;
+    this.groupDepth = 0;
     this.textCache?.beginFrame();
     this.layers.beginFrame(
       this.options.scrollLayers === false ? undefined : context.changes,
@@ -341,7 +369,13 @@ export class Canvas2DRenderer implements UiRenderer {
 
     // Captured before children reuse the shared scratch below.
     const hasText = paint.text !== undefined;
+    const opacity = paint.opacity;
 
+    // Everything this node and its subtree paint goes to `draw`: the
+    // frame's context, or the layer an opacity group is drawn in.
+    let draw = ctx;
+    let group: GroupLayer | null = null;
+    let region: DeviceRect | null = null;
     let saves = 0;
     if (paint.opacity < 1 || paint.hasTransform || sticky) {
       ctx.save();
@@ -351,33 +385,57 @@ export class Canvas2DRenderer implements UiRenderer {
         // children included; its record keeps the flow position.
         ctx.translate(rec.stickyOffsetX, rec.stickyOffsetY);
       }
-      if (paint.opacity < 1) {
+      group = paint.opacity < 1 && opacityNeedsLayer(node, rec, paint, context.layout) ? this.groupLayer(ctx) : null;
+      if (paint.opacity < 1 && group === null) {
         ctx.globalAlpha *= paint.opacity;
       }
       if (paint.hasTransform) {
         this.applyTransform(ctx, rec, paint);
       }
+      if (group !== null) {
+        // Under the node's own transform, so the layer draws the
+        // subtree exactly where the frame would have, less the
+        // region's corner. Sizing the canvas gives it a fresh, clear
+        // backing: drawing into the one the last group was blended
+        // from would make Chrome copy it first, which costs more than
+        // everything else a group does.
+        region = layerRegion(
+          node,
+          rec,
+          ctx.getTransform!(),
+          context.layout,
+          this.surface.physicalWidth,
+          this.surface.physicalHeight,
+          this.surface.dpr
+        );
+        group.host.width = Math.max(1, region.width);
+        group.host.height = Math.max(1, region.height);
+        draw = group.ctx.reset(group.raw);
+        draw.save();
+        group.ctx.adoptTransform(ctx, region.x, region.y);
+        this.groupDepth++;
+      }
     }
 
     if (paint.boxShadows.length > 0) {
-      this.paintShadows(ctx, rec, paint, false);
+      this.paintShadows(draw, rec, paint, false);
     }
-    this.paintBackground(ctx, rec, paint);
+    this.paintBackground(draw, rec, paint);
     if (paint.boxShadows.length > 0) {
-      this.paintShadows(ctx, rec, paint, true);
+      this.paintShadows(draw, rec, paint, true);
     }
-    this.paintImage(ctx, rec, paint);
+    this.paintImage(draw, rec, paint);
     if (node.type === UiNodeType.Paint) {
-      this.paintPicture(ctx, node, rec);
+      this.paintPicture(draw, node, rec);
     }
-    this.paintBorder(ctx, rec, paint);
+    this.paintBorder(draw, rec, paint);
     // Decorations sit beside the border, outside the node's own clip:
     // a focus ring's every pixel lies outside the box that would clip
     // it. Ancestors' clips and the node's transform do apply, which is
     // what makes a ring disappear with a scrolled-away row.
     const decorations = node.decorations;
     if (decorations !== null && hasDecorationPhase(decorations, false)) {
-      this.paintDecorations(ctx, node, rec, paint, decorations, false);
+      this.paintDecorations(draw, node, rec, paint, decorations, false);
     }
 
     if (rec.clips) {
@@ -385,28 +443,28 @@ export class Canvas2DRenderer implements UiRenderer {
       // node's own text are clipped to the box (following its corner
       // radius); for a scroll container the children are also
       // translated by the scroll offset.
-      ctx.save();
+      draw.save();
       if (!borderRadiusIsZero(paint.borderRadius)) {
-        traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
+        traceRoundedRect(draw, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
       } else {
-        ctx.beginPath();
-        ctx.rect(rec.x, rec.y, rec.width, rec.height);
+        draw.beginPath();
+        draw.rect(rec.x, rec.y, rec.width, rec.height);
       }
-      ctx.clip();
+      draw.clip();
       this.pushCull(rec);
     }
     const liftedBefore = this.liftedPass.length;
-    if (!rec.scrollable || !this.renderScrolledThroughLayer(node, rec, context, ctx)) {
+    if (!rec.scrollable || !this.renderScrolledThroughLayer(node, rec, context, draw)) {
       if (rec.scrollable) {
-        ctx.save();
-        ctx.translate(-snapScroll(rec.scrollX, this.surface.dpr), -snapScroll(rec.scrollY, this.surface.dpr));
+        draw.save();
+        draw.translate(-snapScroll(rec.scrollX, this.surface.dpr), -snapScroll(rec.scrollY, this.surface.dpr));
       }
       // Culling works in record coordinates; a transform or a sticky
       // shift moves what is drawn away from them, so descendants are
       // not culled.
-      this.renderChildren(node, context, ctx, cull && !paint.hasTransform && !sticky);
+      this.renderChildren(node, context, draw, cull && !paint.hasTransform && !sticky);
       if (rec.scrollable) {
-        ctx.restore();
+        draw.restore();
       }
     }
     if (rec.clips) {
@@ -424,7 +482,7 @@ export class Canvas2DRenderer implements UiRenderer {
       if (this.paintOwner !== node) {
         this.resolvePaint(node);
       }
-      this.paintContent(ctx, node, rec, this.paint, context);
+      this.paintContent(draw, node, rec, this.paint, context);
     }
     if (rec.liftBoundary && this.liftedPass.length > liftedBefore) {
       // A boundary: everything the subtree lifted is drawn here, over
@@ -432,17 +490,17 @@ export class Canvas2DRenderer implements UiRenderer {
       // context is back at this node's own state, because every clip
       // and transform the walk opened below it has been restored, so
       // the descendants' clips are gone and this node's is not.
-      this.renderLifted(context, ctx, liftedBefore, node);
+      this.renderLifted(context, draw, liftedBefore, node);
     }
 
     if (rec.clips) {
-      ctx.restore();
+      draw.restore();
     }
     if (decorations !== null && hasDecorationPhase(decorations, true)) {
       // Same argument as the text pass above: the lifted pass and the
       // child walk may both have left, or may both have left alone.
       this.paintDecorations(
-        ctx,
+        draw,
         node,
         rec,
         this.paintOwner === node ? this.paint : this.resolvePaint(node),
@@ -451,13 +509,53 @@ export class Canvas2DRenderer implements UiRenderer {
       );
     }
     if (rec.scrollable || rec.textScrollbars) {
-      this.paintScrollbars(ctx, rec, context.now ?? performance.now());
+      this.paintScrollbars(draw, rec, context.now ?? performance.now());
+    }
+
+    if (group !== null) {
+      draw.restore();
+      this.groupDepth--;
+      if (region!.width > 0 && region!.height > 0) {
+        // One pixel of the layer to one of the frame, under whatever
+        // clips the node's ancestors set, which are the ones a group is
+        // held in.
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha *= opacity;
+        ctx.drawImage(group.host as unknown as OffscreenCanvas, region!.x, region!.y, region!.width, region!.height);
+        ctx.restore();
+      }
     }
 
     while (saves > 0) {
       ctx.restore();
       saves--;
     }
+  }
+
+  /**
+   * The canvas an opacity group at the current depth is drawn in, made
+   * the first time a group reaches that depth. Null where no canvas can
+   * be had, or where the frame's context cannot say what transform the
+   * layer should take on; the group then multiplies its opacity into
+   * each draw, as before.
+   */
+  private groupLayer(ctx: Canvas2DContext): GroupLayer | null {
+    if (ctx.getTransform === undefined) {
+      return null;
+    }
+    const existing = this.groups[this.groupDepth];
+    if (existing !== undefined) {
+      return existing;
+    }
+    const host = (this.options.createLayerCanvas ?? offscreenLayerCanvas)(1, 1);
+    const raw = host?.getContext('2d') as Canvas2DContext | null | undefined;
+    if (host === null || raw === null || raw === undefined) {
+      return null;
+    }
+    const layer: GroupLayer = { host, ctx: new PreciseContext(raw), raw };
+    this.groups[this.groupDepth] = layer;
+    return layer;
   }
 
   private renderChildren(node: UiNode, context: RenderContext, ctx: Canvas2DContext, cull: boolean): void {

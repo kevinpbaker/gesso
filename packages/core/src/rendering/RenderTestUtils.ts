@@ -18,7 +18,25 @@ import type { PaintLineCap, PaintLineJoin } from './PaintSurface';
 export interface RecordedCall {
   name: string;
   args: unknown[];
+  /** Which context made the call, when several record into one log; absent for the frame's own. */
+  target?: string;
 }
+
+export interface RecordingOptions {
+  /** A log to record into, shared with other contexts; a fresh one by default. */
+  calls?: RecordedCall[];
+  /** Stamped on every call this context records into a shared log. */
+  target?: string;
+  /**
+   * Whether the context tracks its transform and answers `getTransform`,
+   * as a real one does. Off by default, because a renderer reads the
+   * absence as "no transform worth reporting" and most specs were
+   * written against that; see `Canvas2DContext.getTransform`.
+   */
+  transform?: boolean;
+}
+
+type Matrix = [number, number, number, number, number, number];
 
 /**
  * The gradient a recording context hands back, carrying what it was
@@ -44,7 +62,35 @@ export class RecordedGradient implements Canvas2DGradient {
  * assignment so tests can assert the exact draw sequence.
  */
 export class RecordingCanvasContext implements Canvas2DContext {
-  readonly calls: RecordedCall[] = [];
+  readonly calls: RecordedCall[];
+  private readonly target: string | undefined;
+  private matrix: Matrix = [1, 0, 0, 1, 0, 0];
+  private readonly matrices: Matrix[] = [];
+  getTransform?: () => { a: number; b: number; c: number; d: number; e: number; f: number };
+
+  constructor(options: RecordingOptions = {}) {
+    this.calls = options.calls ?? [];
+    this.target = options.target;
+    if (options.transform === true) {
+      this.getTransform = () => {
+        const [a, b, c, d, e, f] = this.matrix;
+        return { a, b, c, d, e, f };
+      };
+    }
+  }
+
+  /** Multiplies the current matrix by another on the right, as a canvas does. */
+  private compose(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    const m = this.matrix;
+    this.matrix = [
+      m[0] * a + m[2] * b,
+      m[1] * a + m[3] * b,
+      m[0] * c + m[2] * d,
+      m[1] * c + m[3] * d,
+      m[0] * e + m[2] * f + m[4],
+      m[1] * e + m[3] * f + m[5]
+    ];
+  }
 
   private _fillStyle: string | Canvas2DGradient | CanvasPattern = '#000';
   private _strokeStyle: string | Canvas2DGradient | CanvasPattern = '#000';
@@ -211,6 +257,7 @@ export class RecordingCanvasContext implements Canvas2DContext {
       shadowOffsetX: this._shadowOffsetX,
       shadowOffsetY: this._shadowOffsetY
     });
+    this.matrices.push(this.matrix);
     this.record('save', []);
   }
 
@@ -231,22 +278,29 @@ export class RecordingCanvasContext implements Canvas2DContext {
       this._shadowOffsetX = state.shadowOffsetX;
       this._shadowOffsetY = state.shadowOffsetY;
     }
+    this.matrix = this.matrices.pop() ?? this.matrix;
     this.record('restore', []);
   }
 
   translate(x: number, y: number): void {
+    this.compose(1, 0, 0, 1, x, y);
     this.record('translate', [x, y]);
   }
 
   scale(x: number, y: number): void {
+    this.compose(x, 0, 0, y, 0, 0);
     this.record('scale', [x, y]);
   }
 
   rotate(angle: number): void {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    this.compose(cos, sin, -sin, cos, 0, 0);
     this.record('rotate', [angle]);
   }
 
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    this.matrix = [a, b, c, d, e, f];
     this.record('setTransform', [a, b, c, d, e, f]);
   }
 
@@ -316,6 +370,7 @@ export class RecordingCanvasContext implements Canvas2DContext {
   // onto the frame's context (`PaintPictureCache.draw`), rather than
   // onto a picture canvas of its own.
   transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    this.compose(a, b, c, d, e, f);
     this.record('transform', [a, b, c, d, e, f]);
   }
 
@@ -348,7 +403,11 @@ export class RecordingCanvasContext implements Canvas2DContext {
   }
 
   private record(name: string, args: unknown[]): void {
-    this.calls.push({ name, args: args.map(normalizeNumber) });
+    const call: RecordedCall = { name, args: args.map(normalizeNumber) };
+    if (this.target !== undefined) {
+      call.target = this.target;
+    }
+    this.calls.push(call);
   }
 }
 
@@ -562,7 +621,11 @@ export class FakeCanvasHost implements CanvasHost {
   height = 0;
   private contextRequests = 0;
 
-  constructor(private readonly context: Canvas2DContext | null) {}
+  /** `label` names the host for a spec that meets it again as a `drawImage` source. */
+  constructor(
+    private readonly context: Canvas2DContext | null,
+    readonly label?: string
+  ) {}
 
   getContext(_contextId: '2d'): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null {
     this.contextRequests++;
@@ -583,12 +646,48 @@ export class RenderHarness {
   readonly graph = new UiGraph();
   readonly measurer: TextMeasurer = new CharacterCountTextMeasurer();
   readonly engine = new LayoutEngine(this.measurer);
-  readonly context = new RecordingCanvasContext();
-  readonly host = new FakeCanvasHost(this.context);
-  readonly surface = new CanvasSurface(this.host);
-  readonly renderer = new Canvas2DRenderer({ surface: this.surface });
+  readonly context: RecordingCanvasContext;
+  readonly host: FakeCanvasHost;
+  readonly surface: CanvasSurface;
+  readonly renderer: Canvas2DRenderer;
+  /** The layers opacity groups were drawn in, by label; empty without `groups`. */
+  readonly groupLayers = new Map<string, FakeCanvasHost>();
 
-  constructor(logicalWidth: number = 800, logicalHeight: number = 600, dpr: number = 1) {
+  /**
+   * With `groups`, opacity groups get layers as they do in a browser:
+   * the context tracks its transform, and each layer is a recording
+   * context writing into the frame's log, its calls stamped with the
+   * layer's label (`group0`, `group1`, ...) and its host met again as
+   * the source of the `drawImage` that blends it. Text is not kept as
+   * pixels, so it is still drawn as `fillText`.
+   */
+  constructor(
+    logicalWidth: number = 800,
+    logicalHeight: number = 600,
+    dpr: number = 1,
+    options: { groups?: boolean } = {}
+  ) {
+    const groups = options.groups === true;
+    this.context = new RecordingCanvasContext({ transform: groups });
+    this.host = new FakeCanvasHost(this.context);
+    this.surface = new CanvasSurface(this.host);
+    this.renderer = new Canvas2DRenderer(
+      groups
+        ? {
+            surface: this.surface,
+            textCache: false,
+            createLayerCanvas: (width, height) => {
+              const label = `group${this.groupLayers.size}`;
+              const context = new RecordingCanvasContext({ calls: this.context.calls, target: label, transform: true });
+              const host = new FakeCanvasHost(context, label);
+              host.width = width;
+              host.height = height;
+              this.groupLayers.set(label, host);
+              return host;
+            }
+          }
+        : { surface: this.surface }
+    );
     this.surface.setLogicalSize(logicalWidth, logicalHeight, dpr);
   }
 

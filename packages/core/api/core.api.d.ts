@@ -4461,6 +4461,8 @@ declare class Canvas2DRenderer implements UiRenderer {
   private readonly layers;
   private layerDepth;
   private volatileDraws;
+  private readonly groups;
+  private groupDepth;
   constructor(options: Canvas2DRendererOptions);
   private readonly textCache;
   get textCacheStats(): TextRasterCache['stats'] | null;
@@ -4476,6 +4478,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private resolvePaint;
   private beginFrame;
   private renderNode;
+  private groupLayer;
   private renderChildren;
   private renderLifted;
   private applyAncestors;
@@ -4893,6 +4896,7 @@ declare class WebGPURenderer implements UiRenderer {
   private frameLayout;
   private frameBindGroup;
   private cachedInstanceData;
+  private groupLayers;
   readonly lastDraws: DrawStats;
   private pendingCapture;
   private lost;
@@ -4906,6 +4910,7 @@ declare class WebGPURenderer implements UiRenderer {
   get isLost(): boolean;
   capture(): Promise<CapturedFrame>;
   render(root: UiNode, context: RenderContext): void;
+  private groupLayer;
   private takeCapture;
   private clearFrame;
   resize(width: number, height: number, dpr?: number): void;
@@ -4946,6 +4951,7 @@ interface TexturedPipeline {
   bindGroupLayout: GPUBindGroupLayout;
   textSampler: GPUSampler;
   imageSampler: GPUSampler;
+  layerPipeline: GPURenderPipeline;
 }
 type TextureSource = UiImage | UiVideoSurface;
 declare class WebGPUTextureCache {
@@ -5053,7 +5059,9 @@ declare const enum PrimitiveKind {
 declare const enum CommandKind {
   Primitives = 0,
   Glyphs = 1,
-  Image = 2
+  Image = 2,
+  BeginLayer = 3,
+  EndLayer = 4
 }
 type Affine = [number, number, number, number, number, number];
 interface ScissorRect {
@@ -5083,7 +5091,16 @@ interface ImageCommand {
   drawWidth: number;
   drawHeight: number;
 }
-type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
+interface BeginLayerCommand {
+  kind: CommandKind.BeginLayer;
+  scissor: null;
+}
+interface EndLayerCommand {
+  kind: CommandKind.EndLayer;
+  instance: number | null;
+  scissor: ScissorRect | null;
+}
+type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand | BeginLayerCommand | EndLayerCommand;
 interface TextRunDraw {
   text: string;
   font: string;
@@ -8291,6 +8308,12 @@ declare class HarnessScrollSink implements ScrollSink {
 interface RecordedCall {
   name: string;
   args: unknown[];
+  target?: string;
+}
+interface RecordingOptions {
+  calls?: RecordedCall[];
+  target?: string;
+  transform?: boolean;
 }
 declare class RecordedGradient implements Canvas2DGradient {
   readonly kind: 'linear' | 'radial';
@@ -8304,6 +8327,19 @@ declare class RecordedGradient implements Canvas2DGradient {
 }
 declare class RecordingCanvasContext implements Canvas2DContext {
   readonly calls: RecordedCall[];
+  private readonly target;
+  private matrix;
+  private readonly matrices;
+  getTransform?: () => {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    e: number;
+    f: number;
+  };
+  constructor(options?: RecordingOptions);
+  private compose;
   private _fillStyle;
   private _strokeStyle;
   private _lineWidth;
@@ -8378,10 +8414,11 @@ declare function callArgs(context: RecordingCanvasContext, name: string): unknow
 declare function savedDepth(context: RecordingCanvasContext): number;
 declare class FakeCanvasHost implements CanvasHost {
   private readonly context;
+  readonly label?: string | undefined;
   width: number;
   height: number;
   private contextRequests;
-  constructor(context: Canvas2DContext | null);
+  constructor(context: Canvas2DContext | null, label?: string | undefined);
   getContext(_contextId: '2d'): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
   get contextRequestCount(): number;
 }
@@ -8393,7 +8430,10 @@ declare class RenderHarness {
   readonly host: FakeCanvasHost;
   readonly surface: CanvasSurface;
   readonly renderer: Canvas2DRenderer;
-  constructor(logicalWidth?: number, logicalHeight?: number, dpr?: number);
+  readonly groupLayers: Map<string, FakeCanvasHost>;
+  constructor(logicalWidth?: number, logicalHeight?: number, dpr?: number, options?: {
+    groups?: boolean;
+  });
   createNode(id: string, type: UiNodeType): UiNode;
   append(parent: UiNode, ...children: UiNode[]): void;
   layout(node: UiNode, constraints?: Constraints): LayoutResult;

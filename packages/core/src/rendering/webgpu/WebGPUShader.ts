@@ -400,4 +400,17 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
   let color = textureSample(tTexture, tSampler, in.uv);
   return vec4f(color.rgb, color.a * in.opacity * alpha);
 }
+
+// An opacity group's layer, blended onto what holds it. The layer was
+// drawn into with the same blend as the frame, so it holds premultiplied
+// colour, and is scaled whole — colour and alpha alike — by the group's
+// opacity and the clip's coverage.
+@fragment
+fn fsLayer(in: VertexOutput) -> @location(0) vec4f {
+  let alpha = clipCoverage(in.position.xy, uView.z, in.clipIndex);
+  if (alpha <= 0.0) {
+    discard;
+  }
+  return textureSample(tTexture, tSampler, in.uv) * (in.opacity * alpha);
+}
 `;

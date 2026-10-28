@@ -25,7 +25,7 @@ import {
   type ScissorRect
 } from './WebGPURenderData';
 import { VIEW_UNIFORM_FLOATS } from './WebGPUShader';
-import { WebGPUTextureCache } from './WebGPUTextureCache';
+import { createTexturedBindGroup, WebGPUTextureCache } from './WebGPUTextureCache';
 import { WebGPUGlyphPages } from './WebGPUGlyphPages';
 
 export interface WebGPURendererOptions {
@@ -59,6 +59,17 @@ export interface RenderHooks {
 const vertexBufferUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.VERTEX : 0x20;
 const storageBufferUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.STORAGE : 0x80;
 const copyDstBufferUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.COPY_DST : 0x8;
+const layerTextureUsage =
+  (typeof GPUTextureUsage !== 'undefined' ? GPUTextureUsage.RENDER_ATTACHMENT : 0x10) |
+  (typeof GPUTextureUsage !== 'undefined' ? GPUTextureUsage.TEXTURE_BINDING : 0x4);
+
+/** An opacity group's layer: a texture the size of the surface, drawn into and then blended. */
+interface GroupLayer {
+  texture: GPUTexture;
+  view: GPUTextureView;
+  /** Samples the texture for the blend, through the textured pipeline's layout. */
+  bindGroup: GPUBindGroup;
+}
 
 /** A frame read back from the GPU: RGBA, straight alpha, row-major. */
 export interface CapturedFrame {
@@ -113,6 +124,12 @@ export class WebGPURenderer implements UiRenderer {
   private frameLayout: GPUBindGroupLayout | null = null;
   private frameBindGroup: GPUBindGroup | null = null;
   private cachedInstanceData: Float32Array | null = null;
+  /**
+   * The textures opacity groups are drawn in, one per depth of nesting,
+   * so a group inside a group never clears what holds it. Made the first
+   * time a frame reaches that depth and again when the surface resizes.
+   */
+  private groupLayers: GroupLayer[] = [];
   /** Draw calls of the most recent frame. */
   readonly lastDraws: DrawStats = { primitiveDraws: 0, texturedDraws: 0, texturedInstances: 0 };
   private pendingCapture: PendingCapture | null = null;
@@ -318,9 +335,12 @@ export class WebGPURenderer implements UiRenderer {
       this.hooks.onEncodeStart !== undefined || this.hooks.onEncodeEnd !== undefined ? performance.now() : 0;
     const commandEncoder = device.createCommandEncoder();
     const texture = this.surface.getCurrentTexture();
-    const pass = commandEncoder.beginRenderPass({
+    // What the commands are drawing into: the frame, then a layer for
+    // each opacity group open. A group ends one pass and begins another.
+    const targets: GPUTextureView[] = [texture.createView()];
+    let pass = commandEncoder.beginRenderPass({
       colorAttachments: [
-        { view: texture.createView(), clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }
+        { view: targets[0], clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }
       ]
     });
 
@@ -339,6 +359,47 @@ export class WebGPURenderer implements UiRenderer {
     const commands = list.commands;
     for (let i = 0; i < commands.length; i++) {
       const command = commands[i];
+      if (command.kind === CommandKind.BeginLayer || command.kind === CommandKind.EndLayer) {
+        pass.end();
+        const depth = targets.length - 1;
+        let layer: GroupLayer;
+        if (command.kind === CommandKind.BeginLayer) {
+          layer = this.groupLayer(device, depth, texture.width, texture.height);
+          targets.push(layer.view);
+        } else {
+          layer = this.groupLayers[depth - 1]!;
+          targets.pop();
+        }
+        // A layer starts transparent; the target a layer is blended
+        // onto keeps what was drawn on it before the layer began.
+        pass = commandEncoder.beginRenderPass({
+          colorAttachments: [
+            command.kind === CommandKind.BeginLayer
+              ? { view: layer.view, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }
+              : { view: targets[targets.length - 1], loadOp: 'load', storeOp: 'store' }
+          ]
+        });
+        pass.setBindGroup(1, this.frameBindGroup!);
+        currentScissor = null;
+        currentKind = null;
+        if (command.kind === CommandKind.BeginLayer) {
+          continue;
+        }
+        const blendScissor = command.scissor ?? viewport;
+        if (command.instance === null || blendScissor.width <= 0 || blendScissor.height <= 0) {
+          continue;
+        }
+        pass.setPipeline(textured.layerPipeline);
+        pass.setVertexBuffer(0, textured.vertexBuffer);
+        pass.setVertexBuffer(1, this.texturedBuffer!);
+        pass.setIndexBuffer(textured.indexBuffer, 'uint16');
+        pass.setBindGroup(0, layer.bindGroup);
+        currentScissor = setScissor(pass, currentScissor, blendScissor);
+        pass.drawIndexed(textured.indexCount, 1, 0, 0, command.instance);
+        this.lastDraws.texturedDraws++;
+        this.lastDraws.texturedInstances++;
+        continue;
+      }
       const scissor = command.scissor ?? viewport;
       if (scissor.width <= 0 || scissor.height <= 0) {
         // Everything under this clip is off screen; a zero scissor
@@ -399,6 +460,23 @@ export class WebGPURenderer implements UiRenderer {
     if (this.hooks.onEncodeEnd !== undefined) {
       this.hooks.onEncodeEnd(performance.now() - encodeStart);
     }
+  }
+
+  /** The layer for an opacity group at `depth`, made or remade at the surface's size. */
+  private groupLayer(device: GPUDevice, depth: number, width: number, height: number): GroupLayer {
+    const existing = this.groupLayers[depth];
+    if (existing !== undefined && existing.texture.width === width && existing.texture.height === height) {
+      return existing;
+    }
+    existing?.texture.destroy();
+    const texture = device.createTexture({ size: [width, height], format: this.format!, usage: layerTextureUsage });
+    const layer: GroupLayer = {
+      texture,
+      view: texture.createView(),
+      bindGroup: createTexturedBindGroup(device, this.textured!, texture, this.textured!.textSampler)
+    };
+    this.groupLayers[depth] = layer;
+    return layer;
   }
 
   /**
@@ -531,6 +609,10 @@ export class WebGPURenderer implements UiRenderer {
     this.clipBuffer = null;
     this.gradientBuffer?.destroy();
     this.gradientBuffer = null;
+    for (const layer of this.groupLayers) {
+      layer.texture.destroy();
+    }
+    this.groupLayers = [];
     this.frameBindGroup = null;
     this.frameLayout = null;
     this.primitives = null;

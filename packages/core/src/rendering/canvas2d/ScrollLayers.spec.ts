@@ -18,50 +18,12 @@ import { SCROLL_LAYER_SETTLE_FRAMES } from './ScrollLayers';
 /**
  * A recording context that also keeps its transform, as a real one
  * does. Scroll layers are placed by reading it, and the shared double
- * has none, which is what keeps every other spec on the direct path.
+ * has none by default, which is what keeps every other spec on the
+ * direct path.
  */
 class TransformingContext extends RecordingCanvasContext {
-  private matrix = [1, 0, 0, 1, 0, 0];
-  private readonly stack: number[][] = [];
-
-  override save(): void {
-    this.stack.push([...this.matrix]);
-    super.save();
-  }
-
-  override restore(): void {
-    this.matrix = this.stack.pop() ?? this.matrix;
-    super.restore();
-  }
-
-  override setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void {
-    this.matrix = [a, b, c, d, e, f];
-    super.setTransform(a, b, c, d, e, f);
-  }
-
-  override translate(x: number, y: number): void {
-    const [a, b, c, d, e, f] = this.matrix;
-    this.matrix = [a, b, c, d, e + a * x + c * y, f + b * x + d * y];
-    super.translate(x, y);
-  }
-
-  override scale(x: number, y: number): void {
-    const [a, b, c, d, e, f] = this.matrix;
-    this.matrix = [a * x, b * x, c * y, d * y, e, f];
-    super.scale(x, y);
-  }
-
-  override rotate(angle: number): void {
-    const [a, b, c, d, e, f] = this.matrix;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    this.matrix = [a * cos + c * sin, b * cos + d * sin, c * cos - a * sin, d * cos - b * sin, e, f];
-    super.rotate(angle);
-  }
-
-  getTransform(): { a: number; b: number; c: number; d: number; e: number; f: number } {
-    const [a, b, c, d, e, f] = this.matrix;
-    return { a, b, c, d, e, f };
+  constructor() {
+    super({ transform: true });
   }
 }
 
