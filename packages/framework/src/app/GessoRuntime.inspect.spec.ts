@@ -5,6 +5,7 @@ import { Box, Button, Column, Text, darkTheme, defineModifier, hoverable, noKeyM
 import { Component } from '../Component';
 import { Define } from '../decorators';
 import { createComponent } from '../createComponent';
+import type { Inputs } from '../FunctionComponent';
 import type { UiElement } from 'gesso-core';
 import { formatNodeReport, printPropValue } from './NodeReport';
 import { mountRuntime } from './RuntimeTestUtils';
@@ -53,6 +54,41 @@ describe('inspectNode', () => {
 
     expect(report.type).toBe('box');
     expect(report.owners.map(owner => owner.name)).toEqual(['inspected-card']);
+  });
+
+  it("reports what each owner's parent supplied for its inputs, as plain data", () => {
+    function Field(
+      inputs: Inputs<{ label: string; count: number; required: boolean; trailing?: UiElement; onEdit?: () => void }>
+    ) {
+      return Column({}, Text({ text: inputs.label }), inputs.trailing.value ?? Box({}));
+    }
+    const mounted = mountRuntime(
+      Column(
+        {},
+        createComponent(Field, {
+          label: 'Email',
+          count: 3,
+          required: true,
+          trailing: Box({ width: 24, height: 24 }),
+          onEdit: () => {}
+        })
+      )
+    );
+    mounted.frame();
+    let column = mounted.runtime.debugRoot().firstChild!;
+    while (column.firstChild !== null && column.type !== 'column') {
+      column = column.firstChild;
+    }
+    const field = column.type === 'column' ? column : mounted.runtime.debugRoot().firstChild!.firstChild!;
+
+    const report = mounted.runtime.inspectNode(field.firstChild ?? field);
+
+    // The handler is left out: nothing about it is data.
+    expect(report.owners[0]).toMatchObject({
+      name: 'Field',
+      inputs: { label: 'Email', count: 3, required: true, trailing: { element: true } }
+    });
+    expect(report.owners[0]!.inputs).not.toHaveProperty('onEdit');
   });
 
   it('has no owner for a node the application wrote out itself', () => {

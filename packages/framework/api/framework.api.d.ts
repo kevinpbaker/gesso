@@ -851,6 +851,7 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   private createInputRecord;
   private createContext;
   private wireInputs;
+  suppliedInputs(): ReadonlyMap<string, unknown>;
   private applyInput;
   private validateInputs;
   private wireChannels;
@@ -898,7 +899,11 @@ interface UiOwnerReport {
   readonly name: string;
   readonly anchorId: string;
   readonly usedAt?: UiSourceLocation;
+  readonly inputs?: Readonly<Record<string, UiOwnerInput>>;
 }
+type UiOwnerInput = string | number | boolean | null | {
+  readonly element: true;
+};
 interface NodePathTarget {
   readonly type: string;
   readonly id: string;
@@ -3087,6 +3092,7 @@ export {
   UiEnvironmentReport,
   UiFramePhase,
   UiNodeReport,
+  UiOwnerInput,
   UiOwnerReport,
   UiPropOrigin,
   UiPropReport,
@@ -3401,6 +3407,7 @@ import {
   UiEnvironmentReport,
   UiFramePhase,
   UiNodeReport,
+  UiOwnerInput,
   UiOwnerReport,
   UiPropOrigin,
   UiPropReport,
@@ -3703,6 +3710,7 @@ export {
   type UiEnvironmentReport,
   type UiFramePhase,
   type UiNodeReport,
+  type UiOwnerInput,
   type UiOwnerReport,
   type UiPropOrigin,
   type UiPropReport,
