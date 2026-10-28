@@ -829,6 +829,9 @@ export class GessoRuntime {
     if (options.media?.rasterizer !== undefined) {
       this.services.get(MediaService).setRasterizer(options.media.rasterizer);
     }
+    if (options.media?.vectors !== undefined) {
+      this.services.get(MediaService).setSvgResolver(options.media.vectors);
+    }
     if (options.media?.videoResolver !== undefined) {
       this.services.get(MediaService).setVideoResolver(options.media.videoResolver);
     }

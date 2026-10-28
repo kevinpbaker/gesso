@@ -6,6 +6,7 @@ import { renderTest } from 'gesso-testing';
 import {
   Box,
   Column,
+  Row,
   type UiChild,
   type UiNode,
   UiNodeType,
@@ -13,6 +14,7 @@ import {
   lightTheme,
   type UiTheme,
   DefaultImageResolver,
+  DefaultSvgResolver,
   defineModifier,
   IconRasterizer,
   type IconCanvas,
@@ -255,6 +257,28 @@ describe('Image', () => {
 
     expect(node!.properties.get('image')).toBe(mounted.bitmap);
     expect(semanticsOf(node!)).toMatchObject({ role: 'image', label: 'A photograph' });
+  });
+
+  it("draws an SVG source as vectors, through its paint, at the file's own size", async () => {
+    let node: UiNode | null = null;
+    const mounted = renderTest(
+      // In a row in a column, so nothing stretches it and the file's size is its own.
+      Column({}, Row({}, createComponent(Image, { src: 'logo.svg', ref: (n: UiNode | null) => (node = n) }))),
+      {
+        media: {
+          vectors: new DefaultSvgResolver({
+            fetch: async () =>
+              '<svg width="209" height="149" viewBox="0 0 209 149"><rect width="209" height="149"/></svg>'
+          })
+        }
+      }
+    );
+
+    await mounted.settle();
+
+    expect(node!.properties.get('image')).toBeUndefined();
+    expect(node!.properties.get('paint')).toMatchObject({ intrinsicWidth: 209, intrinsicHeight: 149 });
+    expect(mounted.getLayout(node!)).toMatchObject({ width: 209, height: 149 });
   });
 
   it('draws a picture the resolver already holds on the frame that builds the node', async () => {

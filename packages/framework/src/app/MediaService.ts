@@ -1,5 +1,7 @@
 import {
   DefaultImageResolver,
+  DefaultSvgResolver,
+  type SvgResolver,
   DefaultVideoResolver,
   type ImageResolver,
   type VideoResolver,
@@ -21,6 +23,8 @@ export interface MediaOptions {
   resolver?: ImageResolver;
   /** Where an `Icon` finds its raster. */
   rasterizer?: IconRasterizer;
+  /** Where an `Image` reads an SVG source. */
+  vectors?: SvgResolver;
   /** Where a `Video` finds its decoder. */
   videoResolver?: VideoResolver;
 }
@@ -44,6 +48,7 @@ export interface MediaOptions {
 export class MediaService {
   private imageResolver: ImageResolver = new DefaultImageResolver();
   private iconRasterizer = new IconRasterizer();
+  private svgResolver: SvgResolver = new DefaultSvgResolver();
   private videoResolver: VideoResolver | null = null;
   /**
    * Whether each of the three is the service's to dispose.
@@ -61,6 +66,16 @@ export class MediaService {
 
   get images(): ImageResolver {
     return this.imageResolver;
+  }
+
+  /** Where an `Image` reads an SVG source, which it draws as vectors rather than decoding. */
+  get vectors(): SvgResolver {
+    return this.svgResolver;
+  }
+
+  /** The same seam, for SVG. A read file holds no pixels, so there is nothing to dispose either way. */
+  setSvgResolver(resolver: SvgResolver): void {
+    this.svgResolver = resolver;
   }
 
   get icons(): IconRasterizer {
