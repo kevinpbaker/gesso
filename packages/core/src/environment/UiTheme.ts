@@ -6,6 +6,7 @@ import type { UiSpacing } from './UiSpacing';
 import type { UiDensity } from './UiDensity';
 import type { UiContrast } from './UiContrast';
 import type { UiThemeExtensions } from './UiThemeExtension';
+import type { UiUnits } from './UiUnits';
 import { colorsEqualPalette, darkColors, lightColors } from './UiColors';
 import { defaultTypography, typographyEqual } from './UiTypography';
 import { shapesEqual } from './UiShapes';
@@ -14,6 +15,7 @@ import { defaultSpacing, scaleSpacing, spacingEqual } from './UiSpacing';
 import { densityFactors } from './UiDensity';
 import { highContrastColors, type HighContrastOptions } from './UiContrast';
 import { themeExtensionsEqual } from './UiThemeExtension';
+import { defaultUnits, unitsEqual } from './UiUnits';
 import { boxShadow } from '../properties/UiBoxShadow';
 
 /**
@@ -26,8 +28,10 @@ import { boxShadow } from '../properties/UiBoxShadow';
  * `density` and `contrast` are axes rather than scales: they record
  * which way this theme was already turned, so a component can branch
  * on the answer and `withDensity` and `withContrast` can turn it
- * again from the base. `extensions` is where an application's own
- * token groups live; see `UiThemeExtension.ts`.
+ * again from the base. `units` is what an inch and a rem are worth in
+ * pixels, for lengths written in them; see `UiUnits.ts`. `extensions`
+ * is where an application's own token groups live; see
+ * `UiThemeExtension.ts`.
  */
 export interface UiTheme {
   readonly colors: UiColors;
@@ -37,6 +41,7 @@ export interface UiTheme {
   readonly spacing: UiSpacing;
   readonly density: UiDensity;
   readonly contrast: UiContrast;
+  readonly units: UiUnits;
   readonly extensions?: UiThemeExtensions;
 }
 
@@ -46,6 +51,7 @@ export const lightTheme: UiTheme = {
   spacing: defaultSpacing,
   density: 'comfortable',
   contrast: 'standard',
+  units: defaultUnits,
   shapes: {
     none: 0,
     extraSmall: 2,
@@ -118,6 +124,7 @@ export function themesEqual(a: UiTheme, b: UiTheme): boolean {
   return (
     a.density === b.density &&
     a.contrast === b.contrast &&
+    unitsEqual(a.units, b.units) &&
     colorsEqualPalette(a.colors, b.colors) &&
     typographyEqual(a.typography, b.typography) &&
     shapesEqual(a.shapes, b.shapes) &&

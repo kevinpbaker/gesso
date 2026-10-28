@@ -533,6 +533,13 @@ export const AUTHOR_SURFACE: readonly AuthorSurfaceEntry[] = [
     page: '/appearance/themes-and-the-environment'
   },
   {
+    name: 'lengths',
+    package: 'core',
+    group: 'Colour, theme and type',
+    what: "Rems, inches, points and millimetres in pixels, for a theme's `units`: `lengths(theme.units).rem(1)`.",
+    page: '/appearance/themes-and-the-environment'
+  },
+  {
     name: 'defineThemeExtension',
     package: 'core',
     group: 'Colour, theme and type',

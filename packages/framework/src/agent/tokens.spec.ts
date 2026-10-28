@@ -48,6 +48,8 @@ describe('tokens_view', () => {
     expect(resultText(result)).toContain("The theme in force at the application's outermost content.");
     expect(resultText(result)).toContain(`  primary ${colorToHex(orange)}`);
     expect(resultText(result)).toContain('borderRadius takes the name');
+    expect(tokens.units).toEqual({ pixelsPerInch: 96, rootFontSize: 16 });
+    expect(resultText(result)).toContain('1in = 96px, 1pt = 1.333px, 1mm = 3.78px, 1rem = 16px');
   });
 
   it('reads the theme where a control is, when part of the screen has its own', async () => {

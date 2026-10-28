@@ -29,7 +29,7 @@ one is inside the example.
 
 ## What a `UiTheme` holds
 
-Five scales and two axes, and they are independent of each other:
+Five scales, two axes and the units, and they are independent of each other:
 
 | Field        | What it is                                                   |
 | ------------ | ------------------------------------------------------------ |
@@ -40,6 +40,7 @@ Five scales and two axes, and they are independent of each other:
 | `spacing`    | Gaps and insets by name, from `none` to `huge`               |
 | `density`    | `compact`, `comfortable` or `spacious`: how tightly it packs |
 | `contrast`   | `standard` or `high`: how far a mark sits from its ground    |
+| `units`      | What an inch and a rem are worth in pixels                   |
 
 There is also an optional `extensions`, which is where an application's
 own token groups live; the last section of this page is about those.
@@ -151,6 +152,52 @@ are legal in the same prop, and a misspelt token is simply a colour
 that does not parse: the node paints no background rather than
 complaining. Worth knowing when a card comes out transparent.
 
+## Units
+
+Every length Gesso lays out is a logical pixel, the CSS pixel. A theme's
+`units` say what the units a designer thinks in are worth in those
+pixels: `pixelsPerInch`, 96 as in CSS, from which a point (1/72 in) and
+a millimetre (1/25.4 in) follow, and `rootFontSize`, 16 as a browser's
+default, which is one `rem`. `lengths` turns them into conversions:
+
+```tsx
+const { rem, pt, mm } = lengths(theme.units);
+
+<box padding={rem(1)} gap={mm(4)}>
+  <text text="Invoice" fontSize={pt(18)} />
+</box>;
+```
+
+The conversions return numbers, so the element above is given 16, 15.1
+and 24 and never knows they were anything else. That is deliberate: a
+length is read in the layout pass, which caches what it reads per node,
+and a unit resolved against whatever theme a node happened to be under
+would change under that cache. A resolved number cannot. The cost is
+that changing a theme's units moves what is written with them the next
+time it is written, a reload or a component that reads the theme again,
+not a screen already drawn.
+
+A theme that wants its scales to follow its units writes them from the
+units it is about to carry:
+
+```ts
+const units = { pixelsPerInch: 96, rootFontSize: 16 };
+const { rem, pt } = lengths(units);
+
+export const theme: UiTheme = {
+  ...lightTheme,
+  units,
+  spacing: { ...lightTheme.spacing, small: rem(0.5), large: rem(1) },
+  typography: { ...lightTheme.typography, body: { ...lightTheme.typography.body, fontSize: pt(10.5) } }
+};
+```
+
+The stock themes carry the default units, and their scales are the
+pixel values those units give; changing the units on a copy of one does
+not rescale it. The conversions are unrounded, because a size in points
+is often meant to be a fraction of a pixel; round where a half pixel
+would put every box inside on one too.
+
 ## Providing one, and scoping it
 
 `theme` is a prop on every element, and so are `textStyle` and
@@ -230,6 +277,8 @@ comparison is worth knowing:
   names it.
 - **The spacing scale, the density and the contrast** are compared, so
   turning either axis is a change of theme.
+- **The units** are compared, so a theme at another pixels-per-inch or
+  root font size is a change of theme for whatever reads them.
 - **Each extension is compared with the comparison it declared**, which
   is the reason a token group of your own needs no edit here.
 

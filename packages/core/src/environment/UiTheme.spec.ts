@@ -74,6 +74,14 @@ describe('UiTheme', () => {
     expect(themesEqual(lightTheme, withDensity(lightTheme, 'compact'))).toBe(false);
     expect(themesEqual(lightTheme, withContrast(lightTheme, 'high'))).toBe(false);
   });
+
+  it('measures as CSS does, and a change of units is a change of theme', () => {
+    expect(lightTheme.units).toEqual({ pixelsPerInch: 96, rootFontSize: 16 });
+    expect(darkTheme.units).toBe(lightTheme.units);
+    expect(themesEqual(lightTheme, { ...lightTheme, units: { pixelsPerInch: 96, rootFontSize: 16 } })).toBe(true);
+    expect(themesEqual(lightTheme, { ...lightTheme, units: { pixelsPerInch: 72, rootFontSize: 16 } })).toBe(false);
+    expect(themesEqual(lightTheme, { ...lightTheme, units: { pixelsPerInch: 96, rootFontSize: 18 } })).toBe(false);
+  });
 });
 
 describe('withDensity', () => {

@@ -24,6 +24,8 @@ export interface ThemeTokens {
   readonly shadows: Readonly<Record<string, string>>;
   readonly density: string;
   readonly contrast: string;
+  /** What an inch and a rem are worth in pixels: every other length here is pixels. */
+  readonly units: { readonly pixelsPerInch: number; readonly rootFontSize: number };
   /** Token groups the application or a library added, by the name each was declared with. */
   readonly extensions: Readonly<Record<string, unknown>>;
 }
@@ -63,6 +65,7 @@ export function themeTokens(theme: UiTheme): ThemeTokens {
     shadows,
     density: theme.density,
     contrast: theme.contrast,
+    units: { pixelsPerInch: theme.units.pixelsPerInch, rootFontSize: theme.units.rootFontSize },
     extensions
   };
 }
@@ -96,6 +99,13 @@ export function formatThemeTokens(tokens: ThemeTokens, where: string): string {
     lines.push(`  ${name} ${value}`);
   }
   lines.push('', `density ${tokens.density}, contrast ${tokens.contrast}`);
+  const { pixelsPerInch, rootFontSize } = tokens.units;
+  lines.push(
+    '',
+    `units: every length above is pixels. 1in = ${pixelsPerInch}px, 1pt = ${round(pixelsPerInch / 72)}px, ` +
+      `1mm = ${round(pixelsPerInch / 25.4)}px, 1rem = ${rootFontSize}px. To write one in these units, ` +
+      "convert with the theme's: const { rem, inch, pt, mm } = lengths(theme.units) from gesso-core."
+  );
   const extensions = Object.entries(tokens.extensions);
   if (extensions.length > 0) {
     lines.push('', 'extensions: token groups the application added.');
@@ -104,6 +114,10 @@ export function formatThemeTokens(tokens: ThemeTokens, where: string): string {
     }
   }
   return lines.join('\n');
+}
+
+function round(value: number): number {
+  return Math.round(value * 1000) / 1000;
 }
 
 function inline(record: Readonly<Record<string, unknown>>): string {

@@ -15,3 +15,4 @@ export * from './UiSpacing';
 export * from './UiTheme';
 export * from './UiThemeExtension';
 export * from './UiTypography';
+export * from './UiUnits';

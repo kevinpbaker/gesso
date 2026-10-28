@@ -1581,6 +1581,20 @@ declare function withThemeExtension<Theme extends {
   readonly extensions?: UiThemeExtensions;
 }, T extends object>(theme: Theme, extension: UiThemeExtension<T>, value: T): Theme;
 declare function themeExtensionsEqual(a: UiThemeExtensions | undefined, b: UiThemeExtensions | undefined): boolean;
+interface UiUnits {
+  readonly pixelsPerInch: number;
+  readonly rootFontSize: number;
+}
+declare const defaultUnits: UiUnits;
+interface UiLengths {
+  readonly units: UiUnits;
+  rem(value: number): number;
+  inch(value: number): number;
+  pt(value: number): number;
+  mm(value: number): number;
+}
+declare function lengths(units?: UiUnits): UiLengths;
+declare function unitsEqual(a: UiUnits, b: UiUnits): boolean;
 interface UiTheme {
   readonly colors: UiColors;
   readonly typography: UiTypography;
@@ -1589,6 +1603,7 @@ interface UiTheme {
   readonly spacing: UiSpacing;
   readonly density: UiDensity;
   readonly contrast: UiContrast;
+  readonly units: UiUnits;
   readonly extensions?: UiThemeExtensions;
 }
 declare const lightTheme: UiTheme;
@@ -5563,6 +5578,7 @@ export {
   defaultSpacing,
   defaultTextStyle,
   defaultTypography,
+  defaultUnits,
   DefaultVideoResolver,
   DefaultVideoResolverOptions,
   defaultVisualState,
@@ -5764,6 +5780,7 @@ export {
   LazySheetProps,
   lazySource,
   LazySourceArgs,
+  lengths,
   lightColors,
   lightTheme,
   linear,
@@ -6180,6 +6197,7 @@ export {
   UiLayoutContext,
   UiLayoutProtocol,
   UiLength,
+  UiLengths,
   UiLinearGradient,
   UiListenerErrorReporter,
   UiLiveRegion,
@@ -6293,6 +6311,7 @@ export {
   UiTypography,
   UiTypographyExtensions,
   UiTypographyRole,
+  UiUnits,
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVideoSurface,
@@ -6305,6 +6324,7 @@ export {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  unitsEqual,
   unknownContainerSize,
   validateGradient,
   validateRole,
@@ -6489,6 +6509,7 @@ import {
   defaultSpacing,
   defaultTextStyle,
   defaultTypography,
+  defaultUnits,
   DefaultVideoResolver,
   DefaultVideoResolverOptions,
   defaultVisualState,
@@ -6690,6 +6711,7 @@ import {
   LazySheetProps,
   lazySource,
   LazySourceArgs,
+  lengths,
   lightColors,
   lightTheme,
   linear,
@@ -7106,6 +7128,7 @@ import {
   UiLayoutContext,
   UiLayoutProtocol,
   UiLength,
+  UiLengths,
   UiLinearGradient,
   UiListenerErrorReporter,
   UiLiveRegion,
@@ -7219,6 +7242,7 @@ import {
   UiTypography,
   UiTypographyExtensions,
   UiTypographyRole,
+  UiUnits,
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVideoSurface,
@@ -7231,6 +7255,7 @@ import {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  unitsEqual,
   unknownContainerSize,
   validateGradient,
   validateRole,
@@ -7378,6 +7403,7 @@ export {
   defaultSpacing,
   defaultTextStyle,
   defaultTypography,
+  defaultUnits,
   DefaultVideoResolver,
   defaultVisualState,
   defineModifier,
@@ -7508,6 +7534,7 @@ export {
   LazyRow,
   LazySheet,
   lazySource,
+  lengths,
   lightColors,
   lightTheme,
   linear,
@@ -8092,6 +8119,7 @@ export {
   UiInsetSource,
   UiKeyboardController,
   UiKeyboardEvent,
+  UiLengths,
   UiLinearGradient,
   UiLiveRegion,
   UiManualFrameClock,
@@ -8161,6 +8189,7 @@ export {
   UiTypography,
   UiTypographyExtensions,
   UiTypographyRole,
+  UiUnits,
   UiUnknownModifierPropertyError,
   UiVerticalAlign,
   UiVirtualSheet,
@@ -8171,6 +8200,7 @@ export {
   UiWheelDeltaMode,
   UiWheelEvent,
   uniformBorderRadius,
+  unitsEqual,
   unknownContainerSize,
   validateGradient,
   validateRole,

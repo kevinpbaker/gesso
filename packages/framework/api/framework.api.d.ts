@@ -163,6 +163,10 @@ interface ThemeTokens {
   readonly shadows: Readonly<Record<string, string>>;
   readonly density: string;
   readonly contrast: string;
+  readonly units: {
+    readonly pixelsPerInch: number;
+    readonly rootFontSize: number;
+  };
   readonly extensions: Readonly<Record<string, unknown>>;
 }
 interface TextStyleToken {
