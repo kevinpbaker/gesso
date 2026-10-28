@@ -144,6 +144,23 @@ export function resolveLength(
   );
 }
 
+/**
+ * Why a value cannot be a length, or undefined when it can: the rules
+ * `resolveLength` lays out by, for checking a value when it is written
+ * (each length property's `validate`), where the error names the
+ * element, rather than when it is laid out, where it would stop the
+ * frame and everything else in it.
+ */
+export function lengthProblem(value: unknown, property: string): string | undefined {
+  if (value === undefined || value === null || isAutoLength(value) || isPercentLength(value)) {
+    return undefined;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? undefined : `Property '${property}' must be a finite number, got ${String(value)}.`;
+  }
+  return `Property '${property}' has an invalid length ${describe(value)}. Use a number of pixels, percent(n), or auto.`;
+}
+
 function describe(value: unknown): string {
   if (typeof value === 'string') {
     return `'${value}'`;

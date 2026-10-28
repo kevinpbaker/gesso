@@ -3829,6 +3829,7 @@ declare class LayoutEngine {
   private numberProp;
   private lengthProp;
   private lengthPropOrAuto;
+  private lengthOrNothing;
   private marginProp;
   private textWrapProp;
   private textOverflowProp;

@@ -2858,6 +2858,11 @@ interface WorkerGlobal {
   addEventListener(type: 'error', listener: (event: WorkerErrorEvent) => void): void;
   addEventListener(type: 'unhandledrejection', listener: (event: WorkerRejectionEvent) => void): void;
 }
+interface RenderWorkerError {
+  readonly message: string;
+  readonly stack?: string;
+  readonly source: RuntimeErrorSource;
+}
 declare function renderRoot(root: FrameworkChild | ComponentType): RenderWorkerApp;
 declare class RenderWorkerApp {
   private readonly channelRegistrations;
@@ -2871,12 +2876,14 @@ declare class RenderWorkerApp {
   private renderThemes;
   private loadModule;
   private readonly agentTools;
+  private readonly errorListeners;
   private clock;
   private channels;
   private appLogicWorker;
   private restoreConsole;
   constructor(root: FrameworkChild | ComponentType, host?: WorkerGlobal);
   private reportUncaught;
+  private reportError;
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): void;
   loadModulesWith(load: (path: string) => Promise<Record<string, unknown>>): this;
   renderThemesWith(themes: () => DesignThemes): this;
@@ -2886,6 +2893,7 @@ declare class RenderWorkerApp {
   }): this;
   useService(ServiceClass: new () => object): this;
   useAgentTools(tools: readonly AgentToolDefinition[]): this;
+  onError(listener: (error: RenderWorkerError) => void): this;
   useRoutes(routes: RouterRoutes): this;
   useMedia(media: MediaOptions): this;
   useFonts(families: readonly FontFamilyDeclaration[]): this;
@@ -3037,6 +3045,7 @@ export {
   RendererChoice,
   renderRoot,
   RenderWorkerApp,
+  RenderWorkerError,
   requirePlainData,
   resource,
   Resource,
@@ -3352,6 +3361,7 @@ import {
   RendererChoice,
   renderRoot,
   RenderWorkerApp,
+  RenderWorkerError,
   requirePlainData,
   resource,
   Resource,
@@ -3683,6 +3693,7 @@ export {
   type RenderedFrame,
   type RendererChoice,
   type RenderFrameOptions,
+  type RenderWorkerError,
   type ResourceOptions,
   type ResourceState,
   type ResourceStatus,

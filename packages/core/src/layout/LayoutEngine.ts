@@ -37,6 +37,9 @@ import { buildAxisExplanation, describeOverrides, labelNode, withOverrideSource 
 import type { AxisFacts, CustomLayoutExplanation, FlexFacts, LayoutExplanation } from './LayoutExplanation';
 
 /** How long overlay scrollbars stay after the last scroll change. */
+/** Lengths already reported as refused, by node, so each is said once. */
+const refusedLengths = new WeakMap<UiNode, Set<string>>();
+
 export const SCROLLBAR_LINGER_MS = 1200;
 /** Portion of the linger during which the scrollbar fades out. */
 export const SCROLLBAR_FADE_MS = 350;
@@ -5298,7 +5301,7 @@ export class LayoutEngine {
     if (typeof raw === 'number' && Number.isFinite(raw)) {
       return raw;
     }
-    const value = resolveLength(raw, base, property);
+    const value = this.lengthOrNothing(node, raw, base, property, false);
     return value === 'auto' ? undefined : value;
   }
 
@@ -5310,7 +5313,36 @@ export class LayoutEngine {
     if (typeof raw === 'number' && Number.isFinite(raw)) {
       return raw;
     }
-    return resolveLength(raw, base, property, true);
+    return this.lengthOrNothing(node, raw, base, property, true);
+  }
+
+  /**
+   * A length, or nothing when the value cannot be one. A plain value
+   * that cannot is refused when it is written (each length property's
+   * `validate`); one that arrives bound, from an Observable, is caught
+   * here. Throwing here abandoned the frame, and with it every other
+   * element: one mock's `width: '100%'` stopped a whole design editor
+   * drawing. So it is said, once for the node and property, and the
+   * element is laid out as if the property were not set.
+   */
+  private lengthOrNothing(
+    node: UiNode,
+    raw: unknown,
+    base: number | undefined,
+    property: string,
+    keepAuto: boolean
+  ): number | undefined | 'auto' {
+    try {
+      return resolveLength(raw, base, property, keepAuto);
+    } catch (error) {
+      const said = refusedLengths.get(node) ?? new Set<string>();
+      if (!said.has(property)) {
+        said.add(property);
+        refusedLengths.set(node, said);
+        console.error(`[gesso] ${(error as Error).message} On node '${node.id}'; laid out as if it were not set.`);
+      }
+      return undefined;
+    }
   }
 
   /**
@@ -5334,7 +5366,14 @@ export class LayoutEngine {
     if (typeof value === 'number' && Number.isFinite(value)) {
       return value;
     }
-    return resolveLength(value, undefined, side, true) ?? 0;
+    try {
+      return resolveLength(value, undefined, side, true) ?? 0;
+    } catch (error) {
+      // As lengthOrNothing does, without the node to say it once by:
+      // a margin is refused when it is written, so only a bound one gets here.
+      console.error(`[gesso] ${(error as Error).message} Laid out as 0.`);
+      return 0;
+    }
   }
 
   private textWrapProp(node: UiNode): TextWrap | undefined {
