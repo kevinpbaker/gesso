@@ -75,7 +75,18 @@ export interface UiOwnerReport {
   readonly anchorId: string;
   /** Where the component was used, when compiled for development. */
   readonly usedAt?: UiSourceLocation;
+  /**
+   * What its parent supplied for each input, as far as plain data can
+   * say: a word, a number or a flag as it is, and an element (a slot the
+   * parent filled) as `{ element: true }`. Handlers, data objects and
+   * streams with no current value are left out. What a design tool
+   * needs to write a component's use back as code: `label="Email"`.
+   */
+  readonly inputs?: Readonly<Record<string, UiOwnerInput>>;
 }
+
+/** One input's value in an owner report; see `UiOwnerReport.inputs`. */
+export type UiOwnerInput = string | number | boolean | null | { readonly element: true };
 
 /** As much of a node as a one-line path needs. */
 export interface NodePathTarget {

@@ -8,6 +8,7 @@ import {
   type UiEnvironmentReport,
   type UiNodeReport,
   type UiBeneathReport,
+  type UiOwnerInput,
   type UiOwnerReport,
   type UiPropReport,
   type UiSemanticsReport
@@ -25,6 +26,7 @@ import {
   describeOverrides,
   formatExplanation,
   isComponentLikeElement,
+  isUiElement,
   linkOf,
   textRunOfRecordId,
   type UiEnvironment,
@@ -1880,10 +1882,18 @@ export class GessoRuntime {
       const host = this.resolver.hostFor(current.id);
       if (host !== undefined) {
         const usedAt = this.builder.sourceOf(current);
+        const inputs: Record<string, UiOwnerInput> = {};
+        for (const [name, supplied] of host.suppliedInputs()) {
+          const value = ownerInput(supplied);
+          if (value !== undefined) {
+            inputs[name] = value;
+          }
+        }
         owners.push({
           name: getComponentMetadata(host.component).tag,
           anchorId: current.id,
-          ...(usedAt === undefined ? {} : { usedAt })
+          ...(usedAt === undefined ? {} : { usedAt }),
+          ...(Object.keys(inputs).length === 0 ? {} : { inputs })
         });
       }
     }
@@ -4318,4 +4328,28 @@ function withPending(frame: UiFrame, pending: DirtyNodeSet): UiFrame {
     merged.set(node, (merged.get(node) ?? DirtyFlags.None) | node.dirtyFlags);
   }
   return new UiFrame(frame.id, frame.time, merged);
+}
+
+/**
+ * An input's supplied value as an owner report gives it: plain values
+ * as they are, a stream by its current value, an element or a list of
+ * them as a filled slot, and anything else (a handler, a data object)
+ * not at all.
+ */
+function ownerInput(value: unknown): UiOwnerInput | undefined {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (isObservable(value)) {
+    const current = (value as { value?: unknown }).value;
+    return current === undefined || isObservable(current) ? undefined : ownerInput(current);
+  }
+  const isElement = (item: unknown) => isUiElement(item) || isComponentLikeElement(item);
+  if (isElement(value) || (Array.isArray(value) && value.length > 0 && value.every(isElement))) {
+    return { element: true };
+  }
+  return undefined;
 }

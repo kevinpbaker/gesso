@@ -253,6 +253,17 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   }
 
   /**
+   * What the parent most recently supplied for each input, as given:
+   * a value, an element or a stream, whether or not the component has
+   * read it yet. For a tool reading the tree, such as the inspector's
+   * owner report; nothing here changes it.
+   */
+  suppliedInputs(): ReadonlyMap<string, unknown> {
+    const props = this.element.props as Record<string, unknown>;
+    return new Map(Object.entries(props).filter(([name]) => name !== 'key' && name !== 'ref'));
+  }
+
+  /**
    * Connects one input cell to whatever the parent supplied.
    *
    * For a class, an absent prop leaves the cell's default in place, so
