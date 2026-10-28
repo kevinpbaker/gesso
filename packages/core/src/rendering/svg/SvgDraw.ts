@@ -22,9 +22,10 @@ export interface SvgDrawOptions {
   /** How the drawing fills the box. `contain` by default, as an `<img>` of an SVG keeps its proportions. */
   readonly fit?: SvgFit;
   /**
-   * What `currentColor` is: a palette name or a colour. `text` by
-   * default, so an icon set authored in `currentColor` takes the
-   * theme's text colour and follows a theme change.
+   * What \`currentColor\` is: a palette name or a colour. By default the
+   * node's own text colour, inherited, so an icon set authored in
+   * \`currentColor\` takes the colour of the text around it and follows a
+   * theme change.
    */
   readonly color?: UiColorValue;
 }
@@ -69,7 +70,7 @@ export function drawSvg(
   surface.translate((box.width - viewBox.width * scaleX) / 2, (box.height - viewBox.height * scaleY) / 2);
   surface.scale(scaleX, scaleY);
   surface.translate(-viewBox.x, -viewBox.y);
-  const context: Context = { document, surface, currentColor: options.color ?? 'text', using: new Set() };
+  const context: Context = { document, surface, currentColor: options.color ?? 'currentColor', using: new Set() };
   // The root's own presentation attributes are inherited like any
   // group's: an icon set says `fill="none" stroke="currentColor"` there.
   drawChildren(
@@ -96,7 +97,7 @@ export function svgPaint(document: SvgDocument, options: SvgDrawOptions = {}): U
     byOptions = new Map();
     paints.set(document, byOptions);
   }
-  const key = JSON.stringify([options.fit ?? 'contain', options.color ?? 'text']);
+  const key = JSON.stringify([options.fit ?? 'contain', options.color ?? 'currentColor']);
   let paint = byOptions.get(key);
   if (paint === undefined) {
     paint = {

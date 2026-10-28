@@ -130,6 +130,31 @@ describe('PaintPictureCache', () => {
     expect(dark).not.toEqual(light);
   });
 
+  it('resolves currentColor to the text colour the node inherits, and repaints when that changes', () => {
+    const icon: UiPaint = {
+      draw(surface, box) {
+        surface.beginPath();
+        surface.rect(0, 0, box.width, box.height);
+        surface.fillColor('currentColor');
+        surface.fill();
+      }
+    };
+    const node = paintNode({ width: 20, height: 20, paint: icon });
+    const root = node.parent!;
+    root.setProperty('color', '#ff0000');
+    h.graph.propagateEnvironment(root);
+    pictures.pictureFor(node, h.record(node), 1);
+    const red = canvases.last.calls.find(call => call.name === 'fill')!.args[1];
+
+    root.setProperty('color', '#0000ff');
+    h.graph.propagateEnvironment(root);
+    pictures.pictureFor(node, h.record(node), 1);
+    const blue = canvases.last.calls.find(call => call.name === 'fill')!.args[1];
+
+    expect(red).toBe('#f00');
+    expect(blue).toBe('#00f');
+  });
+
   it('places a gradient in the rectangle it was given, not in the node box', () => {
     const ramp = linearGradient(90, [
       { offset: percent(0), color: '#000000' },

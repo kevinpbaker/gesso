@@ -2,7 +2,8 @@ import type { UiNode } from '../graph/UiNode';
 import type { UiEnvironment } from '../environment/UiEnvironment';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import type { UiImage } from '../properties/UiImage';
-import { resolveColorValue, resolveGradient } from '../properties/UiThemeColor';
+import { UiProperties } from '../properties/UiProperty';
+import { resolveColor, resolveColorValue, resolveGradient } from '../properties/UiThemeColor';
 import { EMPTY_RECORDING, PaintRecorder, replayPaint, type PaintRecording } from './PaintRecording';
 import { PaintTarget, type PaintContext2D, type PaintResolver } from './PaintTarget';
 import { paintValuesEqual, pathValuesEqual, type PaintBox, type UiPaint, type UiPath } from './PaintSurface';
@@ -436,10 +437,17 @@ function matches(slot: PaintedSlot, key: SlotKey): boolean {
   );
 }
 
-/** A painter's colour values, against the node's own theme. */
+/**
+ * A painter's colour values, against the node's own theme. \`currentColor\`
+ * is the node's text colour, inherited as CSS's is, so an icon drawn in
+ * it takes the colour of the label beside it: white on a selected row.
+ */
 function resolverFor(node: UiNode): PaintResolver {
   return {
-    color: value => resolveColorValue(node, value),
+    color: value =>
+      value === 'currentColor'
+        ? (resolveColor(node, UiProperties.color) ?? resolveColorValue(node, 'text'))
+        : resolveColorValue(node, value),
     gradient: value => resolveGradient(node, value)
   };
 }
