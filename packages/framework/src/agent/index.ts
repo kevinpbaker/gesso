@@ -9,7 +9,8 @@ export {
   type AgentSurfaceLike,
   type AgentSurfaceOptions,
   type AgentTool,
-  type AgentToolResult
+  type AgentToolResult,
+  WAITS_UP_TO
 } from './AgentSurface';
 export {
   handleMcpMessage,

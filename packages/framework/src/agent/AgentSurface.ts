@@ -57,7 +57,17 @@ export interface AgentTool {
     readonly idempotentHint?: boolean;
     readonly openWorldHint: false;
   };
+  /**
+   * MCP's own place for what is not in its schema. Gesso puts
+   * `gesso/waitsUpToMs` here for a tool that waits on purpose (see
+   * `AgentToolDefinition.waitsUpToMs`), so the bridges between the agent
+   * and the thread give its calls that long.
+   */
+  readonly _meta?: Readonly<Record<string, unknown>>;
 }
+
+/** The `_meta` key a tool that waits on purpose says how long under, in milliseconds. */
+export const WAITS_UP_TO = 'gesso/waitsUpToMs';
 
 /** A resource, in the shape MCP's `resources/list` returns. */
 export interface AgentResource {

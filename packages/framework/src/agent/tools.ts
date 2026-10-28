@@ -1,5 +1,11 @@
 import type { JsonSchema } from '../channel/ChannelSchema';
-import type { AgentContent, AgentSurfaceLike, AgentTool, AgentToolResult } from './AgentSurface';
+import {
+  WAITS_UP_TO,
+  type AgentContent,
+  type AgentSurfaceLike,
+  type AgentTool,
+  type AgentToolResult
+} from './AgentSurface';
 import { validate } from './validate';
 
 /**
@@ -36,6 +42,14 @@ export interface AgentToolDefinition {
   readonly destructive?: boolean;
   /** Calling it twice with the same arguments does what calling it once did. */
   readonly idempotent?: boolean;
+  /**
+   * How long a call may take, in milliseconds, for a tool that waits on
+   * purpose: for a person to answer, or for something to happen (a tool
+   * an agent calls to wait for its next task). The bridges between the
+   * agent and this thread give it that long, where they would give up on
+   * any other call after two minutes.
+   */
+  readonly waitsUpToMs?: number;
   run(args: Readonly<Record<string, unknown>>): AgentToolResult | Promise<AgentToolResult>;
 }
 
@@ -79,7 +93,8 @@ export function toolSurface(definitions: () => readonly AgentToolDefinition[]): 
       ...(definition.destructive === undefined ? {} : { destructiveHint: definition.destructive }),
       ...(definition.idempotent === undefined ? {} : { idempotentHint: definition.idempotent }),
       openWorldHint: false
-    }
+    },
+    ...(definition.waitsUpToMs === undefined ? {} : { _meta: { [WAITS_UP_TO]: definition.waitsUpToMs } })
   });
   return {
     tools: () => definitions().map(listed),

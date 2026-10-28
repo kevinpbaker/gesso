@@ -1,4 +1,11 @@
-import type { AgentConfirmation, AgentResource, AgentSurfaceLike, AgentTool, AgentToolResult } from './AgentSurface';
+import {
+  WAITS_UP_TO,
+  type AgentConfirmation,
+  type AgentResource,
+  type AgentSurfaceLike,
+  type AgentTool,
+  type AgentToolResult
+} from './AgentSurface';
 
 /**
  * An agent surface across a thread.
@@ -119,9 +126,12 @@ function answer(surface: AgentSurfaceLike, request: AgentPortRequest): unknown {
  */
 export function remoteSurface(
   port: AgentPort,
-  options: { timeoutMs?: number; confirm?: AgentConfirm } = {}
+  options: { timeoutMs?: number; callTimeoutMs?: number; confirm?: AgentConfirm } = {}
 ): AgentSurfaceLike {
   const timeoutMs = options.timeoutMs ?? 2000;
+  const callTimeoutMs = options.callTimeoutMs ?? 120_000;
+  /** How long each tool listed says it may wait, for the calls of it. */
+  const waits = new Map<string, number>();
   let next = 1;
   const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
   port.onmessage = event => {
@@ -167,15 +177,25 @@ export function remoteSurface(
       port.postMessage({ ...request, id });
     });
   return {
-    tools: () => ask<readonly AgentTool[]>({ op: 'tools' }, []),
+    tools: () =>
+      ask<readonly AgentTool[]>({ op: 'tools' }, []).then(tools => {
+        for (const tool of tools) {
+          const wait = tool._meta?.[WAITS_UP_TO];
+          if (typeof wait === 'number') {
+            waits.set(tool.name, wait);
+          }
+        }
+        return tools;
+      }),
     resources: () => ask<readonly AgentResource[]>({ op: 'resources' }, []),
     // A command may wait on the person through `confirm`, so a call is
-    // given far longer than a listing before it is abandoned.
+    // given far longer than a listing before it is abandoned; a tool
+    // that waits on purpose, as long as it said, and a moment more.
     call: (name, args) =>
       ask<AgentToolResult>(
         { op: 'call', name, args },
         { content: [{ type: 'text', text: `${name} did not answer in time.` }], isError: true },
-        Math.max(timeoutMs, 120_000)
+        Math.max(timeoutMs, callTimeoutMs, waits.has(name) ? waits.get(name)! + 5_000 : 0)
       ),
     read: async uri => (await ask<Record<string, unknown> | null>({ op: 'read', uri }, null)) ?? undefined
   };
