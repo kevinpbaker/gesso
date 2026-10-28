@@ -216,6 +216,17 @@ describe('the agent endpoint', () => {
     );
   });
 
+  it('tells the agent at once when the page it asked closes, rather than when its wait would end', async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket, { timeoutMs: 60_000 });
+    const page: BridgeClient = { send: () => {} };
+    emit(EVENTS.ready, {}, page);
+    const answer = request(bridge, { body: ping });
+    await Promise.resolve();
+    emit('vite:ws:disconnect', {}, page);
+    expect(JSON.parse((await answer).body!).error.message).toMatch(/closed before it answered/);
+  });
+
   it('tells the agent when the page never answers', async () => {
     const { socket, emit } = fakeSocket();
     const bridge = createAgentBridge(socket, { timeoutMs: 10 });
