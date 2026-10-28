@@ -144,6 +144,7 @@ export { IndexedDbStorage, type IndexedDbStorageOptions } from './storage/Indexe
 export { ShellStorage, type ShellStorageOptions } from './storage/ShellStorage';
 export { persisted, PersistedState, type PersistedOptions } from './storage/persisted';
 export { FrameService } from './app/FrameService';
+export { InspectionService, type InspectionHost } from './app/InspectionService';
 export {
   AudioService,
   type AudioAction,
