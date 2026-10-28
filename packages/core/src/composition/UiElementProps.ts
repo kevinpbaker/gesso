@@ -202,6 +202,7 @@ export type TypographyProps = PropsOf<
 export type InteractionProps = PropsOf<
   | 'cursor'
   | 'pointerEvents'
+  | 'touchEmulation'
   | 'focusable'
   | 'tabStop'
   | 'disabled'

@@ -8,6 +8,7 @@ import {
   type UiPointerDevice
 } from './UiInputEvent';
 import type { HitTester } from './UiHitTester';
+import { emulatesTouch } from './UiInteraction';
 import { UiInputDispatcher } from './UiInputDispatcher';
 import type { GestureInput } from './UiGestureRecognizer';
 import type { ScrollSink } from './UiWheelController';
@@ -146,6 +147,11 @@ interface ScrollbarDrag {
  *     same thing by holding, which the gesture recognizer answers.
  *   - Touch hover: a finger's hover is dropped when it lifts, because
  *     the finger is no longer anywhere. A mouse keeps its hover.
+ *   - Touch emulation: over a `touchEmulation` subtree a mouse is taken
+ *     as a finger, as a browser's device mode does. Its moves with
+ *     nothing pressed hover nothing there, and a press there is a
+ *     finger's from down to up: its slop, its gestures and its hover
+ *     dropped when it lifts.
  *   - Scrollbars: a press on a scroll container's thumb starts a drag
  *     that moves the content with the pointer; a press on the track
  *     beside a visible thumb pages one viewport toward the pointer.
@@ -281,10 +287,11 @@ export class UiPointerController {
     y: number,
     buttons = 1,
     modifiers: UiKeyModifiers = noKeyModifiers(),
-    pointer: UiPointerDevice = MOUSE_POINTER
+    device: UiPointerDevice = MOUSE_POINTER
   ): UiPointerEvent {
     this.lastPosition = { x, y };
-    const event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers, pointer);
+    let pointer = device;
+    let event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers, pointer);
     if (this.downTarget !== null || this.scrollbarDrag !== null) {
       // The press stays with the contact that started it. The contact
       // is still reported, because "a second finger landed" is exactly
@@ -301,6 +308,11 @@ export class UiPointerController {
       return event;
     }
     const target = hit?.node ?? null;
+    if (pointer.kind === 'mouse' && emulatesTouch(target)) {
+      // A finger, from here to its release.
+      pointer = { id: pointer.id, kind: 'touch' };
+      event = new UiPointerEvent(UiEventType.PointerDown, x, y, buttons, modifiers, pointer);
+    }
     this.updateHover(target, x, y, buttons, modifiers, pointer);
     if (target !== null && isSecondaryButton(buttons)) {
       // A right press is a question, not a gesture: it asks what can be
@@ -366,9 +378,10 @@ export class UiPointerController {
     y: number,
     buttons = 0,
     modifiers: UiKeyModifiers = noKeyModifiers(),
-    pointer: UiPointerDevice = MOUSE_POINTER
+    device: UiPointerDevice = MOUSE_POINTER
   ): UiPointerEvent | null {
     this.lastPosition = { x, y };
+    const pointer = this.contactOf(device);
     this.gestures?.contactMove?.(pointer, x, y);
     if (!this.ownsPress(pointer)) {
       return null;
@@ -403,6 +416,11 @@ export class UiPointerController {
     const hit = this.hitTester.hitTest(x, y);
     this.hoverOnScrollbar = hit?.scrollbar !== undefined;
     const target = hit?.node ?? null;
+    if (pointer.kind === 'mouse' && emulatesTouch(target)) {
+      // A finger that is not touching is nowhere.
+      this.updateHover(null, x, y, buttons, modifiers, pointer);
+      return null;
+    }
     this.updateHover(target, x, y, buttons, modifiers, pointer);
     this.selection?.pointerHover?.(target, x, y);
     if (target === null) {
@@ -424,8 +442,9 @@ export class UiPointerController {
     y: number,
     buttons = 0,
     modifiers: UiKeyModifiers = noKeyModifiers(),
-    pointer: UiPointerDevice = MOUSE_POINTER
+    device: UiPointerDevice = MOUSE_POINTER
   ): UiPointerEvent | null {
+    const pointer = this.contactOf(device);
     this.gestures?.contactUp?.(pointer);
     if (!this.ownsPress(pointer)) {
       return null;
@@ -508,7 +527,8 @@ export class UiPointerController {
    * Aborts the active press: dispatches PointerCancel to the pressed
    * node and clears press state so no Click is synthesized.
    */
-  pointerCancel(pointer: UiPointerDevice = MOUSE_POINTER): void {
+  pointerCancel(device: UiPointerDevice = MOUSE_POINTER): void {
+    const pointer = this.contactOf(device);
     this.gestures?.contactUp?.(pointer);
     if (!this.ownsPress(pointer)) {
       return;
@@ -540,6 +560,11 @@ export class UiPointerController {
    */
   private ownsPress(pointer: UiPointerDevice): boolean {
     return this.activePointer === null || this.activePointer.id === pointer.id;
+  }
+
+  /** The contact an event is from: the press's own, which an emulated finger's mouse events are part of. */
+  private contactOf(device: UiPointerDevice): UiPointerDevice {
+    return this.activePointer !== null && this.activePointer.id === device.id ? this.activePointer : device;
   }
 
   // -------------------------------------------------------------------------
