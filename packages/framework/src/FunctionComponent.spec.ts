@@ -64,6 +64,14 @@ describe('functional components', () => {
     ).toBe(false);
   });
 
+  it('draws nothing for a component that returns nothing, as a plain-script one may', () => {
+    const { builder } = createHarness();
+    // Written without types (a design tool's mock in a .jsx file), a body may return null.
+    const Empty = (() => null) as unknown as () => ReturnType<typeof Text>;
+    const root = builder.build(Column(createComponent(Empty, {}), Text({ text: 'after' })));
+    expect(texts(root)).toEqual(['after']);
+  });
+
   it('renders the function once and binds its inputs as cells', () => {
     const renders = vi.fn();
     function Greeting(inputs: Inputs<{ name: string }>) {

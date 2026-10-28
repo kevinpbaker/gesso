@@ -303,6 +303,11 @@ export class UiGraphBuilder {
    * the fragment's children on each emission.
    */
   reconcileChildren(parent: UiNode, definitions: readonly UiChild[]): { nodes: UiNode[]; changed: boolean } {
+    // Nothing is drawn for nothing: a component written without types (a
+    // mock in a .jsx file) may return null, or a list hold false from
+    // `cond && child`, as React allows. The types say UiChild; the
+    // runtime is told what plain script hands it.
+    const present = definitions.some(isNothing) ? definitions.filter(each => !isNothing(each)) : definitions;
     if (this.reconciling.has(parent)) {
       // A binding emitted into a fragment whose own pass is still on the
       // stack: a component body, run while its list was being
@@ -311,14 +316,14 @@ export class UiGraphBuilder {
       // continue over one a second pass had rewritten, leaving nodes
       // registered but unreachable. Keep the newest definitions and run
       // them once the pass returns; only the last emission matters.
-      this.deferredChildren.set(parent, definitions);
+      this.deferredChildren.set(parent, present);
       return { nodes: this.collectChildren(parent), changed: false };
     }
     this.reconciling.add(parent);
     this.reconcileDepth++;
     let result: { nodes: UiNode[]; changed: boolean };
     try {
-      result = this.reconcile(parent, definitions);
+      result = this.reconcile(parent, present);
     } finally {
       this.reconcileDepth--;
       this.reconciling.delete(parent);
@@ -1221,4 +1226,9 @@ function longestIncreasing(values: readonly number[]): number[] {
 function idSegment(key: string | number): string {
   const text = String(key);
   return text.includes(':') || text.includes('%') ? text.replace(/%/g, '%25').replace(/:/g, '%3A') : text;
+}
+
+/** A child that draws nothing: null, undefined or a boolean, from plain script. */
+function isNothing(child: unknown): boolean {
+  return child === null || child === undefined || typeof child === 'boolean';
 }
