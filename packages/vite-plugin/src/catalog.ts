@@ -153,8 +153,18 @@ export class ComponentCatalog {
     this.cached = null;
   }
 
+  /**
+   * The components, read once until something changes. A read that
+   * fails (TypeScript refusing a project mid-change) is a warning and an
+   * empty catalog, tried again on the next call, never a rejection left
+   * for nobody to catch, which ends the dev server.
+   */
   entries(): Promise<readonly CatalogEntry[]> {
-    return (this.cached ??= this.read());
+    return (this.cached ??= this.read().catch((error: unknown) => {
+      this.cached = null;
+      console.warn(`[gesso] The component catalog could not be read: ${String((error as Error).message ?? error)}`);
+      return [];
+    }));
   }
 
   async call(name: string, args: Readonly<Record<string, unknown>> = {}): Promise<CatalogResult> {
@@ -225,7 +235,7 @@ export class ComponentCatalog {
         continue;
       }
       const from = source.file.slice(this.root.length + 1).replace(/\.[cm]?[jt]sx?$/, '');
-      for (const [name, schema] of reader.readComponents(source.file).components) {
+      for (const [name, schema] of reader.readComponents(source.file, this.options.tsconfig).components) {
         found.push({ name, from, file: source.file, schema });
       }
     }
