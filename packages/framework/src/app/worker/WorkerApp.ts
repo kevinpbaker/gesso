@@ -1548,6 +1548,50 @@ export class WorkerApp {
         at: epochFromEvent(event)
       });
     };
+    // A trackpad pinch, as WebKit reports it. Chromium and Firefox send
+    // a pinch as a wheel with ctrlKey set, deltaY in hundredths of the
+    // scale's natural log, and a canvas that zooms on the wheel takes
+    // it with no more than that. WebKit sends gesture events instead,
+    // and a web view that magnifies zooms the whole page on them, the
+    // application's chrome along with the canvas. So the shell turns
+    // each step of the gesture into the wheel a Chromium pinch would
+    // have been, and keeps it from the page by the same rule as a
+    // wheel: when the chain under the pointer would take that wheel.
+    let pinchScale = 1;
+    const onGestureStart = (event: Event): void => {
+      pinchScale = 1;
+      if (this.scrollability.up || this.scrollability.down) {
+        event.preventDefault();
+      }
+    };
+    const onGestureChange = (event: Event): void => {
+      const pinch = event as PinchGestureEvent;
+      const deltaY = pinchWheelDelta(pinchScale, pinch.scale);
+      pinchScale = pinch.scale;
+      if (deltaY === 0) {
+        return;
+      }
+      this.flushPendingMove();
+      if (wheelConsumedBy(this.scrollability, 0, deltaY)) {
+        event.preventDefault();
+      }
+      const { x, y } = toLocal(pinch.clientX, pinch.clientY);
+      this.post({
+        type: 'wheel',
+        x,
+        y,
+        deltaX: 0,
+        deltaY,
+        deltaMode: 0,
+        modifiers: { ...modifiersFrom(pinch), ctrl: true },
+        at: epochFromEvent(pinch)
+      });
+    };
+    const onGestureEnd = (event: Event): void => {
+      if (this.scrollability.up || this.scrollability.down) {
+        event.preventDefault();
+      }
+    };
     const onKeyDown = (event: KeyboardEvent): void => this.forwardKeyDown(event);
     const onKeyUp = (event: KeyboardEvent): void => this.forwardKeyUp(event);
     /**
@@ -1576,6 +1620,9 @@ export class WorkerApp {
     canvas.addEventListener('pointerup', onPointerUp);
     canvas.addEventListener('pointercancel', onPointerCancel);
     canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('gesturestart', onGestureStart);
+    canvas.addEventListener('gesturechange', onGestureChange);
+    canvas.addEventListener('gestureend', onGestureEnd);
     canvas.addEventListener('keydown', onKeyDown);
     canvas.addEventListener('keyup', onKeyUp);
     // A key aimed at the page itself, when the app is the page: the
@@ -1620,6 +1667,9 @@ export class WorkerApp {
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerCancel);
       canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('gesturestart', onGestureStart);
+      canvas.removeEventListener('gesturechange', onGestureChange);
+      canvas.removeEventListener('gestureend', onGestureEnd);
       canvas.removeEventListener('keydown', onKeyDown);
       canvas.removeEventListener('keyup', onKeyUp);
       if (pageKeys) {
@@ -1686,6 +1736,34 @@ export function wheelConsumedBy(scrollability: UiScrollability, deltaX: number, 
     return scrollability.right;
   }
   return deltaX < 0 ? scrollability.left : false;
+}
+
+/**
+ * WebKit's `GestureEvent`, as far as a pinch uses it. Not in the DOM
+ * typings, since no other engine has it.
+ */
+interface PinchGestureEvent extends Event {
+  readonly scale: number;
+  readonly clientX: number;
+  readonly clientY: number;
+  readonly shiftKey: boolean;
+  readonly ctrlKey: boolean;
+  readonly altKey: boolean;
+  readonly metaKey: boolean;
+}
+
+/**
+ * The wheel a Chromium pinch from one scale to the next would have
+ * been: `deltaY` is -100·ln of the step, so spreading the fingers
+ * scrolls up and zooms in, and a handler written for Chromium's pinch
+ * takes WebKit's unchanged. Zero for a step that did not move, or a
+ * scale that is not a scale.
+ */
+export function pinchWheelDelta(from: number, to: number): number {
+  if (!(from > 0) || !(to > 0) || from === to) {
+    return 0;
+  }
+  return -100 * Math.log(to / from);
 }
 
 /**

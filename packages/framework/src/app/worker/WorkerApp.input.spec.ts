@@ -557,3 +557,71 @@ describe('keys pressed on the page', () => {
     expect(shell.fireDocument('keydown', { ...key(), target: shell.body })).toBe(false);
   });
 });
+
+/**
+ * A trackpad pinch in WebKit, which sends gesture events where
+ * Chromium sends a ctrl-wheel. A web view that magnifies zooms the
+ * whole page on them unless the shell keeps them.
+ */
+describe('a WebKit pinch', () => {
+  function gesture(scale: number, prevented: string[], type: string): Event {
+    return {
+      scale,
+      clientX: 120,
+      clientY: 110,
+      shiftKey: false,
+      ctrlKey: false,
+      altKey: false,
+      metaKey: false,
+      timeStamp: 7,
+      preventDefault: () => prevented.push(type)
+    } as unknown as Event;
+  }
+
+  function takesWheel(shell: Harness, takes: boolean): void {
+    shell.internals.handleWorkerMessage({
+      data: {
+        type: 'scrollability',
+        scrollability: { up: takes, down: takes, left: takes, right: takes },
+        scrollsAnything: takes
+      }
+    } as MessageEvent<RuntimeToShellMessage>);
+  }
+
+  it("arrives as the ctrl-wheel Chromium's pinch is, and is kept from the page when the canvas takes it", () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    takesWheel(shell, true);
+    const prevented: string[] = [];
+
+    shell.canvas.dispatch('gesturestart', gesture(1, prevented, 'start'));
+    shell.canvas.dispatch('gesturechange', gesture(1.5, prevented, 'change'));
+    shell.canvas.dispatch('gesturechange', gesture(1.5, prevented, 'still'));
+    shell.canvas.dispatch('gesturechange', gesture(0.75, prevented, 'back'));
+    shell.canvas.dispatch('gestureend', gesture(0.75, prevented, 'end'));
+
+    const wheels = shell.posts.filter(message => message.type === 'wheel');
+    expect(wheels).toHaveLength(2);
+    // Spreading the fingers scrolls up, by a hundred times the log of
+    // the step, at the pointer in the canvas's own coordinates.
+    expect(wheels[0]).toMatchObject({ x: 100, y: 100, deltaX: 0, modifiers: { ctrl: true } });
+    expect((wheels[0] as { deltaY: number }).deltaY).toBeCloseTo(-100 * Math.log(1.5), 10);
+    expect((wheels[1] as { deltaY: number }).deltaY).toBeCloseTo(-100 * Math.log(0.5), 10);
+    // A step that did not move posts nothing, and so prevents nothing.
+    expect(prevented).toEqual(['start', 'change', 'back', 'end']);
+  });
+
+  it('is left to the page when nothing under the pointer takes a wheel', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    takesWheel(shell, false);
+    const prevented: string[] = [];
+
+    shell.canvas.dispatch('gesturestart', gesture(1, prevented, 'start'));
+    shell.canvas.dispatch('gesturechange', gesture(2, prevented, 'change'));
+    shell.canvas.dispatch('gestureend', gesture(2, prevented, 'end'));
+
+    expect(prevented).toEqual([]);
+    expect(shell.posts.filter(message => message.type === 'wheel')).toHaveLength(1);
+  });
+});
