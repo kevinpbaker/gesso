@@ -45,6 +45,13 @@ export interface RenderDependencies {
   readonly channels?: ChannelRegistry;
   /** The running application's services, so a component that injects one finds it. */
   readonly services?: ServiceRegistry;
+  /**
+   * What `light` and `dark` mean, when the application has themes of its
+   * own for them: a design editor drawing a project in the project's
+   * theme, not Gesso's. Asked on each call, so a theme that changes is
+   * followed. By default Gesso's `lightTheme` and `darkTheme`.
+   */
+  readonly themes?: () => { readonly light?: UiTheme; readonly dark?: UiTheme };
   /** Passed to `renderFrame`, for a test that has no `OffscreenCanvas`. */
   readonly frame?: Pick<RenderFrameOptions, 'createCanvas' | 'settleMs'>;
 }
@@ -64,8 +71,13 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
   const root = isUiElement(chosen.value)
     ? chosen.value
     : createComponent(chosen.value as ComponentType, (request.inputs ?? {}) as never);
+  const themes = deps.themes?.() ?? {};
   const theme =
-    request.theme === 'dark' ? darkTheme : request.theme === 'light' ? lightTheme : (deps.appTheme() ?? lightTheme);
+    request.theme === 'dark'
+      ? (themes.dark ?? darkTheme)
+      : request.theme === 'light'
+        ? (themes.light ?? lightTheme)
+        : (deps.appTheme() ?? lightTheme);
   const scale = Math.min(3, Math.max(1, request.scale ?? 1));
   let frame;
   try {

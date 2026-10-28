@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, Text, darkTheme, type UiChild } from 'gesso-core';
+import { Box, Text, UiEnvironmentKeys, darkTheme, lightTheme, type UiChild } from 'gesso-core';
 import type { Inputs } from '../FunctionComponent';
 import { mockCanvas } from '../app/RuntimeTestUtils';
 import type { PictureCanvas } from '../app/renderFrame';
@@ -79,6 +79,28 @@ describe('renderModule', () => {
 
     expect(resultText(settings)).toContain('default from src/mocks/Settings.ts, 200×50');
     expect(resultText(board)).toBe('Board from src/mocks/Board.tsx, 200×600 at 1x, in the app theme.');
+  });
+
+  it("draws light and dark in the application's own themes when it has them", async () => {
+    const { deps } = project({ '/src/ui/Pill.tsx': { Pill } });
+    let seen: unknown;
+    const own = { ...darkTheme, density: 'compact' as const };
+    const withThemes: RenderDependencies = {
+      ...deps,
+      themes: () => ({ dark: own }),
+      frame: { ...deps.frame, settleMs: 100 }
+    };
+    const probe = async (theme: 'light' | 'dark') => {
+      seen = undefined;
+      function Probe(): UiChild {
+        return Box({ height: 10, ref: node => (seen = node?.environment?.get(UiEnvironmentKeys.theme)) });
+      }
+      withThemes.load = async () => ({ Probe });
+      await renderModule({ module: 'src/Probe', width: 100, theme }, withThemes);
+      return seen;
+    };
+    expect(await probe('dark')).toBe(own);
+    expect(await probe('light')).toBe(lightTheme);
   });
 
   it('says which export to choose, and what loaded nothing', async () => {
