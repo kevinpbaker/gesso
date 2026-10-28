@@ -1,5 +1,5 @@
-import type { AgentSurfaceLike, AgentToolResult } from 'gesso-framework/agent';
-import { remoteSurface } from 'gesso-framework/agent';
+import type { AgentConfirmation, AgentSurfaceLike, AgentToolResult } from 'gesso-framework/agent';
+import { remoteSurface, SCREEN_TOOL_NAMES } from 'gesso-framework/agent';
 
 /**
  * A desktop window's screen, offered to agents beside its channels.
@@ -13,9 +13,12 @@ import { remoteSurface } from 'gesso-framework/agent';
  * surface (`createScreenAgent`) that `serveDesktopAgent` offers beside
  * the channel tools.
  *
- * Only the screen tools cross. The render worker's surface also lists
- * the channels it replicates, which the main process serves itself, so
- * they would only be listed twice.
+ * Only the screen tools cross (`SCREEN_TOOL_NAMES`: the `ui_` tools,
+ * `tokens_view` and `render_frame`). The render worker's surface also
+ * lists the channels it replicates, which the main process serves
+ * itself, so they would only be listed twice. An application whose state
+ * lives in its window instead, with nothing in the main process to
+ * serve it, asks for those too with `windowChannels`.
  *
  * Pressing the screen's buttons is everything the person can do, so an
  * application offers this in development, not to every agent with the
@@ -25,8 +28,27 @@ import { remoteSurface } from 'gesso-framework/agent';
 
 import type { ScreenAgentMessage } from './view';
 
-/** The screen tools, by name; what crosses from the render worker. */
-const SCREEN_TOOL = /^ui_/;
+/**
+ * The screen tools, by name; what crosses from the render worker. It
+ * was `/^ui_/`, which kept `tokens_view` and `render_frame` from every
+ * desktop app's agents once they joined the screen's tools.
+ */
+const SCREEN_TOOLS = new Set(SCREEN_TOOL_NAMES);
+
+export interface ScreenAgentOptions {
+  /**
+   * Offer the window's channels too, as its render worker lists them:
+   * for an application whose state lives in its window, such as an
+   * editor, with nothing in the main process to serve it. Off by default,
+   * because an Electrobun application's channels are the main process's.
+   */
+  readonly windowChannels?: boolean;
+  /**
+   * Asks the person before a window channel's `@confirm` command is
+   * sent. Without it such a command is refused.
+   */
+  readonly confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+}
 
 /** The main process's half. */
 export interface ScreenAgent {
@@ -48,15 +70,16 @@ const NO_WINDOW: AgentToolResult = {
   isError: true
 };
 
-export function createScreenAgent(): ScreenAgent {
+export function createScreenAgent(options: ScreenAgentOptions = {}): ScreenAgent {
   const windows: { surface: AgentSurfaceLike }[] = [];
   const current = () => windows.at(-1)?.surface;
+  const offered = (name: string) => options.windowChannels === true || SCREEN_TOOLS.has(name);
   const surface: AgentSurfaceLike = {
-    tools: async () => ((await current()?.tools()) ?? []).filter(tool => SCREEN_TOOL.test(tool.name)),
+    tools: async () => ((await current()?.tools()) ?? []).filter(tool => offered(tool.name)),
     resources: () => [],
     call: async (name, args) => {
       const window = current();
-      if (window === undefined || !SCREEN_TOOL.test(name)) return NO_WINDOW;
+      if (window === undefined || !offered(name)) return NO_WINDOW;
       return window.call(name, args);
     },
     read: () => undefined
@@ -69,9 +92,10 @@ export function createScreenAgent(): ScreenAgent {
         postMessage: (message: unknown) => send(message),
         onmessage: null as ((event: MessageEvent) => void) | null
       };
-      // The screen tools ask the person nothing; a channel command they
-      // might reach is the main process's to confirm, not the window's.
-      const entry = { surface: remoteSurface(port, { confirm: () => false }) };
+      // The screen tools ask the person nothing; a window channel's
+      // command marked `@confirm` is asked through `confirm`, and refused
+      // without one.
+      const entry = { surface: remoteSurface(port, { confirm: options.confirm ?? (() => false) }) };
       windows.push(entry);
       return {
         receive: message => port.onmessage?.({ data: message } as MessageEvent),

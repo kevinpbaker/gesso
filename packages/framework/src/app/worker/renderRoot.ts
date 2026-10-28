@@ -91,6 +91,8 @@ export class RenderWorkerApp {
   private readonly host: WorkerGlobal;
 
   private runtime: GessoRuntime | undefined;
+  /** See `loadModulesWith`. */
+  private loadModule: (path: string) => Promise<Record<string, unknown>> = path => import(/* @vite-ignore */ path);
   /** Held so forwarded display refreshes can be handed to it. */
   private clock: UiHostFrameClock | undefined;
   private channels: ChannelRegistryHandle | undefined;
@@ -207,6 +209,21 @@ export class RenderWorkerApp {
       }
     }
     this.runtime?.reload(this.root, services);
+  }
+
+  /**
+   * How `render_frame` loads a module an agent names, given its path from
+   * the project root with a leading slash (`/mocks/Settings.tsx`). By
+   * default it is imported from where the application is served, which
+   * suits an application drawing its own modules. One whose modules are
+   * served from somewhere else says where: a design editor serving the
+   * project it designs from another folder.
+   *
+   *   renderRoot(Editor).loadModulesWith(path => import(`/@fs${projectRoot}${path}`))
+   */
+  loadModulesWith(load: (path: string) => Promise<Record<string, unknown>>): this {
+    this.loadModule = load;
+    return this;
   }
 
   /**
@@ -385,7 +402,7 @@ export class RenderWorkerApp {
           theme: at => runtime.themeAt(at),
           render: request =>
             renderModule(request, {
-              load: path => import(/* @vite-ignore */ path),
+              load: this.loadModule,
               appTheme: () => runtime.themeAt(),
               channels: runtime.channels,
               services: runtime.services

@@ -23,6 +23,7 @@ import {
   resolveTarget,
   resourceUri,
   resultText,
+  SCREEN_TOOL_NAMES,
   ServedChannel,
   UiHost,
   UiRefs,
@@ -193,6 +194,7 @@ export {
   resolveTarget,
   resourceUri,
   resultText,
+  SCREEN_TOOL_NAMES,
   serveAgentPort,
   serveApplicationAgent,
   themeTokens,
@@ -2831,6 +2833,7 @@ declare class RenderWorkerApp {
   private root;
   private readonly host;
   private runtime;
+  private loadModule;
   private clock;
   private channels;
   private appLogicWorker;
@@ -2838,6 +2841,7 @@ declare class RenderWorkerApp {
   constructor(root: FrameworkChild | ComponentType, host?: WorkerGlobal);
   private reportUncaught;
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): void;
+  loadModulesWith(load: (path: string) => Promise<Record<string, unknown>>): this;
   useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options?: {
     worker?: WorkerHandle | (() => Worker);
     source?: ChannelSource<V, C>;
@@ -4163,6 +4167,7 @@ interface UiSurfaceOptions {
   quietMs?: number;
   settleMs?: number;
 }
+declare const SCREEN_TOOL_NAMES: readonly string[];
 declare class UiRefs {
   private readonly byId;
   private readonly byRef;
@@ -4213,6 +4218,7 @@ export {
   resolveTarget,
   resourceUri,
   resultText,
+  SCREEN_TOOL_NAMES,
   serve,
   serveChannels,
   ServedChannel,
