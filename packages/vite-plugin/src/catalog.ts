@@ -53,6 +53,12 @@ export interface ComponentCatalogOptions {
    * catalog is first read. None by default.
    */
   readonly libraries?: () => Promise<readonly CatalogLibrary[]>;
+  /**
+   * Folders under the root whose files are not the project's
+   * components nor uses of them, from the root: generated code, say,
+   * which names the same components in another framework.
+   */
+  readonly exclude?: readonly string[];
 }
 
 /** A tool, in the shape MCP's `tools/list` returns. */
@@ -204,9 +210,15 @@ export class ComponentCatalog {
     if (reader === null) {
       return [];
     }
+    const excluded = (this.options.exclude ?? []).map(folder => `${this.root}/${folder.replace(/^\.?\/+|\/+$/g, '')}/`);
     const sources = reader
       .sources(this.options.tsconfig)
-      .filter(source => source.file.startsWith(`${this.root}/`) && !/\.(?:spec|test)\.[cm]?[jt]sx?$/.test(source.file));
+      .filter(
+        source =>
+          source.file.startsWith(`${this.root}/`) &&
+          !/\.(?:spec|test)\.[cm]?[jt]sx?$/.test(source.file) &&
+          !excluded.some(folder => source.file.startsWith(folder))
+      );
     const found: { name: string; from: string; library?: string; file?: string; schema: ComponentSchemaOut }[] = [];
     for (const source of sources) {
       if (!mayDeclareComponent(source.text)) {

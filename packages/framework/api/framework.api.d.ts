@@ -8,13 +8,17 @@
 import {
   AgentConfirmation,
   AgentContent,
+  agentError,
+  agentImages,
   AgentResource,
   agentSurface,
   AgentSurface,
   AgentSurfaceLike,
   AgentSurfaceOptions,
+  agentText,
   AgentThemeName,
   AgentTool,
+  AgentToolDefinition,
   AgentToolResult,
   designedTheme,
   DesignThemes,
@@ -28,12 +32,13 @@ import {
   resultText,
   SCREEN_TOOL_NAMES,
   ServedChannel,
+  toolSurface,
   UiHost,
   UiRefs,
   uiSurface,
   UiSurfaceOptions,
   WorkerHandle
-} from "../ui.js";
+} from "../tools.js";
 import {
   UiTheme
 } from "gesso-core";
@@ -156,6 +161,7 @@ interface ApplicationAgentParts {
   readonly channels: () => readonly ServedChannel[];
   readonly workers: () => Iterable<WorkerHandle>;
   readonly ui: () => UiHost | undefined;
+  readonly tools?: () => readonly AgentToolDefinition[];
 }
 declare function serveApplicationAgent(port: MessagePort, parts: ApplicationAgentParts): () => void;
 interface ThemeTokens {
@@ -183,7 +189,10 @@ declare function themeTokens(theme: UiTheme): ThemeTokens;
 declare function formatThemeTokens(tokens: ThemeTokens, which: string): string;
 export {
   AGENT_PORT,
+  agentError,
+  agentImages,
   agentSurface,
+  agentText,
   combineSurfaces,
   confirmInWindow,
   connectDevAgent,
@@ -206,6 +215,7 @@ export {
   serveAgentPort,
   serveApplicationAgent,
   themeTokens,
+  toolSurface,
   type AgentConfirmation,
   type AgentContent,
   type AgentPortRequest,
@@ -216,6 +226,7 @@ export {
   type AgentSurfaceOptions,
   type AgentThemeName,
   type AgentTool,
+  type AgentToolDefinition,
   type AgentToolResult,
   type ApplicationAgentParts,
   type DesignThemes,
@@ -476,6 +487,7 @@ import {
 } from "./FunctionComponent.js";
 import {
   AgentConfirmation,
+  AgentToolDefinition,
   ChannelRegistry,
   ChannelSource,
   ComponentElement,
@@ -484,7 +496,7 @@ import {
   ServiceRegistry,
   UiHost,
   WorkerHandle
-} from "./ui.js";
+} from "./tools.js";
 import {
   BehaviorSubject,
   Observable,
@@ -2285,6 +2297,7 @@ declare class GessoAppBuilder {
   private root;
   private readonly channelRegistrations;
   private readonly serviceRegistrations;
+  private readonly agentTools;
   private frameListener;
   private inspectListener;
   private devtoolsListener;
@@ -2305,6 +2318,7 @@ declare class GessoAppBuilder {
     source?: ChannelSource<V, C>;
   }): this;
   useService(ServiceClass: new () => object): this;
+  useAgentTools(tools: readonly AgentToolDefinition[]): this;
   useRoutes(routes: RouterRoutes): this;
   useMedia(media: MediaOptions): this;
   useFonts(families: readonly FontFamilyDeclaration[]): this;
@@ -2856,6 +2870,7 @@ declare class RenderWorkerApp {
   private runtime;
   private renderThemes;
   private loadModule;
+  private readonly agentTools;
   private clock;
   private channels;
   private appLogicWorker;
@@ -2870,6 +2885,7 @@ declare class RenderWorkerApp {
     source?: ChannelSource<V, C>;
   }): this;
   useService(ServiceClass: new () => object): this;
+  useAgentTools(tools: readonly AgentToolDefinition[]): this;
   useRoutes(routes: RouterRoutes): this;
   useMedia(media: MediaOptions): this;
   useFonts(families: readonly FontFamilyDeclaration[]): this;
@@ -3194,7 +3210,7 @@ import {
   ServiceRegistry,
   workerHandle,
   WorkerHandle
-} from "./ui.js";
+} from "./tools.js";
 import {
   ActionCause,
   ActionEntry,
@@ -3856,7 +3872,7 @@ export {
 // ==== remote/index.d.ts ====
 import {
   ServedChannel
-} from "../ui.js";
+} from "../tools.js";
 import {
   AppLogicEndpoint
 } from "../index.js";
@@ -3927,7 +3943,7 @@ export {
   type RemoteChannelHost,
   type RemoteChannelHostOptions
 };
-// ==== ui.d.ts ====
+// ==== tools.d.ts ====
 import {
   ChannelPort,
   ChannelReplica,
@@ -4214,16 +4230,34 @@ declare class UiRefs {
 declare function uiSurface(host: () => UiHost | undefined, options?: UiSurfaceOptions): AgentSurface;
 declare function outline(tree: UiSemanticsMap, focused: string | null, refs?: UiRefs): string;
 declare function resolveTarget(tree: UiSemanticsMap, args: Readonly<Record<string, unknown>>, refs?: UiRefs): UiSemanticsRecord | string;
+interface AgentToolDefinition {
+  readonly name: string;
+  readonly title?: string;
+  readonly description: string;
+  readonly inputSchema: JsonSchema;
+  readonly readOnly?: boolean;
+  readonly destructive?: boolean;
+  readonly idempotent?: boolean;
+  run(args: Readonly<Record<string, unknown>>): AgentToolResult | Promise<AgentToolResult>;
+}
+declare function agentText(text: string, structured?: Record<string, unknown>): AgentToolResult;
+declare function agentError(text: string): AgentToolResult;
+declare function agentImages(text: string, pictures: readonly Uint8Array[], structured?: Record<string, unknown>): AgentToolResult;
+declare function toolSurface(definitions: () => readonly AgentToolDefinition[]): AgentSurfaceLike;
 export {
   AgentConfirmation,
   AgentContent,
+  agentError,
+  agentImages,
   AgentResource,
   agentSurface,
   AgentSurface,
   AgentSurfaceLike,
   AgentSurfaceOptions,
+  agentText,
   AgentThemeName,
   AgentTool,
+  AgentToolDefinition,
   AgentToolResult,
   APPLICATION_WORKER,
   ChannelRegistry,
@@ -4264,6 +4298,7 @@ export {
   ServedChannel,
   servePorts,
   ServiceRegistry,
+  toolSurface,
   UiHost,
   UiRefs,
   uiSurface,
@@ -4305,7 +4340,7 @@ import {
   serveChannels,
   ServedChannel,
   servePorts
-} from "../ui.js";
+} from "../tools.js";
 import {
   classifyStorageError,
   computed,

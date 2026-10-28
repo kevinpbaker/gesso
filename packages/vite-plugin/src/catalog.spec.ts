@@ -136,6 +136,24 @@ describe("the project's components, as tools", () => {
     expect((data as { usedIn: string[] }).usedIn).toEqual(['Settings.tsx']);
   });
 
+  it('leaves out the folders it is told to: generated code naming the same components is not a use', async () => {
+    files.set(
+      `${dir}/tsconfig.all.json`,
+      files.get(`${dir}/tsconfig.json`)!.replace('["*.ts","*.tsx"]', '["**/*.ts","**/*.tsx"]')
+    );
+    files.set(`${dir}/handoff/Settings.tsx`, SCREEN.replace("'./StatusPill'", "'../StatusPill'"));
+    const everything = new ComponentCatalog(async () => reader, dir, { tsconfig: `${dir}/tsconfig.all.json` });
+    const excluding = new ComponentCatalog(async () => reader, dir, {
+      tsconfig: `${dir}/tsconfig.all.json`,
+      exclude: ['handoff']
+    });
+    const usedIn = async (from: ComponentCatalog) =>
+      ((await from.call('library_get', { name: 'StatusPill' })).structuredContent as { usedIn: string[] }).usedIn;
+
+    expect(await usedIn(everything)).toEqual(['Settings.tsx', 'handoff/Settings.tsx']);
+    expect(await usedIn(excluding)).toEqual(['Settings.tsx']);
+  });
+
   it('finds components by what they are for, and suggests the near ones for a wrong name', async () => {
     const found = await text('library_search', { query: 'top bar' });
     const wrong = await text('library_get', { name: 'StatusBadge' });

@@ -11,6 +11,7 @@ import {
 import type { ServedChannel } from '../channel/serveChannels';
 import { AGENT_PORT } from '../agent/remote';
 import type { AgentConfirmation } from '../agent/AgentSurface';
+import type { AgentToolDefinition } from '../agent/tools';
 
 /** What `useWebMcp` takes besides a boolean: the app's own way to ask the person. */
 export interface WebMcpChoice {
@@ -34,6 +35,8 @@ import type { DevtoolsEvent, DevtoolsRequest } from './DevtoolsProtocol';
 export class GessoAppBuilder {
   private readonly channelRegistrations: ChannelRegistration[] = [];
   private readonly serviceRegistrations: (new () => object)[] = [];
+  /** The application's own agent tools (`useAgentTools`). */
+  private readonly agentTools: AgentToolDefinition[] = [];
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((report: UiNodeReport | null) => void) | undefined;
   private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
@@ -88,6 +91,12 @@ export class GessoAppBuilder {
    */
   useService(ServiceClass: new () => object): this {
     this.serviceRegistrations.push(ServiceClass);
+    return this;
+  }
+
+  /** Offers an agent tools of the application's own; see `renderRoot(...).useAgentTools`. */
+  useAgentTools(tools: readonly AgentToolDefinition[]): this {
+    this.agentTools.push(...tools);
     return this;
   }
 
@@ -321,7 +330,8 @@ export class GessoAppBuilder {
               registration => ({ token: registration.token, source: registration.source }) as unknown as ServedChannel
             ),
         workers: () => this.channelHandle?.workers ?? [],
-        ui: () => (this.app === app ? app.uiHost() : undefined)
+        ui: () => (this.app === app ? app.uiHost() : undefined),
+        tools: () => this.agentTools
       })
     );
     return pair.port1;

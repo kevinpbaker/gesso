@@ -2,6 +2,7 @@ import type { ServedChannel } from '../channel/serveChannels';
 import type { WorkerHandle } from '../worker/WorkerPorts';
 import { agentSurface } from './AgentSurface';
 import { AGENT_PORT, combineSurfaces, remoteSurface, serveAgentPort } from './remote';
+import { toolSurface, type AgentToolDefinition } from './tools';
 import { uiSurface, type UiHost } from './ui';
 
 /** What a thread that draws the application can offer an agent. */
@@ -12,6 +13,8 @@ export interface ApplicationAgentParts {
   readonly workers: () => Iterable<WorkerHandle>;
   /** The screen, once the application has started. */
   readonly ui: () => UiHost | undefined;
+  /** Tools the application offers of its own accord (`useAgentTools`). */
+  readonly tools?: () => readonly AgentToolDefinition[];
 }
 
 /**
@@ -28,6 +31,11 @@ export function serveApplicationAgent(port: MessagePort, parts: ApplicationAgent
     const workers = [...parts.workers()]
       .filter(worker => worker.spawned)
       .map(worker => remoteSurface(worker.open(AGENT_PORT), { confirm }));
-    return combineSurfaces([agentSurface(parts.channels(), { confirm }), ...workers, uiSurface(parts.ui)]);
+    return combineSurfaces([
+      agentSurface(parts.channels(), { confirm }),
+      ...workers,
+      uiSurface(parts.ui),
+      ...(parts.tools === undefined ? [] : [toolSurface(parts.tools)])
+    ]);
   });
 }

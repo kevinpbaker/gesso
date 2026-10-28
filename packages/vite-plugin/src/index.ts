@@ -128,6 +128,12 @@ export interface GessoPluginOptions {
    * read from the files its tsconfig includes; name a library in
    * `libraries` to offer its components too, such as `gesso-components`.
    */
+  /**
+   * What an agent is told when it connects, after what the catalog
+   * says: how this application is meant to be worked with, for one
+   * whose tools are best used in an order.
+   */
+  readonly agentInstructions?: string;
   readonly catalog?:
     | boolean
     | {
@@ -141,6 +147,8 @@ export interface GessoPluginOptions {
         readonly tsconfig?: string;
         /** Packages whose components join the project's own, by the name they are imported by. */
         readonly libraries?: readonly string[];
+        /** Folders under the root that are not the project's components nor uses of them: generated code, say. */
+        readonly exclude?: readonly string[];
       };
 }
 
@@ -301,7 +309,8 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
           ? null
           : new ComponentCatalog(() => readerFor(message => server.config.logger.warn(message)), catalogRoot, {
               tsconfig: absolute(catalogRoot, catalogOptions.tsconfig ?? 'tsconfig.json'),
-              libraries: () => resolveLibraries(server, root, catalogOptions.libraries ?? [])
+              libraries: () => resolveLibraries(server, root, catalogOptions.libraries ?? []),
+              ...(catalogOptions.exclude === undefined ? {} : { exclude: catalogOptions.exclude })
             });
       if (catalogRoot !== root) {
         // Outside the root, Vite watches only what has been imported, and a
@@ -315,7 +324,10 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
               local: {
                 tools: CATALOG_TOOLS,
                 call: (name, args) => catalog!.call(name, args),
-                instructions: CATALOG_INSTRUCTIONS
+                instructions: [
+                  CATALOG_INSTRUCTIONS,
+                  ...(options.agentInstructions === undefined ? [] : [options.agentInstructions])
+                ].join('\n\n')
               }
             })
       });
