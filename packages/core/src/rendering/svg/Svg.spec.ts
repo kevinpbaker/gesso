@@ -84,11 +84,11 @@ describe('drawing it', () => {
     expect(only(ops, 'moveTo')).toHaveLength(2);
   });
 
-  it("draws currentColor in the theme's text colour, or the colour it is given", () => {
+  it("draws currentColor as the node's own text colour, which the painter resolves, or the colour it is given", () => {
     const icon =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4L20 20"/></svg>';
     expect(only(draw(icon), 'strokeColor', 'lineWidth', 'stroke')).toEqual([
-      { op: 'strokeColor', color: 'text' },
+      { op: 'strokeColor', color: 'currentColor' },
       { op: 'lineWidth', width: 2 },
       { op: 'stroke' }
     ]);
