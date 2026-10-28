@@ -94,14 +94,25 @@ export function bandOf(width: number, breakpoints: readonly number[]): number {
 }
 
 /**
- * The width bands of a container, one value per band entered.
+ * The width bands of a container, one value per band entered, and once
+ * more at the first size measured.
  *
  * What `Responsive` builds its children from, and what an author who
  * wants only a number rather than a subtree can subscribe to directly.
+ *
+ * The first value is the size before any layout, usually zeroes, and
+ * the first measurement is the real one. Emitting only when the band
+ * changed left a container whose real width fell in the same band as
+ * the guess built from the guess for good, so a builder that reads the
+ * width (`size.width < 600` inside the `[1024]` band) was handed zero
+ * on a 768-wide tablet. One more value at the first measurement costs
+ * one more build at most, once, and every build after it sees a size
+ * that was measured.
  */
 export function containerBands(size: UiContainerSize, breakpoints: readonly number[]): Observable<number> {
   return size.changes.pipe(
-    map(measured => bandOf(measured.width, breakpoints)),
-    distinctUntilChanged()
+    map((measured, index) => ({ band: bandOf(measured.width, breakpoints), first: index === 0 })),
+    distinctUntilChanged((before, now) => before.band === now.band && !before.first),
+    map(({ band }) => band)
   );
 }
