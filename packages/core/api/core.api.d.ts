@@ -3719,6 +3719,7 @@ declare class LayoutEngine {
   worldBox(node: UiNode): LayoutBox;
   visibleBox(node: UiNode): LayoutBox;
   screenBox(node: UiNode, part?: LayoutBox): LayoutBox;
+  screenBounds(node: UiNode): LayoutBox | null;
   revealAdjustments(node: UiNode, padding?: number, inner?: LayoutBox): ScrollAdjustment[];
   private textScrollAdjustment;
   revealScrollbars(node: UiNode): void;

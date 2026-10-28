@@ -892,6 +892,10 @@ export class GessoRuntime {
     this.services.get(InspectionService).attach({
       nodesAt: (x, y) => this.hitTester.hitStack(x, y),
       inspect: node => this.inspectNode(node),
+      box: node => {
+        const box = this.engine.visibleBox(node);
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      },
       preview: (node, property, value) => this.previewProperty(node, property, value),
       endPreview: (node, property) => this.endPreviews(node, property)
     });
@@ -3138,10 +3142,19 @@ export class GessoRuntime {
           // story: a panned, zoomed map draws a card far from its record,
           // and the mirror put the card's element at the record. The
           // engine projects such a node through every transform above
-          // it, at a walk up per node; transformed subtrees are rare, and
-          // their bounds are in record space, so nothing is culled here.
-          // A node's own transform is not one of them (see `screenBox`),
-          // so a spinner's turning does not move its element every step.
+          // it, at a walk up per node. A node's own transform is not one
+          // of them (see `screenBox`), so a spinner's turning does not
+          // move its element every step.
+          //
+          // Its subtree's bounds are projected the same way, and a
+          // subtree none of which is on screen is passed over whole, as
+          // it is outside a transform: a design tool's board of hundreds
+          // of frames under one camera walked every node of every frame
+          // on every step of a pan.
+          const reach = node === focused ? null : this.engine.screenBounds(node);
+          if (reach !== null && !this.onScreen(reach)) {
+            continue;
+          }
           if (this.semantics.has(node.id)) {
             const box = this.engine.screenBox(node);
             if (node === focused) {

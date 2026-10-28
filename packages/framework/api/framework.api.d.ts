@@ -2618,12 +2618,24 @@ declare class InspectionService {
   attach(host: InspectionHost): void;
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  box(node: UiNode): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
   preview(node: UiNode, property: string, value: unknown): void;
   endPreview(node: UiNode, property?: string): void;
 }
 interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  box?(node: UiNode): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
   preview?(node: UiNode, property: string, value: unknown): void;
   endPreview?(node: UiNode, property?: string): void;
 }

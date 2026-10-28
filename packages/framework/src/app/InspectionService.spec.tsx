@@ -39,6 +39,9 @@ describe('InspectionService', () => {
     expect(report.owners[0]?.name).toBe('Canvas');
     // Outside it, the box is not there; the runtime's own root, also a box, is.
     expect(inspection.nodesAt(500, 500)).not.toContain(stack[1]);
+    // Its box alone is the box the report has.
+    expect(inspection.box(stack[1]!)).toEqual(inspection.inspect(stack[1]!).box);
+    expect(inspection.box(stack[1]!)).toMatchObject({ x: 20, y: 20, width: 200, height: 100 });
   });
 
   it('previews a value over the element’s own until the preview ends', () => {

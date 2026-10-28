@@ -1,6 +1,7 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
 import type { LayoutRecord } from './LayoutRecord';
+import { transformPointsOut } from './LayoutTransform';
 
 /**
  * A conservative box around everything in a subtree that could take a
@@ -71,12 +72,44 @@ function fillNode(node: UiNode, records: ReadonlyMap<UiNode, LayoutRecord>): Lay
   // looks at a single child, so its box is the whole answer and a
   // descendant that reaches past it changes nothing. That is also
   // where an unbounded descendant stops propagating: whatever a
-  // transform inside the clip does, the clip still holds.
+  // sticky node inside the clip does, the clip still holds.
   //
   // The children are filled in either way, because the descent that
   // does happen inside the clip consults them.
   fillChildren(node, rec.paintOrder, records, rec.clips ? null : rec);
+  // A transformed node's box and its children's are in the space the
+  // transform moves them out of; carried through it, the box around
+  // the four corners is in its parent's, where the hit tester and the
+  // semantics walk compare it.
+  const transform = node.properties.get('transform');
+  if (!rec.boundsUnbounded && typeof transform === 'object' && transform !== null) {
+    mapThroughTransform(node, rec);
+  }
   return rec;
+}
+
+/**
+ * A transformed node's bounds, carried out through its transform: the
+ * box around where its corners land. Never smaller than what is drawn,
+ * because a box's image under any affine transform is inside the box
+ * around its corners' images; larger only by a rotation's corners.
+ */
+function mapThroughTransform(node: UiNode, rec: LayoutRecord): void {
+  const corners = new Float64Array([
+    rec.boundsMinX,
+    rec.boundsMinY,
+    rec.boundsMaxX,
+    rec.boundsMinY,
+    rec.boundsMaxX,
+    rec.boundsMaxY,
+    rec.boundsMinX,
+    rec.boundsMaxY
+  ]);
+  transformPointsOut(node, rec, corners);
+  rec.boundsMinX = Math.min(corners[0]!, corners[2]!, corners[4]!, corners[6]!);
+  rec.boundsMinY = Math.min(corners[1]!, corners[3]!, corners[5]!, corners[7]!);
+  rec.boundsMaxX = Math.max(corners[0]!, corners[2]!, corners[4]!, corners[6]!);
+  rec.boundsMaxY = Math.max(corners[1]!, corners[3]!, corners[5]!, corners[7]!);
 }
 
 function fillChildren(
@@ -129,16 +162,16 @@ function union(into: LayoutRecord | null, child: LayoutRecord | null): void {
  * Whether a node's own hit area is something its parent's box cannot
  * describe.
  *
- * A transform is the first case. The hit tester inverts the point into
- * a node's local space before it compares anything, so the box a
- * parent would test the point against is in the space the transform
- * moved the node out of: a node translated three hundred pixels up is
- * hit three hundred pixels up and bounded where it is not. Mapping the
- * box forward through the transform is possible, and rotation makes it
- * fiddly enough to be worth doing on its own evidence rather than
- * here; until then a transformed node is simply always descended into.
+ * A transform was the first case, and is not any more: the hit tester
+ * inverts the point into a node's local space before it compares
+ * anything, so the box a parent tests the point against has to be in
+ * the space the transform moves the node into, and `mapThroughTransform`
+ * carries it there. The evidence it was worth doing on: a design tool's
+ * board, every frame's name drawn the same size at any zoom by a
+ * transform, left every ancestor of every name unbounded, and nothing
+ * on the board was ever passed over.
  *
- * Sticky is the second. A sticky node is drawn, and hit, shifted from
+ * Sticky is the case that remains. A sticky node is drawn, and hit, shifted from
  * its record by an offset `applySticky` writes after placement, and
  * the shift moves the node's whole subtree without moving a single
  * box. The shifted box is knowable here, but it is knowable only
@@ -153,10 +186,6 @@ function union(into: LayoutRecord | null, child: LayoutRecord | null): void {
  * so the walk that fills them always runs against the boxes an anchor
  * settled on.
  */
-function isUnbounded(node: UiNode, rec: LayoutRecord): boolean {
-  if (rec.sticky) {
-    return true;
-  }
-  const transform = node.properties.get('transform');
-  return typeof transform === 'object' && transform !== null;
+function isUnbounded(_node: UiNode, rec: LayoutRecord): boolean {
+  return rec.sticky;
 }
