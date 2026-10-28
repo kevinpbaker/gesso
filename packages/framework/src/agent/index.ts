@@ -47,5 +47,6 @@ export {
 } from './webmcp';
 export { outline, resolveTarget, SCREEN_TOOL_NAMES, UiRefs, uiSurface, type UiHost, type UiSurfaceOptions } from './ui';
 export { serveApplicationAgent, type ApplicationAgentParts } from './app';
+export { designedTheme, type AgentThemeName, type DesignThemes } from './designedTheme';
 export { renderModule, type RenderDependencies, type RenderRequest } from './render';
 export { formatThemeTokens, themeTokens, type TextStyleToken, type ThemeTokens } from './tokens';

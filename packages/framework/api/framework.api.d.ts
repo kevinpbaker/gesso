@@ -13,8 +13,11 @@ import {
   AgentSurface,
   AgentSurfaceLike,
   AgentSurfaceOptions,
+  AgentThemeName,
   AgentTool,
   AgentToolResult,
+  designedTheme,
+  DesignThemes,
   JsonSchema,
   outline,
   RenderDependencies,
@@ -177,7 +180,7 @@ interface TextStyleToken {
   readonly letterSpacing: number;
 }
 declare function themeTokens(theme: UiTheme): ThemeTokens;
-declare function formatThemeTokens(tokens: ThemeTokens, where: string): string;
+declare function formatThemeTokens(tokens: ThemeTokens, which: string): string;
 export {
   AGENT_PORT,
   agentSurface,
@@ -185,6 +188,7 @@ export {
   confirmInWindow,
   connectDevAgent,
   connectWebMcp,
+  designedTheme,
   DEV_AGENT_EVENTS,
   formatThemeTokens,
   handleMcpMessage,
@@ -210,9 +214,11 @@ export {
   type AgentSurface,
   type AgentSurfaceLike,
   type AgentSurfaceOptions,
+  type AgentThemeName,
   type AgentTool,
   type AgentToolResult,
   type ApplicationAgentParts,
+  type DesignThemes,
   type DevAgentApp,
   type DevAgentHot,
   type DevAgentRequest,
@@ -473,6 +479,7 @@ import {
   ChannelRegistry,
   ChannelSource,
   ComponentElement,
+  DesignThemes,
   FrameworkChild,
   ServiceRegistry,
   UiHost,
@@ -2847,10 +2854,7 @@ declare class RenderWorkerApp {
   private reportUncaught;
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): void;
   loadModulesWith(load: (path: string) => Promise<Record<string, unknown>>): this;
-  renderThemesWith(themes: () => {
-    light?: UiTheme;
-    dark?: UiTheme;
-  }): this;
+  renderThemesWith(themes: () => DesignThemes): this;
   useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options?: {
     worker?: WorkerHandle | (() => Worker);
     source?: ChannelSource<V, C>;
@@ -4093,6 +4097,15 @@ interface AgentSurface extends AgentSurfaceLike {
 }
 declare function agentSurface(channels: readonly ServedChannel[], options?: AgentSurfaceOptions): AgentSurface;
 declare function resourceUri(channel: string): string;
+type AgentThemeName = 'app' | 'light' | 'dark';
+interface DesignThemes {
+  readonly light?: UiTheme;
+  readonly dark?: UiTheme;
+}
+declare function designedTheme(asked: AgentThemeName | undefined, themes: DesignThemes, appTheme: () => UiTheme | undefined): {
+  readonly theme: UiTheme;
+  readonly name: AgentThemeName;
+};
 declare class ChannelRegistry {
   private readonly replicas;
   attach<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, port: ChannelPort): ChannelReplica<View, Commands>;
@@ -4153,17 +4166,14 @@ interface RenderRequest {
   readonly width: number;
   readonly height?: number;
   readonly scale?: number;
-  readonly theme?: 'app' | 'light' | 'dark';
+  readonly theme?: AgentThemeName;
 }
 interface RenderDependencies {
   load(path: string): Promise<Record<string, unknown>>;
   appTheme(): UiTheme | undefined;
   readonly channels?: ChannelRegistry;
   readonly services?: ServiceRegistry;
-  readonly themes?: () => {
-    readonly light?: UiTheme;
-    readonly dark?: UiTheme;
-  };
+  readonly themes?: () => DesignThemes;
   readonly frame?: Pick<RenderFrameOptions, 'createCanvas' | 'settleMs'>;
 }
 declare function renderModule(request: RenderRequest, deps: RenderDependencies): Promise<AgentToolResult>;
@@ -4174,6 +4184,7 @@ interface UiHost {
   key(key: string, modifiers: UiKeyModifiers): void;
   flush(): void;
   theme?(at?: string): UiTheme | undefined;
+  designThemes?(): DesignThemes;
   render?(request: RenderRequest): Promise<AgentToolResult>;
 }
 interface UiSurfaceOptions {
@@ -4198,6 +4209,7 @@ export {
   AgentSurface,
   AgentSurfaceLike,
   AgentSurfaceOptions,
+  AgentThemeName,
   AgentTool,
   AgentToolResult,
   APPLICATION_WORKER,
@@ -4208,6 +4220,8 @@ export {
   CommandSchema,
   ComponentElement,
   describeChannel,
+  designedTheme,
+  DesignThemes,
   FrameworkChild,
   isComponentElement,
   isHubMessage,

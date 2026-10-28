@@ -1,4 +1,4 @@
-import { darkTheme, isUiElement, lightTheme, type UiTheme } from 'gesso-core';
+import { isUiElement, type UiTheme } from 'gesso-core';
 
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
@@ -6,6 +6,7 @@ import { createComponent } from '../createComponent';
 import type { ComponentType } from '../FunctionComponent';
 import { renderFrame, type RenderFrameOptions } from '../app/renderFrame';
 import type { AgentToolResult } from './AgentSurface';
+import { designedTheme, type AgentThemeName, type DesignThemes } from './designedTheme';
 
 /**
  * `render_frame`: a module of the project, drawn to a PNG an agent can
@@ -14,8 +15,9 @@ import type { AgentToolResult } from './AgentSurface';
  * An agent that writes a screen and cannot see it is designing blind;
  * the outline `ui_snapshot` gives says what is there, not how it looks.
  * So this draws one: a mock, or a component with inputs, at the width
- * asked for, in the running application's theme by default, through the
- * same runtime the application draws with (see `renderFrame`).
+ * asked for, in the theme the agent is designing in by default (see
+ * `designedTheme`), through the same runtime the application draws with
+ * (see `renderFrame`).
  *
  * The module is loaded by path from where the application is served,
  * which in development is the dev server: the same file the agent just
@@ -32,8 +34,8 @@ export interface RenderRequest {
   readonly width: number;
   readonly height?: number;
   readonly scale?: number;
-  /** `app` (the default) is the theme the running application is drawn in. */
-  readonly theme?: 'app' | 'light' | 'dark';
+  /** The theme to draw in; see `designedTheme` for what each means and which is the default. */
+  readonly theme?: AgentThemeName;
 }
 
 export interface RenderDependencies {
@@ -45,13 +47,8 @@ export interface RenderDependencies {
   readonly channels?: ChannelRegistry;
   /** The running application's services, so a component that injects one finds it. */
   readonly services?: ServiceRegistry;
-  /**
-   * What `light` and `dark` mean, when the application has themes of its
-   * own for them: a design editor drawing a project in the project's
-   * theme, not Gesso's. Asked on each call, so a theme that changes is
-   * followed. By default Gesso's `lightTheme` and `darkTheme`.
-   */
-  readonly themes?: () => { readonly light?: UiTheme; readonly dark?: UiTheme };
+  /** The themes the application designs in, if it has any; see `designedTheme`. */
+  readonly themes?: () => DesignThemes;
   /** Passed to `renderFrame`, for a test that has no `OffscreenCanvas`. */
   readonly frame?: Pick<RenderFrameOptions, 'createCanvas' | 'settleMs'>;
 }
@@ -71,13 +68,7 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
   const root = isUiElement(chosen.value)
     ? chosen.value
     : createComponent(chosen.value as ComponentType, (request.inputs ?? {}) as never);
-  const themes = deps.themes?.() ?? {};
-  const theme =
-    request.theme === 'dark'
-      ? (themes.dark ?? darkTheme)
-      : request.theme === 'light'
-        ? (themes.light ?? lightTheme)
-        : (deps.appTheme() ?? lightTheme);
+  const { theme, name: themeName } = designedTheme(request.theme, deps.themes?.() ?? {}, deps.appTheme);
   const scale = Math.min(3, Math.max(1, request.scale ?? 1));
   let frame;
   try {
@@ -98,7 +89,6 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
     );
   }
   const data = base64(frame.png);
-  const themeName = request.theme ?? 'app';
   const thrown =
     frame.errors.length === 0
       ? ''

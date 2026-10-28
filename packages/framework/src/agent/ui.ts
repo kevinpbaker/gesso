@@ -2,6 +2,7 @@ import type { UiKeyModifiers, UiSemanticsAction, UiSemanticsMap, UiSemanticsReco
 
 import type { JsonSchema } from '../channel/ChannelSchema';
 import type { AgentSurface, AgentTool, AgentToolResult } from './AgentSurface';
+import { designedTheme, type AgentThemeName, type DesignThemes } from './designedTheme';
 import type { RenderRequest } from './render';
 import { formatThemeTokens, themeTokens } from './tokens';
 
@@ -53,6 +54,8 @@ export interface UiHost {
    * `tokens_view` says it cannot answer.
    */
   theme?(at?: string): UiTheme | undefined;
+  /** The themes the application designs in, if they are not its own; see `designedTheme`. */
+  designThemes?(): DesignThemes;
   /** Draws a module of the project to a PNG; see `renderModule`. Optional, as `theme` is. */
   render?(request: RenderRequest): Promise<AgentToolResult>;
 }
@@ -63,6 +66,13 @@ export interface UiSurfaceOptions {
   /** The longest an action waits for that (default 1000 ms). */
   settleMs?: number;
 }
+
+const THEME: JsonSchema = {
+  enum: ['app', 'light', 'dark'],
+  description:
+    "The light or dark theme of what is being designed, or the running application's own (app). By default the " +
+    'light one where the application designs in themes of its own, as a design editor does, else its own.'
+};
 
 const TARGET: Record<string, JsonSchema> = {
   ref: { type: 'string', description: 'The ref ui_snapshot gave the control, such as "e4".' },
@@ -138,7 +148,7 @@ const TOOLS: readonly AgentTool[] = [
       "The theme's colours, type styles, corner radii, spacing scale and shadows, by name and value, as the screen " +
       'draws them. Read it before designing, and write the names rather than raw values. Name a control, by ref or ' +
       'by role and name, to read the theme where it is: part of a screen may have a theme of its own.',
-    inputSchema: { type: 'object', properties: TARGET, additionalProperties: false },
+    inputSchema: { type: 'object', properties: { ...TARGET, theme: THEME }, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false }
   },
   {
@@ -146,7 +156,7 @@ const TOOLS: readonly AgentTool[] = [
     title: 'Draw a frame',
     description:
       'Draws a module of the project to a PNG you can look at: a mock, or a component with inputs, at the width ' +
-      "you ask for, in the running application's theme. The pixels are the application's own: the same layout, " +
+      "you ask for, in the theme being designed in. The pixels are the application's own: the same layout, " +
       'text and paint. Draw what you build, at a phone width and a desktop one, and look before you call it done. ' +
       'Without a height it is as tall as its content, which suits a component or a section; give one for a whole ' +
       'screen, which then fills it.',
@@ -166,10 +176,7 @@ const TOOLS: readonly AgentTool[] = [
         width: { type: 'number', description: 'In logical pixels: 390 for a phone, 1280 for a desktop.' },
         height: { type: 'number', description: 'In logical pixels. Leave it out to fit the content.' },
         scale: { type: 'number', description: 'Device pixels per logical pixel, 1 to 3 (default 1).' },
-        theme: {
-          enum: ['app', 'light', 'dark'],
-          description: "The application's theme (default), or the light or dark one."
-        }
+        theme: THEME
       },
       required: ['module', 'width'],
       additionalProperties: false
@@ -318,14 +325,30 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
             }
             at = found;
           }
-          const theme = ui.theme(at?.id);
+          // A control named is read where it is. Otherwise the theme
+          // asked for, or the one being designed in, which for a design
+          // editor is its project's and not the editor's own.
+          let theme: UiTheme | undefined;
+          let which: string;
+          if (at !== undefined) {
+            theme = ui.theme(at.id);
+            which = `The theme in force at ${describe(at)}`;
+          } else {
+            const designed = designedTheme(args.theme as AgentThemeName | undefined, ui.designThemes?.() ?? {}, () =>
+              ui.theme?.()
+            );
+            theme = designed.name === 'app' ? ui.theme() : designed.theme;
+            which =
+              designed.name === 'app'
+                ? "The theme in force at the application's outermost content"
+                : `The ${designed.name} theme being designed in`;
+          }
           if (theme === undefined) {
             return failure('The application has not drawn anything yet, so no theme is in force.');
           }
           const tokens = themeTokens(theme);
-          const where = at === undefined ? "the application's outermost content" : describe(at);
           return {
-            content: [{ type: 'text', text: formatThemeTokens(tokens, where) }],
+            content: [{ type: 'text', text: formatThemeTokens(tokens, which) }],
             structuredContent: tokens as unknown as Record<string, unknown>,
             isError: false
           };

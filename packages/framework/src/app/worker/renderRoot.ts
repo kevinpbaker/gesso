@@ -5,6 +5,7 @@ import { APPLICATION_WORKER, portHandle, servePorts, type PortHost, type WorkerH
 import { AGENT_PORT } from '../../agent/remote';
 import { serveApplicationAgent } from '../../agent/app';
 import { renderModule } from '../../agent/render';
+import type { DesignThemes } from '../../agent/designedTheme';
 import { isClaimedError } from '../claimedErrors';
 import type { ServedChannel } from '../../channel/serveChannels';
 import { captureConsole } from '../../worker/captureConsole';
@@ -15,7 +16,7 @@ import {
 } from '../../channel/createChannelRegistry';
 import type { ChannelSource } from '../../channel/provide';
 import type { ChannelToken } from '../../channel/ChannelToken';
-import { UiHostFrameClock, type UiTheme } from 'gesso-core';
+import { UiHostFrameClock } from 'gesso-core';
 import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
 import type { MediaOptions } from '../MediaService';
@@ -92,7 +93,7 @@ export class RenderWorkerApp {
 
   private runtime: GessoRuntime | undefined;
   /** See `renderThemesWith`. */
-  private renderThemes: () => { light?: UiTheme; dark?: UiTheme } = () => ({});
+  private renderThemes: () => DesignThemes = () => ({});
   /** See `loadModulesWith`. */
   private loadModule: (path: string) => Promise<Record<string, unknown>> = path => import(/* @vite-ignore */ path);
   /** Held so forwarded display refreshes can be handed to it. */
@@ -229,11 +230,12 @@ export class RenderWorkerApp {
   }
 
   /**
-   * What `render_frame`'s `light` and `dark` draw in, asked on each call:
-   * the themes an application has of its own, such as the project a
-   * design editor is designing. Gesso's own by default.
+   * The themes an application designs in, asked on each call, when they
+   * are not the one it is drawn in: a design editor's project's. They
+   * are what `render_frame` draws in and `tokens_view` reports unless an
+   * agent asks for the application's own; see `designedTheme`.
    */
-  renderThemesWith(themes: () => { light?: UiTheme; dark?: UiTheme }): this {
+  renderThemesWith(themes: () => DesignThemes): this {
     this.renderThemes = themes;
     return this;
   }
@@ -412,6 +414,7 @@ export class RenderWorkerApp {
           },
           flush: () => this.clock?.tick(performance.now()),
           theme: at => runtime.themeAt(at),
+          designThemes: () => this.renderThemes(),
           render: request =>
             renderModule(request, {
               load: this.loadModule,
