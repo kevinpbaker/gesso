@@ -243,6 +243,30 @@ export class ContractReader {
     (event === 'create' ? this.created : event === 'delete' ? this.deleted : this.changed).add(file);
   }
 
+  /**
+   * A snapshot of the projects, with what changed since the last one.
+   *
+   * The checker keeps every project it has opened, and asked to update
+   * one whose tsconfig has since been deleted it refuses the whole
+   * update ("project not found for update"). That was a dev server gone
+   * with it: a project's tsconfig removed while the server ran threw out
+   * of the catalog's read and took the process down. A refused update is
+   * a checker started afresh, which reads the disk as it now is and
+   * opens only what is asked of it again.
+   */
+  private snapshot(request: NonNullable<Parameters<TsApi.API['updateSnapshot']>[0]>): TsApi.Snapshot {
+    const api = (this.api ??= new this.ts.API({ cwd: this.cwd, ...(this.fs === undefined ? {} : { fs: this.fs }) }));
+    try {
+      return api.updateSnapshot({ ...request, fileChanges: this.takeChanges() });
+    } catch {
+      this.close();
+      this.configs.clear();
+      const fresh = (this.api = new this.ts.API({ cwd: this.cwd, ...(this.fs === undefined ? {} : { fs: this.fs }) }));
+      const { fileChanges: _changes, ...rest } = request;
+      return fresh.updateSnapshot(rest);
+    }
+  }
+
   /** What changed since the last snapshot, emptied for the next. */
   private takeChanges(): { changed: string[]; created: string[]; deleted: string[] } {
     const changes = { changed: [...this.changed], created: [...this.created], deleted: [...this.deleted] };
@@ -278,8 +302,8 @@ export class ContractReader {
    * inputs are its `InputCell` fields. A library's index re-exports its
    * components, and reading it reads all of them.
    */
-  readComponents(file: string): ComponentReading {
-    const opened = this.open(file);
+  readComponents(file: string, config?: string): ComponentReading {
+    const opened = this.open(file, config);
     if (typeof opened === 'string') {
       return { components: new Map(), warnings: [opened] };
     }
@@ -304,8 +328,7 @@ export class ContractReader {
    * is, which is the answer the person already gave their editor.
    */
   sources(config: string): { readonly file: string; readonly text: string }[] {
-    const api = (this.api ??= new this.ts.API({ cwd: this.cwd, ...(this.fs === undefined ? {} : { fs: this.fs }) }));
-    const snapshot = api.updateSnapshot({ openProjects: [config], fileChanges: this.takeChanges() });
+    const snapshot = this.snapshot({ openProjects: [config] });
     const program = snapshot.getProject(config)?.program;
     if (program === undefined) {
       return [];
@@ -377,20 +400,28 @@ export class ContractReader {
   }
 
   /**
-   * The checker and the module's exports, or why there are none.
+   * The checker and the module's exports, or why there are none: read
+   * in the project `preferred` names when it includes the file (the
+   * catalog's own tsconfig, which may resolve its imports differently
+   * from any beside it), else the project TypeScript finds for it.
    */
-  private open(file: string): { checker: TsApi.Checker; exports: readonly TsApi.Symbol[] } | string {
-    const api = (this.api ??= new this.ts.API({ cwd: this.cwd, ...(this.fs === undefined ? {} : { fs: this.fs }) }));
+  private open(
+    file: string,
+    preferred?: string
+  ): { checker: TsApi.Checker; exports: readonly TsApi.Symbol[] } | string {
     this.changed.add(file);
-    let snapshot = api.updateSnapshot({ fileChanges: this.takeChanges() });
-    let config = this.configs.get(file);
+    let snapshot = this.snapshot(preferred === undefined ? {} : { openProjects: [preferred] });
+    let config =
+      preferred !== undefined && snapshot.getProject(preferred)?.program.getSourceFile(file) !== undefined
+        ? preferred
+        : this.configs.get(file);
     if (config === undefined) {
       // A file opened through the API is an editor's buffer: the server
       // stops reading it from disk, and an edit the next save makes is
       // never seen. So the file is opened only long enough to learn
       // which project it belongs to, and the project is what stays open.
-      config = api.updateSnapshot({ openFiles: [file] }).getDefaultProjectForFile(file)?.configFileName;
-      snapshot = api.updateSnapshot({
+      config = this.snapshot({ openFiles: [file] }).getDefaultProjectForFile(file)?.configFileName;
+      snapshot = this.snapshot({
         ...(config === undefined ? {} : { openProjects: [config] }),
         closeFiles: [file]
       });

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { ComponentCatalog } from './catalog.ts';
+import { ContractReader, type TypeScriptApi } from './contracts.ts';
+
 import { openCatalog, watchCatalog, type CatalogFs } from './library.ts';
 
 /**
@@ -25,6 +28,49 @@ describe('openCatalog', () => {
       expect(badge.content[0]!.text).toContain('Badge, from src/Badge');
     } finally {
       catalog!.dispose();
+    }
+  });
+});
+
+describe('a project whose own tsconfig goes while the catalog is open', () => {
+  it('reads it through the catalog’s tsconfig, and keeps answering once the project’s own is deleted', async () => {
+    // The plugin has no Node types of its own: the few file calls this needs, by shape.
+    const { mkdirSync, rmSync, writeFileSync } = (await import('node:fs' as string)) as {
+      mkdirSync(path: string, options: { recursive: boolean }): void;
+      rmSync(path: string, options?: { recursive: boolean; force: boolean }): void;
+      writeFileSync(path: string, text: string): void;
+    };
+    // Inside the components package, so `gesso-framework` resolves as it would in a project.
+    const folder = `${components}/.catalog-spec-${Date.now().toString(36)}`;
+    const project = `${folder}/project`;
+    mkdirSync(project, { recursive: true });
+    const base = '../../../../tsconfig.base.json';
+    writeFileSync(`${project}/tsconfig.json`, JSON.stringify({ extends: base, include: ['.'] }));
+    writeFileSync(
+      `${folder}/catalog.json`,
+      JSON.stringify({ extends: '../../../tsconfig.base.json', include: ['project'] })
+    );
+    writeFileSync(
+      `${project}/Card.tsx`,
+      "import type { Inputs } from 'gesso-framework';\nimport type { UiChild } from 'gesso-core';\n\n/** Card: a title over its words. */\nexport function Card(inputs: Inputs<{ title: string }>): UiChild {\n  return <text text={inputs.title} />;\n}\n"
+    );
+    const ts = (await import('typescript/unstable/sync')) as TypeScriptApi;
+    const reader = new ContractReader(ts, project);
+    const catalog = new ComponentCatalog(async () => reader, project, { tsconfig: `${folder}/catalog.json` });
+    try {
+      const before = await catalog.call('library_get', { name: 'Card' });
+      expect(before.content[0]!.text).toContain('title');
+
+      // The project's own tsconfig, which the checker had seen, goes.
+      rmSync(`${project}/tsconfig.json`);
+      reader.invalidate(`${project}/tsconfig.json`, 'delete');
+      catalog.invalidate();
+
+      const after = await catalog.call('library_get', { name: 'Card' });
+      expect(after.content[0]!.text).toContain('title');
+    } finally {
+      reader.close();
+      rmSync(folder, { recursive: true, force: true });
     }
   });
 });
