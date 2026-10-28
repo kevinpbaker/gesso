@@ -131,7 +131,13 @@ export interface GessoPluginOptions {
   readonly catalog?:
     | boolean
     | {
-        /** The tsconfig whose files are the project's source (default `tsconfig.json` in the root). */
+        /**
+         * The project whose components these are, absolute (default
+         * Vite's root). An application that designs another, such as a
+         * design editor serving a project from its own folder, names it.
+         */
+        readonly root?: string;
+        /** The tsconfig whose files are the project's source (default `tsconfig.json` in `root`). */
         readonly tsconfig?: string;
         /** Packages whose components join the project's own, by the name they are imported by. */
         readonly libraries?: readonly string[];
@@ -289,13 +295,19 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         return;
       }
       const catalogOptions = typeof options.catalog === 'object' ? options.catalog : {};
+      const catalogRoot = catalogOptions.root ?? root;
       catalog =
         options.catalog === false
           ? null
-          : new ComponentCatalog(() => readerFor(message => server.config.logger.warn(message)), root, {
-              tsconfig: absolute(root, catalogOptions.tsconfig ?? 'tsconfig.json'),
+          : new ComponentCatalog(() => readerFor(message => server.config.logger.warn(message)), catalogRoot, {
+              tsconfig: absolute(catalogRoot, catalogOptions.tsconfig ?? 'tsconfig.json'),
               libraries: () => resolveLibraries(server, root, catalogOptions.libraries ?? [])
             });
+      if (catalogRoot !== root) {
+        // Outside the root, Vite watches only what has been imported, and a
+        // component saved in a new file has not been.
+        server.watcher.add(catalogRoot);
+      }
       const bridge = createAgentBridge(server.ws as unknown as BridgeSocket, {
         ...(catalog === null
           ? {}

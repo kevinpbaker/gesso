@@ -322,8 +322,10 @@ has the tools. A library joins them only when named:
 gesso({ catalog: { libraries: ['gesso-components'] } });
 ```
 
-`catalog: false` leaves them out, and `catalog: { tsconfig }` names a
-tsconfig other than the root's. A host that is not a dev server, such as
+`catalog: false` leaves them out, `catalog: { tsconfig }` names a
+tsconfig other than the root's, and `catalog: { root }` reads another
+project's components, for an application that designs one, such as a
+design editor serving the project it works on from another folder. A host that is not a dev server, such as
 a desktop app's main process, opens the same catalog from
 `gesso-vite-plugin/catalog`, which imports nothing from Vite:
 [on the desktop](/structure/agents-and-mcp#the-project-s-components-on-the-desktop).
