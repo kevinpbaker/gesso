@@ -180,16 +180,19 @@ describe('Responsive', () => {
     expect(builds).toEqual([0]);
     expect(childCount(node)).toBe(1);
 
+    // Once more at the first size measured, though it is the same band,
+    // so a builder reading the width sees a real one; then not again
+    // inside the band.
     layout.place(node, { x: 0, y: 0, width: 400, height: 100 });
     layout.place(node, { x: 0, y: 0, width: 700, height: 100 });
-    expect(builds).toEqual([0]);
+    expect(builds).toEqual([0, 400]);
 
     layout.place(node, { x: 0, y: 0, width: 1000, height: 100 });
-    expect(builds).toEqual([0, 1000]);
+    expect(builds).toEqual([0, 400, 1000]);
     expect(childCount(node)).toBe(2);
 
     layout.place(node, { x: 0, y: 0, width: 1400, height: 100 });
-    expect(builds).toEqual([0, 1000]);
+    expect(builds).toEqual([0, 400, 1000]);
   });
 
   it('provides its size to the subtree', () => {

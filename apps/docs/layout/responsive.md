@@ -69,10 +69,16 @@ dragging a window edge from 1000 px to 1399 px does no work at all.
 The first build happens before any layout, when the size is zero, so
 `build` has to return something sensible for a container whose room is
 not yet known. Zero picks the narrowest arm, which is the right guess
-and also what a phone gets. It is not what gets drawn when the room is
-wider: the first layout reports the real size, the matching arm is
-built, and it is laid out before the frame paints, so the narrow arm is
-never on screen at 1400 px.
+and also what a phone gets. It is not what gets drawn: the first layout
+reports the real size, `build` is called again with it, even when it is
+in the same band as zero, and that arm is laid out before the frame
+paints. So the narrow arm is never on screen at 1400 px, and a `build`
+that reads `size.width` is never left with the zero.
+
+Within a band, `size` is the size the container had when it entered it,
+not its size now, so a width `build` branches on belongs in `at`:
+`size.width < 600` inside `at={[1024]}` is answered once, at the first
+measurement, and not again as the container narrows past 600.
 
 A rebuilt arm is a new subtree, so whatever lived in the old one goes
 with it: a scroll position, focus, a field's draft, and a dialog
