@@ -720,6 +720,30 @@ describe('UiHitTester', () => {
       expect(tester.hitTest(50, 50)).toBeNull();
     });
 
+    it('bounds a transformed subtree where its transform draws it, and passes over it elsewhere', () => {
+      // A camera box over a board: what is under it is bounded where the
+      // camera draws it, so a point elsewhere passes the board over, and
+      // a point on a card reaches it.
+      const h = new InputTestHarness();
+      const camera = h.node('camera', UiNodeType.Box, {
+        width: 100,
+        height: 100,
+        transform: { x: 0, y: 0, translateX: 200, scaleX: 2, scaleY: 2 }
+      });
+      const card = h.node('card', UiNodeType.Box, { width: 20, height: 20 });
+      h.add(camera, card);
+      h.add(h.root, camera);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+
+      const bounds = h.layout.engine.subtreeBoundsFor(camera)!;
+      expect(bounds.boundsUnbounded).toBe(false);
+      expect([bounds.boundsMinX, bounds.boundsMinY, bounds.boundsMaxX, bounds.boundsMaxY]).toEqual([200, 0, 400, 200]);
+      expect(tester.hitTest(210, 10)?.node).toBe(card);
+      expect(tester.hitTest(50, 50)).toBeNull();
+    });
+
     it('hits an anchored overlay that moved after its frame had placed everything else', () => {
       const h = new InputTestHarness();
       const page = h.node('page', UiNodeType.Column);

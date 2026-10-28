@@ -45,6 +45,19 @@ export class InspectionService {
   }
 
   /**
+   * Where the node is drawn, as `inspect(node).box` reports it, without
+   * the rest of the report: for an editor that reads the boxes of many
+   * nodes as its view moves (a minimap of a board of frames), where
+   * building each node's props, owners and source was most of the cost.
+   */
+  box(node: UiNode): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } {
+    if (this.host === null) {
+      throw new Error('InspectionService has nothing to measure before the runtime has built its tree.');
+    }
+    return this.host.box?.(node) ?? this.host.inspect(node).box;
+  }
+
+  /**
    * Draws a node as though it declared `value` for `property`, until
    * the preview is ended or the node leaves the tree.
    *
@@ -69,6 +82,8 @@ export class InspectionService {
 export interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  /** The node's box alone, as `inspect` reports it. */
+  box?(node: UiNode): { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   preview?(node: UiNode, property: string, value: unknown): void;
   endPreview?(node: UiNode, property?: string): void;
 }

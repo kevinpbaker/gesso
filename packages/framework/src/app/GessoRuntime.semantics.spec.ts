@@ -464,6 +464,46 @@ describe('GessoRuntime semantics', () => {
       expect(updates.at(-1)!.boxes.map(entry => entry.box)).toEqual([{ x: 20, y: 10, width: 30, height: 20 }]);
     });
 
+    it('passes over what a panned, zoomed parent draws off screen', () => {
+      // A design tool's board: groups of controls under one camera box,
+      // a few of them on screen. Each node under the camera used to be
+      // projected through it on every step of a pan, on screen or not.
+      const camera$ = new BehaviorSubject({ translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 });
+      const groups = Array.from({ length: 100 }, (_, group) =>
+        Column(
+          { position: 'absolute', left: 0, top: group * 1600 },
+          ...Array.from({ length: 50 }, (_, i) => Button({ text: `Row ${group}.${i}`, width: 80, height: 30 }))
+        )
+      );
+      const updates: UiSemanticsUpdate[] = [];
+      const { runtime, frame } = mountRuntime(
+        Box(
+          { position: 'relative', overflow: 'hidden', width: 400, height: 600 },
+          Box({ position: 'absolute', top: 0, left: 0, width: 400, height: 160_000, transform: camera$ }, ...groups)
+        ),
+        { onCreate: created => created.onSemantics(update => updates.push(update)) }
+      );
+      frame(0);
+
+      const engine = (runtime as unknown as { engine: { screenBox(node: unknown): unknown } }).engine;
+      const project = engine.screenBox.bind(engine);
+      let projected = 0;
+      engine.screenBox = node => {
+        projected++;
+        return project(node);
+      };
+      camera$.next({ translateX: 0, translateY: -1600, scaleX: 1, scaleY: 1 });
+      frame();
+
+      // What is on screen now (the second group), and within the margin
+      // the mirror keeps around it, moved; no other group was looked at
+      // node by node.
+      const moved = updates.at(-1)!.boxes;
+      expect(moved.length).toBeGreaterThan(0);
+      expect(moved.every(entry => entry.box.y + entry.box.height > -400 && entry.box.y < 1000)).toBe(true);
+      expect(projected).toBeLessThan(500);
+    });
+
     it('looks only at what is on screen to find the boxes that moved', () => {
       // A long document, in groups as an editor renders one: thousands
       // of mirrored nodes, a screenful seen. Every node's box used to be

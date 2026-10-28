@@ -1401,6 +1401,28 @@ export class LayoutEngine {
   }
 
   /**
+   * Where everything under a node is drawn, through every transform
+   * above it: its subtree's bounds, as `subtreeBoundsFor` left them,
+   * projected as `screenBox` projects the node's own box. Null when the
+   * subtree has no bounds to cull by (it draws past them, or has no
+   * record). What a walk under a panned, zoomed parent passes a whole
+   * subtree over by when none of it is on screen.
+   */
+  screenBounds(node: UiNode): LayoutBox | null {
+    const rec = this.records.get(node);
+    if (rec === undefined || rec.boundsUnbounded) {
+      return null;
+    }
+    return this.projectBox(
+      node,
+      rec.boundsMinX,
+      rec.boundsMinY,
+      rec.boundsMaxX - rec.boundsMinX,
+      rec.boundsMaxY - rec.boundsMinY
+    );
+  }
+
+  /**
    * The scroll offsets each scroll ancestor would need so that `node`
    * is inside its viewport, `padding` pixels from the nearest edge,
    * innermost first. Nothing is changed: the caller writes the offsets
