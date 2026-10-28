@@ -32,6 +32,19 @@ describe('UiGraphBuilder', () => {
       expect(graph.getNode(node.id)).toBe(node);
     });
 
+    it('keeps a key with a colon in it to one segment of the id, so it cannot spell another node’s', () => {
+      const { graph, builder } = createBuilder();
+      // Keyed by node ids, as a layers panel keys its rows: `a:0` would
+      // otherwise be the id of the first child of the row keyed `a`.
+      const root = builder.build(Column({}, Box({ key: 'a:0' }), Box({ key: 'a' }, Box({}))));
+      const [first, second] = [root.firstChild!, root.firstChild!.nextSibling!];
+
+      expect(first.id).toBe(`${root.id}:a%3A0`);
+      expect(second.id).toBe(`${root.id}:a`);
+      expect(second.firstChild!.id).toBe(`${root.id}:a:0`);
+      expect(graph.getNode(`${root.id}:a:0`)).toBe(second.firstChild);
+    });
+
     it('builds a nested tree', () => {
       const { graph, builder } = createBuilder();
       const definition = Column(
