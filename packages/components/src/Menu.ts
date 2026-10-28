@@ -331,8 +331,16 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
 
   /** What the menu shows while it is open: made when it opens, kept while it is moved. */
   let shown: UiChild | null = null;
+  /**
+   * Whether it was shown with nothing to take its environment from: a
+   * menu made already open (a right-click's, declared as it opens)
+   * opens before its placeholder is in the tree, and was drawn in the
+   * root's theme, not its own, until it was shown again.
+   */
+  let placedBare = false;
   /** Shows the menu where its inputs say now, beside its anchor or at its point. */
   const place = (content: UiChild): void => {
+    placedBare = (inputs.anchor.value ?? placeholder) === null;
     overlay.show(content, {
       anchor: inputs.anchor.value ?? null,
       environment: inputs.anchor.value ?? placeholder,
@@ -379,7 +387,18 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
 
   // The placeholder stays where the component was declared, which
   // is how the overlay's content inherits this tree's theme.
-  return Row({ ref: (node: UiNode | null) => (placeholder = node), visible: false, width: 0, height: 0 });
+  return Row({
+    ref: (node: UiNode | null) => {
+      placeholder = node;
+      // Open already, in the root's theme: shown again, in this tree's.
+      if (node !== null && placedBare && shown !== null && overlay.isOpen()) {
+        place(shown);
+      }
+    },
+    visible: false,
+    width: 0,
+    height: 0
+  });
 }
 
 /**
