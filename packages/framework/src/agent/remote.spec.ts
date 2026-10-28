@@ -6,6 +6,7 @@ import { defineChannel } from '../channel/ChannelToken';
 import { serve } from '../channel/serveChannels';
 import { agentSurface, resultText, type AgentConfirmation } from './AgentSurface';
 import { combineSurfaces, remoteSurface, serveAgentPort } from './remote';
+import { agentText, toolSurface } from './tools';
 
 const Counter = defineChannel('counter', { view: { count: 0 }, commands: {} as { add(by: number): void } });
 const Clock = defineChannel('clock', { view: { now: 0 }, commands: {} });
@@ -42,6 +43,25 @@ describe('a surface across a port', () => {
     expect(await remote.read('gesso://counter/view')).toEqual({ count: 4 });
     expect(await remote.read('gesso://nothing/view')).toBeUndefined();
     expect((await remote.resources()).map(resource => resource.uri)).toEqual(['gesso://counter/view']);
+  });
+
+  it('gives a call of a tool that waits on purpose as long as it said, and any other its own limit', async () => {
+    const pair = new MessageChannel();
+    open.push(pair.port1, pair.port2);
+    const slowly = (name: string, waitsUpToMs?: number) => ({
+      name,
+      description: 'Answers after a moment.',
+      inputSchema: { type: 'object', properties: {} },
+      ...(waitsUpToMs === undefined ? {} : { waitsUpToMs }),
+      run: () => new Promise<ReturnType<typeof agentText>>(done => setTimeout(() => done(agentText('here')), 60))
+    });
+    serveAgentPort(pair.port2, () => toolSurface(() => [slowly('wait_for_task', 500), slowly('measure')]));
+    const remote = remoteSurface(pair.port1, { timeoutMs: 10, callTimeoutMs: 20 });
+    expect((await remote.tools()).find(tool => tool.name === 'wait_for_task')?._meta).toEqual({
+      'gesso/waitsUpToMs': 500
+    });
+    expect(resultText(await remote.call('wait_for_task', {}))).toBe('here');
+    expect(resultText(await remote.call('measure', {}))).toBe('measure did not answer in time.');
   });
 
   it('takes a thread that never answers as one with nothing to offer', async () => {

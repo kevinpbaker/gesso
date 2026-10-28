@@ -184,6 +184,38 @@ describe('the agent endpoint', () => {
     expect((await request(bridge, { url: '/src/main.ts' })).passed).toBe(true);
   });
 
+  it('gives a call of a tool that waits on purpose as long as the page listed, and any other its own limit', async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket, { timeoutMs: 10 });
+    const page: BridgeClient = {
+      send: (event, payload) => {
+        if (event !== EVENTS.request) {
+          return;
+        }
+        const { id, message } = payload as { id: number; message: { id: number; method: string } };
+        const reply = (result: unknown) =>
+          emit(EVENTS.response, { id, response: { jsonrpc: '2.0', id: message.id, result } }, page);
+        if (message.method === 'tools/list') {
+          queueMicrotask(() =>
+            reply({ tools: [{ name: 'wait_for_task', _meta: { 'gesso/waitsUpToMs': 500 } }, { name: 'measure' }] })
+          );
+        } else {
+          setTimeout(() => reply({ content: [{ type: 'text', text: 'here' }], isError: false }), 40);
+        }
+      }
+    };
+    emit(EVENTS.ready, {}, page);
+    const call = (name: string) =>
+      JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name, arguments: {} } });
+    await request(bridge, { body: JSON.stringify({ jsonrpc: '2.0', id: 8, method: 'tools/list', params: {} }) });
+    expect(JSON.parse((await request(bridge, { body: call('wait_for_task') })).body!).result.content[0].text).toBe(
+      'here'
+    );
+    expect(JSON.parse((await request(bridge, { body: call('measure') })).body!).error.message).toMatch(
+      /did not answer/
+    );
+  });
+
   it('tells the agent when the page never answers', async () => {
     const { socket, emit } = fakeSocket();
     const bridge = createAgentBridge(socket, { timeoutMs: 10 });

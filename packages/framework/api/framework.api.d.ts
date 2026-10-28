@@ -37,6 +37,7 @@ import {
   UiRefs,
   uiSurface,
   UiSurfaceOptions,
+  WAITS_UP_TO,
   WorkerHandle
 } from "../tools.js";
 import {
@@ -106,6 +107,7 @@ type AgentPort = Pick<MessagePort, 'postMessage' | 'onmessage'>;
 declare function serveAgentPort(port: AgentPort, makeSurface: (confirm: AgentConfirm) => AgentSurfaceLike): () => void;
 declare function remoteSurface(port: AgentPort, options?: {
   timeoutMs?: number;
+  callTimeoutMs?: number;
   confirm?: AgentConfirm;
 }): AgentSurfaceLike;
 declare function combineSurfaces(surfaces: readonly AgentSurfaceLike[]): AgentSurfaceLike;
@@ -248,7 +250,8 @@ export {
   type WebMcpOptions,
   UiRefs,
   uiSurface,
-  validate
+  validate,
+  WAITS_UP_TO
 };
 // ==== FunctionComponent.d.ts ====
 import {
@@ -4097,7 +4100,9 @@ interface AgentTool {
     readonly idempotentHint?: boolean;
     readonly openWorldHint: false;
   };
+  readonly _meta?: Readonly<Record<string, unknown>>;
 }
+declare const WAITS_UP_TO = "gesso/waitsUpToMs";
 interface AgentResource {
   readonly uri: string;
   readonly name: string;
@@ -4258,6 +4263,7 @@ interface AgentToolDefinition {
   readonly readOnly?: boolean;
   readonly destructive?: boolean;
   readonly idempotent?: boolean;
+  readonly waitsUpToMs?: number;
   run(args: Readonly<Record<string, unknown>>): AgentToolResult | Promise<AgentToolResult>;
 }
 declare function agentText(text: string, structured?: Record<string, unknown>): AgentToolResult;
@@ -4323,6 +4329,7 @@ export {
   UiRefs,
   uiSurface,
   UiSurfaceOptions,
+  WAITS_UP_TO,
   workerHandle,
   WorkerHandle
 };

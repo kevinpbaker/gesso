@@ -96,6 +96,13 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
   const pages: BridgeClient[] = [];
   const pending = new Map<number, (response: unknown) => void>();
   let next = 1;
+  /**
+   * How long each tool the page listed says it may wait, under MCP's
+   * `_meta` as `gesso/waitsUpToMs` (gesso-framework's `WAITS_UP_TO`):
+   * a call of one is given that long, and a moment more, where any other
+   * is given `timeoutMs`.
+   */
+  const waits = new Map<string, number>();
 
   socket.on(EVENTS.ready, (_data, client) => {
     const at = pages.indexOf(client);
@@ -165,17 +172,39 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
   const relay = (message: unknown): Promise<unknown> => {
     const page = pages[pages.length - 1];
     const id = next++;
+    const request = asRequest(message);
+    const called =
+      request?.method === 'tools/call' && typeof request.params.name === 'string'
+        ? waits.get(request.params.name)
+        : undefined;
+    const limit = called === undefined ? timeoutMs : Math.max(timeoutMs, called + 10_000);
     return new Promise(resolve => {
       const timer = setTimeout(() => {
         pending.delete(id);
-        resolve(rpcError(message, -32001, `The page did not answer within ${Math.round(timeoutMs / 1000)} seconds.`));
-      }, timeoutMs);
+        resolve(rpcError(message, -32001, `The page did not answer within ${Math.round(limit / 1000)} seconds.`));
+      }, limit);
       pending.set(id, response => {
         clearTimeout(timer);
+        if (request?.method === 'tools/list') {
+          noteWaits(response);
+        }
         resolve(response);
       });
       page.send(EVENTS.request, { id, message });
     });
+  };
+
+  const noteWaits = (response: unknown): void => {
+    const tools = (response as { result?: { tools?: unknown } } | null)?.result?.tools;
+    if (!Array.isArray(tools)) {
+      return;
+    }
+    for (const tool of tools as { name?: unknown; _meta?: Record<string, unknown> }[]) {
+      const wait = tool._meta?.['gesso/waitsUpToMs'];
+      if (typeof tool.name === 'string' && typeof wait === 'number') {
+        waits.set(tool.name, wait);
+      }
+    }
   };
 
   return {
