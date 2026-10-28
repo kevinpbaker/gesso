@@ -213,6 +213,15 @@ function paritySection(state: PlaygroundState): UiElement {
       Paint({ width: 44, height: 44, backgroundColor: '#0f172a', paint: PARITY_PAINT }),
       Paint({ width: 44, height: 30, path: PARITY_PATH })
     ),
+    // Group opacity: a disabled button, faded whole, its label white
+    // over the faded box rather than faded a second time through it.
+    // Both backends draw it into a layer and blend that once, so this
+    // reads zero unless one of them draws the group another way.
+    // Square, so it adds no rounded corners to the pixel gate's budget.
+    Box(
+      { width: 84, height: 34, opacity: 0.5, backgroundColor: '#1f6feb', y: 'center', x: 'center' },
+      Text({ text: 'Disabled', color: '#ffffff', fontSize: 12 })
+    ),
     // A radial gradient with a centre off the middle, in a square box:
     // the other half of F9, and square so it adds no rounded corners to
     // the pixel gate's budget.

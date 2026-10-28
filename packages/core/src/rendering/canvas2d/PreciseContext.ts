@@ -122,6 +122,26 @@ export class PreciseContext implements Canvas2DContext, PaintContext2D {
     this.inner.setTransform(a, b, c, d, e, f);
   }
 
+  /**
+   * Takes another context's whole transform, a translation it holds
+   * back included, so a group layer draws exactly where the frame would
+   * have; less `offsetX`/`offsetY` device pixels, where the layer's
+   * corner lies on the frame. Read through `getTransform`, a held
+   * translation would come out as one large float, which is the
+   * precision this class exists to keep.
+   */
+  adoptTransform(from: Canvas2DContext, offsetX = 0, offsetY = 0): void {
+    if (from instanceof PreciseContext) {
+      const m = from.inner.getTransform!();
+      this.inner.setTransform(m.a, m.b, m.c, m.d, m.e - offsetX, m.f - offsetY);
+      this.dx = from.dx;
+      this.dy = from.dy;
+      return;
+    }
+    const m = from.getTransform!();
+    this.setTransform(m.a, m.b, m.c, m.d, m.e - offsetX, m.f - offsetY);
+  }
+
   /** Writes a held translation out for real, for a transform it does not commute with. */
   private flush(): void {
     if (this.holding) {

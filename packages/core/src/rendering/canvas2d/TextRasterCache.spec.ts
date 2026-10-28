@@ -9,27 +9,8 @@ import { TextRasterCache } from './TextRasterCache';
 
 /** A recording context that keeps its transform, as a real one does: the cache places text by reading it. */
 class TransformingContext extends RecordingCanvasContext {
-  private matrix = [1, 0, 0, 1, 0, 0];
-  private readonly stack: number[][] = [];
-
-  override save(): void {
-    this.stack.push([...this.matrix]);
-    super.save();
-  }
-
-  override restore(): void {
-    this.matrix = this.stack.pop() ?? this.matrix;
-    super.restore();
-  }
-
-  override setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void {
-    this.matrix = [a, b, c, d, e, f];
-    super.setTransform(a, b, c, d, e, f);
-  }
-
-  getTransform(): { a: number; b: number; c: number; d: number; e: number; f: number } {
-    const [a, b, c, d, e, f] = this.matrix;
-    return { a, b, c, d, e, f };
+  constructor() {
+    super({ transform: true });
   }
 }
 

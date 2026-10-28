@@ -12,6 +12,7 @@ import {
   viewportScissor,
   CLIP_STRIDE_FLOATS,
   CommandKind,
+  type EndLayerCommand,
   INSTANCE_STRIDE_FLOATS,
   TEXTURED_STRIDE_FLOATS,
   PrimitiveKind,
@@ -238,7 +239,7 @@ describe('buildRenderList opacity', () => {
     expect(readInstance(list, 0).opacity).toBe(0.5);
   });
 
-  it('multiplies nested opacities', () => {
+  it('draws a nested opacity into a layer of its own, blended once', () => {
     const h = new RenderHarness();
     const root = h.graph.root;
     const parent = box(h, 'parent', { width: 100, height: 100, backgroundColor: '#00f', opacity: 0.5 });
@@ -246,8 +247,18 @@ describe('buildRenderList opacity', () => {
     h.graph.appendChild(parent, child);
     h.graph.appendChild(root, parent);
     const list = layoutAndBuild(h, root);
-    expect(readInstance(list, 0).opacity).toBe(0.5);
-    expect(readInstance(list, 1).opacity).toBe(0.25);
+    // The parent paints twice, so it is a group: both draws go into its
+    // layer, the child (one draw) faded within it, and the layer is
+    // blended at the parent's opacity.
+    expect(list.commands.map(c => c.kind)).toEqual([
+      CommandKind.BeginLayer,
+      CommandKind.Primitives,
+      CommandKind.EndLayer
+    ]);
+    expect(readInstance(list, 0).opacity).toBe(1);
+    expect(readInstance(list, 1).opacity).toBe(0.5);
+    const blend = list.commands[2] as EndLayerCommand;
+    expect(list.texturedData[blend.instance! * TEXTURED_STRIDE_FLOATS + 4]).toBe(0.5);
   });
 });
 

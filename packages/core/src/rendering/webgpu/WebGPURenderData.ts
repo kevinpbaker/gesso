@@ -36,6 +36,7 @@ import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
 import { decorationColor, decorationRect, hasDecorationPhase, type DecorationShape } from '../Decorations';
 import { paintPictures } from '../PaintPicture';
+import { layerRegion, opacityNeedsLayer } from '../GroupOpacity';
 import { toPhysicalPixels } from './WebGPUSurface';
 import { EditableLayout } from '../../editing/EditableLayout';
 import { lineIndexForOffset } from '../../editing/TextGeometry';
@@ -144,7 +145,14 @@ export const enum CommandKind {
   /** A contiguous range of glyph instances sharing one atlas page. */
   Glyphs = 1,
   /** One textured instance drawn with an image. */
-  Image = 2
+  Image = 2,
+  /**
+   * Everything until the matching `EndLayer` is drawn into a cleared
+   * layer of its own, the start of an opacity group (`GroupOpacity.ts`).
+   */
+  BeginLayer = 3,
+  /** The layer is done, and is blended onto what holds it at the group's opacity. */
+  EndLayer = 4
 }
 
 export type Affine = [number, number, number, number, number, number];
@@ -196,7 +204,27 @@ export interface ImageCommand {
   drawHeight: number;
 }
 
-export type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand;
+export interface BeginLayerCommand {
+  kind: CommandKind.BeginLayer;
+  /** Always null: opening a layer draws nothing. */
+  scissor: null;
+}
+
+export interface EndLayerCommand {
+  kind: CommandKind.EndLayer;
+  /**
+   * The textured instance that blends the layer: a quad over the
+   * group's region (`layerRegion`), one texel to a device pixel,
+   * carrying the group's opacity and the rounded clip its ancestors
+   * set. Null when the region is off the surface and there is nothing
+   * to blend.
+   */
+  instance: number | null;
+  /** The ancestors' clip, in physical pixels; null for none. */
+  scissor: ScissorRect | null;
+}
+
+export type RenderCommand = PrimitiveCommand | GlyphCommand | ImageCommand | BeginLayerCommand | EndLayerCommand;
 
 /**
  * One line of text the frame drew, as a whole.
@@ -401,8 +429,22 @@ export function buildRenderList(
     cull: { x: 0, y: 0, width: logicalWidth, height: logicalHeight }
   };
 
-  /** The nodes asking for `lift`, met on the walk and drawn after it. */
+  /**
+   * The nodes asking for `lift`, met on the walk and drawn after it,
+   * with their opacity as a product of everything above them: inside a
+   * layer `state.opacity` counts from the layer, and a lifted node is
+   * drawn outside the layers it was met in.
+   */
   const liftedPass: { node: UiNode; opacity: number; ctm: Affine }[] = [];
+
+  /**
+   * The opacity each open layer will be blended at, multiplied out from
+   * the frame: the last entry is what `state.opacity` is relative to.
+   * One entry, 1, while no layer is open.
+   */
+  const layerOpacities: number[] = [1];
+  const physicalWidth = toPhysicalPixels(logicalWidth, dpr);
+  const physicalHeight = toPhysicalPixels(logicalHeight, dpr);
 
   function closePrimitives(): void {
     const end = instanceData.length / INSTANCE_STRIDE_FLOATS;
@@ -623,7 +665,7 @@ export function buildRenderList(
       // opacity. Their clips are exactly what it is escaping. Captured
       // before the cull test, because a lifted node is nearly always
       // somewhere its record box is not.
-      liftedPass.push({ node, opacity: state.opacity, ctm: state.ctm });
+      liftedPass.push({ node, opacity: state.opacity * layerOpacities[layerOpacities.length - 1], ctm: state.ctm });
       return;
     }
 
@@ -644,11 +686,50 @@ export function buildRenderList(
     }
 
     const paint = resolvePaintState(node, paintScratch);
-    const effectiveOpacity = state.opacity * paint.opacity;
+    // An opacity group that paints more than once is drawn into a layer
+    // of its own and blended once (`GroupOpacity.ts`). Inside it the
+    // subtree draws at full strength and under none of its ancestors'
+    // clips, as Canvas2D draws it into an offscreen canvas: those clips,
+    // and the opacity, apply when the layer is blended.
+    const layered = paint.opacity < 1 && opacityNeedsLayer(node, rec, paint, layout);
+    const opacity = paint.opacity;
+    const outerOpacity = state.opacity;
+    const outerClip = state.clip;
+    const outerRounded = state.rounded;
+    const effectiveOpacity = layered ? 1 : state.opacity * paint.opacity;
     // A sticky node (and its children) is shifted to its scroll
     // container's edge; the record keeps the flow position.
     const baseCtm = sticky ? translateTransform(state.ctm, rec.stickyOffsetX, rec.stickyOffsetY) : state.ctm;
     const nodeCtm = paint.hasTransform ? multiplyTransform(baseCtm, buildOwnTransform(rec, paint.transform)) : baseCtm;
+    // The region is the one Canvas2D sizes its layer to. The texture
+    // here is the surface's size, which costs a GPU nothing to clear,
+    // so only the blend is cut to it.
+    const region = layered
+      ? layerRegion(
+          node,
+          rec,
+          {
+            a: nodeCtm[0] * dpr,
+            b: nodeCtm[1] * dpr,
+            c: nodeCtm[2] * dpr,
+            d: nodeCtm[3] * dpr,
+            e: nodeCtm[4] * dpr,
+            f: nodeCtm[5] * dpr
+          },
+          layout,
+          physicalWidth,
+          physicalHeight,
+          dpr
+        )
+      : null;
+    if (layered) {
+      closePrimitives();
+      commands.push({ kind: CommandKind.BeginLayer, scissor: null });
+      layerOpacities.push(layerOpacities[layerOpacities.length - 1] * outerOpacity * opacity);
+      state.opacity = 1;
+      state.clip = null;
+      state.rounded = NO_CLIP_INDEX;
+    }
     // The node's own background, image, border and scrollbars are
     // clipped by its ancestors, as Canvas2D paints them outside the
     // node's own clip; children and the node's own text go under it.
@@ -1134,6 +1215,34 @@ export function buildRenderList(
       beginPrimitives(ownScissor);
       pushScrollbars(instanceData, rec, effectiveOpacity, nodeCtm, ownRounded, now);
     }
+
+    if (region !== null) {
+      closePrimitives();
+      layerOpacities.pop();
+      state.opacity = outerOpacity;
+      state.clip = outerClip;
+      state.rounded = outerRounded;
+      const instance =
+        region.width > 0 && region.height > 0
+          ? pushTextured(
+              texturedData,
+              region.x / dpr,
+              region.y / dpr,
+              region.width / dpr,
+              region.height / dpr,
+              outerOpacity * opacity,
+              IDENTITY,
+              outerRounded,
+              {
+                u: region.x / physicalWidth,
+                v: region.y / physicalHeight,
+                uw: region.width / physicalWidth,
+                vh: region.height / physicalHeight
+              }
+            )
+          : null;
+      commands.push({ kind: CommandKind.EndLayer, instance, scissor: outerClip });
+    }
   }
 
   /**
@@ -1156,7 +1265,7 @@ export function buildRenderList(
     };
     for (let i = from; i < liftedPass.length; i++) {
       const entry = liftedPass[i]!;
-      state.opacity = entry.opacity;
+      state.opacity = entry.opacity / layerOpacities[layerOpacities.length - 1];
       state.ctm = entry.ctm;
       // The boundary's own clip still applies; everything inside it
       // does not, which is the whole of what `lift` escapes.

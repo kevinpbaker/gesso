@@ -15,7 +15,7 @@ import { BOX_SHADOW_BLUR_REACH, boxShadow } from '../properties/UiBoxShadow';
 import { darkTheme } from '../environment/UiTheme';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { percent } from '../layout/UiLength';
-import { FakePaintCanvases, RenderHarness, RecordedGradient } from './RenderTestUtils';
+import { FakeCanvasHost, FakePaintCanvases, RenderHarness, RecordedGradient } from './RenderTestUtils';
 import { paintPictures } from './PaintPicture';
 import type { UiPaint, UiPath } from './PaintSurface';
 import type { RecordedCall } from './RenderTestUtils';
@@ -48,7 +48,10 @@ import {
  *
  * A draw is a fill, a border, a shadow, an image or a text line, with
  * its box, colour and opacity, and the rectangular clip it was painted
- * under. A shadow's box is the shape it is the blur of, in screen space:
+ * under — or the blend of an opacity group's layer, which every draw
+ * since the one before it went into, at the opacity the group is
+ * blended at and under the clip it is blended under. A draw inside a
+ * layer is stated relative to the layer, as each backend draws it. A shadow's box is the shape it is the blur of, in screen space:
  * the box grown by the spread and moved by the offset for an outer one,
  * the hole shrunk by the spread for an inset one.
  * Text positions are compared to within half a pixel, because the
@@ -57,7 +60,7 @@ import {
  */
 
 interface Draw {
-  kind: 'fill' | 'border' | 'shadow' | 'inset-shadow' | 'image' | 'text';
+  kind: 'fill' | 'border' | 'shadow' | 'inset-shadow' | 'image' | 'text' | 'composite';
   x: number;
   y: number;
   width: number;
@@ -196,13 +199,70 @@ function intersect(a: Clip | null, b: Clip): Clip {
 }
 
 /**
- * Decodes the Canvas2D call log into draws. Tracks the CTM, alpha,
- * clip and shadow through save/restore, and recognises the path shapes
- * the renderer traces: `rect`, the moveTo/arcTo rounded rectangle, and
- * a shadow's frame, a lineTo rectangle with one of those inside it.
+ * Decodes the Canvas2D call log into draws, in the order they were
+ * made. The frame and each group layer record into the one log, each
+ * call stamped with the context it went to; every context keeps its own
+ * state, so each is decoded alone and the draws are merged back by
+ * where in the log they were made.
+ *
+ * A layer is the size of its group's region and drawn from the
+ * region's corner, so a draw into one is placed where the layer is
+ * blended: each blend, in the order they happen, moves the draws made
+ * into that layer since its last blend by where it lands, and hands
+ * them to the context it landed on, which a group inside a group moves
+ * again when it is blended in turn.
  */
 function canvasDraws(calls: readonly RecordedCall[]): Draw[] {
+  const placed: { at: number; target: string | undefined; draw: Draw }[] = [];
+  for (const target of new Set(calls.map(call => call.target))) {
+    const own: { call: RecordedCall; at: number }[] = [];
+    calls.forEach((call, at) => {
+      if (call.target === target) {
+        own.push({ call, at });
+      }
+    });
+    placed.push(...contextDraws(own).map(entry => ({ ...entry, target })));
+  }
+  placed.sort((a, b) => a.at - b.at);
+  const lastBlend = new Map<string, number>();
+  for (const blend of placed) {
+    if (blend.draw.kind !== 'composite') {
+      continue;
+    }
+    const label = (calls[blend.at].args[0] as FakeCanvasHost).label!;
+    const from = lastBlend.get(label) ?? -1;
+    for (const entry of placed) {
+      if (entry.target === label && entry.at > from && entry.at < blend.at) {
+        entry.draw = moved(entry.draw, blend.draw.x, blend.draw.y);
+        entry.target = blend.target;
+      }
+    }
+    lastBlend.set(label, blend.at);
+  }
+  return placed.map(entry => entry.draw);
+}
+
+function moved(draw: Draw, dx: number, dy: number): Draw {
+  const shift = <T extends Clip>(rect: T): T => ({ ...rect, x: round(rect.x + dx), y: round(rect.y + dy) });
+  return {
+    ...draw,
+    x: round(draw.x + dx),
+    y: round(draw.y + dy),
+    clip: draw.clip === null ? null : shift(draw.clip),
+    ...(draw.cutout === undefined ? {} : { cutout: shift(draw.cutout) })
+  };
+}
+
+/**
+ * Decodes one context's calls into draws. Tracks the CTM, alpha,
+ * clip and shadow through save/restore, and recognises the path shapes
+ * the renderer traces: `rect`, the moveTo/arcTo rounded rectangle, and
+ * a shadow's frame, a lineTo rectangle with one of those inside it. A
+ * `drawImage` of a group layer is the layer's blend.
+ */
+function contextDraws(calls: readonly { call: RecordedCall; at: number }[]): { at: number; draw: Draw }[] {
   const draws: Draw[] = [];
+  const places: number[] = [];
   let ctm: Affine = [1, 0, 0, 1, 0, 0];
   let alpha = 1;
   let clip: Clip | null = null;
@@ -225,7 +285,7 @@ function canvasDraws(calls: readonly RecordedCall[]): Draw[] {
   // is traced around the rectangle that matters.
   let framed = false;
 
-  for (const call of calls) {
+  for (const { call, at } of calls) {
     const a = call.args as number[];
     switch (call.name) {
       case 'save':
@@ -362,7 +422,12 @@ function canvasDraws(calls: readonly RecordedCall[]): Draw[] {
         clip = intersect(clip, screenBox(ctm, path!.x, path!.y, path!.width, path!.height));
         break;
       case 'drawImage':
-        draws.push({ kind: 'image', ...screenBox(ctm, a[1], a[2], a[3], a[4]), opacity: alpha, clip });
+        draws.push({
+          kind: call.args[0] instanceof FakeCanvasHost ? 'composite' : 'image',
+          ...screenBox(ctm, a[1], a[2], a[3], a[4]),
+          opacity: round(alpha),
+          clip
+        });
         break;
       case 'fillText': {
         const [x, y] = apply(ctm, a[1], a[2]);
@@ -382,8 +447,11 @@ function canvasDraws(calls: readonly RecordedCall[]): Draw[] {
       default:
         break;
     }
+    while (places.length < draws.length) {
+      places.push(at);
+    }
   }
-  return draws;
+  return draws.map((draw, i) => ({ at: places[i], draw }));
 }
 
 function fillDraw(
@@ -449,6 +517,12 @@ function webgpuDraws(list: RenderList): Draw[] {
       flushRuns(command.end);
       continue;
     }
+    if (
+      command.kind === CommandKind.BeginLayer ||
+      (command.kind === CommandKind.EndLayer && command.instance === null)
+    ) {
+      continue;
+    }
     if (command.kind === CommandKind.Primitives) {
       for (let i = command.start; i < command.end; i++) {
         const o = i * INSTANCE_STRIDE_FLOATS;
@@ -475,11 +549,11 @@ function webgpuDraws(list: RenderList): Draw[] {
       }
       continue;
     }
-    const o = command.instance * TEXTURED_STRIDE_FLOATS;
+    const o = command.instance! * TEXTURED_STRIDE_FLOATS;
     const d = list.texturedData;
     const t: Affine = [d[o + 6], d[o + 7], d[o + 8], d[o + 9], d[o + 10], d[o + 11]];
     draws.push({
-      kind: 'image',
+      kind: command.kind === CommandKind.EndLayer ? 'composite' : 'image',
       ...screenBox(t, d[o], d[o + 1], d[o + 2], d[o + 3]),
       opacity: round(d[o + 4]),
       clip: clipOf(command.scissor)
@@ -568,6 +642,11 @@ function expectParity(h: RenderHarness, root: UiNode, constraints = Constraints.
   return canvas;
 }
 
+/** A harness whose opacity groups get layers, as they do in a browser. */
+function harness(width = 800, height = 600): RenderHarness {
+  return new RenderHarness(width, height, 1, { groups: true });
+}
+
 function box(h: RenderHarness, id: string, props: Record<string, unknown>, type = UiNodeType.Box): UiNode {
   const node = h.createNode(id, type);
   for (const [key, value] of Object.entries(props)) {
@@ -592,7 +671,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a card with background, border, padding and text', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     root.setProperty('padding', 12);
     const card = box(h, 'card', {
@@ -618,7 +697,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a paragraph of runs: emphasis, a background, an underline and a hovered link', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     root.setProperty('width', 220);
     const para = box(
@@ -652,7 +731,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a selection spanning two wrapped paragraphs', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     root.setProperty('width', 160);
     // An explicit selection colour: the theme's default is written as
@@ -682,7 +761,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('find matches under an active one, across two paragraphs', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     root.setProperty('width', 160);
     const style = { fontSize: 12, color: '#333', selectionColor: '#66aaff', matchColor: '#ffcc00' };
@@ -701,7 +780,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('children under fragments, plain and zIndex-ordered', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     const plain = box(h, 'plain', { width: 200, height: 100 });
     const fragment = h.createNode('fragment', UiNodeType.Fragment);
@@ -723,7 +802,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a rounded overflow-hidden card clipping a spilling child and an image', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     root.setProperty('padding', 10);
     const image = { width: 300, height: 200 } as ImageBitmap;
@@ -755,7 +834,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
    * place in the tree.
    */
   it('decorated nodes under a clip and under paintOrder', () => {
-    const h = new RenderHarness(400, 200);
+    const h = harness(400, 200);
     const ring: readonly DecorationShape[] = [
       { kind: 'stroke', color: '#22d3ee', lineWidth: 2, outset: 4 },
       // Under the node's content, and inside its box rather than around
@@ -844,7 +923,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
    * is exactly what a parity test cannot see by itself.
    */
   it('a border per edge, placed from the far insets', () => {
-    const h = new RenderHarness(200, 120);
+    const h = harness(200, 120);
     const root = h.createNode('app', UiNodeType.Column);
     const node = box(h, 'bordered', { width: 100, height: 50, backgroundColor: '#1e293b' });
     node.decorations = borderShapes({
@@ -888,7 +967,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
    * percentages against three stops, and a radial gradient off centre.
    */
   it('linear and radial gradients on boxes, clips and colours', () => {
-    const h = new RenderHarness(600, 400);
+    const h = harness(600, 400);
     const root = h.createNode('app', UiNodeType.Column);
     root.setProperty('padding', 8);
     root.setProperty('gap', 6);
@@ -958,7 +1037,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('images under every objectFit', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Row);
     root.setProperty('gap', 4);
     const image = { width: 200, height: 100 } as ImageBitmap;
@@ -970,7 +1049,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('an absolute child of an empty parent at the window edge', () => {
-    const h = new RenderHarness(400, 300);
+    const h = harness(400, 300);
     const root = h.createNode('app', UiNodeType.Row);
     root.setProperty('width', 400);
     root.setProperty('height', 300);
@@ -985,7 +1064,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('box shadows: outer under the background in CSS order, inset over it, under a clip and an opacity', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     root.setProperty('padding', 40);
     root.setProperty('gap', 40);
@@ -1022,13 +1101,16 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
       'border',
       'shadow',
       'shadow',
-      'fill'
+      'fill',
+      'composite'
     ]);
     const [hard, soft, , inset] = draws;
     // The first shadow declared is on top, so it is drawn last.
     expect(soft.blur).toBe(6);
     expect(soft.color).toBe(cssColorKey(UiEnvironmentKeys.theme.defaultValue.colors.primary));
-    expect(soft).toMatchObject({ x: 61, y: 65, width: 198, height: 98, radius: 7, opacity: 0.5 });
+    // At full strength into the clipper's layer, which is blended at half.
+    expect(soft).toMatchObject({ x: 61, y: 65, width: 198, height: 98, radius: 7, opacity: 1 });
+    expect(draws.at(-1)).toMatchObject({ kind: 'composite', opacity: 0.5 });
     expect(hard).toMatchObject({ x: 58, y: 59, width: 208, height: 108, radius: 12, blur: 0 });
     expect(hard.cutout).toEqual({ x: 60, y: 60, width: 200, height: 100, radius: 8 });
     expect(inset).toMatchObject({ x: 60, y: 63, width: 196, height: 96, radius: 6, blur: 5 });
@@ -1039,7 +1121,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     // Culled by its box, the card would take its shadow with it. Its
     // extent reaches as far as the shadow does, and the empty wrapper
     // it stands in grows to cover it too.
-    const h = new RenderHarness(400, 300);
+    const h = harness(400, 300);
     const root = h.createNode('app', UiNodeType.Box);
     root.setProperty('width', 400);
     root.setProperty('height', 300);
@@ -1063,7 +1145,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a scrolled list with a sticky header, an overlay above it, and culling', () => {
-    const h = new RenderHarness(400, 200);
+    const h = harness(400, 200);
     const root = h.createNode('app', UiNodeType.Box);
     root.setProperty('position', 'relative');
     const scroll = h.createNode('scroll', UiNodeType.ScrollView);
@@ -1119,7 +1201,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('nested scrollers with independent offsets', () => {
-    const h = new RenderHarness(300, 300);
+    const h = harness(300, 300);
     const outer = h.createNode('outer', UiNodeType.ScrollView);
     outer.setProperty('width', 300);
     outer.setProperty('height', 300);
@@ -1141,7 +1223,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a translated, scaled and nested-opacity subtree inside a clip', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     const clipper = box(h, 'clipper', { width: 200, height: 200, overflow: 'hidden', opacity: 0.5 });
     const moved = box(h, 'moved', {
@@ -1158,14 +1240,20 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     h.append(clipper, moved);
     h.append(root, clipper);
     const draws = expectParity(h, root);
-    expect(draws.map(d => d.opacity)).toEqual([0.25, 0.25, 0.25]);
+    // Each group is drawn whole and blended once at its own opacity:
+    // the three draws at full strength into the inner group's layer,
+    // that layer at half into the outer one's, and that at half onto
+    // the frame. Not a quarter on each draw, which shows the box
+    // through its own border.
+    expect(draws.map(d => d.kind)).toEqual(['fill', 'fill', 'border', 'composite', 'composite']);
+    expect(draws.map(d => d.opacity)).toEqual([1, 1, 1, 0.5, 0.5]);
   });
 
   it('a subtree moved by a translation, with a pivot transform under it', () => {
     // The two pairs must not be confused: `translateX/Y` moves the
     // node, `x/y` moves where it turns. A node carrying both proves
     // both backends compose them in the same order.
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     const slid = box(h, 'slid', {
       width: 120,
@@ -1187,7 +1275,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a rotated subtree keeps the same draws, boxes compared as bounds', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     const spun = box(h, 'spun', {
       width: 100,
@@ -1201,7 +1289,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a grid of labelled cells', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const grid = h.createNode('grid', UiNodeType.Grid);
     grid.setProperty('columns', [auto, fr(1)]);
     grid.setProperty('gap', 6);
@@ -1265,7 +1353,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   }
 
   it('a painted node, between its own background and its border', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     h.append(
       root,
@@ -1284,7 +1372,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a static path node beside a painted one', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Row);
     root.setProperty('gap', 8);
     h.append(
@@ -1297,7 +1385,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a painted node under an opacity, a transform and a rounded clip', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     const clipper = box(h, 'clipper', {
       width: 160,
@@ -1324,7 +1412,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('a painted node with children stacked over its picture', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const root = h.createNode('app', UiNodeType.Column);
     const gauge = painted(h, 'gauge', { width: 100, height: 100, paint: SPARKLINE, x: 'center', y: 'center' });
     h.append(gauge, box(h, 'label', { text: '72%', fontSize: 14, color: '#111' }, UiNodeType.Text));
@@ -1334,7 +1422,7 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
   });
 
   it('painted nodes in a scrolled list, clipped and culled alike', () => {
-    const h = new RenderHarness();
+    const h = harness();
     const list = h.createNode('list', UiNodeType.ScrollView);
     list.setProperty('width', 240);
     list.setProperty('height', 120);
