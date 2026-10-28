@@ -452,8 +452,10 @@ describe('scroll layers', () => {
     scrollTo(10);
     expect(renderer.scrollLayerStats.built).toBe(0);
     expect(composites()).toEqual([]);
-    // Every row: the direct path does not cull under a transform.
-    expect(directRowFills().length).toBe(ROWS);
+    // The rows the viewport shows, scrolled 10 into rows of 30 in a
+    // viewport of 100: the direct path culls through a transform that
+    // only scales.
+    expect(directRowFills().length).toBe(4);
   });
 
   it('does not keep a layer that drew something following the clock, and does not rebuild it until the subtree changes', () => {

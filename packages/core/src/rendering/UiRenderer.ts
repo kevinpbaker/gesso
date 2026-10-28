@@ -39,5 +39,13 @@ export interface UiRenderer {
    * emptied too and will not say so. The next frame redraws everything.
    */
   surfaceRestored?(): void;
+  /**
+   * When, on the \`performance.now\` clock, the renderer wants a frame
+   * though nothing changes: Canvas2D's kept subtrees, drawn stretched
+   * while a zoom moves, are drawn sharp once it settles, and nothing
+   * else would ask for that frame. Undefined when nothing waits. Read
+   * after each frame.
+   */
+  nextRepaint?(): number | undefined;
   dispose(): void;
 }

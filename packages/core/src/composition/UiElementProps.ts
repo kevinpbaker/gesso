@@ -176,6 +176,7 @@ export type PaintProps = PropsOf<
   | 'boxShadows'
   | 'visible'
   | 'transform'
+  | 'rasterize'
 >;
 
 /**

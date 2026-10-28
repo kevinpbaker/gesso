@@ -1517,6 +1517,21 @@ export const UiProperties = {
     }
   }),
 
+  /**
+   * Keep what this subtree paints as pixels, and copy them while only
+   * what is above it moves or scales: a design tool's frames under a
+   * zooming camera, a map's tiles under a pan. Canvas2D only; see
+   * `RasterCache.ts` for when it draws them again. A hint: a subtree
+   * that changes on most frames, or one too large to hold at the scale
+   * it is drawn at, is drawn directly.
+   */
+  rasterize: defineProperty<boolean>({
+    name: 'rasterize',
+    defaultValue: false,
+    inherited: false,
+    affects: P
+  }),
+
   // -------------------------------------------------------------------------
   // Content
   // -------------------------------------------------------------------------

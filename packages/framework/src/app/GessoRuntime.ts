@@ -548,6 +548,8 @@ export class GessoRuntime {
   private audioListener: ((request: AudioRequest) => void) | null = null;
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Pending frame the renderer asked for though nothing changes; see \`UiRenderer.nextRepaint\`. */
+  private rendererTimer: ReturnType<typeof setTimeout> | null = null;
   private inspectorTimer: ReturnType<typeof setTimeout> | null = null;
   /** Pending wake-up for an animation that does not want every frame. */
   private animationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2135,6 +2137,10 @@ export class GessoRuntime {
     if (this.scrollbarTimer !== null) {
       clearTimeout(this.scrollbarTimer);
       this.scrollbarTimer = null;
+    }
+    if (this.rendererTimer !== null) {
+      clearTimeout(this.rendererTimer);
+      this.rendererTimer = null;
     }
     // The room the platform's insets took is given back: the default
     // registry is shared, and a disposed runtime must not go on
@@ -3757,6 +3763,7 @@ export class GessoRuntime {
     this.frameBegan = null;
     this.lastFrameMs = elapsed;
     this.scheduleScrollbarFade(finished);
+    this.scheduleRendererRepaint(finished);
     this.scheduleCaretBlink(finished);
     // A frame can change the cursor without the pointer moving: the
     // hovered node's `cursor` prop, or the node itself, may have changed.
@@ -3860,6 +3867,28 @@ export class GessoRuntime {
    * property change asks for. The engine says when the next change is
    * due; one pending timer marks a repaint for it.
    */
+  /**
+   * The renderer wants a frame though nothing changes: Canvas2D's kept
+   * subtrees are drawn sharp once a zoom settles. One pending timer
+   * marks the root for paint then, which leaves every kept thing as it
+   * is; a frame before it that is still not settled asks again.
+   */
+  private scheduleRendererRepaint(now: number): void {
+    const next = this.renderer.nextRepaint?.();
+    if (next === undefined || this.rendererTimer !== null) {
+      return;
+    }
+    this.rendererTimer = setTimeout(
+      () => {
+        this.rendererTimer = null;
+        if (this.root !== undefined) {
+          this.graph.markDirty(this.root, DirtyFlags.Paint);
+        }
+      },
+      Math.max(16, next - now)
+    );
+  }
+
   private scheduleScrollbarFade(now: number): void {
     const next = this.engine.nextScrollbarChange(now);
     if (next === undefined || this.scrollbarTimer !== null) {

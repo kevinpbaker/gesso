@@ -1567,6 +1567,7 @@ declare class GessoRuntime {
   private audioListener;
   private caretTimer;
   private scrollbarTimer;
+  private rendererTimer;
   private inspectorTimer;
   private animationTimer;
   private replicas;
@@ -1696,6 +1697,7 @@ declare class GessoRuntime {
   private warnLayoutPasses;
   private handleFrame;
   private scheduleAnimationTick;
+  private scheduleRendererRepaint;
   private scheduleScrollbarFade;
   private scheduleCaretBlink;
   private sendEditingState;
