@@ -88,13 +88,16 @@ export interface AgentBridge {
   readonly connected: boolean;
 }
 
+/** What a request sent to a page that went away is answered with, before it is said to the agent. */
+const PAGE_GONE = Symbol('page gone');
+
 export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOptions = {}): AgentBridge {
   const timeoutMs = options.timeoutMs ?? 130_000;
   const local = options.local;
   const localNames = new Set(local?.tools.map(tool => tool.name) ?? []);
   /** Pages that announced themselves, newest last. */
   const pages: BridgeClient[] = [];
-  const pending = new Map<number, (response: unknown) => void>();
+  const pending = new Map<number, { readonly page: BridgeClient; readonly resolve: (response: unknown) => void }>();
   let next = 1;
   /**
    * How long each tool the page listed says it may wait, under MCP's
@@ -116,12 +119,21 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
     if (at >= 0) {
       pages.splice(at, 1);
     }
+    // What was asked of a page that has gone (closed, or reloaded) is
+    // never answered: said so now, so the agent asks again, rather than
+    // when a tool that waits on purpose would have given up.
+    for (const [id, waiting] of pending) {
+      if (waiting.page === client) {
+        pending.delete(id);
+        waiting.resolve(PAGE_GONE);
+      }
+    }
   });
   socket.on(EVENTS.response, (data: { id: number; response: unknown }) => {
-    const resolve = pending.get(data.id);
-    if (resolve !== undefined) {
+    const waiting = pending.get(data.id);
+    if (waiting !== undefined) {
       pending.delete(data.id);
-      resolve(data.response);
+      waiting.resolve(data.response);
     }
   });
 
@@ -183,12 +195,21 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
         pending.delete(id);
         resolve(rpcError(message, -32001, `The page did not answer within ${Math.round(limit / 1000)} seconds.`));
       }, limit);
-      pending.set(id, response => {
-        clearTimeout(timer);
-        if (request?.method === 'tools/list') {
-          noteWaits(response);
+      pending.set(id, {
+        page,
+        resolve: response => {
+          clearTimeout(timer);
+          if (response === PAGE_GONE) {
+            resolve(
+              rpcError(message, -32001, 'The page closed before it answered (it may have reloaded); call again.')
+            );
+            return;
+          }
+          if (request?.method === 'tools/list') {
+            noteWaits(response);
+          }
+          resolve(response);
         }
-        resolve(response);
       });
       page.send(EVENTS.request, { id, message });
     });
