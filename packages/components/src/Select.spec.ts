@@ -210,6 +210,30 @@ describe('the chosen option in an open select', () => {
   });
 });
 
+/**
+ * An option may be the empty value ("No folder"): the trigger said
+ * the placeholder for it, while the list ticked it as chosen. Found in
+ * Atelier's Move to Screens dialog.
+ */
+describe('a select whose value is an option’s empty value', () => {
+  it('says that option, not the placeholder', () => {
+    const at = (value: string) =>
+      renderTest(
+        createComponent(Select, {
+          label: 'Folder',
+          value,
+          options: [
+            { value: '', label: 'No folder' },
+            { value: 'auth', label: 'Authentication' }
+          ]
+        }),
+        { width: 400, height: 300 }
+      );
+    expect(at('').queryByText('No folder')).not.toBeNull();
+    expect(at('').queryByText('Choose…')).toBeNull();
+  });
+});
+
 const FRUIT = [
   { value: 'apple', label: 'Apple' },
   { value: 'apricot', label: 'Apricot', disabled: true },

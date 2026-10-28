@@ -455,7 +455,10 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
       },
       Text({
         text: combineLatest([value.value, inputs.options]).pipe(
-          map(([chosen]) => (chosen === '' ? placeholder.value : labelFor(chosen)))
+          // The placeholder for the empty value, unless an option holds it ("No folder").
+          map(([chosen, options]) =>
+            chosen === '' && !options.some(option => option.value === '') ? placeholder.value : labelFor(chosen)
+          )
         ),
         color: foregroundToken(disabled),
         flexGrow: 1,
