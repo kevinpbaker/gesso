@@ -43,10 +43,32 @@ export class InspectionService {
     }
     return this.host.inspect(node);
   }
+
+  /**
+   * Draws a node as though it declared `value` for `property`, until
+   * the preview is ended or the node leaves the tree.
+   *
+   * What a design editor shows while a value is being chosen: a padding
+   * dragged or a colour hovered in a list is drawn at once, on the
+   * live tree, and only written to the source when the designer lets go.
+   * It wins over the element's own value and over its modifiers, and
+   * ending it restores whichever of those was there, inheritance
+   * included. The name and value are a prop's, as JSX would write them.
+   */
+  preview(node: UiNode, property: string, value: unknown): void {
+    this.host?.preview?.(node, property, value);
+  }
+
+  /** Ends a preview of one property, or of every property previewed on the node. */
+  endPreview(node: UiNode, property?: string): void {
+    this.host?.endPreview?.(node, property);
+  }
 }
 
 /** What the runtime gives the service. */
 export interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  preview?(node: UiNode, property: string, value: unknown): void;
+  endPreview?(node: UiNode, property?: string): void;
 }

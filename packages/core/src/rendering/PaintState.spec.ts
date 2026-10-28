@@ -173,6 +173,15 @@ describe('resolvePaintState box shadows', () => {
   it('is empty for a node with none', () => {
     expect(resolve({}).boxShadows).toEqual([]);
   });
+
+  it('takes a size on the theme’s shadow scale by name', () => {
+    const named = resolve({ boxShadows: 'medium' }).boxShadows;
+    expect(named.length).toBe(lightTheme.shadows.medium.length);
+    expect(named.length).toBeGreaterThan(0);
+    expect(named[0]!.blurRadius).toBe(lightTheme.shadows.medium[0]!.blurRadius);
+    expect(resolve({ boxShadows: 'none' }).boxShadows).toEqual([]);
+    expect(resolve({ boxShadows: 'enormous' }).boxShadows).toEqual([]);
+  });
 });
 
 describe('resolvePaintState reusing a scratch', () => {

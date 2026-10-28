@@ -146,7 +146,7 @@ Fills, borders, shadows and everything else that changes pixels without changing
 | `borderWidth` | `unset` | no | Paint | Thickness of that border, in pixels. |
 | `borderRadius` | no rounding | no | Paint | Corner rounding: one number, four, or a name in the theme's shape scale (`borderRadius="medium"`), resolved at paint against the theme the element is under. Clips the background, the image and `overflow: hidden`. |
 | `opacity` | `1` | no | Paint | Applies to the whole subtree, not just this node. |
-| `boxShadows` | none | no | Paint | CSS `box-shadow`s: outside the box, or inside it with `inset`, following its corner radius. The first is on top. A colour may be a palette name. Painted outside the node's own clip, and a node is culled only once its shadows are off screen too. |
+| `boxShadows` | none | no | Paint | CSS `box-shadow`s: outside the box, or inside it with `inset`, following its corner radius. The first is on top. A colour may be a palette name, and the whole may be a size on the theme's shadow scale (`boxShadows="medium"`), resolved against the theme the element is under. Painted outside the node's own clip, and a node is culled only once its shadows are off screen too. |
 | `visible` | `true` | no | Paint, Semantics | Hides the box and its subtree without taking it out of layout. |
 | `transform` | `unset` | no | Paint, Transform | Translation, scale and rotation applied at paint time. Layout does not see it. |
 | `rasterize` | `false` | no | Paint | Keeps the subtree as pixels and copies them while only what is above it moves or scales, as a camera does. Canvas2D only; drawn again when anything in it changes. |

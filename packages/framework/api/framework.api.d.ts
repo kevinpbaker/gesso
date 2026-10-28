@@ -1491,6 +1491,7 @@ declare class GessoRuntime {
   readonly inspector: LayoutInspector;
   private readonly resolver;
   private readonly graph;
+  private readonly previewed;
   private readonly engine;
   private readonly builder;
   private readonly scheduler;
@@ -1601,6 +1602,8 @@ declare class GessoRuntime {
   snapshotTree(): UiTreeSnapshot;
   private sendTree;
   themeAt(id?: string): UiTheme | undefined;
+  private previewProperty;
+  private endPreviews;
   inspectNodeById(id: string): UiNodeReport | null;
   setHighlightedNode(id: string | null): void;
   onCursor(listener: ((cursor: string | null) => void) | null): void;
@@ -2612,10 +2615,14 @@ declare class InspectionService {
   attach(host: InspectionHost): void;
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  preview(node: UiNode, property: string, value: unknown): void;
+  endPreview(node: UiNode, property?: string): void;
 }
 interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  preview?(node: UiNode, property: string, value: unknown): void;
+  endPreview?(node: UiNode, property?: string): void;
 }
 declare function audioClock(audio: AudioService, source: string): VideoClock;
 interface AudioElementLike extends EventTarget {

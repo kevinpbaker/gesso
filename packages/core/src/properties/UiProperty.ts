@@ -8,8 +8,8 @@ import { defineProperty, type UiPropertyDefinition } from './UiPropertyDefinitio
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiBasicColors, colorValuesEqual } from './UiColor';
 import { UiBorderRadiuses, borderRadiusValuesEqual } from './UiBorderRadius';
-import type { UiBoxShadow } from './UiBoxShadow';
-import { boxShadowArraysEqual } from './UiBoxShadow';
+import type { UiBoxShadows } from './UiBoxShadow';
+import { boxShadowValuesEqual } from './UiBoxShadow';
 import type { UiGradient } from './UiGradient';
 import { gradientsEqual, validateGradient } from './UiGradient';
 import type { UiTransform } from './UiTransform';
@@ -897,12 +897,12 @@ export const UiProperties = {
     affects: P
   }),
 
-  boxShadows: defineProperty<readonly UiBoxShadow[]>({
+  boxShadows: defineProperty<UiBoxShadows>({
     name: 'boxShadows',
     defaultValue: [],
     inherited: false,
     affects: P,
-    compare: boxShadowArraysEqual
+    compare: boxShadowValuesEqual
   }),
 
   visible: defineProperty<boolean>({

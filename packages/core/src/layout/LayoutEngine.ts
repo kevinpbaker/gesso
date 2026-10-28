@@ -15,7 +15,8 @@ import {
   parseMainAxisAlignment
 } from './Alignment';
 import { resolveString } from '../properties/UiPropertyResolver';
-import { boxShadowReach, type UiBoxShadow } from '../properties/UiBoxShadow';
+import { boxShadowReach, shadowsOf, type UiBoxShadow } from '../properties/UiBoxShadow';
+import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { isPercentLength, resolveLength } from './UiLength';
 import type { UiTrackSize } from './UiLength';
 import { placeGridItems, sizeGridTracks } from './GridLayout';
@@ -393,7 +394,16 @@ const reachScratch = { left: 0, top: 0, right: 0, bottom: 0 };
  * shadow that is on screen.
  */
 function readPaintReach(node: UiNode, rec: LayoutRecord): boolean {
-  const shadows = node.properties.get('boxShadows') as readonly UiBoxShadow[] | undefined;
+  const value = node.properties.get('boxShadows');
+  // A name on the theme's scale reaches as far as the theme's shadows of that size.
+  const shadows =
+    typeof value === 'string'
+      ? shadowsOf(
+          value,
+          (node.environment?.get(UiEnvironmentKeys.theme) ?? UiEnvironmentKeys.theme.defaultValue)
+            .shadows as unknown as { readonly [name: string]: readonly UiBoxShadow[] } | undefined
+        )
+      : (value as readonly UiBoxShadow[] | undefined);
   let left = 0;
   let top = 0;
   let right = 0;

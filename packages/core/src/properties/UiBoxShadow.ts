@@ -21,6 +21,46 @@ export interface UiBoxShadow {
   readonly inset?: boolean;
 }
 
+/** A size on the theme's shadow scale (`UiTheme.shadows`), which `boxShadows` takes as a name. */
+export type UiShadowName = 'none' | 'extraSmall' | 'small' | 'medium' | 'large' | 'extraLarge';
+
+/**
+ * What `boxShadows` holds: the shadows themselves, or a size on the
+ * theme's scale, `boxShadows="medium"`, as `borderRadius` takes a shape.
+ * A name follows the theme, so a rebrand's shadows reach every card.
+ */
+export type UiBoxShadows = readonly UiBoxShadow[] | UiShadowName;
+
+/**
+ * The shadows a `boxShadows` value stands for: itself, or the named
+ * size from `scale`, the node's theme's shadows. A name the scale lacks,
+ * or no scale, is no shadow.
+ */
+export function shadowsOf(
+  value: unknown,
+  scale: { readonly [name: string]: readonly UiBoxShadow[] } | undefined
+): readonly UiBoxShadow[] {
+  if (Array.isArray(value)) {
+    return value as readonly UiBoxShadow[];
+  }
+  if (typeof value === 'string' && scale !== undefined && Object.prototype.hasOwnProperty.call(scale, value)) {
+    return scale[value]!;
+  }
+  return NO_SHADOWS;
+}
+
+const NO_SHADOWS: readonly UiBoxShadow[] = [];
+
+/**
+ * Compares two `boxShadows` values: two names by name, two lists entry by entry.
+ */
+export function boxShadowValuesEqual(a: UiBoxShadows, b: UiBoxShadows): boolean {
+  if (typeof a === 'string' || typeof b === 'string') {
+    return a === b;
+  }
+  return boxShadowArraysEqual(a, b);
+}
+
 /**
  * Creates a box shadow with the supplied parameters.
  */

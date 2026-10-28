@@ -7,7 +7,7 @@ import type { UiColor } from '../properties/UiColor';
 import { UiBasicColors, colorToHex, colorToRgba } from '../properties/UiColor';
 import type { UiBorderRadius } from '../properties/UiBorderRadius';
 import { resolveBorderRadiusValue } from '../properties/UiThemeShape';
-import type { UiBoxShadow } from '../properties/UiBoxShadow';
+import { shadowsOf, type UiBoxShadow } from '../properties/UiBoxShadow';
 import type { UiTransform } from '../properties/UiTransform';
 import type { UiImage } from '../properties/UiImage';
 import { isVideoSurface, type UiVideoSurface } from '../properties/UiVideo';
@@ -436,11 +436,21 @@ const NO_SHADOWS: readonly PaintBoxShadow[] = [];
  */
 const paintShadows = new WeakMap<readonly UiBoxShadow[], { theme: unknown; shadows: readonly PaintBoxShadow[] }>();
 
-function resolvePaintShadows(node: UiNode, shadows: readonly UiBoxShadow[]): readonly PaintBoxShadow[] {
-  if (!Array.isArray(shadows) || shadows.length === 0) {
+function resolvePaintShadows(node: UiNode, value: unknown): readonly PaintBoxShadow[] {
+  if (value === undefined || (Array.isArray(value) && value.length === 0)) {
     return NO_SHADOWS;
   }
-  const theme = node.environment !== null ? node.environment.get(UiEnvironmentKeys.theme) : undefined;
+  const theme =
+    node.environment !== null ? node.environment.get(UiEnvironmentKeys.theme) : UiEnvironmentKeys.theme.defaultValue;
+  // A name is the theme's shadows of that size, which are one array per
+  // theme: the cache below is keyed by it as by a list written inline.
+  const shadows = shadowsOf(
+    value,
+    theme?.shadows as unknown as { readonly [name: string]: readonly UiBoxShadow[] } | undefined
+  );
+  if (shadows.length === 0) {
+    return NO_SHADOWS;
+  }
   const cached = paintShadows.get(shadows);
   if (cached !== undefined && cached.theme === theme) {
     return cached.shadows;
