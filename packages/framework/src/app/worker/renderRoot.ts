@@ -601,6 +601,9 @@ export class RenderWorkerApp {
       case 'colorScheme':
         runtime.setColorScheme(message.scheme);
         break;
+      case 'pointer':
+        runtime.setPointer(message.pointer);
+        break;
       case 'contrast':
         runtime.setContrast(message.contrast);
         break;

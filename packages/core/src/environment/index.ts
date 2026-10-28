@@ -3,6 +3,7 @@ export * from './UiColors';
 export * from './UiContainerSize';
 export * from './UiContrast';
 export * from './UiInsets';
+export * from './UiPointer';
 export * from './UiDensity';
 export * from './UiEnvironment';
 export * from './UiEnvironmentKey';

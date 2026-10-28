@@ -556,6 +556,7 @@ import {
   UiMotion,
   UiNode,
   UiPlatformAdapter,
+  UiPointer,
   UiPointerController,
   UiPointerDevice,
   UiReducedMotionPolicy,
@@ -1094,6 +1095,7 @@ declare class ShellService {
   private leaving;
   private readonly scheme;
   private readonly contrastState;
+  private readonly pointerState;
   private readonly activeState;
   private readonly insets;
   private readonly isFullscreen;
@@ -1109,6 +1111,7 @@ declare class ShellService {
   private nextFileId;
   readonly colorScheme: ReadableCell<ColorScheme>;
   readonly contrast: ReadableCell<UiContrast>;
+  readonly pointer: ReadableCell<UiPointer>;
   readonly windowActive: ReadableCell<boolean>;
   get currentColorScheme(): ColorScheme;
   readonly viewportInsets: ReadableCell<UiInsets>;
@@ -1116,6 +1119,7 @@ declare class ShellService {
   setHandler(handler: ((request: ShellRequest) => void) | null): void;
   applyColorScheme(scheme: ColorScheme): void;
   applyWindowActive(active: boolean): void;
+  applyPointer(pointer: UiPointer): void;
   applyContrast(contrast: UiContrast): void;
   applyViewportInsets(insets: UiInsets): void;
   copyText(text: string): Promise<boolean>;
@@ -1627,6 +1631,7 @@ declare class GessoRuntime {
   setUrl(url: string): void;
   setColorScheme(scheme: ColorScheme): void;
   setWindowActive(active: boolean): void;
+  setPointer(pointer: UiPointer): void;
   setContrast(contrast: UiContrast): void;
   setViewportInsets(insets: UiInsets): void;
   private publishViewportInsets;
@@ -1867,6 +1872,9 @@ type ShellToRuntimeMessage = {
 } | {
   type: 'contrast';
   contrast: UiContrast;
+} | {
+  type: 'pointer';
+  pointer: UiPointer;
 } |
 {
   type: 'windowActive';

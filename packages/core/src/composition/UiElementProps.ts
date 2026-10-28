@@ -241,7 +241,7 @@ export type SemanticsProps = PropsOf<
 >;
 
 /** Environment values an element provides to its subtree. */
-export type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
+export type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 
 /**
  * Behaviour attached to an element without wrapping it: hover and

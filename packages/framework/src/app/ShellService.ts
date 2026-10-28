@@ -1,7 +1,7 @@
 import { insetsEqual, noInsets, type UiInsets } from 'gesso-core';
 
 import { internalState } from '../InternalState';
-import type { UiContrast } from 'gesso-core';
+import type { UiContrast, UiPointer } from 'gesso-core';
 import type { ColorScheme } from './colorScheme';
 import type { ReadableCell } from '../Input';
 
@@ -177,6 +177,7 @@ export class ShellService {
   private leaving = false;
   private readonly scheme = internalState<ColorScheme>('light');
   private readonly contrastState = internalState<UiContrast>('standard');
+  private readonly pointerState = internalState<UiPointer>('fine');
   private readonly activeState = internalState(true);
   private readonly insets = internalState<UiInsets>(noInsets);
   private readonly isFullscreen = internalState<boolean>(false);
@@ -238,6 +239,14 @@ export class ShellService {
    *   );
    */
   readonly contrast: ReadableCell<UiContrast> = this.contrastState;
+
+  /**
+   * What the person points with: `coarse` on a touch screen, `fine` with
+   * a mouse or a trackpad. Fine until a shell says otherwise. The
+   * runtime also provides it at the root (`UiEnvironmentKeys.pointer`),
+   * where controls read it; this is for the application's own choices.
+   */
+  readonly pointer: ReadableCell<UiPointer> = this.pointerState;
 
   /**
    * Whether the window is the one the person is using: shown, and holding
@@ -312,6 +321,13 @@ export class ShellService {
   }
 
   /** Called by the runtime when the shell reports the contrast; not for applications. */
+  /** Called by the runtime when the shell reports what the person points with. */
+  applyPointer(pointer: UiPointer): void {
+    if (this.pointerState.value !== pointer) {
+      this.pointerState.value = pointer;
+    }
+  }
+
   applyContrast(contrast: UiContrast): void {
     if (this.contrastState.value !== contrast) {
       this.contrastState.value = contrast;

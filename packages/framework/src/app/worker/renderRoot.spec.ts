@@ -5,7 +5,16 @@ import { Component } from '../../Component';
 import { Define } from '../../decorators';
 import { internalState } from '../../InternalState';
 import { createComponent } from '../../createComponent';
-import { Box, Column, Text, UiInsetRegistry, type CanvasHost } from 'gesso-core';
+import {
+  Box,
+  Column,
+  lightTheme,
+  Text,
+  UiEnvironmentKeys,
+  UiInsetRegistry,
+  type CanvasHost,
+  type UiNode
+} from 'gesso-core';
 import { claimErrors } from '../claimedErrors';
 import { RenderWorkerApp } from './renderRoot';
 import { channel } from '../../channel/ChannelToken';
@@ -510,6 +519,27 @@ describe('RenderWorkerApp contrast', () => {
     await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
     send({ type: 'contrast', contrast: 'high' });
     expect(seen).toEqual(['standard', 'high']);
+  });
+});
+
+describe('RenderWorkerApp pointer', () => {
+  it('provides the pointer the shell reports at the root, turning the theme for a finger', async () => {
+    const seen: string[] = [];
+    let node: UiNode | null = null;
+
+    function Pointer(_inputs: Inputs<{}>, ctx: ComponentContext) {
+      ctx.inject(ShellService).pointer.subscribe(pointer => seen.push(pointer));
+      return Box({ theme: lightTheme, ref: (each: UiNode | null) => (node = each) }, Text({ text: 'pointer' }));
+    }
+
+    const { host, sent, send } = createFakeWorkerGlobal();
+    new RenderWorkerApp(createComponent(Pointer), host);
+    send(initMessage(createMockCanvas()));
+    await vi.waitFor(() => expect(sent.some(m => m.type === 'frame')).toBe(true));
+    send({ type: 'pointer', pointer: 'coarse' });
+    await vi.waitFor(() => expect(node?.environment?.get(UiEnvironmentKeys.theme).pointer).toBe('coarse'));
+    expect(seen).toEqual(['fine', 'coarse']);
+    expect(node!.environment!.get(UiEnvironmentKeys.pointer)).toBe('coarse');
   });
 });
 

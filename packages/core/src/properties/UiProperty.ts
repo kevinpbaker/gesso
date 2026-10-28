@@ -4,6 +4,7 @@ import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import type { UiContainerSize } from '../environment/UiContainerSize';
 import type { UiInsetSource } from '../environment/UiInsets';
+import type { UiPointer } from '../environment/UiPointer';
 import { defineProperty, type UiPropertyDefinition } from './UiPropertyDefinition';
 import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiBasicColors, colorValuesEqual } from './UiColor';
@@ -1748,6 +1749,19 @@ export const UiProperties = {
 
   theme: defineProperty<UiTheme | undefined>({
     name: 'theme',
+    defaultValue: undefined,
+    inherited: false,
+    affects: E
+  }),
+
+  /**
+   * What the person points with in this subtree, `fine` or `coarse`,
+   * over the device's: a design tool's frame drawn as a phone says
+   * `coarse`, and the controls in it grow to a finger's size. See
+   * `UiPointer`.
+   */
+  pointer: defineProperty<UiPointer | undefined>({
+    name: 'pointer',
     defaultValue: undefined,
     inherited: false,
     affects: E

@@ -34,12 +34,21 @@ export interface UiThemeExtension<T extends object> {
   readonly name: string;
   /** What `themeExtension` returns for a theme that does not carry it. */
   readonly defaults: T;
+  /** What it returns instead for such a theme turned for a finger; `defaults` when absent. See `UiPointer`. */
+  readonly coarse?: T;
   readonly equals: (a: T, b: T) => boolean;
 }
 
 export interface UiThemeExtensionOptions<T extends object> {
   readonly name: string;
   readonly defaults: T;
+  /**
+   * The group's values for a finger: what a theme turned for touch
+   * (`withPointer(theme, 'coarse')`) reads when it does not carry the
+   * group itself. A control library's touch sizes go here, so an
+   * application gets them on a touch screen with nothing to provide.
+   */
+  readonly coarse?: T;
   /**
    * How two values of this extension are compared, for the environment
    * to decide whether a theme change has to invalidate the subtree.
@@ -68,6 +77,7 @@ export function defineThemeExtension<T extends object>(options: UiThemeExtension
     key: Symbol(options.name),
     name: options.name,
     defaults: options.defaults,
+    ...(options.coarse === undefined ? {} : { coarse: options.coarse }),
     equals: options.equals ?? shallowEqual
   };
   // A theme carries values, not the extension objects that describe
@@ -131,11 +141,14 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 /** What the theme carries for this extension, or its declared defaults. */
 export function themeExtension<T extends object>(
-  theme: { readonly extensions?: UiThemeExtensions },
+  theme: { readonly extensions?: UiThemeExtensions; readonly pointer?: 'fine' | 'coarse' },
   extension: UiThemeExtension<T>
 ): T {
   const carried = theme.extensions?.get(extension.key);
-  return carried === undefined ? extension.defaults : (carried as T);
+  if (carried !== undefined) {
+    return carried as T;
+  }
+  return theme.pointer === 'coarse' && extension.coarse !== undefined ? extension.coarse : extension.defaults;
 }
 
 /** Whether the theme carries this extension at all, rather than falling back. */

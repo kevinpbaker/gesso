@@ -143,7 +143,9 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       borderColor: borderToken(invalid),
       borderRadius: tokens.select(t => t.radius.field),
       padding: 8,
-      minHeight: multiline.pipe(map(on => (on ? 72 : 32))),
+      minHeight: combineLatest([multiline, tokens.select(t => t.field.minHeight)]).pipe(
+        map(([on, least]) => (on ? Math.max(72, least) : least))
+      ),
       role: 'textbox',
       label,
       // The error when there is one, so somebody arriving at a field
