@@ -25,6 +25,10 @@ import {
 import {
   Observable
 } from "rxjs";
+interface ScreenAgentOptions {
+  readonly windowChannels?: boolean;
+  readonly confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+}
 interface ScreenAgent {
   readonly surface: AgentSurfaceLike;
   attach(send: (message: ScreenAgentMessage) => void): {
@@ -32,7 +36,7 @@ interface ScreenAgent {
     detach(): void;
   };
 }
-declare function createScreenAgent(): ScreenAgent;
+declare function createScreenAgent(options?: ScreenAgentOptions): ScreenAgent;
 type DesktopServe = (options: {
   hostname: string;
   port: number;
@@ -135,6 +139,7 @@ export {
   type DesktopAgentOptions,
   type DesktopServe,
   type ScreenAgent,
+  type ScreenAgentOptions,
   type ShowMessageBox,
   windowsChannel,
   withWindowRoute

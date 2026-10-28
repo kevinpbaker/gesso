@@ -5,7 +5,7 @@ import { defineChannel, serve } from 'gesso-framework';
 import { AGENT_PORT, serveAgentPort, type AgentSurfaceLike } from 'gesso-framework/agent';
 
 import { serveDesktopAgent, type DesktopServe } from './agent';
-import { createScreenAgent } from './screen';
+import { createScreenAgent, type ScreenAgentOptions } from './screen';
 import { relayScreenAgent } from './view';
 
 const Counter = defineChannel('counter', { view: { count: 0 }, commands: {} as { add(by: number): void } });
@@ -20,6 +20,18 @@ function renderWorker(pressed: string[]): AgentSurfaceLike {
         description: 'Presses a control.',
         inputSchema: { type: 'object' },
         annotations: { readOnlyHint: false, openWorldHint: false }
+      },
+      {
+        name: 'tokens_view',
+        description: "The theme's names.",
+        inputSchema: { type: 'object' },
+        annotations: { readOnlyHint: true, openWorldHint: false }
+      },
+      {
+        name: 'render_frame',
+        description: 'Draws a module.',
+        inputSchema: { type: 'object' },
+        annotations: { readOnlyHint: true, openWorldHint: false }
       },
       {
         name: 'counter_view',
@@ -37,11 +49,11 @@ function renderWorker(pressed: string[]): AgentSurfaceLike {
   };
 }
 
-function setUp() {
+function setUp(options: ScreenAgentOptions = {}) {
   const pressed: string[] = [];
   const channel = new MessageChannel();
   serveAgentPort(channel.port1, () => renderWorker(pressed));
-  const screen = createScreenAgent();
+  const screen = createScreenAgent(options);
   // The window's page, relaying between the main process and its render worker.
   let toMain: (message: unknown) => void = () => {};
   const relay = relayScreenAgent({ openRenderPort: key => (key === AGENT_PORT ? channel.port2 : undefined) }, message =>
@@ -55,11 +67,20 @@ function setUp() {
 describe('a desktop window’s screen, offered to agents', () => {
   it('lists only the screen tools, and presses through the window', async () => {
     const { pressed, screen, channel } = setUp();
-    expect((await screen.surface.tools()).map(tool => tool.name)).toEqual(['ui_press']);
+    // The screen's own tools all cross, whatever their names start with.
+    expect((await screen.surface.tools()).map(tool => tool.name)).toEqual(['ui_press', 'tokens_view', 'render_frame']);
     const result = await screen.surface.call('ui_press', { target: 'Save' });
     expect(result.content[0]).toEqual({ type: 'text', text: 'pressed' });
     expect(pressed).toEqual(['ui_press {"target":"Save"}']);
     expect((await screen.surface.call('counter_view', {})).isError).toBe(true);
+    channel.port1.close();
+  });
+
+  it("offers the window's channels too, for an application whose state lives in its window", async () => {
+    const { pressed, screen, channel } = setUp({ windowChannels: true });
+    expect((await screen.surface.tools()).map(tool => tool.name)).toContain('counter_view');
+    expect((await screen.surface.call('counter_view', {})).isError).toBe(false);
+    expect(pressed).toEqual(['counter_view {}']);
     channel.port1.close();
   });
 
@@ -99,7 +120,7 @@ describe('a desktop window’s screen, offered to agents', () => {
     const names = ((await response.json()) as { result: { tools: { name: string }[] } }).result.tools.map(
       tool => tool.name
     );
-    expect(names).toEqual(['counter_view', 'counter_add', 'ui_press']);
+    expect(names).toEqual(['counter_view', 'counter_add', 'ui_press', 'tokens_view', 'render_frame']);
     channel.port1.close();
   });
 });

@@ -304,8 +304,8 @@ an agent does not have.
 ### The window's screen, in development
 
 The screen tools (`ui_snapshot`, `ui_press`, `ui_type`, `ui_focus`,
-`ui_key`) are served by each window's render worker, out of the main
-process's reach. The window's page can reach it, and already talks to
+`ui_key`, `tokens_view` and `render_frame`) are served by each window's
+render worker, out of the main process's reach. The window's page can reach it, and already talks to
 the main process over the RPC, so it relays them:
 
 ```ts
@@ -327,7 +327,17 @@ const agent = serveDesktopAgent(channels, { screen: dev ? screen.surface : undef
 ```
 
 Only the screen tools cross; the channels the render worker replicates
-are already served by the main process. Agents operate the window
+are already served by the main process. An application whose state
+lives in its window instead, an editor say, with nothing in the main
+process to serve it, passes `createScreenAgent({ windowChannels: true })`
+and the window's channels cross too. The relay only needs something to
+carry messages each way, so a window loaded from a dev server rather
+than `views://` can carry them over a WebSocket to the main process.
+
+`render_frame` loads the module an agent names from where the window is
+served. A window whose modules are served from somewhere else, such as
+an editor serving the project it works on from another folder, says
+where with `renderRoot(App).loadModulesWith(path => import(...))`. Agents operate the window
 attached last. Pressing the screen's buttons is everything the person
 can do, including clicking through a confirmation drawn on the screen,
 so offer it in development, not to every agent holding the token.

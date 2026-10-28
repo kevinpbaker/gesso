@@ -179,6 +179,14 @@ const TOOLS: readonly AgentTool[] = [
 ];
 
 /**
+ * The screen's tools, by name: what a relay that carries only the screen
+ * (`gesso-electrobun`'s, to a desktop app's main process) lets through.
+ * Listed from the tools themselves, so a tool added here is relayed
+ * without the relay being told.
+ */
+export const SCREEN_TOOL_NAMES: readonly string[] = TOOLS.map(tool => tool.name);
+
+/**
  * Short names for record ids.
  *
  * A record's id is its path through the tree, `root:0:0:component:1:0:1`,

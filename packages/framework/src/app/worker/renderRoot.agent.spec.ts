@@ -92,3 +92,24 @@ describe('the render worker, asked by an agent', () => {
     appLink.port2.close();
   });
 });
+
+describe("render_frame's modules", () => {
+  it('loads a module the agent names the way the application said, with its path from the project root', async () => {
+    const { host, send, open } = fakeGlobal();
+    const asked: string[] = [];
+    new RenderWorkerApp(
+      createComponent(() => Box({ width: 10, height: 10 })),
+      host as never
+    ).loadModulesWith(async path => {
+      asked.push(path);
+      throw new Error('not served here');
+    });
+    send({ type: 'init', canvas: mockCanvas() as unknown as OffscreenCanvas, width: 400, height: 300, dpr: 1 });
+
+    const agent = remoteSurface(open(AGENT_PORT));
+    const result = await agent.call('render_frame', { module: 'mocks/Settings', width: 390 });
+
+    expect(result.isError).toBe(true);
+    expect(asked[0]).toBe('/mocks/Settings.tsx');
+  });
+});
