@@ -92,6 +92,24 @@ describe('UiShortcutRegistry', () => {
     expect(registry.handleKey('l', mods({ shift: true }), null)).toBe(false);
   });
 
+  it('matches a digit written with Shift on the key, whatever it types', () => {
+    // Shift+1 types `!` on a US keyboard, so a shortcut written as a
+    // design tool writes its "zoom to fit" never matched a real press.
+    const registry = new UiShortcutRegistry();
+    const fit = vi.fn();
+    registry.register({ keys: 'Shift+1', label: 'Zoom to fit', run: fit });
+
+    expect(registry.handleKey('!', mods({ shift: true }), null, 'Digit1')).toBe(true);
+    // A French keyboard types the digit itself with Shift.
+    expect(registry.handleKey('1', mods({ shift: true }), null, 'Digit1')).toBe(true);
+    expect(fit).toHaveBeenCalledTimes(2);
+
+    // Not a `!` typed on another key, as some layouts put it.
+    expect(registry.handleKey('!', mods({ shift: true }), null, 'Digit8')).toBe(false);
+    expect(registry.handleKey('!', mods({ shift: true }), null)).toBe(false);
+    expect(fit).toHaveBeenCalledTimes(2);
+  });
+
   it('unregisters when the returned function is called', () => {
     const registry = new UiShortcutRegistry();
     const run = vi.fn();

@@ -23,6 +23,8 @@ export interface UiShortcutStep {
   readonly meta: boolean;
   readonly shift: boolean;
   readonly alt: boolean;
+  /** The physical key a press was made on, in the DOM's `code` vocabulary; only a press has one. */
+  readonly code?: string;
 }
 
 /** What an application registers. */
@@ -188,8 +190,11 @@ export class UiShortcutRegistry {
    * `preventDefault()` so the keyboard controller's own defaults (Tab
    * navigation, Enter on a button, an editable's typing) do not also
    * act on a key that has already been spent.
+   *
+   * `code` is the physical key, which a digit written with Shift
+   * matches on (see `sameStep`).
    */
-  handleKey(key: string, modifiers: UiKeyModifiers, focused: UiNode | null): boolean {
+  handleKey(key: string, modifiers: UiKeyModifiers, focused: UiNode | null, code?: string): boolean {
     if (MODIFIER_KEYS.has(key)) {
       return false;
     }
@@ -201,7 +206,7 @@ export class UiShortcutRegistry {
       this.pending = [];
       return false;
     }
-    const step = stepFor(key, modifiers);
+    const step = stepFor(key, modifiers, code);
     const at = this.now();
     if (this.pending.length > 0 && at - this.pendingAt > this.chordTimeout) {
       this.pending = [];
@@ -434,7 +439,7 @@ function matchesPrefix(steps: readonly UiShortcutStep[], sequence: readonly UiSh
 }
 
 function sameStep(want: UiShortcutStep, got: UiShortcutStep): boolean {
-  if (want.key !== got.key) {
+  if (want.key !== got.key && !shiftedDigit(want, got)) {
     return false;
   }
   if (isSymbol(want.key)) {
@@ -459,6 +464,16 @@ function sameStep(want: UiShortcutStep, got: UiShortcutStep): boolean {
 }
 
 /**
+ * A digit written with Shift, pressed: `Shift+1`, as a design tool's
+ * "zoom to fit" is written, is the 1 key with Shift held, whatever
+ * character that types. On a US keyboard it types `!`, on a French one
+ * `1` itself, so the character cannot say; the physical key can.
+ */
+function shiftedDigit(want: UiShortcutStep, got: UiShortcutStep): boolean {
+  return want.shift && got.shift && /^[0-9]$/.test(want.key) && got.code === `Digit${want.key}`;
+}
+
+/**
  * Whether a key is a character that isn't a letter: punctuation, a digit
  * or a symbol, which different layouts put under different keys and
  * reach with or without Shift. A letter keeps its Shift, which is what
@@ -469,14 +484,15 @@ function isSymbol(key: string): boolean {
 }
 
 /** The press the person actually made. */
-function stepFor(key: string, modifiers: UiKeyModifiers): UiShortcutStep {
+function stepFor(key: string, modifiers: UiKeyModifiers, code?: string): UiShortcutStep {
   return {
     key: normalizeKey(key),
     mod: false,
     ctrl: modifiers.ctrl,
     meta: modifiers.meta,
     shift: modifiers.shift,
-    alt: modifiers.alt
+    alt: modifiers.alt,
+    ...(code === undefined ? {} : { code })
   };
 }
 

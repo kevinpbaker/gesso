@@ -3165,6 +3165,7 @@ interface UiShortcutStep {
   readonly meta: boolean;
   readonly shift: boolean;
   readonly alt: boolean;
+  readonly code?: string;
 }
 interface UiShortcut {
   readonly keys: string;
@@ -3193,7 +3194,7 @@ declare class UiShortcutRegistry {
   register(shortcut: UiShortcut): () => void;
   get all(): readonly UiShortcutBinding[];
   active(focused: UiNode | null): readonly UiShortcutBinding[];
-  handleKey(key: string, modifiers: UiKeyModifiers, focused: UiNode | null): boolean;
+  handleKey(key: string, modifiers: UiKeyModifiers, focused: UiNode | null, code?: string): boolean;
   private platform;
   private isEditingKey;
   reset(): void;

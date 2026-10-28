@@ -41,7 +41,7 @@ const shortcutsKind = defineModifier<ShortcutsOptions>({
           return;
         }
         const key = event as UiKeyboardEvent;
-        if (registry.handleKey(key.key, key.modifiers, key.target)) {
+        if (registry.handleKey(key.key, key.modifiers, key.target, key.code)) {
           event.preventDefault();
           event.stopPropagation();
         }
