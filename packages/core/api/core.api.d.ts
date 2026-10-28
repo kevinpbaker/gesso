@@ -2058,6 +2058,7 @@ declare const UiProperties: {
   readonly editingGroup: UiPropertyDefinition<UiEditingGroup | undefined>;
   readonly textInput: UiPropertyDefinition<UiTextInput | undefined>;
   readonly pointerEvents: UiPropertyDefinition<UiPointerEvents | undefined>;
+  readonly touchEmulation: UiPropertyDefinition<boolean | undefined>;
   readonly focusable: UiPropertyDefinition<boolean | undefined>;
   readonly tabStop: UiPropertyDefinition<boolean | undefined>;
   readonly disabled: UiPropertyDefinition<boolean | undefined>;
@@ -2160,7 +2161,7 @@ type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'anchorRect' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform' | 'rasterize'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
-type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
+type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'touchEmulation' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
 type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
@@ -3133,12 +3134,13 @@ declare class UiPointerController {
   private captured;
   get draggingScrollbarOf(): UiNode | null;
   get overScrollbar(): boolean;
-  pointerDown(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent;
-  pointerMove(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;
-  pointerUp(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, pointer?: UiPointerDevice): UiPointerEvent | null;
+  pointerDown(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, device?: UiPointerDevice): UiPointerEvent;
+  pointerMove(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, device?: UiPointerDevice): UiPointerEvent | null;
+  pointerUp(x: number, y: number, buttons?: number, modifiers?: UiKeyModifiers, device?: UiPointerDevice): UiPointerEvent | null;
   private countClick;
-  pointerCancel(pointer?: UiPointerDevice): void;
+  pointerCancel(device?: UiPointerDevice): void;
   private ownsPress;
+  private contactOf;
   private pressScrollbar;
   private recordOrigin;
   private dragScrollbar;

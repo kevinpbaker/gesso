@@ -1264,6 +1264,21 @@ export const UiProperties = {
     affects: DirtyFlags.Properties
   }),
 
+  /**
+   * Takes a mouse over this subtree as a finger, as a browser's device
+   * mode does: nothing is hovered without a press, a press hovers what
+   * it lands on until it lifts, and the press has a finger's slop and
+   * gestures. For a design tool playing a screen drawn for touch with a
+   * mouse; read up the ancestor chain. A finger and a pen are
+   * unchanged.
+   */
+  touchEmulation: defineProperty<boolean | undefined>({
+    name: 'touchEmulation',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
   focusable: defineProperty<boolean | undefined>({
     name: 'focusable',
     defaultValue: undefined,

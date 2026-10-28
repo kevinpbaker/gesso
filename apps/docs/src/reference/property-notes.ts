@@ -371,6 +371,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Interaction',
     note: 'Whether the node takes pointer input, or lets it through to what is behind.'
   },
+  touchEmulation: {
+    group: 'Interaction',
+    note: 'Takes a mouse over the subtree as a finger: no hover without a press, hover dropped when it lifts, as a browser device mode does.'
+  },
   focusable: { group: 'Interaction', note: 'Whether focus can land here at all, by tab, by click or by `focus()`.' },
   tabStop: {
     group: 'Interaction',

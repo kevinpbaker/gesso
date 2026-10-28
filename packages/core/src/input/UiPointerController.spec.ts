@@ -413,6 +413,54 @@ describe('UiPointerController', () => {
       expect(controller.hoveredNode).toBe(a);
     });
 
+    describe('touchEmulation', () => {
+      // The row is a frame drawn for touch, played with a mouse; b stays a mouse's.
+      const emulated = () => {
+        const setup = setupRow();
+        setup.a.properties.set('touchEmulation', true);
+        return setup;
+      };
+
+      it('hovers nothing under it while nothing is pressed, and still hovers beside it', () => {
+        const { b, controller } = emulated();
+        controller.pointerMove(50, 50);
+        expect(controller.hoveredNode).toBeNull();
+        controller.pointerMove(150, 50);
+        expect(controller.hoveredNode).toBe(b);
+        controller.pointerMove(50, 50);
+        expect(controller.hoveredNode).toBeNull();
+      });
+
+      it("takes a press as a finger's, hovering until it lifts", () => {
+        const { h, a, controller } = emulated();
+        const kinds: string[] = [];
+        for (const type of [
+          UiEventType.PointerDown,
+          UiEventType.PointerMove,
+          UiEventType.PointerUp,
+          UiEventType.Click
+        ]) {
+          h.dispatcher.addEventListener(a, type, event =>
+            kinds.push(`${type} ${(event as UiPointerEvent).pointer.kind}`)
+          );
+        }
+        controller.pointerDown(50, 50);
+        expect(controller.hoveredNode).toBe(a);
+        // Further than a mouse's slop and within a finger's: still a tap.
+        controller.pointerMove(56, 57, 1);
+        controller.pointerUp(56, 57);
+        expect(controller.hoveredNode).toBeNull();
+        expect(kinds).toEqual(['pointerdown touch', 'pointermove touch', 'pointerup touch', 'click touch']);
+      });
+
+      it('leaves a real finger and a mouse elsewhere as they are', () => {
+        const { b, controller } = emulated();
+        controller.pointerDown(150, 50);
+        controller.pointerUp(150, 50);
+        expect(controller.hoveredNode).toBe(b);
+      });
+    });
+
     it('drops hover when a touch press is cancelled', () => {
       const { controller } = setupRow();
 

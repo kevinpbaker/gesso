@@ -61,6 +61,17 @@ export function isSubtreeInert(node: UiNode): boolean {
 }
 
 /** `pointerEvents` as CSS inherits it: the nearest value set from the node up, 'auto' when none is. */
+/** Whether a mouse over the node is taken as a finger: `touchEmulation` up the ancestor chain. */
+export function emulatesTouch(node: UiNode | null): boolean {
+  for (let current = node; current !== null; current = current.parent) {
+    const value = current.properties.get('touchEmulation');
+    if (value === true || value === false) {
+      return value;
+    }
+  }
+  return false;
+}
+
 export function pointerEventsOf(node: UiNode | null): 'auto' | 'none' {
   for (let current = node; current !== null; current = current.parent) {
     const value = current.properties.get('pointerEvents');
