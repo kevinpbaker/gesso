@@ -15,7 +15,7 @@ import {
 } from '../../channel/createChannelRegistry';
 import type { ChannelSource } from '../../channel/provide';
 import type { ChannelToken } from '../../channel/ChannelToken';
-import { UiHostFrameClock } from 'gesso-core';
+import { UiHostFrameClock, type UiTheme } from 'gesso-core';
 import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
 import type { MediaOptions } from '../MediaService';
@@ -91,6 +91,8 @@ export class RenderWorkerApp {
   private readonly host: WorkerGlobal;
 
   private runtime: GessoRuntime | undefined;
+  /** See `renderThemesWith`. */
+  private renderThemes: () => { light?: UiTheme; dark?: UiTheme } = () => ({});
   /** See `loadModulesWith`. */
   private loadModule: (path: string) => Promise<Record<string, unknown>> = path => import(/* @vite-ignore */ path);
   /** Held so forwarded display refreshes can be handed to it. */
@@ -223,6 +225,16 @@ export class RenderWorkerApp {
    */
   loadModulesWith(load: (path: string) => Promise<Record<string, unknown>>): this {
     this.loadModule = load;
+    return this;
+  }
+
+  /**
+   * What `render_frame`'s `light` and `dark` draw in, asked on each call:
+   * the themes an application has of its own, such as the project a
+   * design editor is designing. Gesso's own by default.
+   */
+  renderThemesWith(themes: () => { light?: UiTheme; dark?: UiTheme }): this {
+    this.renderThemes = themes;
     return this;
   }
 
@@ -403,6 +415,7 @@ export class RenderWorkerApp {
           render: request =>
             renderModule(request, {
               load: this.loadModule,
+              themes: this.renderThemes,
               appTheme: () => runtime.themeAt(),
               channels: runtime.channels,
               services: runtime.services

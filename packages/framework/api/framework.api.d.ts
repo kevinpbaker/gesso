@@ -2833,6 +2833,7 @@ declare class RenderWorkerApp {
   private root;
   private readonly host;
   private runtime;
+  private renderThemes;
   private loadModule;
   private clock;
   private channels;
@@ -2842,6 +2843,10 @@ declare class RenderWorkerApp {
   private reportUncaught;
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): void;
   loadModulesWith(load: (path: string) => Promise<Record<string, unknown>>): this;
+  renderThemesWith(themes: () => {
+    light?: UiTheme;
+    dark?: UiTheme;
+  }): this;
   useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options?: {
     worker?: WorkerHandle | (() => Worker);
     source?: ChannelSource<V, C>;
@@ -4151,6 +4156,10 @@ interface RenderDependencies {
   appTheme(): UiTheme | undefined;
   readonly channels?: ChannelRegistry;
   readonly services?: ServiceRegistry;
+  readonly themes?: () => {
+    readonly light?: UiTheme;
+    readonly dark?: UiTheme;
+  };
   readonly frame?: Pick<RenderFrameOptions, 'createCanvas' | 'settleMs'>;
 }
 declare function renderModule(request: RenderRequest, deps: RenderDependencies): Promise<AgentToolResult>;
