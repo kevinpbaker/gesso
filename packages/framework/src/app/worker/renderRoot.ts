@@ -5,6 +5,7 @@ import { APPLICATION_WORKER, portHandle, servePorts, type PortHost, type WorkerH
 import { AGENT_PORT } from '../../agent/remote';
 import { serveApplicationAgent } from '../../agent/app';
 import { renderModule } from '../../agent/render';
+import type { AgentToolDefinition } from '../../agent/tools';
 import type { DesignThemes } from '../../agent/designedTheme';
 import { isClaimedError } from '../claimedErrors';
 import type { ServedChannel } from '../../channel/serveChannels';
@@ -96,6 +97,8 @@ export class RenderWorkerApp {
   private renderThemes: () => DesignThemes = () => ({});
   /** See `loadModulesWith`. */
   private loadModule: (path: string) => Promise<Record<string, unknown>> = path => import(/* @vite-ignore */ path);
+  /** The application's own agent tools (`useAgentTools`). */
+  private readonly agentTools: AgentToolDefinition[] = [];
   /** Held so forwarded display refreshes can be handed to it. */
   private clock: UiHostFrameClock | undefined;
   private channels: ChannelRegistryHandle | undefined;
@@ -281,6 +284,19 @@ export class RenderWorkerApp {
   }
 
   /**
+   * Offers an agent tools of the application's own, beside its
+   * channels' and its screen's: ones that answer with something other
+   * than a view, such as a measurement or a composed picture. See
+   * `AgentToolDefinition`. Called again, it adds to them.
+   *
+   *   renderRoot(Editor).useAgentTools(editorTools);
+   */
+  useAgentTools(tools: readonly AgentToolDefinition[]): this {
+    this.agentTools.push(...tools);
+    return this;
+  }
+
+  /**
    * Declares the app's routes, which is all it takes to make a
    * `RouterOutlet` in the tree resolve them.
    *
@@ -399,6 +415,7 @@ export class RenderWorkerApp {
         }
         return workers;
       },
+      tools: () => this.agentTools,
       ui: () => {
         const runtime = this.runtime;
         if (runtime === undefined) {

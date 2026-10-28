@@ -50,3 +50,4 @@ export { serveApplicationAgent, type ApplicationAgentParts } from './app';
 export { designedTheme, type AgentThemeName, type DesignThemes } from './designedTheme';
 export { renderModule, type RenderDependencies, type RenderRequest } from './render';
 export { formatThemeTokens, themeTokens, type TextStyleToken, type ThemeTokens } from './tokens';
+export { agentError, agentImages, agentText, toolSurface, type AgentToolDefinition } from './tools';
