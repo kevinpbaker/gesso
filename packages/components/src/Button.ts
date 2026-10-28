@@ -156,6 +156,7 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
       modifiers: modifiersOf(inputs, tokens.modifier, ...buttonModifiers(variant, tokens)),
       paddingX: metrics(size => size.paddingX),
       paddingY: metrics(size => size.paddingY),
+      minHeight: tokens.select(t => t.button.sizes[size].minHeight),
       x: 'center',
       y: 'center',
       borderRadius: metrics(size => size.radius),

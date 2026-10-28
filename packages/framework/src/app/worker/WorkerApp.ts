@@ -33,6 +33,7 @@ import { SemanticsMirror } from '../SemanticsMirror';
 import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeContrast } from '../contrast';
+import { observePointer } from '../pointer';
 import { observeWindowActive } from '../windowActive';
 import { observeReducedMotion } from '../reducedMotion';
 import {
@@ -1468,6 +1469,7 @@ export class WorkerApp {
       this.post({ type: 'reducedMotion', reduced });
     });
     const detachContrast = observeContrast(contrast => this.post({ type: 'contrast', contrast }));
+    const detachPointer = observePointer(pointer => this.post({ type: 'pointer', pointer }));
     const detachWindowActive = observeWindowActive(active => this.post({ type: 'windowActive', active }));
     const onPointerMove = (event: PointerEvent): void => {
       const { x, y } = toLocal(event.clientX, event.clientY);
@@ -1657,6 +1659,7 @@ export class WorkerApp {
     return () => {
       detachReducedMotion();
       detachContrast();
+      detachPointer();
       detachWindowActive();
       detachFullscreen();
       detachFileDrop();

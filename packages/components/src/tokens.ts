@@ -1,4 +1,10 @@
-import { defaultSpacing, defineThemeExtension, type UiThemeExtension, type UiTypographyRole } from 'gesso-core';
+import {
+  defaultSpacing,
+  defineThemeExtension,
+  TOUCH_TARGET,
+  type UiThemeExtension,
+  type UiTypographyRole
+} from 'gesso-core';
 
 /**
  * The tokens `gesso-components` reads, as a theme extension.
@@ -52,6 +58,14 @@ export interface ButtonSizeTokens {
   readonly paddingY: number;
   readonly radius: number;
   readonly textStyle: UiTypographyRole;
+  /** The least it is tall, whatever its label: nothing with a mouse, a finger's target on touch. */
+  readonly minHeight?: number;
+}
+
+/** A text field's, a number field's and a select's own box. */
+export interface FieldTokens {
+  /** The least a single-line field is tall: 32 with a mouse, a finger's target on touch. */
+  readonly minHeight: number;
 }
 
 /**
@@ -92,6 +106,7 @@ export interface ButtonTokens {
 export interface ControlTokens {
   readonly radius: ControlRadiusTokens;
   readonly button: ButtonTokens;
+  readonly field: FieldTokens;
 }
 
 /**
@@ -189,11 +204,35 @@ function tokensEqual(a: unknown, b: unknown): boolean {
   return true;
 }
 
+const DEFAULTS: ControlTokens = {
+  radius: { field: 6, checkbox: 4, scroller: 6, sheet: 12 },
+  button: { sizes: SIZES, paint: PAINT, hoveredOpacity: 0.88, pressedOpacity: 0.76 },
+  field: { minHeight: 32 }
+};
+
+/**
+ * The same controls for a finger (`withPointer(theme, 'coarse')`): a
+ * medium button and a field at least 44 high, the target WCAG, Apple and
+ * Android ask a finger to be given, a small one 36 and a large one 52,
+ * each with a little more room around its label. What a mouse draws is
+ * not moved.
+ */
+const COARSE: ControlTokens = {
+  ...DEFAULTS,
+  button: {
+    ...DEFAULTS.button,
+    sizes: {
+      small: { ...SIZES.small, paddingX: SIZES.small.paddingX + 4, minHeight: 36 },
+      medium: { ...SIZES.medium, paddingX: SIZES.medium.paddingX + 4, minHeight: TOUCH_TARGET },
+      large: { ...SIZES.large, paddingX: SIZES.large.paddingX + 4, minHeight: 52 }
+    }
+  },
+  field: { minHeight: TOUCH_TARGET }
+};
+
 export const controlTokens: UiThemeExtension<ControlTokens> = defineThemeExtension<ControlTokens>({
   name: 'gesso.controls',
-  defaults: {
-    radius: { field: 6, checkbox: 4, scroller: 6, sheet: 12 },
-    button: { sizes: SIZES, paint: PAINT, hoveredOpacity: 0.88, pressedOpacity: 0.76 }
-  },
+  defaults: DEFAULTS,
+  coarse: COARSE,
   equals: tokensEqual
 });

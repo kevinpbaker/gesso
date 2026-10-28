@@ -13,6 +13,7 @@ import { shapesEqual } from './UiShapes';
 import { shadowsEqual } from './UiShadows';
 import { defaultSpacing, scaleSpacing, spacingEqual } from './UiSpacing';
 import { densityFactors } from './UiDensity';
+import type { UiPointer, UiThemeTouch } from './UiPointer';
 import { highContrastColors, type HighContrastOptions } from './UiContrast';
 import { themeExtensionsEqual } from './UiThemeExtension';
 import { defaultUnits, unitsEqual } from './UiUnits';
@@ -43,6 +44,14 @@ export interface UiTheme {
   readonly contrast: UiContrast;
   readonly units: UiUnits;
   readonly extensions?: UiThemeExtensions;
+  /**
+   * What the person points with, which way this theme was turned (see
+   * `UiPointer`); absent is `fine`. Set by `withPointer`, which every
+   * subtree under a `pointer="coarse"` (or a touch device) is drawn in.
+   */
+  readonly pointer?: UiPointer;
+  /** What the theme changes for a finger; see `UiThemeTouch`. */
+  readonly touch?: UiThemeTouch;
 }
 
 export const lightTheme: UiTheme = {
@@ -124,6 +133,8 @@ export function themesEqual(a: UiTheme, b: UiTheme): boolean {
   return (
     a.density === b.density &&
     a.contrast === b.contrast &&
+    (a.pointer ?? 'fine') === (b.pointer ?? 'fine') &&
+    a.touch === b.touch &&
     unitsEqual(a.units, b.units) &&
     colorsEqualPalette(a.colors, b.colors) &&
     typographyEqual(a.typography, b.typography) &&

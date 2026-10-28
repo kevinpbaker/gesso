@@ -6,6 +6,7 @@ import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
 import { Box, Row, Text, type UiNode } from 'gesso-core';
 import { Button } from './Button';
+import { TextInput } from './TextInput';
 
 function mount(root: Parameters<typeof renderTest>[0]) {
   return renderTest(root, { width: 400, height: 400 });
@@ -22,6 +23,33 @@ function hover(ui: ReturnType<typeof mount>, node: UiNode): void {
 function prop(node: UiNode, name: string): unknown {
   return node.properties.get(name);
 }
+
+describe('Button and TextInput for a finger', () => {
+  it('grow to a finger’s target under pointer="coarse", and are as they were with a mouse', () => {
+    const ui = mount(
+      Box(
+        {},
+        Row(
+          { key: 'mouse' },
+          createComponent(Button, { label: 'Save' }),
+          createComponent(TextInput, { label: 'Email', labelHidden: true })
+        ),
+        Row(
+          { key: 'touch', pointer: 'coarse' },
+          createComponent(Button, { label: 'Save' }),
+          createComponent(TextInput, { label: 'Email', labelHidden: true })
+        )
+      )
+    );
+    ui.frame();
+    const [mouseButton, touchButton] = ui.getAllByRole('button').map(node => ui.getLayout(node).height);
+    const [mouseField, touchField] = ui.getAllByRole('textbox').map(node => ui.getLayout(node).height);
+    expect(mouseButton).toBe(36);
+    expect(touchButton).toBe(44);
+    expect(mouseField).toBeLessThan(44);
+    expect(touchField).toBe(44);
+  });
+});
 
 describe('Button', () => {
   it('takes one label and uses it as the words and the name', () => {

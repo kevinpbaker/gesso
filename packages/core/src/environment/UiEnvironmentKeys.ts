@@ -1,3 +1,4 @@
+import type { UiPointer } from './UiPointer';
 import { createEnvironmentKey } from './UiEnvironmentKey';
 import type { UiTheme } from './UiTheme';
 import type { UiTextStyle } from '../properties/UiTextStyle';
@@ -79,6 +80,17 @@ export const UiEnvironmentKeys = {
    * as it changes. Provided by `Responsive` and by the
    * `containerSize` property; see `UiContainerSize`.
    */
+  /**
+   * What the person points with here: the device's, as the runtime
+   * reads it (CSS's `pointer` feature), or what an ancestor said with
+   * `pointer`. A theme provided under `coarse` is turned for it
+   * (`withPointer`). See `UiPointer`.
+   */
+  pointer: createEnvironmentKey<UiPointer>({
+    name: 'pointer',
+    defaultValue: 'fine'
+  }),
+
   containerSize: createEnvironmentKey<UiContainerSize>({
     name: 'containerSize',
     defaultValue: unknownContainerSize

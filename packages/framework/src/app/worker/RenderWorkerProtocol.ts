@@ -10,7 +10,8 @@ import type {
   UiScrollability,
   UiSemanticsUpdate,
   UiFileDropMessage,
-  UiContrast
+  UiContrast,
+  UiPointer
 } from 'gesso-core';
 import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
 import type { ColorScheme } from '../colorScheme';
@@ -179,6 +180,7 @@ export type ShellToRuntimeMessage =
    */
   | { type: 'colorScheme'; scheme: ColorScheme }
   | { type: 'contrast'; contrast: UiContrast }
+  | { type: 'pointer'; pointer: UiPointer }
   /** Whether the window is shown and holds the focus; once at start-up and on every change. See `ShellService.windowActive`. */
   | { type: 'windowActive'; active: boolean }
   /**

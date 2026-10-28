@@ -1214,21 +1214,104 @@ declare class UiInsetRegistry implements UiInsetSource {
   private recompute;
 }
 declare function observeViewportInsets(onChange: (insets: UiInsets) => void): () => void;
-interface UiPropertyDefinition<T> {
-  readonly name: string;
-  readonly defaultValue: T;
-  readonly inherited: boolean;
-  readonly affects: DirtyFlags;
-  readonly compare?: (a: T, b: T) => boolean;
-  readonly environmentKey?: UiEnvironmentKey<unknown>;
-  readonly resolveFromEnvironment?: (value: unknown) => T;
-  readonly validate?: (value: T) => string | undefined;
-  readonly narrowEffects?: (previous: T, next: T, flags: DirtyFlags) => DirtyFlags;
+interface UiSpacing {
+  readonly none: number;
+  readonly hairline: number;
+  readonly extraSmall: number;
+  readonly small: number;
+  readonly medium: number;
+  readonly large: number;
+  readonly extraLarge: number;
+  readonly huge: number;
 }
-declare function defineProperty<T>(options: Omit<UiPropertyDefinition<T>, 'name'> & {
-  name: string;
-}): UiPropertyDefinition<T>;
-declare function propertyValuesEqual<T>(definition: UiPropertyDefinition<T>, a: T, b: T): boolean;
+declare const defaultSpacing: UiSpacing;
+declare const spacingSteps: readonly (keyof UiSpacing)[];
+declare function scaleSpacing(spacing: UiSpacing, factor: number): UiSpacing;
+declare function spacingEqual(a: UiSpacing, b: UiSpacing): boolean;
+interface UiTextStyle {
+  readonly fontFamily: string;
+  readonly fontSize: number;
+  readonly fontWeight: UiFontWeight;
+  readonly lineHeight: number;
+  readonly letterSpacing: number;
+  readonly color: UiColor;
+  readonly textAlign: UiTextAlign;
+  readonly textDirection: UiTextDirection;
+  readonly fontStyle?: UiFontStyle;
+  readonly fontStretch?: UiFontStretch;
+  readonly fontVariant?: UiFontVariant;
+  readonly fontKerning?: UiFontKerning;
+  readonly textDecoration?: UiTextDecoration;
+}
+type UiFontStyle = 'normal' | 'italic' | 'oblique';
+type UiFontStretch = 'ultra-condensed' | 'extra-condensed' | 'condensed' | 'semi-condensed' | 'normal' | 'semi-expanded' | 'expanded' | 'extra-expanded' | 'ultra-expanded';
+type UiFontVariant = 'normal' | 'small-caps';
+type UiFontKerning = 'auto' | 'normal' | 'none';
+type UiTextDecoration = 'none' | 'underline' | 'line-through' | 'underline line-through';
+interface UiTextMetrics {
+  readonly fontFamily?: string;
+  readonly fontSize?: number;
+  readonly fontWeight?: UiFontWeight;
+  readonly fontStyle?: UiFontStyle;
+  readonly fontStretch?: UiFontStretch;
+  readonly fontVariant?: UiFontVariant;
+  readonly fontKerning?: UiFontKerning;
+  readonly letterSpacing?: number;
+  readonly hidden?: boolean;
+}
+interface UiTextLink {
+  readonly onClick?: () => void;
+  readonly label?: string;
+  readonly href?: string;
+}
+interface UiTextSpan extends UiTextMetrics {
+  readonly text: string;
+  readonly color?: UiColorValue;
+  readonly backgroundColor?: UiColorValue;
+  readonly textDecoration?: UiTextDecoration;
+  readonly link?: UiTextLink;
+}
+interface UiResolvedTextSpan extends UiTextMetrics {
+  readonly start: number;
+  readonly end: number;
+  readonly color?: UiColorValue;
+  readonly backgroundColor?: UiColorValue;
+  readonly textDecoration?: UiTextDecoration;
+  readonly link?: UiTextLink;
+}
+interface UiSpannedText {
+  readonly text: string;
+  readonly spans: readonly UiResolvedTextSpan[];
+}
+declare const defaultTextStyle: UiTextStyle;
+declare function flattenTextSpans(spans: readonly UiTextSpan[]): UiSpannedText;
+declare function spannedTextOf(node: UiNode): UiSpannedText | undefined;
+declare function textContentOf(node: UiNode): string;
+declare function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[];
+declare function editableSpansOf(node: UiNode, text: string, composition?: UiTextRange | null): readonly UiResolvedTextSpan[];
+interface UiTextRange {
+  readonly start: number;
+  readonly end: number;
+}
+type HiddenSpan = Pick<UiResolvedTextSpan, 'start' | 'end' | 'hidden'>;
+declare function hiddenRangesOf(spans: readonly HiddenSpan[]): readonly UiTextRange[];
+declare function spanAtOffset(spans: readonly UiResolvedTextSpan[], offset: number): UiResolvedTextSpan | undefined;
+declare function textSpansEqual(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
+declare function spansDifferOnlyInPaint(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
+declare function textStylesEqual(a: UiTextStyle, b: UiTextStyle): boolean;
+interface UiTypography {
+  readonly body: UiTextStyle;
+  readonly bodyLarge: UiTextStyle;
+  readonly bodySmall: UiTextStyle;
+  readonly headline: UiTextStyle;
+  readonly title: UiTextStyle;
+  readonly label: UiTextStyle;
+}
+interface UiTypographyExtensions {}
+type UiTypographyRole = keyof UiTypography | (keyof UiTypographyExtensions & string);
+declare function isTypographyRole(value: unknown, scale: UiTypography): value is UiTypographyRole;
+declare const defaultTypography: UiTypography;
+declare function typographyEqual(a: UiTypography, b: UiTypography): boolean;
 interface UiBoxShadow {
   readonly offsetX: number;
   readonly offsetY: number;
@@ -1254,6 +1337,108 @@ declare function boxShadowReach(shadows: readonly UiBoxShadow[], out: {
   right: number;
   bottom: number;
 }): void;
+interface UiShadows {
+  readonly none: readonly UiBoxShadow[];
+  readonly extraSmall: readonly UiBoxShadow[];
+  readonly small: readonly UiBoxShadow[];
+  readonly medium: readonly UiBoxShadow[];
+  readonly large: readonly UiBoxShadow[];
+  readonly extraLarge: readonly UiBoxShadow[];
+}
+declare const defaultShadows: UiShadows;
+declare function shadowsEqual(a: UiShadows, b: UiShadows): boolean;
+type UiDensity = 'compact' | 'comfortable' | 'spacious';
+declare const densityFactors: Readonly<Record<UiDensity, number>>;
+type UiContrast = 'standard' | 'high';
+declare function relativeLuminance(color: UiColor): number;
+declare function contrastRatio(a: UiColor, b: UiColor): number;
+declare function raiseContrast(color: UiColor, against: UiColor, ratio: number): UiColor;
+interface HighContrastOptions {
+  readonly surfaces?: Iterable<string>;
+}
+declare function highContrastColors(colors: UiColors, options?: HighContrastOptions): UiColors;
+interface UiThemeExtension<T extends object> {
+  readonly key: symbol;
+  readonly name: string;
+  readonly defaults: T;
+  readonly coarse?: T;
+  readonly equals: (a: T, b: T) => boolean;
+}
+interface UiThemeExtensionOptions<T extends object> {
+  readonly name: string;
+  readonly defaults: T;
+  readonly coarse?: T;
+  readonly equals?: (a: T, b: T) => boolean;
+}
+type UiThemeExtensions = ReadonlyMap<symbol, object>;
+declare const noThemeExtensions: UiThemeExtensions;
+declare function defineThemeExtension<T extends object>(options: UiThemeExtensionOptions<T>): UiThemeExtension<T>;
+declare function themeExtension<T extends object>(theme: {
+  readonly extensions?: UiThemeExtensions;
+  readonly pointer?: 'fine' | 'coarse';
+}, extension: UiThemeExtension<T>): T;
+declare function hasThemeExtension<T extends object>(theme: {
+  readonly extensions?: UiThemeExtensions;
+}, extension: UiThemeExtension<T>): boolean;
+declare function withThemeExtension<Theme extends {
+  readonly extensions?: UiThemeExtensions;
+}, T extends object>(theme: Theme, extension: UiThemeExtension<T>, value: T): Theme;
+declare function themeExtensionsEqual(a: UiThemeExtensions | undefined, b: UiThemeExtensions | undefined): boolean;
+interface UiUnits {
+  readonly pixelsPerInch: number;
+  readonly rootFontSize: number;
+}
+declare const defaultUnits: UiUnits;
+interface UiLengths {
+  readonly units: UiUnits;
+  rem(value: number): number;
+  inch(value: number): number;
+  pt(value: number): number;
+  mm(value: number): number;
+}
+declare function lengths(units?: UiUnits): UiLengths;
+declare function unitsEqual(a: UiUnits, b: UiUnits): boolean;
+interface UiTheme {
+  readonly colors: UiColors;
+  readonly typography: UiTypography;
+  readonly shapes: UiShapes;
+  readonly shadows: UiShadows;
+  readonly spacing: UiSpacing;
+  readonly density: UiDensity;
+  readonly contrast: UiContrast;
+  readonly units: UiUnits;
+  readonly extensions?: UiThemeExtensions;
+  readonly pointer?: UiPointer;
+  readonly touch?: UiThemeTouch;
+}
+declare const lightTheme: UiTheme;
+declare const darkTheme: UiTheme;
+declare function themesEqual(a: UiTheme, b: UiTheme): boolean;
+declare function withDensity(theme: UiTheme, density: UiDensity): UiTheme;
+declare function withContrast(theme: UiTheme, contrast: UiContrast, options?: HighContrastOptions): UiTheme;
+type UiPointer = 'fine' | 'coarse';
+interface UiThemeTouch {
+  readonly typography?: Partial<UiTypography>;
+  readonly spacing?: Partial<UiSpacing>;
+  readonly extensions?: UiThemeExtensions;
+}
+declare const TOUCH_TARGET = 44;
+declare function withPointer(theme: UiTheme, pointer: UiPointer): UiTheme;
+interface UiPropertyDefinition<T> {
+  readonly name: string;
+  readonly defaultValue: T;
+  readonly inherited: boolean;
+  readonly affects: DirtyFlags;
+  readonly compare?: (a: T, b: T) => boolean;
+  readonly environmentKey?: UiEnvironmentKey<unknown>;
+  readonly resolveFromEnvironment?: (value: unknown) => T;
+  readonly validate?: (value: T) => string | undefined;
+  readonly narrowEffects?: (previous: T, next: T, flags: DirtyFlags) => DirtyFlags;
+}
+declare function defineProperty<T>(options: Omit<UiPropertyDefinition<T>, 'name'> & {
+  name: string;
+}): UiPropertyDefinition<T>;
+declare function propertyValuesEqual<T>(definition: UiPropertyDefinition<T>, a: T, b: T): boolean;
 interface PercentLength {
   readonly unit: 'percent';
   readonly value: number;
@@ -1408,77 +1593,6 @@ interface UiPath {
 declare function paintValuesEqual(a: UiPaint | undefined, b: UiPaint | undefined): boolean;
 declare function inputsEqual(a: readonly unknown[] | undefined, b: readonly unknown[] | undefined): boolean;
 declare function pathValuesEqual(a: UiPath | undefined, b: UiPath | undefined): boolean;
-interface UiTextStyle {
-  readonly fontFamily: string;
-  readonly fontSize: number;
-  readonly fontWeight: UiFontWeight;
-  readonly lineHeight: number;
-  readonly letterSpacing: number;
-  readonly color: UiColor;
-  readonly textAlign: UiTextAlign;
-  readonly textDirection: UiTextDirection;
-  readonly fontStyle?: UiFontStyle;
-  readonly fontStretch?: UiFontStretch;
-  readonly fontVariant?: UiFontVariant;
-  readonly fontKerning?: UiFontKerning;
-  readonly textDecoration?: UiTextDecoration;
-}
-type UiFontStyle = 'normal' | 'italic' | 'oblique';
-type UiFontStretch = 'ultra-condensed' | 'extra-condensed' | 'condensed' | 'semi-condensed' | 'normal' | 'semi-expanded' | 'expanded' | 'extra-expanded' | 'ultra-expanded';
-type UiFontVariant = 'normal' | 'small-caps';
-type UiFontKerning = 'auto' | 'normal' | 'none';
-type UiTextDecoration = 'none' | 'underline' | 'line-through' | 'underline line-through';
-interface UiTextMetrics {
-  readonly fontFamily?: string;
-  readonly fontSize?: number;
-  readonly fontWeight?: UiFontWeight;
-  readonly fontStyle?: UiFontStyle;
-  readonly fontStretch?: UiFontStretch;
-  readonly fontVariant?: UiFontVariant;
-  readonly fontKerning?: UiFontKerning;
-  readonly letterSpacing?: number;
-  readonly hidden?: boolean;
-}
-interface UiTextLink {
-  readonly onClick?: () => void;
-  readonly label?: string;
-  readonly href?: string;
-}
-interface UiTextSpan extends UiTextMetrics {
-  readonly text: string;
-  readonly color?: UiColorValue;
-  readonly backgroundColor?: UiColorValue;
-  readonly textDecoration?: UiTextDecoration;
-  readonly link?: UiTextLink;
-}
-interface UiResolvedTextSpan extends UiTextMetrics {
-  readonly start: number;
-  readonly end: number;
-  readonly color?: UiColorValue;
-  readonly backgroundColor?: UiColorValue;
-  readonly textDecoration?: UiTextDecoration;
-  readonly link?: UiTextLink;
-}
-interface UiSpannedText {
-  readonly text: string;
-  readonly spans: readonly UiResolvedTextSpan[];
-}
-declare const defaultTextStyle: UiTextStyle;
-declare function flattenTextSpans(spans: readonly UiTextSpan[]): UiSpannedText;
-declare function spannedTextOf(node: UiNode): UiSpannedText | undefined;
-declare function textContentOf(node: UiNode): string;
-declare function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[];
-declare function editableSpansOf(node: UiNode, text: string, composition?: UiTextRange | null): readonly UiResolvedTextSpan[];
-interface UiTextRange {
-  readonly start: number;
-  readonly end: number;
-}
-type HiddenSpan = Pick<UiResolvedTextSpan, 'start' | 'end' | 'hidden'>;
-declare function hiddenRangesOf(spans: readonly HiddenSpan[]): readonly UiTextRange[];
-declare function spanAtOffset(spans: readonly UiResolvedTextSpan[], offset: number): UiResolvedTextSpan | undefined;
-declare function textSpansEqual(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
-declare function spansDifferOnlyInPaint(a: readonly UiTextSpan[] | undefined, b: readonly UiTextSpan[] | undefined): boolean;
-declare function textStylesEqual(a: UiTextStyle, b: UiTextStyle): boolean;
 declare enum UiVisualState {
   Normal = "normal",
   Hovered = "hovered",
@@ -1516,107 +1630,6 @@ interface UiLayoutProtocol {
   explain?(children: readonly UiLayoutChild[], size: Size, context: UiLayoutContext): readonly string[];
 }
 declare function isLayoutProtocol(value: unknown): value is UiLayoutProtocol;
-interface UiTypography {
-  readonly body: UiTextStyle;
-  readonly bodyLarge: UiTextStyle;
-  readonly bodySmall: UiTextStyle;
-  readonly headline: UiTextStyle;
-  readonly title: UiTextStyle;
-  readonly label: UiTextStyle;
-}
-interface UiTypographyExtensions {}
-type UiTypographyRole = keyof UiTypography | (keyof UiTypographyExtensions & string);
-declare function isTypographyRole(value: unknown, scale: UiTypography): value is UiTypographyRole;
-declare const defaultTypography: UiTypography;
-declare function typographyEqual(a: UiTypography, b: UiTypography): boolean;
-interface UiShadows {
-  readonly none: readonly UiBoxShadow[];
-  readonly extraSmall: readonly UiBoxShadow[];
-  readonly small: readonly UiBoxShadow[];
-  readonly medium: readonly UiBoxShadow[];
-  readonly large: readonly UiBoxShadow[];
-  readonly extraLarge: readonly UiBoxShadow[];
-}
-declare const defaultShadows: UiShadows;
-declare function shadowsEqual(a: UiShadows, b: UiShadows): boolean;
-interface UiSpacing {
-  readonly none: number;
-  readonly hairline: number;
-  readonly extraSmall: number;
-  readonly small: number;
-  readonly medium: number;
-  readonly large: number;
-  readonly extraLarge: number;
-  readonly huge: number;
-}
-declare const defaultSpacing: UiSpacing;
-declare const spacingSteps: readonly (keyof UiSpacing)[];
-declare function scaleSpacing(spacing: UiSpacing, factor: number): UiSpacing;
-declare function spacingEqual(a: UiSpacing, b: UiSpacing): boolean;
-type UiDensity = 'compact' | 'comfortable' | 'spacious';
-declare const densityFactors: Readonly<Record<UiDensity, number>>;
-type UiContrast = 'standard' | 'high';
-declare function relativeLuminance(color: UiColor): number;
-declare function contrastRatio(a: UiColor, b: UiColor): number;
-declare function raiseContrast(color: UiColor, against: UiColor, ratio: number): UiColor;
-interface HighContrastOptions {
-  readonly surfaces?: Iterable<string>;
-}
-declare function highContrastColors(colors: UiColors, options?: HighContrastOptions): UiColors;
-interface UiThemeExtension<T extends object> {
-  readonly key: symbol;
-  readonly name: string;
-  readonly defaults: T;
-  readonly equals: (a: T, b: T) => boolean;
-}
-interface UiThemeExtensionOptions<T extends object> {
-  readonly name: string;
-  readonly defaults: T;
-  readonly equals?: (a: T, b: T) => boolean;
-}
-type UiThemeExtensions = ReadonlyMap<symbol, object>;
-declare const noThemeExtensions: UiThemeExtensions;
-declare function defineThemeExtension<T extends object>(options: UiThemeExtensionOptions<T>): UiThemeExtension<T>;
-declare function themeExtension<T extends object>(theme: {
-  readonly extensions?: UiThemeExtensions;
-}, extension: UiThemeExtension<T>): T;
-declare function hasThemeExtension<T extends object>(theme: {
-  readonly extensions?: UiThemeExtensions;
-}, extension: UiThemeExtension<T>): boolean;
-declare function withThemeExtension<Theme extends {
-  readonly extensions?: UiThemeExtensions;
-}, T extends object>(theme: Theme, extension: UiThemeExtension<T>, value: T): Theme;
-declare function themeExtensionsEqual(a: UiThemeExtensions | undefined, b: UiThemeExtensions | undefined): boolean;
-interface UiUnits {
-  readonly pixelsPerInch: number;
-  readonly rootFontSize: number;
-}
-declare const defaultUnits: UiUnits;
-interface UiLengths {
-  readonly units: UiUnits;
-  rem(value: number): number;
-  inch(value: number): number;
-  pt(value: number): number;
-  mm(value: number): number;
-}
-declare function lengths(units?: UiUnits): UiLengths;
-declare function unitsEqual(a: UiUnits, b: UiUnits): boolean;
-interface UiTheme {
-  readonly colors: UiColors;
-  readonly typography: UiTypography;
-  readonly shapes: UiShapes;
-  readonly shadows: UiShadows;
-  readonly spacing: UiSpacing;
-  readonly density: UiDensity;
-  readonly contrast: UiContrast;
-  readonly units: UiUnits;
-  readonly extensions?: UiThemeExtensions;
-}
-declare const lightTheme: UiTheme;
-declare const darkTheme: UiTheme;
-declare function themesEqual(a: UiTheme, b: UiTheme): boolean;
-declare function withDensity(theme: UiTheme, density: UiDensity): UiTheme;
-declare function withContrast(theme: UiTheme, contrast: UiContrast, options?: HighContrastOptions): UiTheme;
 interface UiVideoSurface {
   readonly frame: VideoFrame | ImageBitmap | null;
   readonly version: number;
@@ -2087,6 +2100,7 @@ declare const UiProperties: {
   readonly virtualWindow: UiPropertyDefinition<UiVirtualWindow | undefined>;
   readonly virtualSheet: UiPropertyDefinition<UiVirtualSheet | undefined>;
   readonly theme: UiPropertyDefinition<UiTheme | undefined>;
+  readonly pointer: UiPropertyDefinition<UiPointer | undefined>;
   readonly textStyle: UiPropertyDefinition<UiTextStyle | UiTypographyRole | undefined>;
   readonly contentColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly containerSize: UiPropertyDefinition<UiContainerSize | undefined>;
@@ -2148,7 +2162,7 @@ type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColo
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
-type EnvironmentProps = PropsOf<'theme' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
+type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];
 };
@@ -2661,6 +2675,7 @@ declare const UiEnvironmentKeys: {
   readonly color: UiEnvironmentKey<UiColorValue>;
   readonly textDirection: UiEnvironmentKey<UiTextDirection | undefined>;
   readonly contentColor: UiEnvironmentKey<UiColor>;
+  readonly pointer: UiEnvironmentKey<UiPointer>;
   readonly containerSize: UiEnvironmentKey<UiContainerSize>;
   readonly insets: UiEnvironmentKey<UiInsetSource>;
 };
@@ -6219,6 +6234,7 @@ export {
   ThemeTokenTarget,
   tightenConstraints,
   TightenOptions,
+  TOUCH_TARGET,
   touchActionFor,
   TouchScrollerOptions,
   tracePathData,
@@ -6353,6 +6369,7 @@ export {
   UiPlacement,
   UiPlatformAdapter,
   UiPoint,
+  UiPointer,
   UiPointerController,
   UiPointerDevice,
   UiPointerEvent,
@@ -6425,6 +6442,7 @@ export {
   UiThemeExtension,
   UiThemeExtensionOptions,
   UiThemeExtensions,
+  UiThemeTouch,
   UiTimerFrameClock,
   UiTimerFrameClockOptions,
   UiTouchScroller,
@@ -6489,6 +6507,7 @@ export {
   withContrast,
   withDensity,
   withOverrideSource,
+  withPointer,
   withThemeExtension,
   wordRangeAt,
   wordRangeIn,
@@ -7166,6 +7185,7 @@ import {
   ThemeTokenTarget,
   tightenConstraints,
   TightenOptions,
+  TOUCH_TARGET,
   touchActionFor,
   TouchScrollerOptions,
   tracePathData,
@@ -7300,6 +7320,7 @@ import {
   UiPlacement,
   UiPlatformAdapter,
   UiPoint,
+  UiPointer,
   UiPointerController,
   UiPointerDevice,
   UiPointerEvent,
@@ -7372,6 +7393,7 @@ import {
   UiThemeExtension,
   UiThemeExtensionOptions,
   UiThemeExtensions,
+  UiThemeTouch,
   UiTimerFrameClock,
   UiTimerFrameClockOptions,
   UiTouchScroller,
@@ -7436,6 +7458,7 @@ import {
   withContrast,
   withDensity,
   withOverrideSource,
+  withPointer,
   withThemeExtension,
   wordRangeAt,
   wordRangeIn,
@@ -7878,6 +7901,7 @@ export {
   themesEqual,
   themeTokens,
   tightenConstraints,
+  TOUCH_TARGET,
   touchActionFor,
   tracePathData,
   traceRoundedRect,
@@ -8293,6 +8317,7 @@ export {
   UiPinchRecognizer,
   UiPlacement,
   UiPlatformAdapter,
+  UiPointer,
   UiPointerController,
   UiPointerEvent,
   UiPointerEvents,
@@ -8340,6 +8365,7 @@ export {
   UiThemeExtension,
   UiThemeExtensionOptions,
   UiThemeExtensions,
+  UiThemeTouch,
   UiTimerFrameClock,
   UiTouchScroller,
   UiTransform,
@@ -8383,6 +8409,7 @@ export {
   withContrast,
   withDensity,
   withOverrideSource,
+  withPointer,
   withThemeExtension,
   wordRangeAt,
   wordRangeIn,

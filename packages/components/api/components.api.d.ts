@@ -78,6 +78,10 @@ interface ButtonSizeTokens {
   readonly paddingY: number;
   readonly radius: number;
   readonly textStyle: UiTypographyRole;
+  readonly minHeight?: number;
+}
+interface FieldTokens {
+  readonly minHeight: number;
 }
 interface ControlRadiusTokens {
   readonly field: number;
@@ -94,6 +98,7 @@ interface ButtonTokens {
 interface ControlTokens {
   readonly radius: ControlRadiusTokens;
   readonly button: ButtonTokens;
+  readonly field: FieldTokens;
 }
 declare const controlTokens: UiThemeExtension<ControlTokens>;
 interface ButtonProps extends ControlLayoutProps {

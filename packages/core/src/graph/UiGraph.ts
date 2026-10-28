@@ -9,6 +9,7 @@ import type { UiEventBinding } from '../bindings/UiEventBinding';
 import { UiEnvironment } from '../environment/UiEnvironment';
 import { findEnvironmentKey, type UiEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
+import { withPointer } from '../environment/UiPointer';
 import { isTypographyRole } from '../environment/UiTypography';
 import { inheritedPropertyFlags, propertyNarrowers } from '../properties/UiPropertyRegistry';
 import type { UiTextStyle } from '../properties/UiTextStyle';
@@ -802,9 +803,23 @@ export class UiGraph {
     const base = parent !== null ? parent.environment : null;
     let env = base ?? new UiEnvironment(null);
 
+    const pointer = node.getProperty<unknown>('pointer');
+    if (pointer === 'fine' || pointer === 'coarse') {
+      env = env.set(UiEnvironmentKeys.pointer as UiEnvironmentKey<unknown>, pointer);
+    }
     const theme = node.getProperty<unknown>('theme');
     if (theme !== undefined) {
       env = env.set(UiEnvironmentKeys.theme as UiEnvironmentKey<unknown>, theme);
+    }
+    // The theme in scope, turned for the pointer in scope: where either
+    // is provided, so a theme given under a finger, or a finger given
+    // over a theme, draws its subtree for touch (`withPointer`).
+    if (pointer !== undefined || theme !== undefined) {
+      const scoped = env.get(UiEnvironmentKeys.theme);
+      const turned = withPointer(scoped, env.get(UiEnvironmentKeys.pointer));
+      if (turned !== scoped) {
+        env = env.set(UiEnvironmentKeys.theme as UiEnvironmentKey<unknown>, turned);
+      }
     }
 
     const textStyle = node.getProperty<unknown>('textStyle');

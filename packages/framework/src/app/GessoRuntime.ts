@@ -122,6 +122,7 @@ import {
   type DirtyNodeSet,
   type UiFrameClockFactory,
   type UiContrast,
+  type UiPointer,
   writeOverrideProperty,
   clearOverrideProperty
 } from 'gesso-core';
@@ -1694,6 +1695,20 @@ export class GessoRuntime {
   /** Whether the window is the one in use, passed straight to `ShellService`; see `ShellService.windowActive`. */
   setWindowActive(active: boolean): void {
     this.services.get(ShellService).applyWindowActive(active);
+  }
+
+  /**
+   * What the person points with, as the shell reports it: kept on
+   * `ShellService.pointer`, and provided at the root, so every theme in
+   * the tree is turned for a finger on a touch device (`withPointer`)
+   * without the application doing anything. A subtree that says
+   * `pointer` itself keeps what it says.
+   */
+  setPointer(pointer: UiPointer): void {
+    this.services.get(ShellService).applyPointer(pointer);
+    if (this.graph.updateNodePropertyNow(this.graph.root, 'pointer', pointer, DirtyFlags.Environment)) {
+      this.requestRepaint();
+    }
   }
 
   /** The contrast the platform asks for, passed straight to `ShellService`; see `ShellService.contrast`. */
