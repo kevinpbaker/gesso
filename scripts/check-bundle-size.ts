@@ -72,8 +72,34 @@ async function measure(entry: string, outDir: string): Promise<Measured> {
       reportCompressedSize: false
     }
   });
-  const code = readFileSync(at(`${outDir}/out.js`), 'utf8');
+  const code = eagerCode(at(outDir), 'out.js');
   return { raw: Buffer.byteLength(code), gzip: gzipSync(code).byteLength, code };
+}
+
+/**
+ * The entry and every chunk it imports statically, which is what loads
+ * before the entry runs.
+ *
+ * The bundler splits a module that both a static and a dynamic import
+ * reach into a chunk of its own, and which modules land in one moves
+ * with any change to the graph. Measured alone, the entry then shrinks
+ * and the engine can leave it without leaving the page: the single-thread
+ * bundle once read as the shell's size, with no Canvas2D call in it,
+ * because its rasterizer had moved into a chunk the entry imports. A
+ * chunk reached only by `import()` loads when it is asked for, and is
+ * not counted.
+ */
+function eagerCode(dir: string, entry: string, seen = new Set<string>()): string {
+  if (seen.has(entry)) {
+    return '';
+  }
+  seen.add(entry);
+  const code = readFileSync(`${dir}/${entry}`, 'utf8');
+  const chunks = [...code.matchAll(/(?:^|[;\n}])\s*(?:import|export)\b[^;'"()]*?from\s*["']\.\/([^"']+\.js)["']/g)].map(
+    match => match[1] as string
+  );
+  const bare = [...code.matchAll(/(?:^|[;\n}])\s*import\s*["']\.\/([^"']+\.js)["']/g)].map(match => match[1] as string);
+  return [code, ...[...chunks, ...bare].map(chunk => eagerCode(dir, chunk, seen))].join('\n');
 }
 
 const kb = (bytes: number): string => `${(bytes / 1000).toFixed(1)} kB`;
