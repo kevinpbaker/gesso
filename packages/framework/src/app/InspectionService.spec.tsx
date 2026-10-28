@@ -40,4 +40,34 @@ describe('InspectionService', () => {
     // Outside it, the box is not there; the runtime's own root, also a box, is.
     expect(inspection.nodesAt(500, 500)).not.toContain(stack[1]);
   });
+
+  it('previews a value over the element’s own until the preview ends', () => {
+    let inspection!: InspectionService;
+    function Canvas(_inputs: unknown, ctx: ComponentContext): UiChild {
+      inspection = ctx.inject(InspectionService);
+      return (
+        <column>
+          <box width={200} height={100} padding={8} />
+        </column>
+      );
+    }
+    const mounted = mountRuntime(<Canvas />);
+    mounted.frame();
+    const box = inspection.nodesAt(10, 10).find(node => node.type === 'box' && node.getProperty('width') === 200)!;
+
+    inspection.preview(box, 'width', 320);
+    inspection.preview(box, 'padding', 24);
+    mounted.frame();
+    expect(inspection.inspect(box).box.width).toBe(320);
+    expect(box.getProperty('padding')).toBe(24);
+
+    inspection.endPreview(box, 'width');
+    mounted.frame();
+    expect(inspection.inspect(box).box.width).toBe(200);
+    expect(box.getProperty('padding')).toBe(24);
+
+    inspection.endPreview(box);
+    mounted.frame();
+    expect(box.getProperty('padding')).toBe(8);
+  });
 });

@@ -280,7 +280,7 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   },
   boxShadows: {
     group: 'Paint',
-    note: "CSS `box-shadow`s: outside the box, or inside it with `inset`, following its corner radius. The first is on top. A colour may be a palette name. Painted outside the node's own clip, and a node is culled only once its shadows are off screen too.",
+    note: 'CSS `box-shadow`s: outside the box, or inside it with `inset`, following its corner radius. The first is on top. A colour may be a palette name, and the whole may be a size on the theme\'s shadow scale (`boxShadows="medium"`), resolved against the theme the element is under. Painted outside the node\'s own clip, and a node is culled only once its shadows are off screen too.',
     defaultValue: 'none'
   },
   opacity: { group: 'Paint', note: 'Applies to the whole subtree, not just this node.' },

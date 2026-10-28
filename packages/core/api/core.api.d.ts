@@ -1237,6 +1237,12 @@ interface UiBoxShadow {
   readonly color: UiColorValue;
   readonly inset?: boolean;
 }
+type UiShadowName = 'none' | 'extraSmall' | 'small' | 'medium' | 'large' | 'extraLarge';
+type UiBoxShadows = readonly UiBoxShadow[] | UiShadowName;
+declare function shadowsOf(value: unknown, scale: {
+  readonly [name: string]: readonly UiBoxShadow[];
+} | undefined): readonly UiBoxShadow[];
+declare function boxShadowValuesEqual(a: UiBoxShadows, b: UiBoxShadows): boolean;
 declare function boxShadow(offsetX: number, offsetY: number, blurRadius: number, spreadRadius: number, color: UiColorValue, inset?: boolean): UiBoxShadow;
 declare function boxShadowsEqual(a: UiBoxShadow, b: UiBoxShadow): boolean;
 declare function boxShadowArraysEqual(a: readonly UiBoxShadow[], b: readonly UiBoxShadow[]): boolean;
@@ -2005,7 +2011,7 @@ declare const UiProperties: {
   readonly borderWidth: UiPropertyDefinition<number | undefined>;
   readonly borderRadius: UiPropertyDefinition<UiBorderRadiusValue>;
   readonly opacity: UiPropertyDefinition<number>;
-  readonly boxShadows: UiPropertyDefinition<readonly UiBoxShadow[]>;
+  readonly boxShadows: UiPropertyDefinition<UiBoxShadows>;
   readonly visible: UiPropertyDefinition<boolean>;
   readonly fontFamily: UiPropertyDefinition<string>;
   readonly fontSize: UiPropertyDefinition<number>;
@@ -5579,6 +5585,7 @@ export {
   boxShadowRadius,
   boxShadowReach,
   boxShadowsEqual,
+  boxShadowValuesEqual,
   breakpoint,
   BreakpointArgs,
   bufferSource,
@@ -6127,6 +6134,7 @@ export {
   setPerformanceMarks,
   setSelectionRange,
   shadowsEqual,
+  shadowsOf,
   shapesEqual,
   SharedClaim,
   sharedElement,
@@ -6236,6 +6244,7 @@ export {
   UiBorderRadiuses,
   UiBorderRadiusValue,
   UiBoxShadow,
+  UiBoxShadows,
   UiChild,
   UiChildrenBinding,
   UiColor,
@@ -6378,6 +6387,7 @@ export {
   UiSemanticState,
   UiSemanticStates,
   UiSemanticsUpdate,
+  UiShadowName,
   UiShadows,
   UiShapeExtensions,
   UiShapeName,
@@ -6523,6 +6533,7 @@ import {
   boxShadowRadius,
   boxShadowReach,
   boxShadowsEqual,
+  boxShadowValuesEqual,
   breakpoint,
   BreakpointArgs,
   bufferSource,
@@ -7070,6 +7081,7 @@ import {
   setPerformanceMarks,
   setSelectionRange,
   shadowsEqual,
+  shadowsOf,
   shapesEqual,
   SharedClaim,
   sharedElement,
@@ -7179,6 +7191,7 @@ import {
   UiBorderRadiuses,
   UiBorderRadiusValue,
   UiBoxShadow,
+  UiBoxShadows,
   UiChild,
   UiChildrenBinding,
   UiColor,
@@ -7321,6 +7334,7 @@ import {
   UiSemanticState,
   UiSemanticStates,
   UiSemanticsUpdate,
+  UiShadowName,
   UiShadows,
   UiShapeExtensions,
   UiShapeName,
@@ -7454,6 +7468,7 @@ export {
   boxShadowRadius,
   boxShadowReach,
   boxShadowsEqual,
+  boxShadowValuesEqual,
   breakpoint,
   bufferSource,
   buildFontString,
@@ -7818,6 +7833,7 @@ export {
   setPerformanceMarks,
   setSelectionRange,
   shadowsEqual,
+  shadowsOf,
   shapesEqual,
   sharedElement,
   sheetSource,
@@ -8209,6 +8225,7 @@ export {
   UiBorderRadiuses,
   UiBorderRadiusValue,
   UiBoxShadow,
+  UiBoxShadows,
   UiChildrenBinding,
   UiColor,
   UiColors,
@@ -8293,6 +8310,7 @@ export {
   UiSelfAlignment,
   UiSemanticState,
   UiSemanticStates,
+  UiShadowName,
   UiShadows,
   UiShapeExtensions,
   UiShapeName,

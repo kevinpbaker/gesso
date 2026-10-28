@@ -121,7 +121,9 @@ import {
   UiFrame,
   type DirtyNodeSet,
   type UiFrameClockFactory,
-  type UiContrast
+  type UiContrast,
+  writeOverrideProperty,
+  clearOverrideProperty
 } from 'gesso-core';
 import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
@@ -350,6 +352,9 @@ export interface GessoRuntimeOptions {
  * between this class and its two hosts — GessoApp on the main thread
  * and renderRoot() in a render worker.
  */
+/** The source of `InspectionService.preview`'s writes, below every modifier's in the cascade. */
+const PREVIEW = Symbol('preview');
+
 /** How many shell requests are held for a listener that has not attached, before the rest are dropped. */
 const HELD_SHELL_REQUESTS = 256;
 /** The longest last frame after which an input's frame is still drawn early: half a 60 Hz refresh. See `GessoRuntime.answerInput`. */
@@ -372,6 +377,8 @@ export class GessoRuntime {
 
   private readonly resolver: ComponentHostResolver;
   private readonly graph = new UiGraph();
+  /** The properties `InspectionService.preview` is drawing over, by node; gone with the node. */
+  private readonly previewed = new WeakMap<UiNode, Set<string>>();
   private readonly engine: LayoutEngine;
   private readonly builder: UiGraphBuilder;
   private readonly scheduler: UiScheduler;
@@ -884,7 +891,9 @@ export class GessoRuntime {
     this.input = this.createInput();
     this.services.get(InspectionService).attach({
       nodesAt: (x, y) => this.hitTester.hitStack(x, y),
-      inspect: node => this.inspectNode(node)
+      inspect: node => this.inspectNode(node),
+      preview: (node, property, value) => this.previewProperty(node, property, value),
+      endPreview: (node, property) => this.endPreviews(node, property)
     });
     this.services.get(FocusService).setManager(this.input.focus);
     this.services.get(EditingService).setController(this.input.editing);
@@ -1423,6 +1432,39 @@ export class GessoRuntime {
       }
     }
     return (node.environment ?? this.graph.buildNodeEnvironment(node)).get(UiEnvironmentKeys.theme);
+  }
+
+  /**
+   * `InspectionService.preview`: a write over the node's own value, as
+   * a modifier's is, from a source of its own placed after every
+   * modifier, so it wins and ending it restores what was under it.
+   */
+  private previewProperty(node: UiNode, property: string, value: unknown): void {
+    const previewed = this.previewed.get(node) ?? new Set<string>();
+    previewed.add(property);
+    this.previewed.set(node, previewed);
+    writeOverrideProperty(
+      this.graph,
+      node,
+      property,
+      { source: PREVIEW, name: 'preview', order: Number.MAX_SAFE_INTEGER, value },
+      propertyEffects(property)
+    );
+  }
+
+  private endPreviews(node: UiNode, property?: string): void {
+    const previewed = this.previewed.get(node);
+    if (previewed === undefined) {
+      return;
+    }
+    for (const name of property === undefined ? [...previewed] : [property]) {
+      if (previewed.delete(name)) {
+        clearOverrideProperty(this.graph, node, name, PREVIEW, propertyEffects(name));
+      }
+    }
+    if (previewed.size === 0) {
+      this.previewed.delete(node);
+    }
   }
 
   /** `inspectNode` for a node named by id, or null when the tree has no such node. */
