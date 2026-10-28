@@ -22,7 +22,14 @@ export { pinchable, type PinchableOptions, type ZoomState } from './pinch';
 export { contextMenu, shortcut, shortcuts } from './shortcuts';
 export type { ContextMenuOptions, ShortcutOptions, ShortcutsOptions } from './shortcuts';
 export { animateLayout, type AnimateLayoutOptions } from './animation';
-export { imageSource, iconSource, type ImageSourceArgs, type IconSourceArgs, type ImageSources } from './media';
+export {
+  imageSource,
+  iconSource,
+  mediaLoadsInFlight,
+  type ImageSourceArgs,
+  type IconSourceArgs,
+  type ImageSources
+} from './media';
 export { motion, sharedElement, type MotionArgs, type SharedElementArgs } from './motion';
 export { videoSource, type VideoSourceArgs, type VideoTransport, type VideoClock, type VideoState } from './video';
 export { scrollPosition, type ScrollOffset, type ScrollPositionArgs } from './scroll';

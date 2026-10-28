@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, Column, Text, darkTheme, type UiChild } from 'gesso-core';
+import { Box, Column, Text, darkTheme, imageSource, type ImageResolver, type UiChild, type UiImage } from 'gesso-core';
 import { createComponent } from '../createComponent';
 import { mockCanvas } from './RuntimeTestUtils';
 import { renderFrame, type PictureCanvas } from './renderFrame';
@@ -42,6 +42,41 @@ describe('renderFrame', () => {
     // Resized to the content, in device pixels.
     expect(made[0]!.width).toBe(780);
     expect(made[0]!.height).toBe(frame.height * 2);
+  });
+
+  it('waits for a picture still on its way, which asks for no frames while it is', async () => {
+    const { createCanvas } = canvases();
+    const bitmap = { width: 10, height: 10, close() {} } as unknown as UiImage;
+    let arrived = false;
+    // Slower than the quiet that otherwise ends the wait, by some way.
+    const resolver: ImageResolver = {
+      resolve: () =>
+        new Promise(resolve =>
+          setTimeout(() => {
+            arrived = true;
+            resolve(bitmap);
+          }, 250)
+        ),
+      release: () => {},
+      dispose: () => {}
+    };
+    let drawnAfterArrival: boolean | undefined;
+    const frame = await renderFrame(
+      Box({ width: 10, height: 10, modifiers: [imageSource({ resolver, source: 'hero.png' })] }),
+      {
+        width: 100,
+        createCanvas: (width, height) =>
+          Object.assign(createCanvas(width, height), {
+            convertToBlob: async () => {
+              drawnAfterArrival = arrived;
+              return new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
+            }
+          }),
+        settleMs: 2000
+      }
+    );
+    expect(frame.width).toBe(100);
+    expect(drawnAfterArrival).toBe(true);
   });
 
   it('keeps the height it is given', async () => {

@@ -4214,6 +4214,7 @@ declare class IconRasterizer {
   dispose(): void;
   private draw;
 }
+declare function mediaLoadsInFlight(): number;
 type ImageSources = string | readonly string[];
 interface ImageSourceArgs {
   readonly resolver: ImageResolver;
@@ -5866,6 +5867,7 @@ export {
   measure,
   measureFlow,
   measureSpan,
+  mediaLoadsInFlight,
   minmax,
   MinMaxTrack,
   motion,
@@ -6808,6 +6810,7 @@ import {
   measure,
   measureFlow,
   measureSpan,
+  mediaLoadsInFlight,
   minmax,
   MinMaxTrack,
   motion,
@@ -7641,6 +7644,7 @@ export {
   measure,
   measureFlow,
   measureSpan,
+  mediaLoadsInFlight,
   minmax,
   motion,
   MOTION_CHANNELS,

@@ -1,4 +1,12 @@
-import { Column, UiManualFrameClock, lightTheme, type CanvasHost, type UiChild, type UiTheme } from 'gesso-core';
+import {
+  Column,
+  UiManualFrameClock,
+  lightTheme,
+  mediaLoadsInFlight,
+  type CanvasHost,
+  type UiChild,
+  type UiTheme
+} from 'gesso-core';
 
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { FrameworkChild } from '../ComponentElement';
@@ -14,8 +22,9 @@ import { GessoRuntime } from './GessoRuntime';
  * a phone's width and a desktop's, and before anything has mounted it.
  * So the tree gets a runtime of its own, on a canvas nobody sees, with
  * a clock this drives by hand: it runs frames until the tree stops
- * asking for them (a picture decoding, a font arriving), sizes the
- * canvas to the content, draws, and is thrown away.
+ * asking for them and no picture is still on its way (a picture being
+ * fetched asks for no frames until it arrives), sizes the canvas to the
+ * content, draws, and is thrown away.
  *
  * The runtime is the same one the application uses, with Canvas2D, so
  * the picture is the application's pixels and not an approximation of
@@ -146,6 +155,10 @@ export async function renderFrame(root: FrameworkChild, options: RenderFrameOpti
       while (quiet < 3 && Date.now() < deadline) {
         if (clock.isPending) {
           clock.tick((now += 16));
+          quiet = 0;
+        } else if (mediaLoadsInFlight() > 0) {
+          // Quiet only because a picture is still being fetched or
+          // decoded: it asks for a frame when it lands.
           quiet = 0;
         } else {
           quiet++;
