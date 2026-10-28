@@ -22,6 +22,32 @@ function follow<T>(value: Reactive<T>): Observable<T> {
   return isObservable(value) ? (value as Observable<T>) : of(value);
 }
 
+/** Pictures this thread's media modifiers are fetching or decoding now. */
+let inFlight = 0;
+
+/**
+ * How many pictures the media modifiers in this thread are still
+ * fetching or decoding: an `Image`'s bitmap or its SVG.
+ *
+ * A tree waiting on a picture asks for no frames while it waits, so a
+ * caller that judges a tree finished by its quiet (`renderFrame`, which
+ * draws a mock once, off screen) would draw it without the picture.
+ * This is the other half of finished: nothing still on its way.
+ */
+export function mediaLoadsInFlight(): number {
+  return inFlight;
+}
+
+/** Counts a load from its start until it settles, either way. */
+function counted<T>(loading: Promise<T>): Promise<T> {
+  inFlight++;
+  const done = () => {
+    inFlight--;
+  };
+  loading.then(done, done);
+  return loading;
+}
+
 /** One url, or several to try in order until one resolves. */
 export type ImageSources = string | readonly string[];
 
@@ -118,8 +144,7 @@ function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly str
       args.onState?.('loaded');
       return;
     }
-    args.resolver
-      .resolve(source)
+    counted(args.resolver.resolve(source))
       .then((bitmap: UiImage) => {
         if (!live) {
           return;
@@ -180,7 +205,7 @@ function drawVector(
     show(ready);
     return;
   }
-  vectors.resolve(source).then(
+  counted(vectors.resolve(source)).then(
     document => {
       if (live()) {
         show(document);
