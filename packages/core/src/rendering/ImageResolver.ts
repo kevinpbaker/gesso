@@ -91,11 +91,9 @@ const DEFAULT_CAPACITY = 32;
  *
  * **What it cannot decode.** `createImageBitmap` takes a `Blob`, and
  * Chrome refuses an SVG one — "The source image could not be decoded".
- * So an `Image` pointed at an `.svg` fails on a browser where the same
- * file in an `<img>` would work, and a vector glyph belongs in `Icon`,
- * which draws a path rather than decoding a document. Found by
- * pointing the playground's Media card at an SVG data URL and getting
- * a placeholder.
+ * Found by pointing the playground's Media card at an SVG data URL and
+ * getting a placeholder. So an `Image` never sends one here: an SVG
+ * source is read by `SvgResolver` and drawn as vectors (`svg/`).
  *
  * **Eviction.** Reference counting first, LRU second. A bitmap
  * something on screen is holding is never evicted, however long the

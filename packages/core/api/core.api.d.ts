@@ -4121,6 +4121,56 @@ declare class DefaultImageResolver implements ImageResolver {
   release(source: string): void;
   dispose(): void;
 }
+interface SvgXmlElement {
+  readonly name: string;
+  readonly attributes: Readonly<Record<string, string>>;
+  readonly children: readonly SvgXmlElement[];
+  readonly text: string;
+}
+interface SvgDocument {
+  readonly root: SvgXmlElement;
+  readonly width: number;
+  readonly height: number;
+  readonly viewBox: SvgRect;
+  readonly ids: ReadonlyMap<string, SvgXmlElement>;
+  readonly rules: readonly SvgStyleRule[];
+  readonly unsupported: readonly string[];
+}
+interface SvgRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+interface SvgStyleRule {
+  readonly selector: SvgSelector;
+  readonly declarations: Readonly<Record<string, string>>;
+  readonly specificity: number;
+}
+interface SvgSelector {
+  readonly name?: string;
+  readonly id?: string;
+  readonly classes: readonly string[];
+}
+declare function parseSvg(source: string): SvgDocument;
+interface SvgResolver {
+  resolve(source: string): Promise<SvgDocument>;
+  peek?(source: string): SvgDocument | null;
+}
+interface DefaultSvgResolverOptions {
+  capacity?: number;
+  fetch?: (source: string) => Promise<string>;
+}
+declare function isSvgSource(source: string): boolean;
+declare class DefaultSvgResolver implements SvgResolver {
+  private readonly entries;
+  private readonly settled;
+  private readonly capacity;
+  private readonly fetchText;
+  constructor(options?: DefaultSvgResolverOptions);
+  resolve(source: string): Promise<SvgDocument>;
+  peek(source: string): SvgDocument | null;
+}
 interface IconSpec {
   readonly path: string;
   readonly viewBox: number;
@@ -4167,6 +4217,7 @@ type ImageSources = string | readonly string[];
 interface ImageSourceArgs {
   readonly resolver: ImageResolver;
   readonly source: Reactive<ImageSources>;
+  readonly vectors?: SvgResolver;
   readonly onState?: (state: 'loading' | 'loaded' | 'failed', error?: unknown) => void;
 }
 declare const imageSource: ((args: ImageSourceArgs, key?: string | number) => UiModifier<ImageSourceArgs>) & {
@@ -4561,6 +4612,13 @@ declare class LayoutInspector {
   private hoveredShapes;
   private clippedVisibleBox;
 }
+type SvgFit = 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
+interface SvgDrawOptions {
+  readonly fit?: SvgFit;
+  readonly color?: UiColorValue;
+}
+declare function drawSvg(document: SvgDocument, surface: PaintSurface, box: Pick<PaintBox, 'width' | 'height'>, options?: SvgDrawOptions): void;
+declare function svgPaint(document: SvgDocument, options?: SvgDrawOptions): UiPaint;
 type PaintOp = {
   readonly op: 'save';
 } | {
@@ -5576,6 +5634,8 @@ export {
   defaultShadows,
   defaultShapes,
   defaultSpacing,
+  DefaultSvgResolver,
+  DefaultSvgResolverOptions,
   defaultTextStyle,
   defaultTypography,
   defaultUnits,
@@ -5603,6 +5663,7 @@ export {
   DragSourceOptions,
   drawOverlayShapes,
   DrawStats,
+  drawSvg,
   drawText,
   dropIndexShifts,
   dropTarget,
@@ -5741,6 +5802,7 @@ export {
   isScrollContainer,
   isShapeName,
   isSubtreeInert,
+  isSvgSource,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -5885,6 +5947,7 @@ export {
   parseFlexDirection,
   parseMainAxisAlignment,
   parseShortcut,
+  parseSvg,
   parseTransform,
   parseWebVtt,
   pathValuesEqual,
@@ -6056,6 +6119,12 @@ export {
   statesEqual,
   steps,
   SubtreeBounds,
+  SvgDocument,
+  SvgDrawOptions,
+  SvgFit,
+  svgPaint,
+  SvgRect,
+  SvgResolver,
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
@@ -6507,6 +6576,8 @@ import {
   defaultShadows,
   defaultShapes,
   defaultSpacing,
+  DefaultSvgResolver,
+  DefaultSvgResolverOptions,
   defaultTextStyle,
   defaultTypography,
   defaultUnits,
@@ -6534,6 +6605,7 @@ import {
   DragSourceOptions,
   drawOverlayShapes,
   DrawStats,
+  drawSvg,
   drawText,
   dropIndexShifts,
   dropTarget,
@@ -6672,6 +6744,7 @@ import {
   isScrollContainer,
   isShapeName,
   isSubtreeInert,
+  isSvgSource,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -6816,6 +6889,7 @@ import {
   parseFlexDirection,
   parseMainAxisAlignment,
   parseShortcut,
+  parseSvg,
   parseTransform,
   parseWebVtt,
   pathValuesEqual,
@@ -6987,6 +7061,12 @@ import {
   statesEqual,
   steps,
   SubtreeBounds,
+  SvgDocument,
+  SvgDrawOptions,
+  SvgFit,
+  svgPaint,
+  SvgRect,
+  SvgResolver,
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
@@ -7401,6 +7481,7 @@ export {
   defaultShadows,
   defaultShapes,
   defaultSpacing,
+  DefaultSvgResolver,
   defaultTextStyle,
   defaultTypography,
   defaultUnits,
@@ -7423,6 +7504,7 @@ export {
   dragSessionFor,
   dragSource,
   drawOverlayShapes,
+  drawSvg,
   drawText,
   dropIndexShifts,
   dropTarget,
@@ -7512,6 +7594,7 @@ export {
   isScrollContainer,
   isShapeName,
   isSubtreeInert,
+  isSvgSource,
   isTypographyRole,
   isUiChild,
   isUiElement,
@@ -7600,6 +7683,7 @@ export {
   parseFlexDirection,
   parseMainAxisAlignment,
   parseShortcut,
+  parseSvg,
   parseTransform,
   parseWebVtt,
   pathValuesEqual,
@@ -7707,6 +7791,7 @@ export {
   Stack,
   statesEqual,
   steps,
+  svgPaint,
   syncEditorValue,
   Text,
   TEXT_MATCHES_PROP,
@@ -7770,6 +7855,7 @@ export {
   type DecorationShape,
   type DecorationStroke,
   type DefaultImageResolverOptions,
+  type DefaultSvgResolverOptions,
   type DefaultVideoResolverOptions,
   type DraggableOptions,
   type DragOffset,
@@ -7944,6 +8030,11 @@ export {
   type SpanPaint,
   type StackProps,
   type SubtreeBounds,
+  type SvgDocument,
+  type SvgDrawOptions,
+  type SvgFit,
+  type SvgRect,
+  type SvgResolver,
   type TextAlign,
   type TextContentProps,
   type TextLine,

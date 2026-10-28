@@ -105,11 +105,10 @@ looks wrong.
 - **One path, one colour.** A two-colour mark is two `Icon`s stacked, or
   two paths in separate nodes; the framework playground draws its own
   logo that way.
-- **Path data, not documents.** There is no SVG parser here: no groups,
-  no transforms, no gradients, no `<use>`. Take the `d` attribute out of
-  the file. A whole SVG cannot be loaded as an
-  [image](/media/images-and-the-resolver) either, because
-  `createImageBitmap` refuses an SVG blob.
+- **Path data, not documents.** `Icon` takes one path: no groups, no
+  transforms, no gradients, no `<use>`. A whole SVG file is an
+  [image](/media/images-and-the-resolver#svg-files) instead, which
+  reads it and draws it as vectors.
 - **Rasterised at 2, not at the display.** The scale is fixed at twice
   the logical size unless the application declares a rasteriser of its
   own with `useMedia({ rasterizer: new IconRasterizer({ scale: 3 }) })`,

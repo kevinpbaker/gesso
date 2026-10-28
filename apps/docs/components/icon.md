@@ -10,8 +10,9 @@ of a menu row. For a photograph or a thumbnail use an
 [image](/components/image), which decodes a file rather than drawing a
 path.
 
-An `Icon` takes path data, not a file. There is no SVG parser in the
-framework and nothing to load: the path is rasterised into a small
+An `Icon` takes path data, not a file; a whole SVG file is an
+[image](/media/images-and-the-resolver#svg-files). There is nothing to
+load: the path is rasterised into a small
 bitmap, and the bitmap is drawn into a box exactly as a picture is.
 Icon sets ship their paths as strings, so pasting one in is the whole
 of adopting a set.

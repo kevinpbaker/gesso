@@ -15,6 +15,7 @@ import {
 import {
   steps,
   Box,
+  Paint,
   type UiChild,
   type UiElement,
   type UiNode,
@@ -157,6 +158,7 @@ export function Image(inputs: Inputs<ImageProps>, ctx: ComponentContext): UiChil
   // to a `src` that changes shows the new picture and releases the old.
   const source = {
     resolver: store.images,
+    vectors: store.vectors,
     source: inputs.src,
     onState: (next: 'loading' | 'loaded' | 'failed', error?: unknown) => {
       status.value = next;
@@ -164,7 +166,10 @@ export function Image(inputs: Inputs<ImageProps>, ctx: ComponentContext): UiChil
     }
   };
 
-  return Box({
+  // A paint node rather than a box, because an SVG source is drawn as
+  // the node's `paint` and only a paint node draws one, and is sized by
+  // it when nothing else sizes the node. A bitmap is drawn by either.
+  return Paint({
     ...layoutOf(inputs),
     ref: inputs.ref?.value,
     modifiers: modifiersOf(inputs, imageSource(source)),

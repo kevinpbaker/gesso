@@ -174,11 +174,7 @@ does, leave the `alt` off.
 
 ## Limits
 
-- **SVG does not decode.** `createImageBitmap` takes a `Blob` and Chrome
-  refuses an SVG one, with "The source image could not be decoded", so
-  an `Image` pointed at an `.svg` fails where the same file in an `<img>`
-  would work. A vector glyph belongs in [`Icon`](/media/icons), which
-  draws a path instead of decoding a document.
+- **SVG is drawn, not decoded**; see [SVG files](#svg-files) below.
 - **Several urls for one picture.** `src` may be a list, tried in order
   until one resolves: the same file on several mirrors, or a small
   render then a large one. Only the url that answered is held, a failed
@@ -220,3 +216,37 @@ It has not been.
 [Icons](/media/icons) are the other half of this tier: a glyph drawn
 from a path rather than a file fetched from a server, and the one thing
 in the library that cannot resolve a palette colour at paint time.
+
+## SVG files
+
+`createImageBitmap` takes a `Blob`, and Chrome refuses an SVG one with
+"The source image could not be decoded", and a render worker has no
+`<img>` to draw one through. So an `Image` whose source ends in `.svg`
+or `.svgz`, or is a `data:image/svg+xml` URL, does not go to the
+resolver at all. The file is fetched as text, read in the worker by
+`parseSvg`, and drawn as the node's `paint` through the same surface a
+painted node draws through: vectors on either renderer, drawn again at
+whatever size the node is laid out at, and read once however many
+nodes show it (`DefaultSvgResolver`).
+
+```tsx
+const logo = new URL('./assets/logo.svg', import.meta.url).href;
+
+<Image src={logo} width={209} height={149} objectFit="contain" />;
+```
+
+`objectFit` places the drawing in the box as it places a bitmap. With
+no width or height, the node takes the file's own `width` and `height`,
+or its viewBox's. A `currentColor` in the file is the theme's `text`
+colour, so an icon set authored that way follows the theme.
+
+What a design tool exports is drawn: paths and the basic shapes, groups
+and `<use>`, nested `<svg>`, transforms, fills and strokes with their
+opacities and rules, dashes, linear and radial gradients, clip paths,
+and a `<style>` of simple selectors such as `.st0`. A gradient stroke
+is drawn in its last colour. Text, embedded images, masks, filters,
+patterns and markers are not drawn yet; a file that uses them draws
+the rest, and the console names what it skipped, once per file.
+
+`parseSvg`, `drawSvg` and `svgPaint` are exported for drawing a file
+without an `Image`: `<paint paint={svgPaint(parseSvg(text))} />`.

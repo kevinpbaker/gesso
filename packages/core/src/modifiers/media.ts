@@ -6,6 +6,9 @@ import type { UiColorValue } from '../properties/UiPropertyValues';
 import { resolveColorValue } from '../properties/UiThemeColor';
 import type { UiImage } from '../properties/UiImage';
 import type { ImageResolver } from '../rendering/ImageResolver';
+import { svgPaint, type SvgFit } from '../rendering/svg/SvgDraw';
+import type { SvgDocument } from '../rendering/svg/SvgDocument';
+import { isSvgSource, type SvgResolver } from '../rendering/svg/SvgResolver';
 import type { IconRasterizer, IconSpec } from '../rendering/IconRasterizer';
 import { defineModifier } from './UiModifier';
 import type { UiModifierHost } from './UiModifierHost';
@@ -30,6 +33,13 @@ export interface ImageSourceArgs {
    * new value replaces the last.
    */
   readonly source: Reactive<ImageSources>;
+  /**
+   * Where an SVG source is read, since the platform decoder refuses
+   * one. Given, an `.svg` or `data:image/svg+xml` source is drawn as
+   * vectors through the node's `paint`, fitted by its `objectFit`;
+   * without it, an SVG source is decoded like any other and fails.
+   */
+  readonly vectors?: SvgResolver;
   readonly onState?: (state: 'loading' | 'loaded' | 'failed', error?: unknown) => void;
 }
 
@@ -74,6 +84,7 @@ function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly str
   let held: string | null = null;
   args.onState?.('loading');
   host.clear('image');
+  host.clear('paint');
   const attempt = (index: number, lastError: unknown): void => {
     if (!live) {
       return;
@@ -81,6 +92,17 @@ function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly str
     const source = sources[index];
     if (source === undefined) {
       args.onState?.('failed', lastError ?? new Error('No image source was given.'));
+      return;
+    }
+    if (args.vectors !== undefined && isSvgSource(source)) {
+      drawVector(
+        host,
+        args,
+        args.vectors,
+        source,
+        () => live,
+        error => attempt(index + 1, error)
+      );
       return;
     }
     held = source;
@@ -118,6 +140,54 @@ function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly str
       held = null;
     }
   };
+}
+
+/** SVG sources already warned about, so a file shown in every row says what it lacks once. */
+const warnedSvg = new Set<string>();
+
+/**
+ * An SVG source, read and set as the node's `paint`: vectors, drawn at
+ * whatever size the node is laid out at, with `currentColor` the
+ * node's inherited text colour. Nothing is held, because a read file
+ * holds no pixels to release.
+ */
+function drawVector(
+  host: UiModifierHost,
+  args: ImageSourceArgs,
+  vectors: SvgResolver,
+  source: string,
+  live: () => boolean,
+  fail: (error: unknown) => void
+): void {
+  const show = (document: SvgDocument): void => {
+    const fit = (host.node.getProperty('objectFit') as SvgFit | undefined) ?? 'contain';
+    host.set('paint', svgPaint(document, { fit }));
+    if (document.unsupported.length > 0 && !warnedSvg.has(source)) {
+      warnedSvg.add(source);
+      console.warn(
+        `[gesso] ${source.slice(0, 80)} uses ${document.unsupported.join(', ')}, which Gesso does not draw yet; ` +
+          'the rest of it is drawn.'
+      );
+    }
+    args.onState?.('loaded');
+  };
+  const ready = vectors.peek?.(source) ?? null;
+  if (ready !== null) {
+    show(ready);
+    return;
+  }
+  vectors.resolve(source).then(
+    document => {
+      if (live()) {
+        show(document);
+      }
+    },
+    (error: unknown) => {
+      if (live()) {
+        fail(error);
+      }
+    }
+  );
 }
 
 function sameSources(a: ImageSources, b: ImageSources): boolean {

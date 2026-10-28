@@ -515,6 +515,7 @@ import {
   RendererBackend,
   setPerformanceMarks as setPerformanceMarks$1,
   Size,
+  SvgResolver,
   TextMeasurer,
   TextMeasureRequest,
   UI_ROLES,
@@ -1373,16 +1374,20 @@ declare class RouterService {
 interface MediaOptions {
   resolver?: ImageResolver;
   rasterizer?: IconRasterizer;
+  vectors?: SvgResolver;
   videoResolver?: VideoResolver;
 }
 declare class MediaService {
   private imageResolver;
   private iconRasterizer;
+  private svgResolver;
   private videoResolver;
   private ownsResolver;
   private ownsRasterizer;
   private ownsVideoResolver;
   get images(): ImageResolver;
+  get vectors(): SvgResolver;
+  setSvgResolver(resolver: SvgResolver): void;
   get icons(): IconRasterizer;
   get videos(): VideoResolver;
   setResolver(resolver: ImageResolver): void;

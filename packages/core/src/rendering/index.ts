@@ -13,6 +13,12 @@ export { decorationColor, decorationRect, hasDecorationPhase, paintsAfterChildre
 export type { DecorationShape, DecorationFill, DecorationStroke, DecorationRect } from './Decorations';
 export { DefaultImageResolver } from './ImageResolver';
 export type { ImageResolver, DefaultImageResolverOptions } from './ImageResolver';
+export { parseSvg } from './svg/SvgDocument';
+export type { SvgDocument, SvgRect } from './svg/SvgDocument';
+export { drawSvg, svgPaint } from './svg/SvgDraw';
+export type { SvgDrawOptions, SvgFit } from './svg/SvgDraw';
+export { DefaultSvgResolver, isSvgSource } from './svg/SvgResolver';
+export type { SvgResolver, DefaultSvgResolverOptions } from './svg/SvgResolver';
 export { IconRasterizer, iconKey } from './IconRasterizer';
 export type { IconSpec, IconRasterizerOptions, IconCanvas, IconContext } from './IconRasterizer';
 export {

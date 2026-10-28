@@ -102,10 +102,13 @@ what a decoded PNG would have been. [Images and the
 resolver](/media/images-and-the-resolver) is where the caching,
 eviction and reference counting are described in full.
 
-**A limit worth knowing before you hit it:** `createImageBitmap` takes a
-blob, and Chrome refuses an SVG one, so an `Image` pointed at an `.svg`
-fails where the same file in an `<img>` would have worked. A vector
-glyph belongs in [Icon](/components/icon).
+**An SVG file is drawn, not decoded.** `createImageBitmap` refuses an
+SVG blob, so an `Image` whose source ends in `.svg`, or is a
+`data:image/svg+xml` URL, reads the file and draws it as vectors
+instead: sharp at any size, fitted by `objectFit`, and sized by the
+file's own `width` and `height` when nothing else sizes it. A
+`currentColor` in it is the theme's text colour. See [Images and the
+resolver](/media/images-and-the-resolver#svg-files) for what is drawn.
 
 ## Loading and failure
 
