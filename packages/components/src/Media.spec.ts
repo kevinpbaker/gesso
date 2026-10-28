@@ -256,6 +256,7 @@ describe('Image', () => {
     await mounted.settle();
 
     expect(node!.properties.get('image')).toBe(mounted.bitmap);
+    expect(node!.properties.get('src')).toBe('photo.png');
     expect(semanticsOf(node!)).toMatchObject({ role: 'image', label: 'A photograph' });
   });
 
@@ -278,6 +279,7 @@ describe('Image', () => {
 
     expect(node!.properties.get('image')).toBeUndefined();
     expect(node!.properties.get('paint')).toMatchObject({ intrinsicWidth: 209, intrinsicHeight: 149 });
+    expect(node!.properties.get('src')).toBe('logo.svg');
     expect(mounted.getLayout(node!)).toMatchObject({ width: 209, height: 149 });
   });
 
