@@ -2568,6 +2568,16 @@ declare class FrameService {
   readonly frames: Observable<FrameMetrics>;
   publish(metrics: FrameMetrics): void;
 }
+declare class InspectionService {
+  private host;
+  attach(host: InspectionHost): void;
+  nodesAt(x: number, y: number): readonly UiNode[];
+  inspect(node: UiNode): UiNodeReport;
+}
+interface InspectionHost {
+  nodesAt(x: number, y: number): readonly UiNode[];
+  inspect(node: UiNode): UiNodeReport;
+}
 declare function audioClock(audio: AudioService, source: string): VideoClock;
 interface AudioElementLike extends EventTarget {
   src: string;
@@ -2937,6 +2947,8 @@ export {
   IndexedDbStorageOptions,
   Inject,
   Input,
+  InspectionHost,
+  InspectionService,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -3249,6 +3261,8 @@ import {
   IndexedDbStorageOptions,
   Inject,
   Input,
+  InspectionHost,
+  InspectionService,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -3450,6 +3464,7 @@ export {
   input,
   Input,
   InputCell,
+  InspectionService,
   internalState,
   InternalState,
   into,
@@ -3592,6 +3607,7 @@ export {
   type IndexedDbStorageOptions,
   type Inputs,
   type InputValue,
+  type InspectionHost,
   type JsonSchema,
   type MediaOptions,
   type MediaSessionLike,

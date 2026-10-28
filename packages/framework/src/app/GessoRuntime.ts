@@ -137,6 +137,7 @@ import { FontService, type FontFamilyDeclaration } from './FontService';
 import { TextService } from './TextService';
 import { AnimationService } from './AnimationService';
 import { FrameService } from './FrameService';
+import { InspectionService } from './InspectionService';
 import { InputLatencyTracker } from './InputLatency';
 import { SmoothScroller } from './SmoothScroller';
 import { ChannelRegistry } from '../channel/ChannelRegistry';
@@ -745,6 +746,11 @@ export class GessoRuntime {
     if (!this.services.has(FrameService)) {
       this.services.register(FrameService);
     }
+    // And the inspector's answers, for a tool built in Gesso that
+    // points at what is on the screen; attached once input exists.
+    if (!this.services.has(InspectionService)) {
+      this.services.register(InspectionService);
+    }
     // And the image resolver and icon rasteriser, whose caches must be
     // per runtime: two runtimes in one worker must not share a bitmap
     // one of them is about to close.
@@ -869,6 +875,10 @@ export class GessoRuntime {
 
     this.buildRoot(options.root);
     this.input = this.createInput();
+    this.services.get(InspectionService).attach({
+      nodesAt: (x, y) => this.hitTester.hitStack(x, y),
+      inspect: node => this.inspectNode(node)
+    });
     this.services.get(FocusService).setManager(this.input.focus);
     this.services.get(EditingService).setController(this.input.editing);
     this.services.get(ScrollService).setScroller((node, padding) => this.scrollIntoView(node, padding));
