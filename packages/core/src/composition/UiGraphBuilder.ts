@@ -634,7 +634,7 @@ export class UiGraphBuilder {
   ): UiNode | undefined {
     const key = this.elementKey(definition);
     if (key !== undefined) {
-      const candidate = this.graph.getNode(`${parent.id}:${key}`);
+      const candidate = this.graph.getNode(`${parent.id}:${idSegment(key)}`);
       if (candidate === undefined || candidate.parent !== parent || candidate.type !== definition.type) {
         return undefined;
       }
@@ -737,7 +737,7 @@ export class UiGraphBuilder {
       if (key === undefined) {
         continue;
       }
-      const candidate = this.graph.getNode(`${parent.id}:${key}`);
+      const candidate = this.graph.getNode(`${parent.id}:${idSegment(key)}`);
       const position = candidate === undefined ? undefined : at.get(candidate);
       if (candidate === undefined || position === undefined || candidate.type !== definition.type) {
         continue;
@@ -1141,7 +1141,7 @@ export class UiGraphBuilder {
   private createNodeId(parent: UiNode, definition: UiElement, index: number): string {
     const key = this.elementKey(definition);
     if (key !== undefined) {
-      return `${parent.id}:${key}`;
+      return `${parent.id}:${idSegment(key)}`;
     }
     return `${parent.id}:${index}`;
   }
@@ -1163,7 +1163,7 @@ export class UiGraphBuilder {
    */
   private createComponentAnchorId(parent: UiNode, element: ComponentLikeElement, index: number): string {
     const key = element.key === undefined || element.key === null ? index : element.key;
-    return `${parent.id}:component:${String(key)}`;
+    return `${parent.id}:component:${idSegment(String(key))}`;
   }
 }
 
@@ -1198,4 +1198,19 @@ function longestIncreasing(values: readonly number[]): number[] {
     run.push(index);
   }
   return run.reverse();
+}
+
+/**
+ * A key as one segment of a node id, which joins segments with colons.
+ *
+ * A key holding a colon would otherwise read as more than one segment,
+ * and could spell another node's id: a row keyed `a:0` beside a row
+ * keyed `a` whose first child is `a:0` again, which threw "already used
+ * outside parent" for a list keyed by ids (a layers panel's). Escaped,
+ * a key is one segment whatever it holds, and a key with no colon in it
+ * is unchanged.
+ */
+function idSegment(key: string | number): string {
+  const text = String(key);
+  return text.includes(':') || text.includes('%') ? text.replace(/%/g, '%25').replace(/:/g, '%3A') : text;
 }
