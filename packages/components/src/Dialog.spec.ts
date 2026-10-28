@@ -265,6 +265,27 @@ describe("Dialog's scrim", () => {
     expect(drawn).not.toContain(colorToCss(lightColors.scrim));
   });
 
+  it('draws a menu made already open, at a point, in the palette it was declared in', () => {
+    // A right-click's menu, declared as it opens: its placeholder was
+    // not in the tree yet, and it opened in the root's light palette
+    // over a dark page.
+    const ui = renderTest(
+      Box(
+        { width: 400, height: 300, theme: darkTheme },
+        createComponent(Menu, {
+          open: new BehaviorSubject(true),
+          at: { x: 40, y: 40 },
+          items: [{ value: 'delete', label: 'Delete' }]
+        })
+      ),
+      { width: 400, height: 300 }
+    );
+    ui.frame();
+    const drawn = fills(ui);
+    expect(drawn).toContain(colorToCss(darkColors.surface));
+    expect(drawn).not.toContain(colorToCss(lightColors.surface));
+  });
+
   it('is there at once under reduced motion', () => {
     const { ui, open, scrim } = mount();
     ui.runtime.services.get(AnimationService).applyReducedMotion(true);
