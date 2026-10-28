@@ -286,6 +286,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   opacity: { group: 'Paint', note: 'Applies to the whole subtree, not just this node.' },
   visible: { group: 'Paint', note: 'Hides the box and its subtree without taking it out of layout.' },
   transform: { group: 'Paint', note: 'Translation, scale and rotation applied at paint time. Layout does not see it.' },
+  rasterize: {
+    group: 'Paint',
+    note: 'Keeps the subtree as pixels and copies them while only what is above it moves or scales, as a camera does. Canvas2D only; drawn again when anything in it changes.'
+  },
   paint: {
     group: 'Paint',
     note: 'A painter given a drawing surface, the resolved box and the device scale, with the inputs it reads. Repainted when those change and not otherwise.'

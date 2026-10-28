@@ -792,11 +792,13 @@ describe('Canvas2DRenderer lifted nodes', () => {
     ]);
   });
 
-  it('paints an unlifted node in tree order', () => {
+  it("leaves an unlifted node inside its ancestors' clip, where a transform out of it is culled", () => {
     const h = liftedHarness(false);
+    // The picture's transform puts it 300 above the scroll view that
+    // clips it, so nothing of it would show: culled through its
+    // transform, not drawn into the clip.
     expect(callArgs(h.context, 'fillRect')).toEqual([
       [0, 0, 60, 100],
-      [60, 0, 60, 100],
       [120, 0, 60, 100]
     ]);
   });

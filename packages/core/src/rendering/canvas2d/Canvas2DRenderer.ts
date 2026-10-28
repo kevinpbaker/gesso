@@ -38,7 +38,9 @@ import type { PaintContext2D } from '../PaintTarget';
 import { PreciseContext } from './PreciseContext';
 import { offscreenLayerCanvas, placeLayer, ScrollLayerCache, SPILL } from './ScrollLayers';
 import { TextRasterCache } from './TextRasterCache';
+import { RasterCache } from './RasterCache';
 import { layerRegion, opacityNeedsLayer } from '../GroupOpacity';
+import { parseTransform } from '../../properties/UiTransform';
 import type { LayerCanvasFactory, LayerRect, ScrollLayer, ScrollLayerStats } from './ScrollLayers';
 
 export interface Canvas2DRendererOptions {
@@ -80,6 +82,16 @@ export interface Canvas2DRendererOptions {
    * the layers themselves passes 1.
    */
   scrollLayerSettleFrames?: number;
+  /**
+   * Whether a node marked \`rasterize\` keeps its subtree as pixels.
+   * Defaults to true; false draws it every frame. See \`RasterCache.ts\`.
+   */
+  rasterCache?: boolean;
+  /**
+   * How long a zoom's scale must hold before what was kept at another is
+   * drawn again, sharp. Defaults to \`SETTLE_MS\`; a spec passes 0.
+   */
+  rasterSettleMs?: number;
 }
 
 /** An opacity group's canvas; see `Canvas2DRenderer.groups`. */
@@ -213,6 +225,32 @@ export class Canvas2DRenderer implements UiRenderer {
     );
     this.textCache =
       options.textCache === false ? null : new TextRasterCache(options.createLayerCanvas ?? offscreenLayerCanvas);
+    this.rasters =
+      options.rasterCache === false
+        ? null
+        : new RasterCache(options.createLayerCanvas ?? offscreenLayerCanvas, options.rasterSettleMs);
+  }
+
+  /** Subtrees marked \`rasterize\` kept as pixels; see \`RasterCache.ts\`. */
+  private readonly rasters: RasterCache | null;
+  /** How deep inside a kept subtree's own walk the traversal is. One is not kept inside another. */
+  private rasterDepth = 0;
+  /**
+   * The device pixels the walk draws within: the surface's, or a kept
+   * subtree's canvas while it is drawn into. An opacity group's region is
+   * cut to them.
+   */
+  private boundsWidth = 0;
+  private boundsHeight = 0;
+
+  /** What the raster cache did since the last reset, or null with it off. For budget specs. */
+  get rasterCacheStats(): RasterCache['stats'] | null {
+    return this.rasters?.stats ?? null;
+  }
+
+  /** When a frame is wanted though nothing changes: a zoom settling, whose kept pixels are then drawn sharp. */
+  nextRepaint(): number | undefined {
+    return this.rasters?.nextRepaint;
   }
 
   /** Text kept as pixels; see `TextRasterCache.ts`. */
@@ -254,7 +292,13 @@ export class Canvas2DRenderer implements UiRenderer {
   surfaceRestored(): void {
     this.layers.dropAll();
     this.textCache?.dropAll();
+    this.rasters?.dropAll();
     this.groups.length = 0;
+  }
+
+  /** Kept subtrees were drawn with the fallback face. */
+  fontsChanged(): void {
+    this.rasters?.dropAll();
   }
 
   dispose(): void {
@@ -262,6 +306,7 @@ export class Canvas2DRenderer implements UiRenderer {
     this.scaledImages.dispose();
     this.layers.dropAll();
     this.textCache?.dropAll();
+    this.rasters?.dropAll();
     this.groups.length = 0;
   }
 
@@ -287,6 +332,10 @@ export class Canvas2DRenderer implements UiRenderer {
     this.layerDepth = 0;
     this.groupDepth = 0;
     this.textCache?.beginFrame();
+    this.rasterDepth = 0;
+    this.boundsWidth = this.surface.physicalWidth;
+    this.boundsHeight = this.surface.physicalHeight;
+    this.rasters?.beginFrame(context.changes, this.surface.physicalWidth * this.surface.physicalHeight);
     this.layers.beginFrame(
       this.options.scrollLayers === false ? undefined : context.changes,
       this.surface.dpr,
@@ -300,6 +349,7 @@ export class Canvas2DRenderer implements UiRenderer {
     }
     this.layers.endFrame();
     this.textCache?.endFrame();
+    this.rasters?.endFrame();
   }
 
   /**
@@ -353,14 +403,15 @@ export class Canvas2DRenderer implements UiRenderer {
     const sticky = rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0;
     // By where its subtree may paint, not its own box: a node that
     // doesn't clip lets an absolute child stand anywhere.
+    if (cull && !this.extentVisible(node, rec)) {
+      return;
+    }
     if (
-      cull &&
-      !this.intersectsCull(
-        rec.extentMinX + rec.stickyOffsetX,
-        rec.extentMinY + rec.stickyOffsetY,
-        rec.extentMaxX - rec.extentMinX,
-        rec.extentMaxY - rec.extentMinY
-      )
+      this.rasters !== null &&
+      this.rasterDepth === 0 &&
+      !sticky &&
+      node.properties.get('rasterize') === true &&
+      this.drawKept(node, rec, context, ctx)
     ) {
       return;
     }
@@ -404,8 +455,8 @@ export class Canvas2DRenderer implements UiRenderer {
           rec,
           ctx.getTransform!(),
           context.layout,
-          this.surface.physicalWidth,
-          this.surface.physicalHeight,
+          this.boundsWidth,
+          this.boundsHeight,
           this.surface.dpr
         );
         group.host.width = Math.max(1, region.width);
@@ -438,6 +489,13 @@ export class Canvas2DRenderer implements UiRenderer {
       this.paintDecorations(draw, node, rec, paint, decorations, false);
     }
 
+    // Culling works in record coordinates, which a transform or a sticky
+    // shift moves what is drawn away from. One that only moves and
+    // scales (a camera) takes the visible region back through it, so
+    // its descendants are culled in their own coordinates; one that
+    // turns stops culling below it.
+    const mapped = cull && (paint.hasTransform || sticky) && this.pushMappedCull(rec, paint, sticky);
+    const cullChildren = cull && (mapped || (!paint.hasTransform && !sticky));
     if (rec.clips) {
       // overflow hidden/scroll/auto and ScrollView: children and the
       // node's own text are clipped to the box (following its corner
@@ -459,15 +517,15 @@ export class Canvas2DRenderer implements UiRenderer {
         draw.save();
         draw.translate(-snapScroll(rec.scrollX, this.surface.dpr), -snapScroll(rec.scrollY, this.surface.dpr));
       }
-      // Culling works in record coordinates; a transform or a sticky
-      // shift moves what is drawn away from them, so descendants are
-      // not culled.
-      this.renderChildren(node, context, draw, cull && !paint.hasTransform && !sticky);
+      this.renderChildren(node, context, draw, cullChildren);
       if (rec.scrollable) {
         draw.restore();
       }
     }
     if (rec.clips) {
+      this.popCull();
+    }
+    if (mapped) {
       this.popCull();
     }
 
@@ -531,6 +589,41 @@ export class Canvas2DRenderer implements UiRenderer {
       ctx.restore();
       saves--;
     }
+  }
+
+  /**
+   * Draws a node marked \`rasterize\` from its kept pixels, drawing it
+   * into them first when they are out of date. False when it is to be
+   * drawn directly: a transform of its own, which its extent does not
+   * include, or anything \`RasterCache\` declines.
+   */
+  private drawKept(node: UiNode, rec: LayoutRecord, context: RenderContext, ctx: Canvas2DContext): boolean {
+    if (node.properties.get('transform') !== undefined) {
+      return false;
+    }
+    return this.rasters!.draw(ctx, node, rec, context.now ?? performance.now(), (target, width, height) => {
+      const volatile = this.volatileDraws;
+      const lifted = this.liftedPass.length;
+      const boundsWidth = this.boundsWidth;
+      const boundsHeight = this.boundsHeight;
+      this.boundsWidth = width;
+      this.boundsHeight = height;
+      this.rasterDepth++;
+      // Not through a scroll layer, which is placed on the frame, not here.
+      this.layerDepth++;
+      try {
+        // The whole subtree, culled by nothing: a pan shows the rest.
+        this.renderNode(node, context, target, false, false);
+      } finally {
+        this.layerDepth--;
+        this.rasterDepth--;
+        this.boundsWidth = boundsWidth;
+        this.boundsHeight = boundsHeight;
+      }
+      // Pixels that change unannounced, or a node lifted out of it to
+      // the top layer, which a copy would leave out: drawn this once.
+      return this.volatileDraws === volatile && this.liftedPass.length === lifted;
+    });
   }
 
   /**
@@ -973,7 +1066,8 @@ export class Canvas2DRenderer implements UiRenderer {
         this.paintHighlightedText(ctx, paint, context);
         return;
       }
-      if (this.textCache?.draw(ctx, node, this.contentBox, paint, context.text) === true) {
+      // Inside a kept subtree the text is kept with it, once.
+      if (this.rasterDepth === 0 && this.textCache?.draw(ctx, node, this.contentBox, paint, context.text) === true) {
         return;
       }
       drawText(ctx, this.contentBox, paint, context.text);
@@ -1323,6 +1417,38 @@ export class Canvas2DRenderer implements UiRenderer {
   // Bounds culling
   // -------------------------------------------------------------------------
 
+  /**
+   * Whether where a node's subtree may paint meets the visible region,
+   * after its sticky shift and its own transform, which its extent does
+   * not include: a node a transform moves on screen from off it is
+   * drawn. One that turns is always drawn.
+   */
+  private extentVisible(node: UiNode, rec: LayoutRecord): boolean {
+    let left = rec.extentMinX;
+    let top = rec.extentMinY;
+    let right = rec.extentMaxX;
+    let bottom = rec.extentMaxY;
+    const raw = node.properties.get('transform');
+    const transform = raw === undefined ? undefined : parseTransform(raw);
+    if (transform !== undefined) {
+      if (transform.rotation !== 0) {
+        return true;
+      }
+      // Drawn at translate + origin + scale·(p − origin), as \`applyTransform\` places it.
+      const originX = rec.x + transform.x;
+      const originY = rec.y + transform.y;
+      const x0 = transform.translateX + originX + transform.scaleX * (left - originX);
+      const x1 = transform.translateX + originX + transform.scaleX * (right - originX);
+      const y0 = transform.translateY + originY + transform.scaleY * (top - originY);
+      const y1 = transform.translateY + originY + transform.scaleY * (bottom - originY);
+      left = Math.min(x0, x1);
+      right = Math.max(x0, x1);
+      top = Math.min(y0, y1);
+      bottom = Math.max(y0, y1);
+    }
+    return this.intersectsCull(left + rec.stickyOffsetX, top + rec.stickyOffsetY, right - left, bottom - top);
+  }
+
   private intersectsCull(x: number, y: number, width: number, height: number): boolean {
     if (this.cullWidth <= 0 || this.cullHeight <= 0) {
       return false;
@@ -1378,6 +1504,40 @@ export class Canvas2DRenderer implements UiRenderer {
     this.cullY = top + rec.scrollY;
     this.cullWidth = width;
     this.cullHeight = height;
+  }
+
+  /**
+   * Takes the visible region back through a node's sticky shift and a
+   * transform that only moves and scales, into the coordinates its
+   * children are laid out in. False, with nothing pushed, for one that
+   * turns or flips.
+   */
+  private pushMappedCull(rec: LayoutRecord, paint: PaintState, sticky: boolean): boolean {
+    let shiftX = sticky ? rec.stickyOffsetX : 0;
+    let shiftY = sticky ? rec.stickyOffsetY : 0;
+    let scaleX = 1;
+    let scaleY = 1;
+    let originX = 0;
+    let originY = 0;
+    if (paint.hasTransform) {
+      const transform = paint.transform;
+      if (transform.rotation !== 0 || !(transform.scaleX > 0) || !(transform.scaleY > 0)) {
+        return false;
+      }
+      shiftX += transform.translateX;
+      shiftY += transform.translateY;
+      scaleX = transform.scaleX;
+      scaleY = transform.scaleY;
+      originX = rec.x + transform.x;
+      originY = rec.y + transform.y;
+    }
+    // Drawn at shift + origin + scale·(p − origin); so p = origin + (q − shift − origin) / scale.
+    this.cullStack.push(this.cullX, this.cullY, this.cullWidth, this.cullHeight);
+    this.cullX = originX + (this.cullX - shiftX - originX) / scaleX;
+    this.cullY = originY + (this.cullY - shiftY - originY) / scaleY;
+    this.cullWidth /= scaleX;
+    this.cullHeight /= scaleY;
+    return true;
   }
 
   private popCull(): void {

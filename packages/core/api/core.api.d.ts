@@ -2063,6 +2063,7 @@ declare const UiProperties: {
   readonly rowCount: UiPropertyDefinition<number | undefined>;
   readonly columnCount: UiPropertyDefinition<number | undefined>;
   readonly transform: UiPropertyDefinition<Partial<UiTransform> | undefined>;
+  readonly rasterize: UiPropertyDefinition<boolean>;
   readonly text: UiPropertyDefinition<string | undefined>;
   readonly image: UiPropertyDefinition<ImageBitmap | undefined>;
   readonly video: UiPropertyDefinition<UiVideoSurface | undefined>;
@@ -2137,7 +2138,7 @@ type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'min
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY' | 'layoutData'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'anchorRect' | 'placement' | 'anchorOffset'>;
-type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform'>;
+type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform' | 'rasterize'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
@@ -4477,6 +4478,7 @@ interface UiRenderer {
   resize(width: number, height: number, dpr: number): void;
   fontsChanged?(): void;
   surfaceRestored?(): void;
+  nextRepaint?(): number | undefined;
   dispose(): void;
 }
 type LayerCanvasFactory = (width: number, height: number) => CanvasHost | null;
@@ -4506,12 +4508,42 @@ declare class TextRasterCache {
   private make;
   private drop;
 }
+declare class RasterCache {
+  private readonly createCanvas;
+  private readonly settleMs;
+  private readonly entries;
+  private frame;
+  private pixels;
+  private open;
+  private spent;
+  private surfacePixels;
+  private wanted;
+  readonly stats: {
+    copied: number;
+    drawn: number;
+    direct: number;
+  };
+  constructor(createCanvas: LayerCanvasFactory, settleMs?: number);
+  beginFrame(changes: RenderChanges | undefined, surfacePixels?: number): void;
+  endFrame(): void;
+  dropAll(): void;
+  resetStats(): void;
+  get nextRepaint(): number | undefined;
+  draw(ctx: Canvas2DContext, node: UiNode, rec: LayoutRecord, now: number, paint: (target: Canvas2DContext, width: number, height: number) => boolean): boolean;
+  private resharpen;
+  private want;
+  private redraw;
+  private make;
+  private drop;
+}
 interface Canvas2DRendererOptions {
   surface: CanvasSurface;
   scrollLayers?: boolean;
   createLayerCanvas?: LayerCanvasFactory;
   textCache?: boolean;
   scrollLayerSettleFrames?: number;
+  rasterCache?: boolean;
+  rasterSettleMs?: number;
 }
 declare class Canvas2DRenderer implements UiRenderer {
   private readonly options;
@@ -4534,6 +4566,12 @@ declare class Canvas2DRenderer implements UiRenderer {
   private readonly groups;
   private groupDepth;
   constructor(options: Canvas2DRendererOptions);
+  private readonly rasters;
+  private rasterDepth;
+  private boundsWidth;
+  private boundsHeight;
+  get rasterCacheStats(): RasterCache['stats'] | null;
+  nextRepaint(): number | undefined;
   private readonly textCache;
   get textCacheStats(): TextRasterCache['stats'] | null;
   get scrollLayerStats(): ScrollLayerStats;
@@ -4543,11 +4581,13 @@ declare class Canvas2DRenderer implements UiRenderer {
   get isReady(): boolean;
   resize(width: number, height: number, dpr: number): void;
   surfaceRestored(): void;
+  fontsChanged(): void;
   dispose(): void;
   render(root: UiNode, context: RenderContext): void;
   private resolvePaint;
   private beginFrame;
   private renderNode;
+  private drawKept;
   private groupLayer;
   private renderChildren;
   private renderLifted;
@@ -4567,9 +4607,11 @@ declare class Canvas2DRenderer implements UiRenderer {
   private paintLayer;
   private walkLayer;
   private applyTransform;
+  private extentVisible;
   private intersectsCull;
   private paintScrollbars;
   private pushCull;
+  private pushMappedCull;
   private popCull;
 }
 declare function traceRoundedRect(ctx: Canvas2DContext, x: number, y: number, width: number, height: number, radius: number): void;
