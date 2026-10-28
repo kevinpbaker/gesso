@@ -2066,6 +2066,7 @@ declare const UiProperties: {
   readonly text: UiPropertyDefinition<string | undefined>;
   readonly image: UiPropertyDefinition<ImageBitmap | undefined>;
   readonly video: UiPropertyDefinition<UiVideoSurface | undefined>;
+  readonly src: UiPropertyDefinition<string | undefined>;
   readonly objectFit: UiPropertyDefinition<UiObjectFit | undefined>;
   readonly scrollX: UiPropertyDefinition<number | undefined>;
   readonly scrollBehavior: UiPropertyDefinition<"instant" | "smooth" | undefined>;

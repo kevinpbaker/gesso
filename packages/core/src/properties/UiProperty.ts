@@ -1529,6 +1529,22 @@ export const UiProperties = {
     affects: P
   }),
 
+  /**
+   * The URL the node's picture was loaded from, as `imageSource` last
+   * resolved it: an image's or an SVG's.
+   *
+   * Nothing lays it out or paints it. It is there for what reads a tree
+   * as a document, an inspector, a design tool writing the screen as
+   * HTML, since the bitmap or the drawing on the node no longer says
+   * where it came from.
+   */
+  src: defineProperty<string | undefined>({
+    name: 'src',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.None
+  }),
+
   objectFit: defineProperty<UiObjectFit | undefined>({
     name: 'objectFit',
     defaultValue: undefined,

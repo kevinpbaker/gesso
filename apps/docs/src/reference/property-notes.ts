@@ -430,6 +430,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   image: { group: 'Media', note: 'A decoded bitmap drawn inside the box, clipped by `borderRadius`.' },
   video: { group: 'Media', note: 'A video surface drawn where an image would be, under the same fit and clip.' },
   objectFit: { group: 'Media', note: 'How that bitmap or surface fills the box: `fill`, `cover`, `contain`, `none`.' },
+  src: {
+    group: 'Media',
+    note: 'The URL an `Image` loaded its picture from, for tools that read the tree; nothing draws it.'
+  },
 
   // Virtualization
   virtualIndex: { group: 'Virtualization', note: 'Which item in the full list this mounted row is.' },

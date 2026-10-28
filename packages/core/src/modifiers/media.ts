@@ -85,6 +85,7 @@ function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly str
   args.onState?.('loading');
   host.clear('image');
   host.clear('paint');
+  host.clear('src');
   const attempt = (index: number, lastError: unknown): void => {
     if (!live) {
       return;
@@ -113,6 +114,7 @@ function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly str
     const ready = args.resolver.peek?.(source) ?? null;
     if (ready !== null) {
       host.set('image', ready);
+      host.set('src', source);
       args.onState?.('loaded');
       return;
     }
@@ -123,6 +125,7 @@ function load(host: UiModifierHost, args: ImageSourceArgs, sources: readonly str
           return;
         }
         host.set('image', bitmap);
+        host.set('src', source);
         args.onState?.('loaded');
       })
       .catch((error: unknown) => {
@@ -162,6 +165,7 @@ function drawVector(
   const show = (document: SvgDocument): void => {
     const fit = (host.node.getProperty('objectFit') as SvgFit | undefined) ?? 'contain';
     host.set('paint', svgPaint(document, { fit }));
+    host.set('src', source);
     if (document.unsupported.length > 0 && !warnedSvg.has(source)) {
       warnedSvg.add(source);
       console.warn(
