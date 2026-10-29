@@ -104,12 +104,49 @@ export interface PaintSurface {
   /** Multiplies into the opacity already in force, as a node's does. */
   alpha(value: number): void;
   /**
-   * Blurs everything drawn after it, by a radius in logical pixels.
+   * Blurs everything drawn after it, by a radius (CSS's standard
+   * deviation) in the current coordinates, so a blur under a `scale`
+   * scales with what it blurs. The transform in force at the call is
+   * the one it is measured in.
    *
    * Scoped by `save` and `restore` like every other style value, so a
    * frosted panel is `save`, `blur`, draw, `restore`. Zero clears it.
    */
   blur(radius: number): void;
+
+  // -------------------------------------------------------------------------
+  // Layers
+  // -------------------------------------------------------------------------
+
+  /**
+   * Starts a masked layer: what is drawn from here to `layerMask` is
+   * the layer's content, kept apart from what is drawn already and cut
+   * to this rectangle, in the current coordinates.
+   *
+   * Saves the state as `save` does. The content starts with the
+   * transform in force and an empty path, and with every other style
+   * value at its initial one: the alpha, blur and clip in force here
+   * apply to the layer as a whole, when `endMaskedLayer` draws it.
+   *
+   * An SVG `<mask>` and a drop shadow are both drawn this way. A host
+   * that cannot keep a layer apart draws the content unmasked and the
+   * mask not at all, which is a picture that is wrong in one detail
+   * rather than missing.
+   */
+  beginMaskedLayer(x: number, y: number, width: number, height: number): void;
+  /**
+   * Ends the layer's content and starts its mask: the state is as
+   * `beginMaskedLayer` found it, the path empty, and the mask cut to the
+   * same rectangle. Where the mask is drawn the content shows, by how
+   * much `mode` says; where nothing is, nothing does.
+   */
+  layerMask(mode?: PaintMaskMode): void;
+  /**
+   * Draws the layer's content, masked, where it began, and restores the
+   * state `beginMaskedLayer` saved. A layer ended without a mask draws
+   * its content as it is.
+   */
+  endMaskedLayer(): void;
 
   // -------------------------------------------------------------------------
   // Drawing
@@ -137,6 +174,13 @@ export type PaintFillRule = 'nonzero' | 'evenodd';
 export type PaintLineCap = 'butt' | 'round' | 'square';
 export type PaintLineJoin = 'miter' | 'round' | 'bevel';
 export type PaintTextAlign = 'left' | 'center' | 'right';
+/**
+ * How a layer's mask says how much of it shows. `luminance`, the
+ * default, is SVG's `<mask>` and CSS's `mask-type: luminance`: the
+ * mask's brightness times its alpha, so white shows the content and
+ * black hides it. `alpha` is the mask's alpha alone, whatever its colour.
+ */
+export type PaintMaskMode = 'luminance' | 'alpha';
 
 /** The little of a text style a single painted line can carry. */
 export interface PaintTextStyle {
