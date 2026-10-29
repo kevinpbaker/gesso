@@ -8,6 +8,7 @@ import {
 
 import {
   AGENT_PATH,
+  connectLines,
   createAgentBridge,
   type BridgeRequest,
   type BridgeResponse,
@@ -130,18 +131,25 @@ export interface GessoPluginOptions {
    */
   readonly agent?: boolean;
   /**
-   * Offer the project's components to an agent over the same endpoint,
-   * as `library_overview`, `library_search` and `library_get` (default
-   * true while `agent` is on). The components are the project's own,
-   * read from the files its tsconfig includes; name a library in
-   * `libraries` to offer its components too, such as `gesso-components`.
+   * The name an agent lists the endpoint under, and so the prefix of
+   * its tools' names in most agents (`mcp__my-app__…`): the lines the
+   * dev server prints to connect one use it. Default the root folder's
+   * name.
    */
+  readonly agentName?: string;
   /**
    * What an agent is told when it connects, after what the catalog
    * says: how this application is meant to be worked with, for one
    * whose tools are best used in an order.
    */
   readonly agentInstructions?: string;
+  /**
+   * Offer the project's components to an agent over the same endpoint,
+   * as `library_overview`, `library_search` and `library_get` (default
+   * true while `agent` is on). The components are the project's own,
+   * read from the files its tsconfig includes; name a library in
+   * `libraries` to offer its components too, such as `gesso-components`.
+   */
   readonly catalog?:
     | boolean
     | {
@@ -347,9 +355,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         const base = server.resolvedUrls?.local[0];
         if (base !== undefined) {
           const url = new URL(AGENT_PATH, base).href;
-          server.config.logger.info(
-            `  ➜  Agents:  ${url}\n             claude mcp add --transport http ${agentName(server.config.root)} ${url}`
-          );
+          server.config.logger.info(connectLines(options.agentName ?? agentName(server.config.root), url));
         }
       });
     },

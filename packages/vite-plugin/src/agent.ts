@@ -35,6 +35,20 @@
 /** The path an agent is pointed at. */
 export const AGENT_PATH = '/__gesso/mcp';
 
+/**
+ * What the dev server prints when it starts: the endpoint, which any
+ * MCP client connects to, and the line to add it in the agents most
+ * used from a terminal.
+ */
+export function connectLines(name: string, url: string): string {
+  return [
+    `  ➜  Agents:  ${url}  (MCP, as ${name})`,
+    `             claude mcp add --transport http ${name} ${url}`,
+    `             codex mcp add ${name} --url ${url}`,
+    `             gemini mcp add --transport http ${name} ${url}`
+  ].join('\n');
+}
+
 /** The HMR events, as `connectDevAgent` names them. */
 export const EVENTS = {
   ready: 'gesso:agent:ready',

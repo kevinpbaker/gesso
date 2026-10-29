@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AGENT_PATH,
+  connectLines,
   createAgentBridge,
   EVENTS,
   type BridgeClient,
@@ -63,6 +64,18 @@ function request(
 }
 
 const ping = JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'ping' });
+
+describe('the lines to connect an agent', () => {
+  it('give the endpoint, and the line to add it in each agent, under the name asked for', () => {
+    const url = 'http://localhost:5173/__gesso/mcp';
+    expect(connectLines('my-app', url).split('\n')).toEqual([
+      `  ➜  Agents:  ${url}  (MCP, as my-app)`,
+      `             claude mcp add --transport http my-app ${url}`,
+      `             codex mcp add my-app --url ${url}`,
+      `             gemini mcp add --transport http my-app ${url}`
+    ]);
+  });
+});
 
 describe("the server's own tools", () => {
   const local = {
