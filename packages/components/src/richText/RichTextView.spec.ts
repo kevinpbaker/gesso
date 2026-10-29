@@ -37,4 +37,18 @@ describe('markdown, drawn read-only', () => {
     });
     expect(runs().find(run => run.text === 'WEB-12')).toMatchObject({ fontWeight: 600 });
   });
+
+  it('starts every item of a list at one x, whether or not it wraps', async () => {
+    const long = 'A list item long enough to wrap onto a second line in a view this narrow, and then some more words.';
+    ui = renderTest(createComponent(RichTextView, { value: `- ${long}\n- Short.` }), { width: 300, height: 400 });
+    await ui.settle();
+    const itemText = (start: string) =>
+      ui
+        .allNodes()
+        .find(node => ((node.properties.get('spans') ?? []) as InlineRun[]).some(run => run.text.startsWith(start)))!;
+    const wrapping = ui.getLayout(itemText('A list item'));
+    const short = ui.getLayout(itemText('Short'));
+    expect(wrapping.height).toBeGreaterThan(short.height);
+    expect(wrapping.x).toBe(short.x);
+  });
 });

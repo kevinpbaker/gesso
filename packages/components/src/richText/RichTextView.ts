@@ -80,7 +80,11 @@ function BlockLine(
                   : '☐',
           fontSize: 14,
           color: 'textMuted',
-          width: 18
+          // Held at its width: beside text that wraps, the marker shrank
+          // to its glyph, and an item that wrapped began further left
+          // than one that did not.
+          width: 18,
+          flexShrink: 0
         }),
         text(14)
       );

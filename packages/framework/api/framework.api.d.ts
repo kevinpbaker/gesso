@@ -129,6 +129,7 @@ interface DevAgentResponse {
 declare const DEV_AGENT_EVENTS: {
   readonly ready: 'gesso:agent:ready';
   readonly request: 'gesso:agent:request';
+  readonly received: 'gesso:agent:received';
   readonly response: 'gesso:agent:response';
 };
 declare function connectDevAgent(app: DevAgentApp, hot: DevAgentHot, info?: McpServerInfo): void;
