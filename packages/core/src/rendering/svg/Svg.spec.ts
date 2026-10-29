@@ -56,7 +56,28 @@ describe('reading the file', () => {
     const document = parseSvg(
       '<svg viewBox="0 0 10 10"><text>A</text><text>B</text><rect filter="url(#f)"/><image/></svg>'
     );
-    expect(document.unsupported).toEqual(['text', 'filter', 'image']);
+    expect(document.unsupported).toEqual(['text', 'image', 'filter']);
+  });
+
+  it('draws a mask and a drop shadow, and says so of any other filter or a mask that names nothing', () => {
+    const drawn = parseSvg(
+      '<svg viewBox="0 0 10 10"><defs><mask id="m"><rect width="10" height="10" fill="#fff"/></mask>' +
+        '<filter id="s"><feDropShadow dx="0" dy="1" stdDeviation="1"/></filter></defs>' +
+        '<rect mask="url(#m)" filter="url(#s)" width="5" height="5"/></svg>'
+    );
+    expect(drawn.unsupported).toEqual([]);
+    const blurred = parseSvg(
+      '<svg viewBox="0 0 10 10"><filter id="b"><feGaussianBlur stdDeviation="2"/></filter>' +
+        '<rect filter="url(#b)" width="5" height="5"/></svg>'
+    );
+    expect(blurred.unsupported).toEqual(['filter']);
+    // Two steps, even if one is a drop shadow, are a filter not drawn.
+    const chained = parseSvg(
+      '<svg viewBox="0 0 10 10"><filter id="c"><feDropShadow/><feOffset dx="1"/></filter></svg>'
+    );
+    expect(chained.unsupported).toEqual(['filter']);
+    expect(parseSvg('<svg viewBox="0 0 10 10"><rect mask="url(#nothing)"/></svg>').unsupported).toEqual(['mask']);
+    expect(parseSvg('<svg viewBox="0 0 10 10"><rect filter="blur(2px)"/></svg>').unsupported).toEqual(['filter']);
   });
 
   it('refuses a file with no <svg> in it', () => {
@@ -214,6 +235,124 @@ describe('drawing it', () => {
         stops: [{ offset: percent(0) }, { offset: percent(100) }]
       }
     });
+  });
+
+  it('masks with a black-and-white <mask> in user space: the content, then the mask, as one layer', () => {
+    // Atelier's icon: a white field with black bars across it, which cut
+    // the bars out of what it masks.
+    const ops = draw(
+      '<svg viewBox="0 0 100 100"><defs><mask id="bars" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">' +
+        '<rect width="100" height="100" fill="#fff"/><path d="M50 0V100" stroke="#000" stroke-width="4"/></mask></defs>' +
+        '<g transform="translate(0 -2)"><g mask="url(#bars)"><rect x="10" y="10" width="80" height="80" fill="red"/></g></g></svg>',
+      { width: 100, height: 100 }
+    );
+    expect(
+      only(ops, 'transform', 'beginMaskedLayer', 'layerMask', 'endMaskedLayer', 'fillColor', 'strokeColor')
+    ).toEqual([
+      { op: 'transform', a: 1, b: 0, c: 0, d: 1, e: 0, f: -2 },
+      { op: 'beginMaskedLayer', x: 0, y: 0, width: 100, height: 100 },
+      { op: 'fillColor', color: { r: 1, g: 0, b: 0, a: 1 } },
+      { op: 'layerMask', mode: 'luminance' },
+      { op: 'fillColor', color: { r: 1, g: 1, b: 1, a: 1 } },
+      // The bar's path is filled in black too, as any path is by
+      // default, though a line has nothing to fill.
+      { op: 'fillColor', color: black },
+      { op: 'strokeColor', color: black },
+      { op: 'endMaskedLayer' }
+    ]);
+    // The mask itself is not drawn where it stands.
+    expect(only(ops, 'fill', 'stroke')).toHaveLength(4);
+  });
+
+  it("places a mask's region in fractions of the masked element's bounding box by default", () => {
+    // A tenth beyond the box on every side, and the box is the group's
+    // children through their transforms, without the group's own.
+    const ops = draw(
+      '<svg viewBox="0 0 100 100"><mask id="m"><rect width="100" height="100" fill="#fff"/></mask>' +
+        '<g mask="url(#m)" transform="scale(2)"><rect x="10" y="20" width="10" height="5"/>' +
+        '<rect transform="translate(10 0)" x="10" y="20" width="10" height="5"/></g></svg>',
+      { width: 100, height: 100 }
+    );
+    expect(only(ops, 'beginMaskedLayer')).toEqual([{ op: 'beginMaskedLayer', x: 8, y: 19.5, width: 24, height: 6 }]);
+
+    const fractions = draw(
+      '<svg viewBox="0 0 100 100"><mask id="m" x="0" y="25%" width="0.5" height="50%" maskContentUnits="objectBoundingBox">' +
+        '<rect width="0.5" height="1" fill="#fff"/></mask><rect mask="url(#m)" x="20" y="40" width="40" height="20"/></svg>',
+      { width: 100, height: 100 }
+    );
+    expect(only(fractions, 'beginMaskedLayer', 'transform', 'rect')).toEqual([
+      { op: 'beginMaskedLayer', x: 20, y: 45, width: 20, height: 10 },
+      { op: 'rect', x: 20, y: 40, width: 40, height: 20 },
+      // The mask's content is drawn in the box's fractions too.
+      { op: 'transform', a: 40, b: 0, c: 0, d: 20, e: 20, f: 40 },
+      { op: 'rect', x: 0, y: 0, width: 0.5, height: 1 }
+    ]);
+  });
+
+  it('masks by alpha for mask-type alpha, and draws a mask that reaches itself once', () => {
+    const ops = draw(
+      '<svg viewBox="0 0 10 10"><mask id="m" style="mask-type: alpha" maskUnits="userSpaceOnUse">' +
+        '<rect mask="url(#m)" width="10" height="10"/></mask><rect mask="url(#m)" width="10" height="10"/></svg>'
+    );
+    expect(only(ops, 'beginMaskedLayer', 'layerMask', 'endMaskedLayer').map(op => op.op)).toEqual([
+      'beginMaskedLayer',
+      'layerMask',
+      'endMaskedLayer'
+    ]);
+    expect(only(ops, 'layerMask')).toEqual([{ op: 'layerMask', mode: 'alpha' }]);
+  });
+
+  it('draws a drop shadow: the element in the flood colour, moved and blurred in a layer at the flood opacity, then the element', () => {
+    const ops = draw(
+      '<svg viewBox="0 0 100 100"><filter id="s" x="-10%" y="-10%" width="120%" height="125%">' +
+        '<feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.3"/></filter>' +
+        '<rect x="10" y="10" width="80" height="80" rx="18" fill="red" stroke="blue" filter="url(#s)"/></svg>',
+      { width: 100, height: 100 }
+    );
+    const shadow = only(
+      ops,
+      'clip',
+      'alpha',
+      'beginMaskedLayer',
+      'endMaskedLayer',
+      'translate',
+      'blur',
+      'fillColor',
+      'strokeColor',
+      'fill',
+      'stroke'
+    ).slice(2); // the viewBox's translates
+    expect(shadow).toEqual([
+      // Both the shadow and the element are cut to the filter's region.
+      { op: 'clip', rule: 'nonzero' },
+      { op: 'alpha', value: 0.3 },
+      { op: 'beginMaskedLayer', x: 2, y: 2, width: 96, height: 100 },
+      { op: 'translate', x: 0, y: 12 },
+      { op: 'blur', radius: 14 },
+      { op: 'fillColor', color: black },
+      { op: 'fill', rule: 'nonzero' },
+      { op: 'strokeColor', color: black },
+      { op: 'stroke' },
+      { op: 'endMaskedLayer' },
+      { op: 'fillColor', color: { r: 1, g: 0, b: 0, a: 1 } },
+      { op: 'fill', rule: 'nonzero' },
+      { op: 'strokeColor', color: { r: 0, g: 0, b: 1, a: 1 } },
+      { op: 'stroke' }
+    ]);
+    expect(only(ops, 'roundRect')).toHaveLength(2);
+  });
+
+  it("draws a drop shadow with feDropShadow's defaults, and an element whose filter it cannot draw as it is", () => {
+    const ops = draw(
+      '<svg viewBox="0 0 10 10"><filter id="s"><feDropShadow/></filter><filter id="b"><feGaussianBlur/></filter>' +
+        '<rect filter="url(#s)" width="5" height="5"/><rect filter="url(#b)" width="5" height="5"/></svg>'
+    );
+    expect(only(ops, 'translate', 'blur').slice(2)).toEqual([
+      { op: 'translate', x: 2, y: 2 },
+      { op: 'blur', radius: 2 }
+    ]);
+    expect(only(ops, 'beginMaskedLayer')).toHaveLength(1);
+    expect(only(ops, 'fill')).toHaveLength(3);
   });
 
   it('draws a <use> that reaches itself as nothing, rather than forever', () => {

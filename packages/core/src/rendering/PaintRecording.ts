@@ -2,7 +2,14 @@ import type { UiColorValue } from '../properties/UiPropertyValues';
 import type { UiGradient } from '../properties/UiGradient';
 import type { UiImage } from '../properties/UiImage';
 import { tracePathData } from './PaintPathData';
-import type { PaintFillRule, PaintLineCap, PaintLineJoin, PaintSurface, PaintTextStyle } from './PaintSurface';
+import type {
+  PaintFillRule,
+  PaintLineCap,
+  PaintLineJoin,
+  PaintMaskMode,
+  PaintSurface,
+  PaintTextStyle
+} from './PaintSurface';
 
 /**
  * One call a painter made, as data.
@@ -84,6 +91,15 @@ export type PaintOp =
   | { readonly op: 'lineDash'; readonly segments: readonly number[]; readonly offset: number }
   | { readonly op: 'alpha'; readonly value: number }
   | { readonly op: 'blur'; readonly radius: number }
+  | {
+      readonly op: 'beginMaskedLayer';
+      readonly x: number;
+      readonly y: number;
+      readonly width: number;
+      readonly height: number;
+    }
+  | { readonly op: 'layerMask'; readonly mode: PaintMaskMode }
+  | { readonly op: 'endMaskedLayer' }
   | { readonly op: 'fill'; readonly rule: PaintFillRule }
   | { readonly op: 'stroke' }
   | { readonly op: 'clip'; readonly rule: PaintFillRule }
@@ -248,6 +264,18 @@ export class PaintRecorder implements PaintSurface {
     this.recorded.push({ op: 'blur', radius });
   }
 
+  beginMaskedLayer(x: number, y: number, width: number, height: number): void {
+    this.recorded.push({ op: 'beginMaskedLayer', x, y, width, height });
+  }
+
+  layerMask(mode: PaintMaskMode = 'luminance'): void {
+    this.recorded.push({ op: 'layerMask', mode });
+  }
+
+  endMaskedLayer(): void {
+    this.recorded.push(END_MASKED_LAYER);
+  }
+
   fill(rule: PaintFillRule = 'nonzero'): void {
     this.recorded.push({ op: 'fill', rule });
   }
@@ -277,6 +305,7 @@ const RESTORE: PaintOp = Object.freeze({ op: 'restore' as const });
 const BEGIN_PATH: PaintOp = Object.freeze({ op: 'beginPath' as const });
 const CLOSE_PATH: PaintOp = Object.freeze({ op: 'closePath' as const });
 const STROKE: PaintOp = Object.freeze({ op: 'stroke' as const });
+const END_MASKED_LAYER: PaintOp = Object.freeze({ op: 'endMaskedLayer' as const });
 
 /**
  * Replays a recording onto any surface.
@@ -363,6 +392,15 @@ export function replayPaint(recording: PaintRecording, surface: PaintSurface): v
         break;
       case 'blur':
         surface.blur(op.radius);
+        break;
+      case 'beginMaskedLayer':
+        surface.beginMaskedLayer(op.x, op.y, op.width, op.height);
+        break;
+      case 'layerMask':
+        surface.layerMask(op.mode);
+        break;
+      case 'endMaskedLayer':
+        surface.endMaskedLayer();
         break;
       case 'fill':
         surface.fill(op.rule);

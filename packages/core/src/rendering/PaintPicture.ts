@@ -5,28 +5,17 @@ import type { UiImage } from '../properties/UiImage';
 import { UiProperties } from '../properties/UiProperty';
 import { resolveColor, resolveColorValue, resolveGradient } from '../properties/UiThemeColor';
 import { EMPTY_RECORDING, PaintRecorder, replayPaint, type PaintRecording } from './PaintRecording';
-import { PaintTarget, type PaintContext2D, type PaintResolver } from './PaintTarget';
+import {
+  PaintTarget,
+  type PaintCanvas,
+  type PaintCanvasFactory,
+  type PaintContext2D,
+  type PaintDeviceRect,
+  type PaintResolver
+} from './PaintTarget';
 import { paintValuesEqual, pathValuesEqual, type PaintBox, type UiPaint, type UiPath } from './PaintSurface';
 
-/**
- * The canvas a picture is drawn into, and the bitmap it becomes.
- *
- * `IconCanvas`'s sibling, and injectable for the same two reasons: the
- * suite has no `OffscreenCanvas`, and a host that lacks one should
- * fail by drawing nothing rather than by throwing in a frame.
- *
- * `take()` is synchronous, which is the whole reason the default is
- * `transferToImageBitmap` and not `createImageBitmap`. An asynchronous
- * raster would put the picture a frame behind its inputs and would
- * need a way to ask for another frame from inside a renderer, which no
- * renderer has and none should.
- */
-export interface PaintCanvas {
-  context(): PaintContext2D | null;
-  take(): UiImage;
-}
-
-export type PaintCanvasFactory = (width: number, height: number) => PaintCanvas | null;
+export type { PaintCanvas, PaintCanvasFactory } from './PaintTarget';
 
 /**
  * The largest picture that will be rasterised, per side, in physical
@@ -264,7 +253,11 @@ export class PaintPictureCache {
     ctx.beginPath();
     ctx.rect(0, 0, rec.width, rec.height);
     ctx.clip();
-    replayPaint(recording, new PaintTarget(ctx, resolverFor(node)));
+    // A masked layer is cut to the box on the frame, as the bitmap would be.
+    const m = ctx.getTransform?.();
+    const layers =
+      m === undefined ? undefined : { create: this.createCanvas, bounds: deviceBox(m, rec.width, rec.height) };
+    replayPaint(recording, new PaintTarget(ctx, resolverFor(node), layers));
     ctx.restore();
   }
 
@@ -361,7 +354,10 @@ export class PaintPictureCache {
     // trick `IconRasterizer` plays with the viewBox: nothing below
     // this line has to know what a device pixel ratio is.
     ctx.scale(box.scale, box.scale);
-    replayPaint(recording, new PaintTarget(ctx, resolverFor(node)));
+    replayPaint(
+      recording,
+      new PaintTarget(ctx, resolverFor(node), { create: this.createCanvas, bounds: { x: 0, y: 0, width, height } })
+    );
     return canvas.take();
   }
 }
@@ -375,6 +371,19 @@ export class PaintPictureCache {
  * make it possible for them not to.
  */
 export const paintPictures = new PaintPictureCache();
+
+/** The device pixels a box at the origin covers under a transform. */
+function deviceBox(
+  m: { a: number; b: number; c: number; d: number; e: number; f: number },
+  width: number,
+  height: number
+): PaintDeviceRect {
+  const xs = [m.e, m.a * width + m.e, m.c * height + m.e, m.a * width + m.c * height + m.e];
+  const ys = [m.f, m.b * width + m.f, m.d * height + m.f, m.b * width + m.d * height + m.f];
+  const x = Math.floor(Math.min(...xs));
+  const y = Math.floor(Math.min(...ys));
+  return { x, y, width: Math.ceil(Math.max(...xs)) - x, height: Math.ceil(Math.max(...ys)) - y };
+}
 
 /** Everything a slot's picture depends on, read off the node and its box. */
 interface SlotKey {

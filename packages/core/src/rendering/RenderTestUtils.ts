@@ -11,8 +11,7 @@ import { Canvas2DRenderer } from './canvas2d/Canvas2DRenderer';
 import type { Canvas2DContext, Canvas2DGradient } from './canvas2d/Canvas2DContext';
 import { CanvasSurface } from './canvas2d/CanvasSurface';
 import type { CanvasHost } from './canvas2d/CanvasSurface';
-import type { PaintContext2D, PaintGradient } from './PaintTarget';
-import type { PaintCanvasFactory } from './PaintPicture';
+import type { PaintCanvasFactory, PaintContext2D, PaintGradient } from './PaintTarget';
 import type { PaintLineCap, PaintLineJoin } from './PaintSurface';
 
 export interface RecordedCall {

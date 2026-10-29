@@ -5,10 +5,12 @@ import type { UiColorValue } from '../../properties/UiPropertyValues';
 import { tracePathData } from '../PaintPathData';
 import type { PaintBox, PaintFillRule, PaintLineCap, PaintLineJoin, PaintSurface, UiPaint } from '../PaintSurface';
 import {
+  dropShadowOf,
   localName,
   numbersIn,
   parseDeclarations,
   parseViewBox,
+  referencedId,
   selectorMatches,
   type SvgDocument,
   type SvgRect
@@ -115,8 +117,13 @@ interface Context {
   readonly document: SvgDocument;
   readonly surface: PaintSurface;
   readonly currentColor: UiColorValue;
-  /** The `<use>`s being drawn, so one that reaches itself draws nothing instead of forever. */
+  /**
+   * The `<use>`s and `<mask>`s being drawn, so one that reaches itself
+   * draws nothing, or is not masked again, instead of going forever.
+   */
   readonly using: Set<SvgXmlElement>;
+  /** The colour every fill and stroke is drawn in instead of its own, while a drop shadow is drawn. */
+  readonly flood?: UiColorValue | undefined;
 }
 
 /** A fill or a stroke: nothing, a colour, or a gradient by id. */
@@ -212,26 +219,264 @@ function drawElement(element: SvgXmlElement, inherited: Style, viewport: SvgRect
   if (declared['clip-path'] !== undefined) {
     clipTo(declared['clip-path'], viewport, context);
   }
+  const content = (at: Context): void => {
+    switch (name) {
+      case 'g':
+      case 'a':
+      case 'switch':
+        drawChildren(element, style, viewport, at);
+        break;
+      case 'svg':
+        drawNested(element, style, viewport, at);
+        break;
+      case 'use':
+        drawUse(element, style, viewport, at);
+        break;
+      default: {
+        const shape = shapeOf(element, name, viewport);
+        if (shape !== null && style.visible) {
+          paintShape(shape, style, viewport, at);
+        }
+      }
+    }
+  };
+  // SVG's order: the filter first, then the clip and the mask, then
+  // the opacity, each on what the one before it made.
+  const filtered = (): void => {
+    const filter = declared.filter === undefined ? undefined : referencedElement(declared.filter, 'filter', context);
+    const shadow = filter === undefined ? undefined : dropShadowOf(filter);
+    if (filter === undefined || shadow === undefined) {
+      content(context);
+    } else {
+      drawWithShadow(element, filter, shadow, style, viewport, context, content);
+    }
+  };
+  const mask = declared.mask === undefined ? undefined : referencedElement(declared.mask, 'mask', context);
+  if (mask === undefined || context.using.has(mask)) {
+    filtered();
+  } else {
+    drawMasked(element, mask, viewport, context, filtered);
+  }
+  surface.restore();
+}
+
+/** The element of a kind that a `url(#id)` value names, if it is one. */
+function referencedElement(value: string, kind: string, context: Context): SvgXmlElement | undefined {
+  const id = referencedId(value);
+  const target = id === undefined ? undefined : context.document.ids.get(id);
+  return target !== undefined && localName(target.name) === kind ? target : undefined;
+}
+
+/**
+ * Draws an element through a `<mask>`: its drawing is a layer, and the
+ * mask's children, drawn into the layer's mask, say how much of it
+ * shows. By their luminance, or by their alpha for `mask-type: alpha`.
+ *
+ * The mask's region and its content are placed in the element's user
+ * space or in fractions of its bounding box, as `maskUnits` and
+ * `maskContentUnits` say; the region is cut to as the layer is.
+ */
+function drawMasked(
+  element: SvgXmlElement,
+  mask: SvgXmlElement,
+  viewport: SvgRect,
+  context: Context,
+  draw: () => void
+): void {
+  const { surface } = context;
+  const attributes = mask.attributes;
+  const declared = declarationsOf(mask, context.document);
+  const bounds =
+    attributes.maskUnits === 'userSpaceOnUse' && attributes.maskContentUnits !== 'objectBoundingBox'
+      ? undefined
+      : elementBounds(element, viewport, context);
+  const region = regionOf(attributes, attributes.maskUnits === 'userSpaceOnUse', bounds, viewport);
+  surface.beginMaskedLayer(region.x, region.y, region.width, region.height);
+  draw();
+  surface.layerMask(declared['mask-type'] === 'alpha' ? 'alpha' : 'luminance');
+  if (attributes.maskContentUnits === 'objectBoundingBox') {
+    surface.transform(bounds!.width, 0, 0, bounds!.height, bounds!.x, bounds!.y);
+  }
+  // A mask's children inherit from the mask, not from what it masks.
+  const root = cascade(INITIAL_STYLE, declarationsOf(context.document.root, context.document), context);
+  context.using.add(mask);
+  drawChildren(mask, cascade(root, declared, context), viewport, { ...context, flood: undefined });
+  context.using.delete(mask);
+  surface.endMaskedLayer();
+}
+
+/**
+ * Draws an element with the drop shadow its filter is, and then the
+ * element over it, both cut to the filter's region as a filter's result
+ * is.
+ *
+ * The shadow is the element again, every paint of it the flood colour,
+ * moved by `dx` and `dy` and blurred by `stdDeviation`: its alpha in
+ * the flood colour, which is what `<feDropShadow>` makes. It is drawn
+ * as a layer composited at the flood opacity, so where two of a group's
+ * shapes overlap their shadow is not darker; a host without layers
+ * draws it shape by shape, which differs only there.
+ */
+function drawWithShadow(
+  element: SvgXmlElement,
+  filter: SvgXmlElement,
+  shadow: SvgXmlElement,
+  style: Style,
+  viewport: SvgRect,
+  context: Context,
+  draw: (at: Context) => void
+): void {
+  const { surface } = context;
+  const attributes = filter.attributes;
+  const userSpace = attributes.filterUnits === 'userSpaceOnUse';
+  const primitivesInBox = attributes.primitiveUnits === 'objectBoundingBox';
+  const bounds = userSpace && !primitivesInBox ? undefined : elementBounds(element, viewport, context);
+  const region = regionOf(attributes, userSpace, bounds, viewport);
+  if (!(region.width > 0) || !(region.height > 0)) {
+    // An empty filter region leaves nothing of the element to draw.
+    return;
+  }
+  const declared = declarationsOf(shadow, context.document);
+  const number = (value: string | undefined, fallback: number): number => {
+    const parsed = value === undefined ? NaN : parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  let dx = number(declared.dx, 2);
+  let dy = number(declared.dy, 2);
+  const [sx, sy] = numbersIn(declared.stdDeviation ?? '2');
+  let deviation = Math.max(0, sy === undefined ? (sx ?? 2) : ((sx ?? 0) + sy) / 2);
+  if (primitivesInBox) {
+    dx *= bounds!.width;
+    dy *= bounds!.height;
+    deviation *= Math.sqrt((bounds!.width ** 2 + bounds!.height ** 2) / 2);
+  }
+  const color = colorValue(declared['flood-color'] ?? 'black', style, context) ?? BLACK_COLOR;
+  const opacity = unit(declared['flood-opacity']);
+
+  surface.save();
+  surface.beginPath();
+  surface.rect(region.x, region.y, region.width, region.height);
+  surface.clip();
+  if (opacity > 0) {
+    surface.save();
+    if (opacity < 1) {
+      surface.alpha(opacity);
+    }
+    surface.beginMaskedLayer(region.x, region.y, region.width, region.height);
+    surface.translate(dx, dy);
+    if (deviation > 0) {
+      surface.blur(deviation);
+    }
+    draw({ ...context, flood: color });
+    surface.endMaskedLayer();
+    surface.restore();
+  }
+  draw(context);
+  surface.restore();
+}
+
+/**
+ * A mask's or a filter's region: its `x`, `y`, `width` and `height` in
+ * user space, or in fractions of the element's bounding box, which is
+ * where they are by default and where they default to a tenth beyond
+ * it on every side.
+ */
+function regionOf(
+  attributes: Readonly<Record<string, string>>,
+  userSpace: boolean,
+  bounds: SvgRect | undefined,
+  viewport: SvgRect
+): SvgRect {
+  if (userSpace) {
+    return {
+      x: length(attributes.x ?? '-10%', viewport.width),
+      y: length(attributes.y ?? '-10%', viewport.height),
+      width: length(attributes.width ?? '120%', viewport.width),
+      height: length(attributes.height ?? '120%', viewport.height)
+    };
+  }
+  const box = bounds!;
+  return {
+    x: box.x + fraction(attributes.x ?? '-10%') * box.width,
+    y: box.y + fraction(attributes.y ?? '-10%') * box.height,
+    width: fraction(attributes.width ?? '120%') * box.width,
+    height: fraction(attributes.height ?? '120%') * box.height
+  };
+}
+
+/** A fraction written as a number or a percentage: `0.5` and `50%` alike. */
+function fraction(value: string): number {
+  const trimmed = value.trim();
+  const parsed = trimmed.endsWith('%') ? parseFloat(trimmed) / 100 : parseFloat(trimmed);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * An element's bounding box in its own user space, as `getBBox` gives
+ * it: its geometry and its children's through their transforms, without
+ * a stroke and without its own transform.
+ */
+function elementBounds(element: SvgXmlElement, viewport: SvgRect, context: Context): SvgRect {
+  const bounds = new BoundsSurface();
+  addBounds(element, IDENTITY, viewport, context, bounds, new Set());
+  return bounds.bounds();
+}
+
+function addBounds(
+  element: SvgXmlElement,
+  matrix: Matrix,
+  viewport: SvgRect,
+  context: Context,
+  bounds: BoundsSurface,
+  using: Set<SvgXmlElement>
+): void {
+  const name = localName(element.name);
+  const into = new TransformedSurface(bounds as unknown as PaintSurface, matrix) as unknown as PaintSurface;
+  /** A child, or a used element, under its own transform. */
+  const add = (child: SvgXmlElement, at: Matrix): void => {
+    const declared = declarationsOf(child, context.document);
+    if (declared.display === 'none') {
+      return;
+    }
+    const transform = declared.transform === undefined ? at : multiply(at, parseTransform(declared.transform));
+    addBounds(child, transform, viewport, context, bounds, using);
+  };
   switch (name) {
     case 'g':
     case 'a':
     case 'switch':
-      drawChildren(element, style, viewport, context);
-      break;
-    case 'svg':
-      drawNested(element, style, viewport, context);
-      break;
-    case 'use':
-      drawUse(element, style, viewport, context);
-      break;
-    default: {
-      const shape = shapeOf(element, name, viewport);
-      if (shape !== null && style.visible) {
-        paintShape(shape, style, viewport, context);
+      for (const child of element.children) {
+        if (!NOT_DRAWN.has(localName(child.name))) {
+          add(child, matrix);
+        }
       }
+      return;
+    case 'use': {
+      const target = referenced(element, context.document);
+      if (target === undefined || using.has(element)) {
+        return;
+      }
+      using.add(element);
+      const x = length(element.attributes.x, viewport.width);
+      const y = length(element.attributes.y, viewport.height);
+      add(target, multiply(matrix, [1, 0, 0, 1, x, y]));
+      using.delete(element);
+      return;
     }
+    case 'svg':
+    case 'symbol': {
+      const a = element.attributes;
+      into.rect(
+        length(a.x, viewport.width),
+        length(a.y, viewport.height),
+        length(a.width ?? '100%', viewport.width),
+        length(a.height ?? '100%', viewport.height)
+      );
+      return;
+    }
+    default:
+      shapeOf(element, name, viewport)?.trace(into);
   }
-  surface.restore();
 }
 
 /** A nested `<svg>`: a viewport of its own, at its x and y. */
@@ -406,6 +651,14 @@ function setPaint(
 ): boolean {
   if (paint.kind === 'none') {
     return false;
+  }
+  if (context.flood !== undefined) {
+    if (role === 'fill') {
+      context.surface.fillColor(context.flood);
+    } else {
+      context.surface.strokeColor(context.flood);
+    }
+    return true;
   }
   if (paint.kind === 'color') {
     if (role === 'fill') {

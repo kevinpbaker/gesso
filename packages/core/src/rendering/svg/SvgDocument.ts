@@ -13,10 +13,10 @@ import { parseSvgXml, type SvgXmlElement } from './SvgXml';
  *
  * What a design tool exports is what is read: shapes and paths, groups
  * and `<use>`, transforms, solid fills and strokes with their
- * opacities, linear and radial gradients, clip paths, a `<style>` of
- * simple selectors, and nested `<svg>`. What is not drawn yet is named
- * in `unsupported`, so a file that leans on it can say so rather than
- * look subtly wrong.
+ * opacities, linear and radial gradients, clip paths, masks, a filter
+ * that is one drop shadow, a `<style>` of simple selectors, and nested
+ * `<svg>`. What is not drawn yet is named in `unsupported`, so a file
+ * that leans on it can say so rather than look subtly wrong.
  */
 export interface SvgDocument {
   /** The `<svg>` element. */
@@ -26,11 +26,16 @@ export interface SvgDocument {
   readonly height: number;
   /** The region of the drawing's own coordinates that fills that size. */
   readonly viewBox: SvgRect;
-  /** Every element with an `id`, for `<use>`, gradients and clip paths. */
+  /** Every element with an `id`, for `<use>`, gradients, clip paths, masks and filters. */
   readonly ids: ReadonlyMap<string, SvgXmlElement>;
   /** The rules of its `<style>` elements, in document order. */
   readonly rules: readonly SvgStyleRule[];
-  /** What the file uses that is not drawn: `text`, `filter`, `mask` and so on, once each. */
+  /**
+   * What the file uses that is not drawn: `text`, `image`, `marker` and
+   * so on, once each. `filter` is a filter that is anything but one
+   * `<feDropShadow>`, or a `filter` that names something else; `mask`
+   * is a `mask` that names something other than a `<mask>`.
+   */
   readonly unsupported: readonly string[];
 }
 
@@ -57,11 +62,9 @@ export interface SvgSelector {
 }
 
 /** Elements drawn as nothing, because nothing here draws them yet. */
-const UNSUPPORTED_ELEMENTS = new Set(['text', 'image', 'foreignObject', 'mask', 'filter', 'pattern', 'marker']);
+const UNSUPPORTED_ELEMENTS = new Set(['text', 'image', 'foreignObject', 'pattern', 'marker']);
 /** Attributes that point at one of those. */
 const UNSUPPORTED_ATTRIBUTES: Readonly<Record<string, string>> = {
-  mask: 'mask',
-  filter: 'filter',
   'marker-start': 'marker',
   'marker-mid': 'marker',
   'marker-end': 'marker'
@@ -91,14 +94,32 @@ export function parseSvg(source: string): SvgDocument {
     if (UNSUPPORTED_ELEMENTS.has(name)) {
       unsupported.add(name);
     }
+    if (name === 'filter' && dropShadowOf(element) === undefined) {
+      unsupported.add('filter');
+    }
     for (const [attribute, feature] of Object.entries(UNSUPPORTED_ATTRIBUTES)) {
       if (element.attributes[attribute] !== undefined && element.attributes[attribute] !== 'none') {
         unsupported.add(feature);
       }
     }
+    for (const attribute of ['mask', 'filter'] as const) {
+      const value = element.attributes[attribute];
+      if (value !== undefined && value !== 'none') {
+        references.push([attribute, value]);
+      }
+    }
     element.children.forEach(visit);
   };
+  const references: [attribute: 'mask' | 'filter', value: string][] = [];
   visit(root);
+  // Checked once every id is known, since a reference may come first.
+  for (const [attribute, value] of references) {
+    const id = referencedId(value);
+    const target = id === undefined ? undefined : ids.get(id);
+    if (target === undefined || localName(target.name) !== attribute) {
+      unsupported.add(attribute);
+    }
+  }
 
   const viewBox = parseViewBox(root.attributes.viewBox);
   const width = absoluteLength(root.attributes.width) ?? viewBox?.width ?? 300;
@@ -113,6 +134,29 @@ export function parseSvg(source: string): SvgDocument {
     unsupported: [...unsupported]
   };
 }
+
+/** The id a value of the form `url(#id)` names, or undefined for anything else. */
+export function referencedId(value: string): string | undefined {
+  return /^\s*url\(\s*['"]?#([^'")]+)['"]?\s*\)\s*$/.exec(value)?.[1];
+}
+
+/**
+ * The `<feDropShadow>` a `<filter>` is, when it is exactly one drop
+ * shadow of the element itself; undefined for any other filter, which
+ * is not drawn.
+ */
+export function dropShadowOf(filter: SvgXmlElement): SvgXmlElement | undefined {
+  const primitives = filter.children.filter(child => !NOT_PRIMITIVES.has(localName(child.name)));
+  const [primitive] = primitives;
+  if (primitives.length !== 1 || localName(primitive!.name) !== 'feDropShadow') {
+    return undefined;
+  }
+  const input = primitive!.attributes.in;
+  return input === undefined || input === 'SourceGraphic' ? primitive : undefined;
+}
+
+/** What a `<filter>` may hold that is not a step of it. */
+const NOT_PRIMITIVES = new Set(['title', 'desc', 'metadata']);
 
 /** An element's name without its namespace prefix: `svg:path` is `path`. */
 export function localName(name: string): string {

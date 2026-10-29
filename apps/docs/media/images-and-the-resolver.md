@@ -243,10 +243,12 @@ colour, so an icon set authored that way follows the theme.
 What a design tool exports is drawn: paths and the basic shapes, groups
 and `<use>`, nested `<svg>`, transforms, fills and strokes with their
 opacities and rules, dashes, linear and radial gradients, clip paths,
-and a `<style>` of simple selectors such as `.st0`. A gradient stroke
-is drawn in its last colour. Text, embedded images, masks, filters,
-patterns and markers are not drawn yet; a file that uses them draws
-the rest, and the console names what it skipped, once per file.
+masks (by luminance or by alpha, in user space or the element's
+bounding box), a filter that is one `<feDropShadow>`, and a `<style>`
+of simple selectors such as `.st0`. A gradient stroke is drawn in its
+last colour. Text, embedded images, any other filter, patterns and
+markers are not drawn yet; a file that uses them draws the rest, and
+the console names what it skipped, once per file.
 
 `parseSvg`, `drawSvg` and `svgPaint` are exported for drawing a file
 without an `Image`: `<paint paint={svgPaint(parseSvg(text))} />`.

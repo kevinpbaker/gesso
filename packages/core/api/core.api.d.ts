@@ -1548,6 +1548,9 @@ interface PaintSurface {
   lineDash(segments: readonly number[], offset?: number): void;
   alpha(value: number): void;
   blur(radius: number): void;
+  beginMaskedLayer(x: number, y: number, width: number, height: number): void;
+  layerMask(mode?: PaintMaskMode): void;
+  endMaskedLayer(): void;
   fill(rule?: PaintFillRule): void;
   stroke(): void;
   clip(rule?: PaintFillRule): void;
@@ -1558,6 +1561,7 @@ type PaintFillRule = 'nonzero' | 'evenodd';
 type PaintLineCap = 'butt' | 'round' | 'square';
 type PaintLineJoin = 'miter' | 'round' | 'bevel';
 type PaintTextAlign = 'left' | 'center' | 'right';
+type PaintMaskMode = 'luminance' | 'alpha';
 interface PaintTextStyle {
   readonly fontSize?: number;
   readonly fontFamily?: string;
@@ -4797,6 +4801,17 @@ type PaintOp = {
   readonly op: 'blur';
   readonly radius: number;
 } | {
+  readonly op: 'beginMaskedLayer';
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+} | {
+  readonly op: 'layerMask';
+  readonly mode: PaintMaskMode;
+} | {
+  readonly op: 'endMaskedLayer';
+} | {
   readonly op: 'fill';
   readonly rule: PaintFillRule;
 } | {
@@ -4851,6 +4866,9 @@ declare class PaintRecorder implements PaintSurface {
   lineDash(segments: readonly number[], offset?: number): void;
   alpha(value: number): void;
   blur(radius: number): void;
+  beginMaskedLayer(x: number, y: number, width: number, height: number): void;
+  layerMask(mode?: PaintMaskMode): void;
+  endMaskedLayer(): void;
   fill(rule?: PaintFillRule): void;
   stroke(): void;
   clip(rule?: PaintFillRule): void;
@@ -4890,11 +4908,44 @@ interface PaintContext2D {
   miterLimit: number;
   globalAlpha: number;
   filter?: string;
+  getTransform?(): PaintMatrix;
+  setTransform?(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  globalCompositeOperation?: string;
+  getImageData?(x: number, y: number, width: number, height: number): PaintPixels;
+  putImageData?(pixels: PaintPixels, x: number, y: number): void;
   fillStyle: string | PaintGradient;
   strokeStyle: string | PaintGradient;
   font: string;
   textAlign: 'left' | 'center' | 'right';
   textBaseline: 'alphabetic';
+}
+interface PaintMatrix {
+  readonly a: number;
+  readonly b: number;
+  readonly c: number;
+  readonly d: number;
+  readonly e: number;
+  readonly f: number;
+}
+interface PaintPixels {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray;
+}
+interface PaintCanvas {
+  context(): PaintContext2D | null;
+  take(): UiImage;
+}
+type PaintCanvasFactory = (width: number, height: number) => PaintCanvas | null;
+interface PaintLayers {
+  readonly create: PaintCanvasFactory;
+  readonly bounds: PaintDeviceRect;
+}
+interface PaintDeviceRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
 }
 interface PaintGradient {
   addColorStop(offset: number, color: string): void;
@@ -4904,11 +4955,14 @@ interface PaintResolver {
   gradient(value: UiGradient): ResolvedGradient | undefined;
 }
 declare class PaintTarget implements PaintSurface {
-  private readonly ctx;
   private readonly resolver;
+  private readonly layerSource?;
   private readonly blurStack;
   private blurRadius;
-  constructor(ctx: PaintContext2D, resolver: PaintResolver);
+  private ctx;
+  private readonly layers;
+  private suppressed;
+  constructor(ctx: PaintContext2D, resolver: PaintResolver, layerSource?: PaintLayers | undefined);
   save(): void;
   restore(): void;
   translate(x: number, y: number): void;
@@ -4935,17 +4989,16 @@ declare class PaintTarget implements PaintSurface {
   lineDash(segments: readonly number[], offset?: number): void;
   alpha(value: number): void;
   blur(radius: number): void;
+  beginMaskedLayer(x: number, y: number, width: number, height: number): void;
+  layerMask(mode?: PaintMaskMode): void;
+  endMaskedLayer(): void;
+  private openLayerCanvas;
   fill(rule?: PaintFillRule): void;
   stroke(): void;
   clip(rule?: PaintFillRule): void;
   text(value: string, x: number, y: number, style?: PaintTextStyle): void;
   image(image: UiImage, x: number, y: number, width: number, height: number): void;
 }
-interface PaintCanvas {
-  context(): PaintContext2D | null;
-  take(): UiImage;
-}
-type PaintCanvasFactory = (width: number, height: number) => PaintCanvas | null;
 interface PaintStats {
   recorded: number;
   rasterized: number;
@@ -5989,14 +6042,19 @@ export {
   PaintCanvas,
   PaintCanvasFactory,
   PaintContext2D,
+  PaintDeviceRect,
   PaintElementProps,
   PaintFillRule,
   PaintGradient,
+  PaintLayers,
   PaintLineCap,
   PaintLineJoin,
+  PaintMaskMode,
+  PaintMatrix,
   PaintOp,
   PaintPictureCache,
   paintPictures,
+  PaintPixels,
   PaintProps,
   PaintRecorder,
   PaintRecording,
@@ -6940,14 +6998,19 @@ import {
   PaintCanvas,
   PaintCanvasFactory,
   PaintContext2D,
+  PaintDeviceRect,
   PaintElementProps,
   PaintFillRule,
   PaintGradient,
+  PaintLayers,
   PaintLineCap,
   PaintLineJoin,
+  PaintMaskMode,
+  PaintMatrix,
   PaintOp,
   PaintPictureCache,
   paintPictures,
+  PaintPixels,
   PaintProps,
   PaintRecorder,
   PaintRecording,
@@ -8043,12 +8106,17 @@ export {
   type PaintCanvas,
   type PaintCanvasFactory,
   type PaintContext2D,
+  type PaintDeviceRect,
   type PaintElementProps,
   type PaintFillRule,
   type PaintGradient,
+  type PaintLayers,
   type PaintLineCap,
   type PaintLineJoin,
+  type PaintMaskMode,
+  type PaintMatrix,
   type PaintOp,
+  type PaintPixels,
   type PaintProps,
   type PaintRecording,
   type PaintResolver,
