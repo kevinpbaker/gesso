@@ -552,6 +552,8 @@ interface UiColors {
   readonly focusRing: UiColor;
   readonly selectionBackground: UiColor;
   readonly selectionForeground: UiColor;
+  readonly tooltipBackground: UiColor;
+  readonly tooltipForeground: UiColor;
 }
 declare const lightColors: UiColors;
 declare const darkColors: UiColors;

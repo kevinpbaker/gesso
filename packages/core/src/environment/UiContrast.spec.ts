@@ -69,6 +69,12 @@ describe('highContrastColors', () => {
     expect(highContrastColors(darkColors).scrim).toBe(darkColors.scrim);
   });
 
+  it("raises a tooltip's text against the tooltip, and leaves the tooltip as it was", () => {
+    const raised = highContrastColors(darkColors);
+    expect(raised.tooltipBackground).toBe(darkColors.tooltipBackground);
+    expect(contrastRatio(raised.tooltipForeground, darkColors.tooltipBackground)).toBeGreaterThanOrEqual(7);
+  });
+
   it('raises a name a custom palette added', () => {
     const custom = { ...lightColors, accentSoft: rgba(0.75, 0.7, 0.4) };
     const raised = highContrastColors(custom) as typeof custom;

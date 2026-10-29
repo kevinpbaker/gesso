@@ -102,7 +102,9 @@ export const gessoColors: UiColors = {
   danger: hex(DANGER),
   focusRing: hex('#8b9ce4'),
   selectionBackground: hex(ACCENT_WASH),
-  selectionForeground: hex(CHALK)
+  selectionForeground: hex(CHALK),
+  tooltipBackground: hex(SURFACE_OVERLAY),
+  tooltipForeground: hex(TEXT)
 };
 
 export const gessoTheme: UiTheme = { ...darkTheme, colors: gessoColors };

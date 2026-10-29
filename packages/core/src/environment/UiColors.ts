@@ -76,6 +76,19 @@ export interface UiColors {
   // "chosen" looks like without any of them naming a colour.
   readonly selectionBackground: UiColor;
   readonly selectionForeground: UiColor;
+
+  /**
+   * A tooltip's box and its text.
+   *
+   * Their own pair rather than the control pair swapped round, which is
+   * what a tooltip used to be: that is dark on a light page, but on a
+   * dark one it turned the tooltip near-white, the brightest thing on
+   * the screen for a label that should sit quietly over it. A tooltip
+   * stays dark in both palettes, as the platforms draw theirs; in the
+   * dark one a step lighter than the panels, so it lifts off them.
+   */
+  readonly tooltipBackground: UiColor;
+  readonly tooltipForeground: UiColor;
 }
 
 /**
@@ -108,7 +121,9 @@ export const lightColors: UiColors = {
   danger: rgb8(220, 38, 38),
   focusRing: rgb8(17, 24, 39),
   selectionBackground: rgb8(219, 234, 254),
-  selectionForeground: rgb8(30, 58, 138)
+  selectionForeground: rgb8(30, 58, 138),
+  tooltipBackground: rgb8(17, 24, 39),
+  tooltipForeground: UiBasicColors.white
 } as const;
 
 export const darkColors: UiColors = {
@@ -132,7 +147,9 @@ export const darkColors: UiColors = {
   danger: rgb8(248, 113, 113),
   focusRing: rgb8(243, 244, 246),
   selectionBackground: rgb8(30, 58, 95),
-  selectionForeground: rgb8(219, 234, 254)
+  selectionForeground: rgb8(219, 234, 254),
+  tooltipBackground: rgb8(55, 61, 72),
+  tooltipForeground: rgb8(243, 244, 246)
 } as const;
 
 /**

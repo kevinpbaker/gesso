@@ -160,7 +160,9 @@ rather than the only one.
 The tooltip is drawn in the overlay layer the runtime mounts above the
 app root, so opening one moves nothing in the layout. Its content
 inherits the theme and text style of its anchor, which is what keeps a
-tooltip opened from a dark panel dark.
+tooltip opened from a dark panel dark. Its box and text are the
+palette's `tooltipBackground` and `tooltipForeground`, dark in both
+stock palettes; a theme restyles every tooltip by setting those two.
 
 ## What has been checked
 
