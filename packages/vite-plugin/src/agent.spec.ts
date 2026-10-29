@@ -103,7 +103,10 @@ describe("the server's own tools", () => {
       {},
       fakePage(emit, message => {
         const { id, method } = message as { id: number; method: string };
-        seen.push(method);
+        // What the bridge asks for itself as the page connects is not the agent's.
+        if (!String(id).startsWith('gesso:')) {
+          seen.push(method);
+        }
         if (method === 'initialize') {
           return { jsonrpc: '2.0', id, result: { instructions: 'The page.' } };
         }
@@ -139,7 +142,12 @@ describe('the agent endpoint', () => {
     emit(
       EVENTS.ready,
       {},
-      fakePage(emit, message => (seen.push(message), { jsonrpc: '2.0', id: 7, result: {} }))
+      fakePage(emit, message => {
+        if (!String((message as { id: unknown }).id).startsWith('gesso:')) {
+          seen.push(message);
+        }
+        return { jsonrpc: '2.0', id: 7, result: {} };
+      })
     );
 
     const response = await request(bridge, { body: ping });
@@ -228,6 +236,18 @@ describe('the agent endpoint', () => {
     expect(JSON.parse((await answer).body!).error.message).toMatch(/closed before it answered/);
   });
 
+  it('hears a page close as Vite 6 and later say it, and as Vite 5 did', async () => {
+    for (const event of ['vite:client:disconnect', 'vite:ws:disconnect']) {
+      const { socket, emit } = fakeSocket();
+      const bridge = createAgentBridge(socket, { timeoutMs: 60_000 });
+      const page: BridgeClient = { send: () => {} };
+      emit(EVENTS.ready, {}, page);
+      emit(event, {}, page);
+      expect(bridge.connected).toBe(false);
+      expect(JSON.parse((await request(bridge, { body: ping })).body!).error.message).toMatch(/No page is running/);
+    }
+  });
+
   it('tells the agent when the page never answers', async () => {
     const { socket, emit } = fakeSocket();
     const bridge = createAgentBridge(socket, { timeoutMs: 10 });
@@ -273,7 +293,7 @@ describe('a page that cannot answer', () => {
     emit(EVENTS.ready, {}, page);
     await request(bridge, { body: rpc(1, 'initialize') });
     await request(bridge, { body: rpc(2, 'tools/list') });
-    emit('vite:ws:disconnect', {}, page);
+    emit('vite:client:disconnect', {}, page);
 
     const hello = JSON.parse((await request(bridge, { body: rpc(3, 'initialize') })).body!);
     expect(hello.result.instructions).toBe('Read the board first.');
@@ -286,6 +306,19 @@ describe('a page that cannot answer', () => {
     expect(JSON.parse((await request(bridge, { body: call('nope') })).body!).error.message).toMatch(
       /No page is running/
     );
+  });
+
+  it('asks a page what it offers as it connects, so its tools are listed once it goes though no agent asked', async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket);
+    const page = receivingPage(emit);
+    emit(EVENTS.ready, {}, page);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    emit('vite:client:disconnect', {}, page);
+    const listed = JSON.parse((await request(bridge, { body: rpc(1, 'tools/list') })).body!);
+    expect(listed.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['atelier_view']);
+    const hello = JSON.parse((await request(bridge, { body: rpc(2, 'initialize') })).body!);
+    expect(hello.result.instructions).toBe('Read the board first.');
   });
 
   it('keeps what the page listed for the next server, which lists it before any page connects', async () => {
