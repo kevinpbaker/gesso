@@ -6,7 +6,15 @@ import {
   type UserConfig
 } from 'vite';
 
-import { AGENT_PATH, createAgentBridge, type BridgeRequest, type BridgeResponse, type BridgeSocket } from './agent.ts';
+import {
+  AGENT_PATH,
+  createAgentBridge,
+  type BridgeRequest,
+  type BridgeResponse,
+  type BridgeSocket,
+  type PageMemory,
+  type RememberedPage
+} from './agent.ts';
 import { CATALOG_INSTRUCTIONS, CATALOG_TOOLS, ComponentCatalog, type CatalogLibrary } from './catalog.ts';
 import { ContractReader, declaresChannel, describeCalls, type TypeScriptApi } from './contracts.ts';
 import { transformRenderWorker } from './render.ts';
@@ -318,6 +326,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         server.watcher.add(catalogRoot);
       }
       const bridge = createAgentBridge(server.ws as unknown as BridgeSocket, {
+        memory: pageMemory(root),
         ...(catalog === null
           ? {}
           : {
@@ -619,4 +628,15 @@ async function firstResolved(context: Resolver, importer: string, names: readonl
     }
   }
   return null;
+}
+
+/**
+ * What each project's page last listed, by root. Kept in the module,
+ * which Node holds across Vite's own restarts (a config saved), so a
+ * restarted server lists the page's tools before the page reconnects.
+ */
+const pagesListed = new Map<string, RememberedPage>();
+
+function pageMemory(root: string): PageMemory {
+  return { read: () => pagesListed.get(root), write: page => pagesListed.set(root, page) };
 }

@@ -7,7 +7,8 @@ import {
   type BridgeClient,
   type BridgeRequest,
   type BridgeResponse,
-  type BridgeSocket
+  type BridgeSocket,
+  type RememberedPage
 } from './agent.ts';
 import { transformShell, transformSyncShell } from './shell.ts';
 
@@ -233,6 +234,91 @@ describe('the agent endpoint', () => {
     emit(EVENTS.ready, {}, { send: () => {} });
     const response = JSON.parse((await request(bridge, { body: ping })).body!);
     expect(response.error.message).toMatch(/did not answer/);
+  });
+});
+
+describe('a page that cannot answer', () => {
+  const rpc = (id: number, method: string, params: Record<string, unknown> = {}) =>
+    JSON.stringify({ jsonrpc: '2.0', id, method, params });
+  const call = (name: string) => rpc(9, 'tools/call', { name, arguments: {} });
+
+  /** A page that takes each request as it arrives, then answers it after `delay`, and lists `atelier_view`. */
+  function receivingPage(emit: ReturnType<typeof fakeSocket>['emit'], delay = 0, quiet = () => false) {
+    const page: BridgeClient = {
+      send: (event, payload) => {
+        if (event !== EVENTS.request || quiet()) {
+          return;
+        }
+        const { id, message } = payload as { id: number; message: { id: number; method: string } };
+        emit(EVENTS.received, { id }, page);
+        const result =
+          message.method === 'tools/list'
+            ? { tools: [{ name: 'atelier_view' }] }
+            : message.method === 'initialize'
+              ? { instructions: 'Read the board first.' }
+              : { content: [{ type: 'text', text: 'the board' }], isError: false };
+        setTimeout(
+          () => emit(EVENTS.response, { id, response: { jsonrpc: '2.0', id: message.id, result } }, page),
+          delay
+        );
+      }
+    };
+    return page;
+  }
+
+  it("still lists the page's tools once it has gone, and a call of one says no window is open", async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket);
+    const page = receivingPage(emit);
+    emit(EVENTS.ready, {}, page);
+    await request(bridge, { body: rpc(1, 'initialize') });
+    await request(bridge, { body: rpc(2, 'tools/list') });
+    emit('vite:ws:disconnect', {}, page);
+
+    const hello = JSON.parse((await request(bridge, { body: rpc(3, 'initialize') })).body!);
+    expect(hello.result.instructions).toBe('Read the board first.');
+    const listed = JSON.parse((await request(bridge, { body: rpc(4, 'tools/list') })).body!);
+    expect(listed.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['atelier_view']);
+    const answer = JSON.parse((await request(bridge, { body: call('atelier_view') })).body!);
+    expect(answer.result.isError).toBe(true);
+    expect(answer.result.content[0].text).toMatch(/No window of the app is open to answer atelier_view/);
+    // A tool it never listed is still not one.
+    expect(JSON.parse((await request(bridge, { body: call('nope') })).body!).error.message).toMatch(
+      /No page is running/
+    );
+  });
+
+  it('keeps what the page listed for the next server, which lists it before any page connects', async () => {
+    let kept: RememberedPage | undefined;
+    const memory = { read: () => kept, write: (page: RememberedPage) => (kept = page) };
+    const first = fakeSocket();
+    const page = receivingPage(first.emit);
+    const bridge = createAgentBridge(first.socket, { memory });
+    first.emit(EVENTS.ready, {}, page);
+    await request(bridge, { body: rpc(1, 'tools/list') });
+    expect(kept?.tools.map(tool => tool.name)).toEqual(['atelier_view']);
+
+    const restarted = createAgentBridge(fakeSocket().socket, { memory });
+    const listed = JSON.parse((await request(restarted, { body: rpc(2, 'tools/list') })).body!);
+    expect(listed.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['atelier_view']);
+  });
+
+  it('says in moments that a page that takes requests has gone quiet, and waits on one that took it', async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket, { timeoutMs: 60_000, receiveTimeoutMs: 20 });
+    let paused = false;
+    const page = receivingPage(emit, 40, () => paused);
+    emit(EVENTS.ready, {}, page);
+    // Taken, and answered after longer than the quiet limit: waited for.
+    expect(JSON.parse((await request(bridge, { body: call('atelier_view') })).body!).result.content[0].text).toBe(
+      'the board'
+    );
+    paused = true;
+    const started = Date.now();
+    const answer = JSON.parse((await request(bridge, { body: call('atelier_view') })).body!);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(answer.result.isError).toBe(true);
+    expect(answer.result.content[0].text).toMatch(/did not take atelier_view .* hidden or minimised/);
   });
 });
 
