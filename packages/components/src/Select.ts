@@ -460,7 +460,14 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
             chosen === '' && !options.some(option => option.value === '') ? placeholder.value : labelFor(chosen)
           )
         ),
-        color: foregroundToken(disabled),
+        // The placeholder muted, as a text field's is: it says what to choose, not what was chosen.
+        color: combineLatest([value.value, inputs.options, foregroundToken(disabled)]).pipe(
+          map(([chosen, options, foreground]) =>
+            chosen === '' && !options.some(option => option.value === '') && foreground === 'controlForeground'
+              ? 'textMuted'
+              : foreground
+          )
+        ),
         flexGrow: 1,
         // One line, cut short with an ellipsis where the select is given
         // less room than its value needs, before the chevron rather than

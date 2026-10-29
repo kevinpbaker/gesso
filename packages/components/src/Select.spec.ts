@@ -232,6 +232,21 @@ describe('a select whose value is an option’s empty value', () => {
     expect(at('').queryByText('No folder')).not.toBeNull();
     expect(at('').queryByText('Choose…')).toBeNull();
   });
+
+  it('draws its placeholder muted, as a text field does, and a chosen value as text', () => {
+    const at = (value: string) =>
+      renderTest(
+        createComponent(Select, {
+          label: 'Weight',
+          value,
+          placeholder: 'Medium',
+          options: [{ value: '700', label: 'Bold' }]
+        }),
+        { width: 400, height: 300 }
+      );
+    expect(at('').getByText('Medium').getProperty('color')).toBe('textMuted');
+    expect(at('700').getByText('Bold').getProperty('color')).toBe('controlForeground');
+  });
 });
 
 const FRUIT = [
