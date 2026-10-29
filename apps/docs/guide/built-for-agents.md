@@ -110,11 +110,14 @@ has the detail.
 ## Where an agent connects
 
 **While you develop**, the dev server is an MCP server. `pnpm dev`
-prints the line to connect Claude Code:
+prints its address, which any MCP client connects to, and the line to
+add it in Claude Code, Codex and Gemini CLI:
 
 ```text
-  ➜  Agents:  http://localhost:5173/__gesso/mcp
+  ➜  Agents:  http://localhost:5173/__gesso/mcp  (MCP, as my-app)
              claude mcp add --transport http my-app http://localhost:5173/__gesso/mcp
+             codex mcp add my-app --url http://localhost:5173/__gesso/mcp
+             gemini mcp add --transport http my-app http://localhost:5173/__gesso/mcp
 ```
 
 Open the app in a browser and the agent can read every channel the page

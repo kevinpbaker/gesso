@@ -134,12 +134,15 @@ endpoint and through WebMCP, after the channel tools.
 A web application's channels are in its workers, and a browser tab
 cannot listen on a port, so it cannot host the server above. In
 development it does not need to. [The Vite plugin](/tooling/vite-plugin)
-serves MCP at `/__gesso/mcp` on the dev server and prints the command
-to connect when it starts:
+serves MCP at `/__gesso/mcp` on the dev server and prints the commands
+to connect when it starts, under the root folder's name unless
+`agentName` gives another:
 
 ```text
-  ➜  Agents:  http://localhost:5173/__gesso/mcp
+  ➜  Agents:  http://localhost:5173/__gesso/mcp  (MCP, as my-app)
              claude mcp add --transport http my-app http://localhost:5173/__gesso/mcp
+             codex mcp add my-app --url http://localhost:5173/__gesso/mcp
+             gemini mcp add --transport http my-app http://localhost:5173/__gesso/mcp
 ```
 
 Open the app in a browser, connect, and the agent sees every channel

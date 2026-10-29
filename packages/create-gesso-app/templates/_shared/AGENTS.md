@@ -156,8 +156,8 @@ what the app is doing:
   automation tool's accessibility tree reads it, and clicking those
   elements clicks the app. A screenshot shows what was drawn.
 - **Driving the running app.** While `pnpm dev` runs, the dev server
-  serves MCP at `/__gesso/mcp` and prints the `claude mcp add` line
-  for it. Connected, you can read every channel's view and send its
+  serves MCP at `/__gesso/mcp` and prints the lines to add it to
+  Claude Code, Codex or Gemini CLI. Connected, you can read every channel's view and send its
   commands to the page open in the browser, which is the quickest way
   to check that a command does what it should. `ui_snapshot`, `ui_press`,
   `ui_type` and `ui_key` read and operate the screen itself, the way a
