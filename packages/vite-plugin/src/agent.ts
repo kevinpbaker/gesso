@@ -153,8 +153,21 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
       pages.splice(at, 1);
     }
     pages.push(client);
+    // What it offers, asked of it now rather than when an agent next
+    // lists: kept, it is what is listed for it should it go.
+    void relay({ jsonrpc: '2.0', id: 'gesso:tools', method: 'tools/list', params: {} });
+    void relay({
+      jsonrpc: '2.0',
+      id: 'gesso:initialize',
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: { name: 'gesso-vite-plugin', version: '0' }
+      }
+    });
   });
-  socket.on('vite:ws:disconnect', (_data, client) => {
+  const dropPage = (_data: never, client: BridgeClient): void => {
     const at = pages.indexOf(client);
     if (at >= 0) {
       pages.splice(at, 1);
@@ -168,7 +181,12 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
         waiting.resolve(PAGE_GONE);
       }
     }
-  });
+  };
+  // Vite 6 and later say a page's socket closed as `vite:client:disconnect`;
+  // before, `vite:ws:disconnect`. Missed, a closed page stayed the one
+  // asked, and an agent's every call went to a page that was not there.
+  socket.on('vite:client:disconnect', dropPage);
+  socket.on('vite:ws:disconnect', dropPage);
   socket.on(EVENTS.received, (data: { id: number }, client) => {
     receiving.add(client);
     pending.get(data.id)?.received?.();
