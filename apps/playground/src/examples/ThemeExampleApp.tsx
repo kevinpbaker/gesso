@@ -323,7 +323,11 @@ export function buildTheme(spec: ThemeSpec): UiTheme {
     // A chosen row: the accent behind it, and text that stays legible
     // on top of it whichever way the palette leans.
     selectionBackground: mix(hex(palette.surface), primary, palette.dark ? 0.32 : 0.2),
-    selectionForeground: text
+    selectionForeground: text,
+    // Dark whichever way the palette leans: the page's ink on a light
+    // one, a step up from the surface on a dark one.
+    tooltipBackground: palette.dark ? mix(hex(palette.surface), text, 0.16) : text,
+    tooltipForeground: palette.dark ? text : hex(palette.background)
   };
   return {
     ...lightTheme,

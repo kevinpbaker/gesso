@@ -28,7 +28,7 @@ export function tooltipContent(text: string): UiChild {
   return Box(
     {
       padding: 6,
-      backgroundColor: 'controlForeground',
+      backgroundColor: 'tooltipBackground',
       borderRadius: 4,
       maxWidth: 220,
       // A tooltip must never take a hit: the pointer is on its way
@@ -37,7 +37,7 @@ export function tooltipContent(text: string): UiChild {
       role: 'tooltip',
       label: text
     },
-    Text({ text, color: 'controlBackground', textStyle: 'bodySmall', selectable: false })
+    Text({ text, color: 'tooltipForeground', textStyle: 'bodySmall', selectable: false })
   );
 }
 

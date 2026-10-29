@@ -116,7 +116,8 @@ const FOREGROUNDS: Readonly<Record<string, keyof UiColors>> = {
   controlForegroundDisabled: 'controlBackground',
   controlBorder: 'controlBackground',
   controlAccent: 'controlBackground',
-  selectionForeground: 'selectionBackground'
+  selectionForeground: 'selectionBackground',
+  tooltipForeground: 'tooltipBackground'
 } as const;
 
 /** What a high-contrast palette needs to know of an application's own names. */
@@ -169,5 +170,6 @@ const SURFACES: ReadonlySet<string> = new Set([
   'controlBackground',
   'controlBackgroundHovered',
   'controlBackgroundPressed',
-  'selectionBackground'
+  'selectionBackground',
+  'tooltipBackground'
 ]);

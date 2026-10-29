@@ -24,7 +24,7 @@ import { darkTheme, lightTheme, rgb8, type UiColor, type UiColors, type UiTextSt
  * **Roles** are the palette a component actually asks for. Every token
  * is a ramp step, never a fresh colour, which is what stops a palette
  * drifting into forty unrelated hexes as it grows. It answers the
- * twenty-one names `UiColors` declares, so every stock component is
+ * twenty-three names `UiColors` declares, so every stock component is
  * dressed, and adds eleven of its own for jobs the stock set has no
  * name for. Extra names work because a colour token is looked up on
  * the palette the node inherits: see `themeColorFor` in
@@ -216,7 +216,9 @@ const lightColors: BrandColors = {
 
   focusRing: ULTRAMARINE[500],
   selectionBackground: ULTRAMARINE[100],
-  selectionForeground: ULTRAMARINE[600]
+  selectionForeground: ULTRAMARINE[600],
+  tooltipBackground: INK[900],
+  tooltipForeground: LINEN[50]
 };
 
 const darkColors: BrandColors = {
@@ -257,7 +259,9 @@ const darkColors: BrandColors = {
 
   focusRing: ULTRAMARINE[300],
   selectionBackground: ULTRAMARINE[800],
-  selectionForeground: ULTRAMARINE[100]
+  selectionForeground: ULTRAMARINE[100],
+  tooltipBackground: INK[600],
+  tooltipForeground: LINEN[200]
 };
 
 /**

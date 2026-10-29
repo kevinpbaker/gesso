@@ -127,7 +127,7 @@ is painted. Every prop that takes a colour accepts a name:
 modifier paints for a hovered or pressed state, the stops of a
 gradient, and each shadow in `boxShadows`.
 
-The names in the shipped palette, in the three groups they fall into:
+The names in the shipped palette, in the four groups they fall into:
 
 - **The surface and its content.** `background`, `surface`, `primary`,
   `secondary`, `text`, `textMuted`, `border`, `shadow`, `placeholder`
@@ -141,6 +141,8 @@ The names in the shipped palette, in the three groups they fall into:
   `controlAccent`, `danger`, `focusRing`.
 - **Selection**, for a row that is chosen rather than operated:
   `selectionBackground`, `selectionForeground`.
+- **Tooltips**: `tooltipBackground`, `tooltipForeground`. Dark in both
+  stock palettes, as a platform's tooltips are.
 
 The `UiColors` interface in `gesso-core` is the source of truth for
 that list, and `lightTheme` and `darkTheme` show what each name is set
