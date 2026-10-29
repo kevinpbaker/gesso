@@ -1,5 +1,55 @@
 # gesso-components
 
+## 0.7.0
+
+### Minor Changes
+
+- 5b66cbf: SVG files draw. An `Image` whose source ends in `.svg` or is a `data:image/svg+xml` URL reads the file in the worker and draws it as vectors through `PaintSurface`, on either renderer, at whatever size the node is laid out at, rather than failing because `createImageBitmap` refuses SVG. `objectFit` places it, the file's own size sizes the node when nothing else does, and `currentColor` is the theme's text colour. Drawn: paths and basic shapes, groups, `<use>`, nested `<svg>`, transforms, fills and strokes with opacities, dashes, linear and radial gradients, clip paths and simple `<style>` rules; text, images, masks, filters, patterns and markers are skipped with a console note. New in `gesso-core`: `parseSvg`, `drawSvg`, `svgPaint`, `DefaultSvgResolver`, `isSvgSource`, and `imageSource`'s `vectors` argument; in `gesso-framework`, `MediaService.vectors`, `setSvgResolver` and the `media.vectors` option. `Image` is now built on a paint node rather than a box.
+- 803a189: Touch, apart from the screen's size. What the person points with is now in the environment (`UiEnvironmentKeys.pointer`, `fine` or `coarse`): the runtime reads it from the device (CSS's `pointer` feature), keeps it on `ShellService.pointer`, and provides it at the root, and a `pointer` prop says it for a subtree, as a design tool's phone frame does. A theme provided under a coarse pointer is turned for it (`withPointer`): its `touch` values (larger type, more room, token groups of its own) are laid over it, and a token group it does not carry resolves to the group's own `coarse` values (`defineThemeExtension({ coarse })`). The controls use that: on touch a medium `Button` and a `TextInput` are at least 44 high (`TOUCH_TARGET`), a small button 36 and a large one 52. With a mouse nothing moves.
+
+### Patch Changes
+
+- 4a13fb4: `ContractReader.readComponents(file)` describes every component a module exports, as the channel reader already describes channels: what each one is for, from its JSDoc, and each input as JSON Schema with its TypeScript type, its description, its `@default`, and whether it is required. A callback, a child and a value only code can make are named for what they are rather than rejected. A type several inputs share, such as `UiLength`, is described once under `$defs`, and an input inherited from a shared props type says which one. Point it at a library's index and it reads the whole library: all 55 of `gesso-components` in under half a second. It is the catalog an AI agent designing with the library reads, so that it reaches for `Badge` instead of drawing one from boxes.
+
+  Every component in `gesso-components` now opens with a one-line JSDoc summary, so hovering one in an editor says what it is. Twelve had their description only in the design note at the top of the file, which attached to whatever was declared under it.
+
+- 0ded944: A `Menu` made already open (a right-click's, declared as it opens) opened before its placeholder was in the tree, and drew in the root's palette rather than the one it was declared in: light over a dark editor. It is shown again in its own theme as soon as its placeholder arrives, as `Dialog` already was.
+- bef0d1f: `Select` says the chosen option's label when its value is `''` and an option holds it ("No folder"), instead of the placeholder, which is for an empty value no option holds.
+- b597ec1: `Select` draws its placeholder in the theme's muted text colour, as `TextInput` does, so what it says to choose reads apart from a value that was chosen.
+- aa2db11: A `TextArea`, or a multiline `TextInput`, with no `onSubmit` leaves Command-Enter and Control-Enter to what holds it again. Since `onSubmit` was called from one, the field took those keys whether or not it had an `onSubmit`, so a form that submits from its own key handler, as a commit message's box does, never heard them.
+- 639be4a: Palettes gain `tooltipBackground` and `tooltipForeground`, and a tooltip is drawn in them. It used to be the control colours swapped round, which is dark on a light page but turned near-white on a dark one; both stock palettes now keep it dark, the dark one a step lighter than its panels. A custom `UiColors` needs the two names.
+- Updated dependencies [fe71a86]
+- Updated dependencies [2034818]
+- Updated dependencies [0e73baa]
+- Updated dependencies [c053bc3]
+- Updated dependencies [cf57c23]
+- Updated dependencies [407cefe]
+- Updated dependencies [85d58ae]
+- Updated dependencies [ae6af9a]
+- Updated dependencies [6a7c397]
+- Updated dependencies [17711c4]
+- Updated dependencies [4e0b6b7]
+- Updated dependencies [2c55872]
+- Updated dependencies [6a7c397]
+- Updated dependencies [3ababdf]
+- Updated dependencies [0307034]
+- Updated dependencies [b85d643]
+- Updated dependencies [4956e76]
+- Updated dependencies [bf6cf01]
+- Updated dependencies [cdca567]
+- Updated dependencies [6a7d6d4]
+- Updated dependencies [29e3863]
+- Updated dependencies [cf99e93]
+- Updated dependencies [5b66cbf]
+- Updated dependencies [c35209d]
+- Updated dependencies [9c411b1]
+- Updated dependencies [639be4a]
+- Updated dependencies [9c8c730]
+- Updated dependencies [803a189]
+- Updated dependencies [688eaa2]
+  - gesso-framework@0.7.0
+  - gesso-core@0.7.0
+
 ## 0.6.30
 
 ### Patch Changes
