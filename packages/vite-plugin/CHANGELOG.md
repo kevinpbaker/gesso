@@ -1,5 +1,27 @@
 # gesso-vite-plugin
 
+## 0.7.0
+
+### Minor Changes
+
+- fe71a86: An application can offer an agent tools of its own, beside its channels' and its screen's: `renderRoot(App).useAgentTools([...])`, and `useAgentTools` on the app builder. A tool is a name, a description, an input schema and a `run` that may answer with text, data and pictures (`agentText`, `agentImages`, `agentError` from `gesso-framework/agent`); its arguments are checked against the schema first. In `gesso-vite-plugin`, `agentInstructions` adds an application's own words to what an agent is told when it connects, and `catalog.exclude` leaves folders of generated code out of the component catalog, so they are not counted as uses.
+
+### Patch Changes
+
+- cedb9ff: A call the dev server's agent bridge sent to a page that then closed or reloaded is answered at once, saying the page closed and to call again, rather than left to time out; a tool that waits on purpose would otherwise have kept the agent waiting for its whole wait.
+- 3910bc9: `gesso({ catalog: { root } })` reads another project's components for the agent endpoint, rather than those of the project Vite serves: for an application that designs one, such as a design editor serving the project it works on from another folder. The dev server watches that folder too, so a component saved in a new file there is in the next answer.
+- 4198183: The component catalog reads a project's components through the tsconfig it was given, not whichever one sits beside them, and keeps working when a tsconfig it had seen is deleted while the dev server runs: TypeScript refusing the update is a fresh checker, and a failed read is a warning and an empty catalog, never an unhandled rejection that ended the server.
+- 0e73baa: The dev server's agent endpoint now offers the project's own components, so an AI agent designing a screen uses what is there instead of drawing it again from boxes. `library_overview` lists every component in one line each, `library_search` finds the ones a few words describe, and `library_get` gives one in full: each input's type, default and meaning, examples, and the files that already use it. They are read from the files the project's tsconfig includes, a component saved in a new file is in the next answer, and they are answered on the dev server, so an agent can read them before a page is open. A library's components join only when named: `gesso({ catalog: { libraries: ['gesso-components'] } })`, and `catalog: false` leaves the tools out.
+
+  `tokens_view` joins the screen tools: the colours, type styles, corner radii, spacing scale and shadows of the theme in force, by name and value, at a control or at the application's outermost content. An agent told the names writes `backgroundColor="surface"` rather than a colour that will not follow the theme into dark mode. `GessoRuntime.themeAt(id)` gives the same theme to anything else that asks.
+
+- 4a13fb4: `ContractReader.readComponents(file)` describes every component a module exports, as the channel reader already describes channels: what each one is for, from its JSDoc, and each input as JSON Schema with its TypeScript type, its description, its `@default`, and whether it is required. A callback, a child and a value only code can make are named for what they are rather than rejected. A type several inputs share, such as `UiLength`, is described once under `$defs`, and an input inherited from a shared props type says which one. Point it at a library's index and it reads the whole library: all 55 of `gesso-components` in under half a second. It is the catalog an AI agent designing with the library reads, so that it reaches for `Badge` instead of drawing one from boxes.
+
+  Every component in `gesso-components` now opens with a one-line JSDoc summary, so hovering one in an editor says what it is. Twelve had their description only in the design note at the top of the file, which attached to whatever was declared under it.
+
+- 4894062: The component catalog can be served from a desktop app's main process. `gesso-vite-plugin/catalog` carries it without Vite: `openCatalog({ root, fs })` reads the project's components with the checker and watches `root` with the `fs` it is given, so a component saved in a new file is in the next answer, and answers null when TypeScript 7 is not installed. `serveDesktopAgent` takes it as `catalog` and offers `library_overview`, `library_search` and `library_get` after the channels and the screen, with the catalog's instructions added to the app's, so an agent designing in a desktop app builds with the project's own components.
+- 9c411b1: An application's agent tool can say it waits on purpose, for a person or for its next task, with `waitsUpToMs`: it is listed under MCP's `_meta` as `gesso/waitsUpToMs` (`WAITS_UP_TO`), and the bridges between the agent and the thread, the dev server's and the render worker's, give a call of it that long, where they gave up on every call after two minutes.
+
 ## 0.6.30
 
 ## 0.6.29

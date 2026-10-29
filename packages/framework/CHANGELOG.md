@@ -1,5 +1,66 @@
 # gesso-framework
 
+## 0.7.0
+
+### Minor Changes
+
+- fe71a86: An application can offer an agent tools of its own, beside its channels' and its screen's: `renderRoot(App).useAgentTools([...])`, and `useAgentTools` on the app builder. A tool is a name, a description, an input schema and a `run` that may answer with text, data and pictures (`agentText`, `agentImages`, `agentError` from `gesso-framework/agent`); its arguments are checked against the schema first. In `gesso-vite-plugin`, `agentInstructions` adds an application's own words to what an agent is told when it connects, and `catalog.exclude` leaves folders of generated code out of the component catalog, so they are not counted as uses.
+- 2034818: A tree drawn under transforms no longer costs a walk of all of it on every frame. A transformed node's subtree bounds are now its box and its children's carried out through its transform, where they were left unbounded and made every ancestor unbounded too; the hit tester passes such a subtree over when the point is outside it, and the accessibility mirror passes over what a panned, zoomed parent draws off screen (`LayoutEngine.screenBounds`). `InspectionService.box(node)` gives a node's box without building the rest of its report, for an editor that measures many nodes as its view moves. On a design tool's board of a thousand frames under one camera, a pan went from about one frame in three seconds to frames of about 25 milliseconds.
+- c053bc3: A length that is not one (`width: '100%'`) is refused where it is written, naming the element, instead of throwing in layout: that throw abandoned every frame, so one element's mistake stopped the whole application drawing. One that arrives bound, from an Observable, is reported once and laid out as if unset. `renderRoot(...).onError(listener)` hears every error the render worker reports to the shell, for an application that shows its errors itself with the plugin's `overlay: false`.
+- 6a7c397: `InspectionService.preview(node, property, value)` draws a node as though it declared a value, over its own and over its modifiers, until `endPreview` or the node leaves the tree: what a design editor shows while a colour is hovered or a padding dragged, before writing it to the source.
+- 0307034: An inspector report's owners say what each component's parent supplied for its inputs, as `inputs`: a word, a number or a flag as it is, an element (a slot the parent filled) as `{ element: true }`, and handlers or data left out. A design tool can then write a component's use back as code, `<TextField label="Email" />`, and an inspector can show a component's props. `ComponentHost.suppliedInputs()` is what it reads.
+- b85d643: `rasterize` keeps what a subtree paints as pixels and copies them while only what is above it moves or scales: a design tool's frames under a zooming camera are one `drawImage` each, not every photograph and path drawn again. Canvas2D draws a kept subtree again when anything in it changes, and once a zoom settles at another scale, sharp; while the zoom moves it stretches what it has, redrawing only what fits the frame. `UiRenderer.nextRepaint` asks the runtime for that settling frame. Culling also goes through a transform that only moves and scales, so a zoomed-in camera draws only what is on screen; a node moved by its own transform is culled where it is drawn, not where its box is.
+- 5b66cbf: SVG files draw. An `Image` whose source ends in `.svg` or is a `data:image/svg+xml` URL reads the file in the worker and draws it as vectors through `PaintSurface`, on either renderer, at whatever size the node is laid out at, rather than failing because `createImageBitmap` refuses SVG. `objectFit` places it, the file's own size sizes the node when nothing else does, and `currentColor` is the theme's text colour. Drawn: paths and basic shapes, groups, `<use>`, nested `<svg>`, transforms, fills and strokes with opacities, dashes, linear and radial gradients, clip paths and simple `<style>` rules; text, images, masks, filters, patterns and markers are skipped with a console note. New in `gesso-core`: `parseSvg`, `drawSvg`, `svgPaint`, `DefaultSvgResolver`, `isSvgSource`, and `imageSource`'s `vectors` argument; in `gesso-framework`, `MediaService.vectors`, `setSvgResolver` and the `media.vectors` option. `Image` is now built on a paint node rather than a box.
+- 9c411b1: An application's agent tool can say it waits on purpose, for a person or for its next task, with `waitsUpToMs`: it is listed under MCP's `_meta` as `gesso/waitsUpToMs` (`WAITS_UP_TO`), and the bridges between the agent and the thread, the dev server's and the render worker's, give a call of it that long, where they gave up on every call after two minutes.
+- 803a189: Touch, apart from the screen's size. What the person points with is now in the environment (`UiEnvironmentKeys.pointer`, `fine` or `coarse`): the runtime reads it from the device (CSS's `pointer` feature), keeps it on `ShellService.pointer`, and provides it at the root, and a `pointer` prop says it for a subtree, as a design tool's phone frame does. A theme provided under a coarse pointer is turned for it (`withPointer`): its `touch` values (larger type, more room, token groups of its own) are laid over it, and a token group it does not carry resolves to the group's own `coarse` values (`defineThemeExtension({ coarse })`). The controls use that: on touch a medium `Button` and a `TextInput` are at least 44 high (`TOUCH_TARGET`), a small button 36 and a large one 52. With a mouse nothing moves.
+
+### Patch Changes
+
+- 0e73baa: The dev server's agent endpoint now offers the project's own components, so an AI agent designing a screen uses what is there instead of drawing it again from boxes. `library_overview` lists every component in one line each, `library_search` finds the ones a few words describe, and `library_get` gives one in full: each input's type, default and meaning, examples, and the files that already use it. They are read from the files the project's tsconfig includes, a component saved in a new file is in the next answer, and they are answered on the dev server, so an agent can read them before a page is open. A library's components join only when named: `gesso({ catalog: { libraries: ['gesso-components'] } })`, and `catalog: false` leaves the tools out.
+
+  `tokens_view` joins the screen tools: the colours, type styles, corner radii, spacing scale and shadows of the theme in force, by name and value, at a control or at the application's outermost content. An agent told the names writes `backgroundColor="surface"` rather than a colour that will not follow the theme into dark mode. `GessoRuntime.themeAt(id)` gives the same theme to anything else that asks.
+
+- cf57c23: `tokens_view` and `render_frame` default to the themes an application designs in, when it names them with `renderThemesWith`: a design editor's project's theme rather than the editor's own, which is what an agent designing that project needs to read and draw in. Both take `theme: 'app' | 'light' | 'dark'`, `app` being the running application's own. `formatThemeTokens`'s second argument is now the sentence that names the theme ("The theme in force at …"), not only the place.
+- 407cefe: A desktop app's agents get `tokens_view` and `render_frame` from its windows, as a dev server's do. The relay from a window to the main process let through only tools named `ui_*`, so the two newer screen tools never crossed; it now lets through the screen's tools by name (`SCREEN_TOOL_NAMES`). `createScreenAgent({ windowChannels: true })` lets the window's channels through as well, for an application whose state lives in its window, and takes a `confirm` for their `@confirm` commands.
+
+  `renderRoot(App).loadModulesWith(load)` says how `render_frame` loads the module an agent names, for an application whose modules are served from somewhere other than its own root, such as an editor serving the project it designs from another folder.
+
+- 17711c4: `InspectionService` gives a component the inspector's answers about what is on the screen: `nodesAt(x, y)` is every node under a point, topmost first, in the coordinates a pointer event carries, and `inspect(node)` is the inspector's report on one, with the line that wrote it and where each component around it was used. It is for tools built in Gesso that point at Gesso, such as a design editor whose canvas holds live frames and where a click picks what is under it instead of pressing it. Injected like any service: `ctx.inject(InspectionService)`.
+- 4e0b6b7: Under `vite dev`, an element written in JSX remembers the file, line and column it was written on, and a component remembers where it was used. The inspector's report says so: a node's `source` is the line that made it, and each owner's `usedAt` is the line that used the component around it, so `formatNodeReport` now reads `written at src/Settings.tsx:12:7` and `rendered by Card (used at src/Settings.tsx:30:9)`. `UiGraphBuilder.sourceOf(node)` gives the same answer for any node. A canvas has no DOM for the browser's own inspector to point at, and this is the way back from a box on screen to the code. A production build compiles to `jsx`, which is given no location, so it costs nothing there.
+- 4956e76: `renderFrame` waits for a picture still being fetched or decoded before it draws, rather than taking the tree's quiet for finished: a large image could arrive after the frame was drawn, leaving it out. `mediaLoadsInFlight()` says how many pictures the media modifiers in this thread are still loading.
+- bf6cf01: `render_frame` joins the screen tools an agent gets: it draws a module of the project to a PNG, at the width asked for, and answers with it as an MCP image. It draws the module's default export, its only component, or the export named, with the inputs given, in the running application's theme unless `light` or `dark` is asked for. Without a height a frame is as tall as its content; given one, a screen fills it. The answer says when nothing was drawn, and what was thrown while it was drawn. A frame shares the application's channels and services, so a screen shows its real data.
+
+  `renderFrame(root, { width })` is the same drawing for any other use: a tree drawn once by a runtime of its own on an `OffscreenCanvas`, run until it stops asking for frames, sized to its content and read back as PNG bytes.
+
+  An error a frame causes is reported to the agent rather than over the person's screen. The render worker and the devtools overlay leave alone an error a frame has claimed (`claimErrors` in the framework, under a `Symbol.for` key the overlay reads).
+
+  `ServiceRegistry` takes a parent, which `get` falls back to and `has` does not consult, so an offscreen runtime finds the application's services and still registers its own.
+
+  A tool result's `content` can now hold an image (`AgentContent`), so code that read `content[0].text` without checking the part's type needs `resultText(result)`, which joins a result's text.
+
+- cdca567: `renderRoot(App).renderThemesWith(() => ({ light, dark }))` says what `render_frame`'s `light` and `dark` draw in, asked on each call: an application's own themes rather than Gesso's, such as the design system of a project a design editor is designing, so an agent sees a mock in the product's colours and type.
+- c35209d: A theme carries `units`, what an inch and a rem are worth in pixels: `{ pixelsPerInch: 96, rootFontSize: 16 }` on the stock themes, as in CSS. `lengths(theme.units)` gives `rem`, `inch`, `pt` and `mm` conversions to pixels, resolved where a value is written, so a theme can write its scales from the units it carries and a screen can write a print margin in millimetres or type in points. `themesEqual` compares the units. `UiTheme.units` is required, so a theme written without spreading a stock one has to add it. `tokens_view` reports the units, and tells an agent how to write a length in them.
+- 688eaa2: A trackpad pinch in WebKit (Safari, and the macOS web view an Electrobun app runs in) reaches the application as the ctrl-wheel Chromium and Firefox send for one, `deltaY` being -100·ln of each step's scale. Before, WebKit's gesture events went unheard, so a canvas that zooms on a ctrl-wheel could not be pinched there and a web view that magnifies zoomed the whole page instead. The gesture is kept from the page by the same rule as a wheel: when the chain under the pointer would take it, which `overscrollBehavior="contain"` says of every wheel.
+- Updated dependencies [2034818]
+- Updated dependencies [c053bc3]
+- Updated dependencies [85d58ae]
+- Updated dependencies [ae6af9a]
+- Updated dependencies [4e0b6b7]
+- Updated dependencies [2c55872]
+- Updated dependencies [6a7c397]
+- Updated dependencies [3ababdf]
+- Updated dependencies [b85d643]
+- Updated dependencies [4956e76]
+- Updated dependencies [6a7d6d4]
+- Updated dependencies [29e3863]
+- Updated dependencies [cf99e93]
+- Updated dependencies [5b66cbf]
+- Updated dependencies [c35209d]
+- Updated dependencies [639be4a]
+- Updated dependencies [9c8c730]
+- Updated dependencies [803a189]
+  - gesso-core@0.7.0
+
 ## 0.6.30
 
 ### Patch Changes

@@ -1,5 +1,35 @@
 # gesso-electrobun
 
+## 0.7.0
+
+### Patch Changes
+
+- 4894062: The component catalog can be served from a desktop app's main process. `gesso-vite-plugin/catalog` carries it without Vite: `openCatalog({ root, fs })` reads the project's components with the checker and watches `root` with the `fs` it is given, so a component saved in a new file is in the next answer, and answers null when TypeScript 7 is not installed. `serveDesktopAgent` takes it as `catalog` and offers `library_overview`, `library_search` and `library_get` after the channels and the screen, with the catalog's instructions added to the app's, so an agent designing in a desktop app builds with the project's own components.
+- 407cefe: A desktop app's agents get `tokens_view` and `render_frame` from its windows, as a dev server's do. The relay from a window to the main process let through only tools named `ui_*`, so the two newer screen tools never crossed; it now lets through the screen's tools by name (`SCREEN_TOOL_NAMES`). `createScreenAgent({ windowChannels: true })` lets the window's channels through as well, for an application whose state lives in its window, and takes a `confirm` for their `@confirm` commands.
+
+  `renderRoot(App).loadModulesWith(load)` says how `render_frame` loads the module an agent names, for an application whose modules are served from somewhere other than its own root, such as an editor serving the project it designs from another folder.
+
+- Updated dependencies [fe71a86]
+- Updated dependencies [2034818]
+- Updated dependencies [0e73baa]
+- Updated dependencies [c053bc3]
+- Updated dependencies [cf57c23]
+- Updated dependencies [407cefe]
+- Updated dependencies [6a7c397]
+- Updated dependencies [17711c4]
+- Updated dependencies [4e0b6b7]
+- Updated dependencies [0307034]
+- Updated dependencies [b85d643]
+- Updated dependencies [4956e76]
+- Updated dependencies [bf6cf01]
+- Updated dependencies [cdca567]
+- Updated dependencies [5b66cbf]
+- Updated dependencies [c35209d]
+- Updated dependencies [9c411b1]
+- Updated dependencies [803a189]
+- Updated dependencies [688eaa2]
+  - gesso-framework@0.7.0
+
 ## 0.6.30
 
 ### Patch Changes
