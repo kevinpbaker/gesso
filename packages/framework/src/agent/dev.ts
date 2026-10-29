@@ -46,6 +46,8 @@ export interface DevAgentResponse {
 export const DEV_AGENT_EVENTS = {
   ready: 'gesso:agent:ready',
   request: 'gesso:agent:request',
+  /** Page to server: a request has arrived and is being answered, so the page is running. */
+  received: 'gesso:agent:received',
   response: 'gesso:agent:response'
 } as const;
 
@@ -70,6 +72,9 @@ export function connectDevAgent(app: DevAgentApp, hot: DevAgentHot, info: McpSer
     return surface;
   };
   hot.on(DEV_AGENT_EVENTS.request, (request: DevAgentRequest) => {
+    // Said at once, before the answer: a page paused in a hidden window
+    // says nothing, and the server tells the agent so in moments.
+    hot.send(DEV_AGENT_EVENTS.received, { id: request.id });
     void handleMcpMessage(reach(), request.message, {
       name: info.name ?? (document.title || 'gesso'),
       ...info

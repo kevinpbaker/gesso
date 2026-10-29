@@ -22,6 +22,14 @@
  * checker reads here and which an agent should be able to read before
  * any page is open. Those are answered here, and listed alongside the
  * page's; everything else still goes to the page.
+ *
+ * A page that cannot answer is said to be one, rather than let the
+ * agent wait or wonder. The tools the page last listed are remembered
+ * (across a restart too, given `memory`), so with no page open they are
+ * still listed, and a call of one says no page is open to answer it.
+ * And a page takes each request as it arrives (`received`), so one that
+ * has gone quiet, a window hidden and paused by its browser, is said to
+ * be in moments, not when the call would have timed out.
  */
 
 /** The path an agent is pointed at. */
@@ -31,6 +39,8 @@ export const AGENT_PATH = '/__gesso/mcp';
 export const EVENTS = {
   ready: 'gesso:agent:ready',
   request: 'gesso:agent:request',
+  /** The page has a request and is answering it. */
+  received: 'gesso:agent:received',
   response: 'gesso:agent:response'
 } as const;
 
@@ -69,6 +79,26 @@ export interface AgentBridgeOptions {
   timeoutMs?: number;
   /** Tools the server answers itself, page or no page. */
   local?: LocalTools;
+  /**
+   * How long a page that says it takes requests may go without taking
+   * one, in milliseconds (default 10 000), before the agent is told it
+   * has gone quiet.
+   */
+  receiveTimeoutMs?: number;
+  /** Where what the page last listed is kept, so a restarted server still lists its tools. */
+  memory?: PageMemory;
+}
+
+/** What a page last told an agent about itself: its tools, and its instructions. */
+export interface RememberedPage {
+  readonly tools: readonly { readonly name: string }[];
+  readonly instructions?: string;
+}
+
+/** Keeps what a page last listed beyond one bridge: across a dev server's restarts. */
+export interface PageMemory {
+  read(): RememberedPage | undefined;
+  write(page: RememberedPage): void;
 }
 
 /** Tools the dev server answers without the page: see the file's comment. */
@@ -93,11 +123,21 @@ const PAGE_GONE = Symbol('page gone');
 
 export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOptions = {}): AgentBridge {
   const timeoutMs = options.timeoutMs ?? 130_000;
+  const receiveTimeoutMs = options.receiveTimeoutMs ?? 10_000;
   const local = options.local;
   const localNames = new Set(local?.tools.map(tool => tool.name) ?? []);
   /** Pages that announced themselves, newest last. */
   const pages: BridgeClient[] = [];
-  const pending = new Map<number, { readonly page: BridgeClient; readonly resolve: (response: unknown) => void }>();
+  const pending = new Map<
+    number,
+    { readonly page: BridgeClient; readonly resolve: (response: unknown) => void; received?: () => void }
+  >();
+  /** Pages that say when they take a request: one that goes quiet is waited on only `receiveTimeoutMs`. */
+  const receiving = new WeakSet<BridgeClient>();
+  /** What a page last listed, said for it while none is open. */
+  let remembered: { tools: readonly { readonly name: string }[]; instructions?: string } = options.memory?.read() ?? {
+    tools: []
+  };
   let next = 1;
   /**
    * How long each tool the page listed says it may wait, under MCP's
@@ -129,6 +169,10 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
       }
     }
   });
+  socket.on(EVENTS.received, (data: { id: number }, client) => {
+    receiving.add(client);
+    pending.get(data.id)?.received?.();
+  });
   socket.on(EVENTS.response, (data: { id: number; response: unknown }) => {
     const waiting = pending.get(data.id);
     if (waiting !== undefined) {
@@ -141,21 +185,34 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
    * The answer the server gives itself, or undefined to relay. A call
    * to one of its own tools is always answered here; with no page open,
    * so are the handshake and the listings, so an agent connected before
-   * the page still reads the catalog.
+   * the page still reads the catalog, and still sees the page's tools,
+   * as it last listed them, each saying no page is open to answer it.
    */
-  const answerWithLocal = (message: unknown): Promise<unknown> | undefined => {
+  const answerHere = (message: unknown): Promise<unknown> | undefined => {
     const request = asRequest(message);
-    if (request === undefined || local === undefined) {
+    if (request === undefined) {
       return undefined;
     }
     const { id, method, params } = request;
-    if (method === 'tools/call' && typeof params.name === 'string' && localNames.has(params.name)) {
+    if (
+      local !== undefined &&
+      method === 'tools/call' &&
+      typeof params.name === 'string' &&
+      localNames.has(params.name)
+    ) {
       const args = params.arguments as Readonly<Record<string, unknown>> | undefined;
       return local.call(params.name, args).then(result => ({ jsonrpc: '2.0', id, result }));
     }
     if (pages.length > 0) {
       return undefined;
     }
+    const pageTools = remembered.tools.filter(tool => !localNames.has(tool.name));
+    if (local === undefined && pageTools.length === 0) {
+      return undefined;
+    }
+    const instructions = [remembered.instructions, local?.instructions].filter(
+      (text): text is string => text !== undefined && text !== ''
+    );
     switch (method) {
       case 'initialize':
         return Promise.resolve({
@@ -165,11 +222,23 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
             protocolVersion: typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-06-18',
             capabilities: { tools: {}, resources: {} },
             serverInfo: { name: 'gesso', version: '0.0.0' },
-            ...(local.instructions === undefined ? {} : { instructions: local.instructions })
+            ...(instructions.length === 0 ? {} : { instructions: instructions.join('\n\n') })
           }
         });
       case 'tools/list':
-        return Promise.resolve({ jsonrpc: '2.0', id, result: { tools: local.tools } });
+        return Promise.resolve({ jsonrpc: '2.0', id, result: { tools: [...(local?.tools ?? []), ...pageTools] } });
+      case 'tools/call':
+        if (typeof params.name === 'string' && pageTools.some(tool => tool.name === params.name)) {
+          return Promise.resolve(
+            failed(
+              id,
+              `No window of the app is open to answer ${params.name}: it was closed, or it is reloading (a page ` +
+                'that lost the dev server reconnects when it comes back). Open the app from this dev server, or ' +
+                `bring its window forward and reload it if it is blank, then call ${params.name} again.`
+            )
+          );
+        }
+        return undefined;
       case 'ping':
         return Promise.resolve({ jsonrpc: '2.0', id, result: {} });
       case 'resources/list':
@@ -185,20 +254,37 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
     const page = pages[pages.length - 1];
     const id = next++;
     const request = asRequest(message);
-    const called =
-      request?.method === 'tools/call' && typeof request.params.name === 'string'
-        ? waits.get(request.params.name)
-        : undefined;
+    const tool =
+      request?.method === 'tools/call' && typeof request.params.name === 'string' ? request.params.name : null;
+    const called = tool === null ? undefined : waits.get(tool);
     const limit = called === undefined ? timeoutMs : Math.max(timeoutMs, called + 10_000);
     return new Promise(resolve => {
       const timer = setTimeout(() => {
         pending.delete(id);
         resolve(rpcError(message, -32001, `The page did not answer within ${Math.round(limit / 1000)} seconds.`));
       }, limit);
+      // A page that takes requests and has not taken this one is not
+      // running: a window hidden or minimised, which its browser pauses,
+      // or one stuck. Said in moments, rather than at the limit.
+      const quiet = receiving.has(page)
+        ? setTimeout(() => {
+            pending.delete(id);
+            clearTimeout(timer);
+            const text =
+              `The app's window did not take ${tool ?? 'the request'} within ${Math.round(receiveTimeoutMs / 1000)} ` +
+              'seconds: it is most likely hidden or minimised, and paused by its browser, or it is stuck. Bring the ' +
+              `window forward (reload it if it is blank), then call ${tool ?? 'again'}${tool === null ? '' : ' again'}.`;
+            resolve(
+              request === undefined || tool === null ? rpcError(message, -32001, text) : failed(request.id, text)
+            );
+          }, receiveTimeoutMs)
+        : undefined;
       pending.set(id, {
         page,
+        received: () => clearTimeout(quiet),
         resolve: response => {
           clearTimeout(timer);
+          clearTimeout(quiet);
           if (response === PAGE_GONE) {
             resolve(
               rpcError(message, -32001, 'The page closed before it answered (it may have reloaded); call again.')
@@ -207,12 +293,35 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           }
           if (request?.method === 'tools/list') {
             noteWaits(response);
+            remember({ tools: listed(response) });
+          }
+          if (request?.method === 'initialize') {
+            const instructions = (response as { result?: { instructions?: unknown } } | null)?.result?.instructions;
+            remember({ instructions: typeof instructions === 'string' ? instructions : undefined });
           }
           resolve(response);
         }
       });
       page.send(EVENTS.request, { id, message });
     });
+  };
+
+  /** Keeps what a page said of itself, for while none is open. */
+  const remember = (part: {
+    tools?: readonly { readonly name: string }[];
+    instructions?: string | undefined;
+  }): void => {
+    const instructions = 'instructions' in part ? part.instructions : remembered.instructions;
+    const now = { tools: part.tools ?? remembered.tools, ...(instructions === undefined ? {} : { instructions }) };
+    if (JSON.stringify(now) === JSON.stringify(remembered)) {
+      return;
+    }
+    remembered = now;
+    try {
+      options.memory?.write(now);
+    } catch {
+      // Kept in memory still; only a restart forgets it.
+    }
   };
 
   const noteWaits = (response: unknown): void => {
@@ -262,7 +371,7 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           return;
         }
         const notification = typeof message === 'object' && message !== null && !('id' in message);
-        const own = local === undefined ? undefined : answerWithLocal(message);
+        const own = answerHere(message);
         if (own !== undefined) {
           void own.then(answer => send(response, 200, 'application/json', JSON.stringify(answer)));
           return;
@@ -307,6 +416,21 @@ function send(response: BridgeResponse, status: number, type?: string, body?: st
     response.setHeader('content-type', type);
   }
   response.end(body);
+}
+
+/** A tool call that could not be made, as MCP says one: a result marked as an error, which the agent reads. */
+function failed(id: string | number | null, text: string): unknown {
+  return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text }], isError: true } };
+}
+
+/** The tools a page's `tools/list` answer lists, or none. */
+function listed(response: unknown): readonly { readonly name: string }[] {
+  const tools = (response as { result?: { tools?: unknown } } | null)?.result?.tools;
+  return Array.isArray(tools)
+    ? (tools as unknown[]).filter(
+        (tool): tool is { name: string } => typeof (tool as { name?: unknown })?.name === 'string'
+      )
+    : [];
 }
 
 function rpcError(message: unknown, code: number, text: string): unknown {
