@@ -130,7 +130,7 @@ describe('the docs slider example', () => {
     expect(ui.getSemantics(volume).valueNow).toBe(0);
   });
 
-  it('does not move a controlled value the application never writes back', () => {
+  it('starts at a value nothing hears, and moves from there', () => {
     const level = new BehaviorSubject(30);
     const ui = renderTest(createComponent(Slider, { label: 'Volume', min: 0, max: 100, step: 5, value: level }), SIZE);
     const slider = ui.getByRole('slider');
@@ -139,8 +139,9 @@ describe('the docs slider example', () => {
     ui.fireEvent.press('ArrowRight');
     ui.fireEvent.press('End');
     ui.frame();
-    expect(ui.getSemantics(slider).valueNow).toBe(30);
+    expect(ui.getSemantics(slider).valueNow).toBe(100);
 
+    // A new value from the application starts it again.
     level.next(45);
     ui.frame();
     expect(ui.getSemantics(slider).valueNow).toBe(45);

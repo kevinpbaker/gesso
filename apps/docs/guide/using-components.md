@@ -61,9 +61,12 @@ shows what you give it; hand it `defaultValue` and it keeps its own:
 <TextInput label="Email" defaultValue="you@example.com" />
 ```
 
-A controlled input given no `onChange` does not move, because nothing
-writes the value back. That is the same effect `readOnly` has, for the
-same reason.
+A `value` given with no `onChange` has nobody to own it, so it is
+where the input starts, and the input owns it from there; a new value
+from the parent starts it again. A screen written as a picture of a
+moment, `<Switch checked={true} />`, is then one a person can use. An
+input that only the application may change says so with `readOnly` or
+`disabled`.
 
 ## The five tiers
 

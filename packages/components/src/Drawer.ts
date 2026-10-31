@@ -116,7 +116,9 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
     source: inputs.open,
     initial: inputs.defaultOpen,
     fallback: false,
-    onChange: inputs.onOpenChange
+    onChange: inputs.onOpenChange,
+    // A caller used to `onClose` hears every close through it, and owns `open`.
+    heardBy: [inputs.onClose]
   });
 
   /**

@@ -200,8 +200,9 @@ taller than that.
 ```
 
 Which form applies is decided once, when the rail is built. A
-controlled rail given no `onChange` never moves on a press, which is how
-a destination is refused. The open set has the same two forms through
+controlled rail whose `onChange` does not write the key back never moves
+on a press, which is how a destination is refused; one given no
+`onChange` at all starts at its `value` and moves on its own. The open set has the same two forms through
 `expanded` and `defaultExpanded`, owned separately from the value.
 
 The rail never opens a group on its own. If the active destination is

@@ -61,9 +61,10 @@ the message all read the theme.
 ```
 
 Which form applies is decided once, when the component is built, from
-whether `value` was supplied; supplying both throws. A controlled field
-handed no `onChange` does not move until the application moves it, and
-the value it is written is shown as it is: `min` and `max` bound what a person can produce with the
+whether `value` was supplied; supplying both throws. A field handed
+`value` and no `onChange` starts there and moves on its own, until the
+application hands it a new value, and the value it is written is shown
+as it is: `min` and `max` bound what a person can produce with the
 keyboard, the buttons or the text, not what the application can set. A
 value written from outside the range is shown, and the first step from
 there lands back inside it.

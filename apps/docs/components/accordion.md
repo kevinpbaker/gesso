@@ -78,11 +78,11 @@ whether `open` was supplied; supplying both throws.
 `onOpenChange` is handed the whole set the accordion would take, which
 is what makes a policy easy to write: the example filters the pinned
 section back in, and a handler that wanted at most two open would slice
-the array. What the application writes back is what is drawn, and a
-controlled accordion given no `onOpenChange` does not move at all. The
-spec proves both directions: a click that the handler declines leaves
-the section open, and a write from a button somewhere else opens two
-sections that nobody clicked.
+the array. What the application writes back is what is drawn, and an
+accordion handed `open` and no `onOpenChange` at all starts there and
+opens and shuts on its own. The spec proves both directions: a click
+that the handler declines leaves the section open, and a write from a
+button somewhere else opens two sections that nobody clicked.
 
 An uncontrolled accordion keeps one cell of its own and still calls
 `onOpenChange`, so an open set you only want to observe needs no state

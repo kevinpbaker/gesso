@@ -128,15 +128,14 @@ describe('the docs accordion example', () => {
     expect(expanded(ui)).toEqual(['Basics', 'Can I send it back?']);
   });
 
-  it('does not move a controlled accordion the application never writes back', () => {
+  it('starts a controlled accordion nothing hears where it was handed, and moves from there', () => {
     const open = new BehaviorSubject<readonly string[]>(['one']);
     const ui = renderTest(createComponent(Accordion, { sections: SECTIONS, open }), SIZE);
 
-    // No `onOpenChange` at all, so every request is dropped.
+    // No `onOpenChange` at all, so nobody owns it but the accordion.
     ui.fireEvent.click(ui.getByRole('button', { name: 'Second' }));
-    ui.fireEvent.click(ui.getByRole('button', { name: 'First' }));
     ui.frame();
-    expect(expanded(ui)).toEqual(['First']);
+    expect(expanded(ui)).toContain('Second');
 
     open.next(['two']);
     ui.frame();

@@ -111,6 +111,12 @@ const value = controlled({
 });
 ```
 
+A `value` with no `onChange` beside it has nobody to own it, so it is
+where the control starts, and the control owns it from there; a new
+value from the parent starts it again. A mock written as a picture of a
+moment, `<Toggle on={true} />`, is then one a person can use, and a
+component of your own gets that by going through `controlled()`.
+
 For the plain case where the owner is a local cell, `bind` is the
 spread: `<Slider {...bind(volume)} />` passes the cell as `value` and
 writes changes back into it. A control whose value has another name

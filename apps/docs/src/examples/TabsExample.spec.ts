@@ -120,7 +120,7 @@ describe('the docs tabs example', () => {
     expect(ui.queryByText('Two shipments in transit, one waiting for collection.')).toBeNull();
   });
 
-  it('does not move a controlled strip the application never writes back', () => {
+  it('starts a strip nothing hears at the tab it was handed, and moves from there', () => {
     const tabs: readonly TabDefinition[] = [
       { value: 'one', label: 'One' },
       { value: 'two', label: 'Two' }
@@ -129,19 +129,18 @@ describe('the docs tabs example', () => {
     const ui = renderTest(createComponent(Tabs, { tabs, value: view, children: Text({ text: 'panel' }) }), SIZE);
     const list = ui.getByRole('tablist');
 
-    // No `onChange` at all: every request is dropped on the floor.
+    // No `onChange` at all: nobody owns it but the strip.
     ui.fireEvent.focus(list);
-    ui.fireEvent.keyDown('ArrowRight');
-    ui.fireEvent.keyDown('End');
     ui.fireEvent.click(ui.getByRole('tab', { name: 'Two' }));
-    ui.frame();
-    expect(ui.getAllByRole('tab', { states: ['selected'] }).map(node => ui.getSemantics(node).label)).toEqual(['One']);
-
-    // The application writing the value is the only thing that moves it.
-    view.next('two');
     ui.frame();
     expect(ui.getAllByRole('tab', { states: ['selected'] }).map(node => ui.getSemantics(node).label)).toEqual(['Two']);
     expect(ui.getSemantics(ui.getByRole('tabpanel')).label).toBe('Two');
+
+    // A new value from the application starts it again.
+    view.next('two');
+    view.next('one');
+    ui.frame();
+    expect(ui.getAllByRole('tab', { states: ['selected'] }).map(node => ui.getSemantics(node).label)).toEqual(['One']);
   });
 
   it('lets an uncontrolled strip manage itself', () => {

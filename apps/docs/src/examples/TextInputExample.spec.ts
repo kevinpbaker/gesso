@@ -55,7 +55,7 @@ describe('the docs text input example', () => {
     expect(ui.getSemantics(email).valueText).toBe('ada@example.com');
   });
 
-  it('does not move a controlled value the application never writes back', () => {
+  it('starts at a value nothing hears, and keeps what is typed', () => {
     const address = new BehaviorSubject('ada@example.com');
     const ui = renderTest(createComponent(TextInput, { label: 'Email', value: address }), SIZE);
     const field = ui.getByRole('textbox');
@@ -65,12 +65,8 @@ describe('the docs text input example', () => {
     ui.fireEvent.type('!');
     ui.frame();
 
-    // The keystroke reached the field's own model, which is what keeps
-    // the caret off the application's critical path. Nothing reported
-    // it, because no `onChange` was given, so the value the
-    // application holds and the value an assistive technology reads
-    // are both still the one it was handed.
-    expect(ui.getSemantics(field).valueText).toBe('ada@example.com');
+    // No `onChange` was given, so nobody owns the value but the field.
+    expect(ui.getSemantics(field).valueText).toBe('ada@example.com!');
 
     // And the next value the application does write lands in the field.
     address.next('grace@example.com');

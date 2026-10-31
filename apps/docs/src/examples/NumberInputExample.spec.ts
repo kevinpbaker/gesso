@@ -123,7 +123,7 @@ describe('the docs number input example', () => {
     expect(ui.getSemantics(tip).valueText).toBe('2.5');
   });
 
-  it('does not move a controlled value the application never writes back', () => {
+  it('starts at a value nothing hears, and moves from there', () => {
     const guests = new BehaviorSubject(2);
     const ui = renderTest(createComponent(NumberInput, { label: 'Guests', min: 1, max: 8, value: guests }), SIZE);
     const field = ui.getByRole('spinbutton');
@@ -132,8 +132,9 @@ describe('the docs number input example', () => {
     ui.fireEvent.press('ArrowUp');
     ui.fireEvent.click(ui.getByRole('button', { name: 'Increase' }));
     ui.frame();
-    expect(ui.getSemantics(field).valueNow).toBe(2);
+    expect(ui.getSemantics(field).valueNow).toBe(4);
 
+    // A new value from the application starts it again.
     guests.next(5);
     ui.frame();
     expect(ui.getSemantics(field).valueNow).toBe(5);

@@ -768,6 +768,7 @@ interface ControlledOptions<T> {
   readonly initial: InputCell<T | undefined>;
   readonly fallback: T;
   readonly onChange: OutputCell<[next: T]>;
+  readonly heardBy?: readonly OutputCell<never>[];
 }
 declare function controlled<T>(options: ControlledOptions<T>): ControlledValue<T>;
 declare function Define(tag: string): ClassDecorator;

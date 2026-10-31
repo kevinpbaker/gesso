@@ -80,10 +80,10 @@ Two consequences worth knowing before you write a transform in
 
 - Writing a **different** string back resets the field's undo history.
   As far as the model is concerned, the text it replaced never existed.
-- A controlled field handed no `onChange` reports nothing and is
-  written nothing, so the value the application holds, and the value an
-  assistive technology reads, both stay where they were. The next write
-  the application does make lands in the field.
+- A field handed `value` and no `onChange` starts at that value and
+  keeps what is typed, as a `defaultValue` would; the next value the
+  application hands it lands in the field. A field only the application
+  may change is `readOnly`.
 
 ## What the field brings with it
 

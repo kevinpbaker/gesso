@@ -350,12 +350,13 @@ describe('RangeSlider, controlled and uncontrolled', () => {
     expect(values()).toEqual([10, 40]);
   });
 
-  it('does not move when the application never writes back', () => {
+  it('starts at a value nothing hears, and moves from it', () => {
     const { ui, low, values } = mount('ltr', { defaultValue: undefined, value: [20, 80] as Pair, onChange: undefined });
+    expect(values()).toEqual([20, 80]);
     ui.fireEvent.focus(low());
     ui.fireEvent.keyDown('ArrowRight');
-    ui.fireEvent.keyDown('End');
-    expect(values()).toEqual([20, 80]);
+    ui.frame();
+    expect(values()).toEqual([21, 80]);
   });
 
   it('throws when given both forms', () => {

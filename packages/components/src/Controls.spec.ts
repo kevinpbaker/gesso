@@ -158,6 +158,64 @@ describe('Switch', () => {
   });
 });
 
+/**
+ * A value given with no `onChange` beside it: a screen written as a
+ * picture of a moment, which a design tool's Play mode runs as it is.
+ */
+describe('a value nothing hears', () => {
+  const isOn = (ui: ReturnType<typeof mount>): boolean => ui.recordFor('switch').states?.includes('checked') === true;
+
+  it('is where the control starts, and the control owns it from there', () => {
+    const ui = mount(createComponent(Switch, { label: 'Mentions', checked: true }));
+    expect(isOn(ui)).toBe(true);
+
+    ui.fireEvent.click(ui.getByRole('switch'));
+    ui.frame();
+
+    expect(isOn(ui)).toBe(false);
+  });
+
+  it('keeps what was done when the parent hands the same value again, and starts again from a new one', () => {
+    const checked$ = new BehaviorSubject(true);
+    const ui = mount(createComponent(Switch, { label: 'Mentions', checked: checked$ }));
+    ui.fireEvent.click(ui.getByRole('switch'));
+    ui.frame();
+
+    checked$.next(true);
+    ui.frame();
+    expect(isOn(ui)).toBe(false);
+
+    checked$.next(false);
+    checked$.next(true);
+    ui.frame();
+    expect(isOn(ui)).toBe(true);
+    ui.fireEvent.click(ui.getByRole('switch'));
+    ui.frame();
+    expect(isOn(ui)).toBe(false);
+  });
+
+  it('takes typing from the value it was given', () => {
+    const ui = mount(createComponent(TextInput, { label: 'Email', value: 'jordan@' }));
+    const field = ui.focusRole('textbox');
+    ui.fireEvent.keyDown('End');
+    ui.fireEvent.type('greenleaf.co');
+    ui.frame();
+
+    expect(field.properties.get('value')).toBe('jordan@greenleaf.co');
+  });
+
+  it('stays the parent’s once the parent hears it', () => {
+    const changes: boolean[] = [];
+    const ui = mount(createComponent(Switch, { label: 'Mentions', checked: true, onChange: v => changes.push(v) }));
+
+    ui.fireEvent.click(ui.getByRole('switch'));
+    ui.frame();
+
+    expect(changes).toEqual([false]);
+    expect(isOn(ui)).toBe(true);
+  });
+});
+
 describe('RadioGroup', () => {
   const options = [
     { value: 'card', label: 'Card' },

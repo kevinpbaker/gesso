@@ -64,8 +64,9 @@ whether `value` was supplied; supplying both throws.
 
 A controlled range slider draws the pair it is given, and `onChange` is
 a request. An application that writes back `[low, Math.min(400, high)]`
-caps the top thumb at 400 however far it is dragged, and one handed no
-`onChange` does not move at all until the application moves it.
+caps the top thumb at 400 however far it is dragged. One handed `value`
+and no `onChange` starts at that pair and moves on its own from there,
+until the application hands it a new pair.
 
 Every pair the control reports is already in order and already keeps
 `minDistance`, so an `onChange` never has to sort or check what it is

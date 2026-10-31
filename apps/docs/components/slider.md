@@ -62,9 +62,10 @@ whether `value` was supplied; supplying both throws.
 A controlled slider draws the value it is given, and `onChange` is a
 request rather than a change. The example above takes advantage of
 that: it writes back `Math.min(80, next)`, so the control asks for 100
-and shows 80. A controlled slider handed no `onChange` at all therefore
-does not move until the application moves it, which is the same shape
-every control in the library has.
+and shows 80. A slider handed `value` and no `onChange` at all has
+nobody to decline for it, so it starts at that value and moves on its
+own, until the application hands it a new one: the same shape every
+control in the library has.
 
 An uncontrolled slider keeps one cell of its own and reports through
 `onChange` as well, so a value you only want to observe still needs no

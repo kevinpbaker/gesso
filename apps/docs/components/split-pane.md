@@ -63,8 +63,8 @@ or an Observable, and the shared layout props on
 The controlled form is what to reach for when the split is worth
 keeping: it is one number, so a screen that restores where the user
 left the divider is a cell you save and hand back. As everywhere else
-in the library, a controlled component that is handed no `onSplitChange`
-never moves.
+in the library, a component handed `split` and no `onSplitChange` starts
+there and moves on its own, until the application hands it a new split.
 
 ## One pane at a time
 

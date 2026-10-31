@@ -321,6 +321,25 @@ describe('Drawer, controlled and not', () => {
     expect(entries(ui)).toHaveLength(1);
   });
 
+  it('stays open when an owner that hears only onClose does not close it', () => {
+    let closes = 0;
+    const { ui } = mount({ onOpenChange: undefined, onClose: () => closes++ });
+    openFrom(ui);
+    ui.fireEvent.keyDown('Escape');
+    settle(ui);
+    expect(closes).toBe(1);
+    expect(entries(ui)).toHaveLength(1);
+  });
+
+  it('starts open from an open nothing hears, and closes on its own', () => {
+    const ui = renderTest(createComponent(Drawer, { open: true, title: 'Filters' }), { width: WIDTH, height: HEIGHT });
+    settle(ui);
+    expect(ui.getByRole('dialog', { name: 'Filters' })).toBeDefined();
+    ui.fireEvent.keyDown('Escape');
+    settle(ui);
+    expect(ui.queryByRole('dialog')).toBeNull();
+  });
+
   it('owns its state with defaultOpen, and still reports the change', () => {
     const changes: boolean[] = [];
     const ui = renderTest(

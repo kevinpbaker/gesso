@@ -96,11 +96,11 @@ Which form applies is decided once, when the component is built, from
 whether `value` was supplied; supplying both throws.
 
 A controlled strip draws the value it is handed, and `onChange` is a
-request rather than a change. A controlled strip given no `onChange` at
-all does not move until the application moves it, and the spec beside
-the example proves exactly that: every arrow, every key and every click
-leaves it where it was, and a write to the cell moves it with no gesture
-behind it.
+request rather than a change. A strip handed `value` and no `onChange` at
+all has nobody to decline for it, so it starts at that tab and moves on
+its own, and the spec beside the example proves exactly that: a click
+moves it, and a new value written to the cell moves it again with no
+gesture behind it.
 
 An uncontrolled strip keeps one cell of its own and still calls
 `onChange`, so a selection you only want to observe needs no state at
