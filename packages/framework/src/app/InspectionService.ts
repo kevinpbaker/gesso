@@ -76,6 +76,28 @@ export class InspectionService {
   endPreview(node: UiNode, property?: string): void {
     this.host?.endPreview?.(node, property);
   }
+
+  /**
+   * Draws a component as though its parent passed `inputs`, over what
+   * the parent did pass, until the preview is ended or the component
+   * leaves the tree. The component is named by its anchor, as
+   * `inspect(node).owners[].anchorId` gives it.
+   *
+   * What a design editor shows when a component on a played screen is
+   * jumped to one of its states (Filled, Error, Disabled): the same
+   * instance, still live, given that state's inputs, and the inputs it
+   * was written with back when the preview ends. A later preview of the
+   * same component replaces this one. The names and values are props',
+   * as JSX would write them. An anchor no component holds is ignored.
+   */
+  previewInputs(anchorId: string, inputs: Readonly<Record<string, unknown>>): void {
+    this.host?.previewInputs?.(anchorId, inputs);
+  }
+
+  /** Ends a preview of a component's inputs: its parent's are its own again. */
+  endInputPreview(anchorId: string): void {
+    this.host?.previewInputs?.(anchorId, null);
+  }
 }
 
 /** What the runtime gives the service. */
@@ -86,4 +108,6 @@ export interface InspectionHost {
   box?(node: UiNode): { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   preview?(node: UiNode, property: string, value: unknown): void;
   endPreview?(node: UiNode, property?: string): void;
+  /** Null ends the preview. */
+  previewInputs?(anchorId: string, inputs: Readonly<Record<string, unknown>> | null): void;
 }

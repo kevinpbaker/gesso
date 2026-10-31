@@ -97,6 +97,20 @@ export class InputCell<T> extends BehaviorSubject<T> {
   }
 }
 
+/**
+ * Hands a cell a value even when it holds it already, which `next`
+ * drops: an input a design tool's preview starts or ends is told again,
+ * so a control that owns what it was started at starts again from it.
+ * For the host, not for components.
+ */
+export function forceInput<T>(cell: InputCell<T>, value: T): void {
+  if (Object.is(value, cell.getValue())) {
+    BehaviorSubject.prototype.next.call(cell, value);
+  } else {
+    cell.next(value);
+  }
+}
+
 /** The component whose function body is running, while one is. */
 let bodyOf: string | null = null;
 

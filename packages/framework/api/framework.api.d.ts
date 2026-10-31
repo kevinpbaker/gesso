@@ -856,6 +856,8 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   private readonly inputSources;
   private readonly inputSubscriptions;
   private readonly functionalCells;
+  private previewed;
+  private readonly beforePreview;
   private readonly mountHooks;
   private readonly unmountHooks;
   private rendering;
@@ -865,6 +867,8 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   mount(): void;
   dispose(): void;
   updateProps(props: P): void;
+  previewInputs(values: Readonly<Record<string, unknown>> | null): void;
+  private providedFor;
   private renderFunction;
   private createInputRecord;
   private createContext;
@@ -2636,6 +2640,8 @@ declare class InspectionService {
   };
   preview(node: UiNode, property: string, value: unknown): void;
   endPreview(node: UiNode, property?: string): void;
+  previewInputs(anchorId: string, inputs: Readonly<Record<string, unknown>>): void;
+  endInputPreview(anchorId: string): void;
 }
 interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
@@ -2648,6 +2654,7 @@ interface InspectionHost {
   };
   preview?(node: UiNode, property: string, value: unknown): void;
   endPreview?(node: UiNode, property?: string): void;
+  previewInputs?(anchorId: string, inputs: Readonly<Record<string, unknown>> | null): void;
 }
 declare function audioClock(audio: AudioService, source: string): VideoClock;
 interface AudioElementLike extends EventTarget {

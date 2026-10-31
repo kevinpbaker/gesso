@@ -898,7 +898,8 @@ export class GessoRuntime {
         return { x: box.x, y: box.y, width: box.width, height: box.height };
       },
       preview: (node, property, value) => this.previewProperty(node, property, value),
-      endPreview: (node, property) => this.endPreviews(node, property)
+      endPreview: (node, property) => this.endPreviews(node, property),
+      previewInputs: (anchorId, inputs) => this.resolver.hostFor(anchorId)?.previewInputs(inputs)
     });
     this.services.get(FocusService).setManager(this.input.focus);
     this.services.get(EditingService).setController(this.input.editing);

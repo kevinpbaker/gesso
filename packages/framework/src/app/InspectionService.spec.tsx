@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import type { UiChild } from 'gesso-core';
+import type { UiChild, UiNode } from 'gesso-core';
+import { map } from 'rxjs';
 
-import type { ComponentContext } from '../FunctionComponent';
+import { Component } from '../Component';
+import { controlled } from '../controlled';
+import { Define, Input } from '../decorators';
+import type { ComponentContext, Inputs } from '../FunctionComponent';
+import { input } from '../Input';
 import { InspectionService } from './InspectionService';
 import { mountRuntime } from './RuntimeTestUtils';
 
@@ -72,5 +77,101 @@ describe('InspectionService', () => {
     inspection.endPreview(box);
     mounted.frame();
     expect(box.getProperty('padding')).toBe(8);
+  });
+
+  it('previews a component’s inputs over its parent’s, live, until the preview ends', () => {
+    let inspection!: InspectionService;
+    let turn!: () => void;
+    /** A field drawn with its error under it, and a switch that owns what it was started at. */
+    function Field(inputs: Inputs<{ label: string; error?: string; on?: boolean; defaultOn?: boolean; onChange?: (on: boolean) => void }>): UiChild {
+      const on = controlled({ component: 'Field', name: 'on', source: inputs.on, initial: inputs.defaultOn, fallback: false, onChange: inputs.onChange });
+      turn = () => on.change(!on.current());
+      return (
+        <column>
+          <text text={inputs.label} />
+          <text text={inputs.error.pipe(map(error => error ?? ''))} />
+          <text text={on.value.pipe(map(value => (value ? 'on' : 'off')))} />
+        </column>
+      );
+    }
+    function Canvas(_inputs: unknown, ctx: ComponentContext): UiChild {
+      inspection = ctx.inject(InspectionService);
+      return (
+        <column>
+          <Field label="Email" on={true} />
+        </column>
+      );
+    }
+    const mounted = mountRuntime(
+      <column>
+        <Canvas />
+      </column>
+    );
+    mounted.frame();
+    const texts = (): string[] => {
+      const out: string[] = [];
+      const visit = (node: UiNode): void => {
+        if (node.type === 'text') {
+          out.push(String(node.getProperty('text')));
+        }
+        for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+          visit(child);
+        }
+      };
+      visit(mounted.runtime.debugRoot());
+      return out;
+    };
+    const label = inspection.nodesAt(5, 5).find(node => node.type === 'text')!;
+    const anchor = inspection.inspect(label).owners.find(owner => owner.name === 'Field')!.anchorId;
+    expect(texts()).toEqual(['Email', '', 'on']);
+
+    // A person turns it off; jumped to a state written on, it is on again.
+    turn();
+    mounted.frame();
+    expect(texts()).toEqual(['Email', '', 'off']);
+    inspection.previewInputs(anchor, { error: 'We couldn’t find that email.', on: true });
+    mounted.frame();
+    expect(texts()).toEqual(['Email', 'We couldn’t find that email.', 'on']);
+
+    // Ended, it is as written: no error, and on, as the parent passed it.
+    turn();
+    mounted.frame();
+    inspection.endInputPreview(anchor);
+    mounted.frame();
+    expect(texts()).toEqual(['Email', '', 'on']);
+  });
+
+  it('gives a class component back its own default for an input its parent leaves out', () => {
+    let inspection!: InspectionService;
+    @Define('badge')
+    class Badge extends Component {
+      @Input() tone = input('neutral');
+      override render(): UiChild {
+        return <text text={this.tone} />;
+      }
+    }
+    function Canvas(_inputs: unknown, ctx: ComponentContext): UiChild {
+      inspection = ctx.inject(InspectionService);
+      return (
+        <column>
+          <Badge />
+        </column>
+      );
+    }
+    const mounted = mountRuntime(
+      <column>
+        <Canvas />
+      </column>
+    );
+    mounted.frame();
+    const text = inspection.nodesAt(5, 5).find(node => node.type === 'text')!;
+    const anchor = inspection.inspect(text).owners.find(owner => owner.name === 'badge')!.anchorId;
+
+    inspection.previewInputs(anchor, { tone: 'danger' });
+    mounted.frame();
+    expect(text.getProperty('text')).toBe('danger');
+    inspection.endInputPreview(anchor);
+    mounted.frame();
+    expect(text.getProperty('text')).toBe('neutral');
   });
 });

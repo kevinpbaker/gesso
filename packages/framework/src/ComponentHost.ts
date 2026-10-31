@@ -6,7 +6,7 @@ import type { ChannelReplica } from './channel/ChannelReplica';
 import type { ChannelToken, CommandMap } from './channel/ChannelToken';
 
 import { isObservable, type UiChild } from 'gesso-core';
-import { InputCell, isOutputTarget, outputTargetOf, withBodyOf } from './Input';
+import { forceInput, InputCell, isOutputTarget, outputTargetOf, withBodyOf } from './Input';
 import type { Component } from './Component';
 import { type ComponentElement } from './ComponentElement';
 import {
@@ -67,6 +67,12 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
 
   /** A functional component's cells, by prop name, as they were handed out. */
   private readonly functionalCells = new Map<string, InputCell<unknown>>();
+
+  /** Inputs a tool draws the component with over its parent's, until it ends them; see `previewInputs`. */
+  private previewed: Readonly<Record<string, unknown>> | null = null;
+
+  /** A class's input values from before they were previewed, for the ones its parent does not pass. */
+  private readonly beforePreview = new Map<string, unknown>();
   private readonly mountHooks: Array<() => void> = [];
   private readonly unmountHooks: Array<() => void> = [];
   /** True only while the component function runs; hooks may register then. */
@@ -152,8 +158,61 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       return;
     }
     for (const [name, cell] of this.functionalCells) {
-      this.applyInput(name, cell, props[name], true);
+      this.applyInput(name, cell, this.providedFor(name), true);
     }
+  }
+
+  /**
+   * Feeds the inputs `values` names from them instead of from the
+   * parent, until a call with null hands them back to the parent: a
+   * design tool showing one of a component's states on the live tree.
+   * A later call replaces the earlier one; a new prop from the parent
+   * for a previewed input waits until the preview ends.
+   *
+   * Each input a preview starts or ends is handed its value even when
+   * it holds that value already, as a new value from the parent is: a
+   * control that owns what it was started at (`controlled`) starts
+   * again from it, rather than keeping what a person turned it to.
+   */
+  previewInputs(values: Readonly<Record<string, unknown>> | null): void {
+    const names = new Set([...Object.keys(this.previewed ?? {}), ...Object.keys(values ?? {})]);
+    if (this.instance !== undefined) {
+      // A class keeps its own default for an input its parent leaves
+      // out, which a preview writes over: kept here, and given back.
+      const cells = this.instance as unknown as Record<string, InputCell<unknown>>;
+      const inputs = new Set(getComponentMetadata(this.element.component).inputs);
+      for (const name of Object.keys(values ?? {})) {
+        if (inputs.has(name) && !this.beforePreview.has(name)) {
+          this.beforePreview.set(name, cells[name]!.getValue());
+        }
+      }
+      this.previewed = values;
+      this.wireInputs(names);
+      for (const [name, value] of this.beforePreview) {
+        if (values === null || !Object.hasOwn(values, name)) {
+          this.beforePreview.delete(name);
+          if (this.providedFor(name) === undefined) {
+            cells[name]!.next(value);
+          }
+        }
+      }
+      return;
+    }
+    this.previewed = values;
+    for (const name of names) {
+      const cell = this.functionalCells.get(name);
+      if (cell !== undefined) {
+        this.applyInput(name, cell, this.providedFor(name), true, true);
+      }
+    }
+  }
+
+  /** What an input is fed from: a preview's value for it, else the parent's prop. */
+  private providedFor(name: string): unknown {
+    if (this.previewed !== null && Object.hasOwn(this.previewed, name)) {
+      return this.previewed[name];
+    }
+    return (this.element.props as Record<string, unknown>)[name];
   }
 
   private renderFunction(): UiChild {
@@ -182,7 +241,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
         cell = new InputCell<unknown>(undefined);
         cell.label = `${this.element.tag}.${name}`;
         this.functionalCells.set(name, cell);
-        this.applyInput(name, cell, (this.element.props as Record<string, unknown>)[name], true);
+        this.applyInput(name, cell, this.providedFor(name), true);
       }
       return cell;
     };
@@ -242,13 +301,12 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     };
   }
 
-  private wireInputs(): void {
+  private wireInputs(forced: ReadonlySet<string> = new Set()): void {
     const metadata = getComponentMetadata(this.element.component);
-    const props = this.element.props as Record<string, unknown>;
     for (const inputName of metadata.inputs) {
       const cell = (this.instance as unknown as Record<string, InputCell<unknown>>)[inputName];
       cell.label ??= `${metadata.tag}.${inputName}`;
-      this.applyInput(inputName, cell, props[inputName], false);
+      this.applyInput(inputName, cell, this.providedFor(inputName), false, forced.has(inputName));
     }
   }
 
@@ -272,8 +330,8 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
    * fallback)` supplies one — so a prop the parent stops passing is
    * pushed through as `undefined`, which re-applies the fallback.
    */
-  private applyInput(inputName: string, cell: InputCell<unknown>, provided: unknown, resetWhenAbsent: boolean): void {
-    if (this.inputSources.has(inputName) && this.inputSources.get(inputName) === provided) {
+  private applyInput(inputName: string, cell: InputCell<unknown>, provided: unknown, resetWhenAbsent: boolean, force = false): void {
+    if (!force && this.inputSources.has(inputName) && this.inputSources.get(inputName) === provided) {
       return;
     }
 
@@ -303,13 +361,26 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     }
 
     if (isObservable(provided)) {
-      const subscription = provided.subscribe(value => pushInput(cell, value));
+      // Forced, the first value goes through even when the cell holds it.
+      let first = force;
+      const subscription = provided.subscribe(value => {
+        if (first) {
+          first = false;
+          forceInput(cell, value);
+        } else {
+          pushInput(cell, value);
+        }
+      });
       this.inputSubscriptions.set(inputName, subscription);
       this.subscriptions.add(subscription);
       return;
     }
 
-    pushInput(cell, provided);
+    if (force) {
+      forceInput(cell, provided);
+    } else {
+      pushInput(cell, provided);
+    }
   }
 
   private validateInputs(): void {
