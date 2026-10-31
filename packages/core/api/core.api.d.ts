@@ -283,6 +283,11 @@ declare function createEnvironmentKey<T>(options: {
   compare?: (a: T, b: T) => boolean;
 }): UiEnvironmentKey<T>;
 declare function findEnvironmentKey(name: string): UiEnvironmentKey<unknown> | undefined;
+interface UiProvision<T = unknown> {
+  readonly key: UiEnvironmentKey<T>;
+  readonly value: T;
+}
+declare function provided<T>(key: UiEnvironmentKey<T>, value: T): UiProvision;
 declare class UiEnvironment {
   readonly parent: UiEnvironment | null;
   private readonly values;
@@ -1003,7 +1008,7 @@ declare function isObservable$1(value: unknown): value is Observable<unknown>;
 declare function isUiChild(value: unknown): value is UiChild;
 declare function isUiElement(value: unknown): value is UiElement;
 interface ComponentResolver {
-  resolve(element: ComponentLikeElement, anchorId: string): UiChild;
+  resolve(element: ComponentLikeElement, anchorId: string, anchor?: UiNode): UiChild;
   release(anchorId: string): void;
   flushMounts(): void;
 }
@@ -2110,6 +2115,7 @@ declare const UiProperties: {
   readonly pointer: UiPropertyDefinition<UiPointer | undefined>;
   readonly textStyle: UiPropertyDefinition<UiTextStyle | UiTypographyRole | undefined>;
   readonly contentColor: UiPropertyDefinition<UiColorValue | undefined>;
+  readonly provide: UiPropertyDefinition<readonly UiProvision<unknown>[] | undefined>;
   readonly containerSize: UiPropertyDefinition<UiContainerSize | undefined>;
   readonly insets: UiPropertyDefinition<UiInsetSource | undefined>;
   readonly visualState: UiPropertyDefinition<UiVisualStateSet>;
@@ -2169,7 +2175,7 @@ type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColo
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'touchEmulation' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
-type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets'>;
+type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets' | 'provide'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];
 };
@@ -6113,6 +6119,7 @@ export {
   propertyValuesEqualByName,
   proportionalFontMetrics,
   PropsOf,
+  provided,
   provideEnvironment,
   publishInset,
   PublishInsetArgs,
@@ -6447,6 +6454,7 @@ export {
   UiPropertyValues,
   UiProps,
   UiPropValue,
+  UiProvision,
   UiRadialGradient,
   UiReducedMotionPolicy,
   UiRenderer,
@@ -7069,6 +7077,7 @@ import {
   propertyValuesEqualByName,
   proportionalFontMetrics,
   PropsOf,
+  provided,
   provideEnvironment,
   publishInset,
   PublishInsetArgs,
@@ -7403,6 +7412,7 @@ import {
   UiPropertyValues,
   UiProps,
   UiPropValue,
+  UiProvision,
   UiRadialGradient,
   UiReducedMotionPolicy,
   UiRenderer,
@@ -7860,6 +7870,7 @@ export {
   propertyValuesEqual,
   propertyValuesEqualByName,
   proportionalFontMetrics,
+  provided,
   provideEnvironment,
   publishInset,
   radialGradient,
@@ -8399,6 +8410,7 @@ export {
   UiPropertyName,
   UiPropertyValueOf,
   UiPropertyValues,
+  UiProvision,
   UiRadialGradient,
   UiResolvedTextSpan,
   UiRole,

@@ -467,5 +467,9 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Environment',
     note: 'Declares this node a size query container and provides its content size to the subtree.'
   },
-  insets: { group: 'Environment', note: 'Provides the registry a floating bar publishes into and a page reads.' }
+  insets: { group: 'Environment', note: 'Provides the registry a floating bar publishes into and a page reads.' },
+  provide: {
+    group: 'Environment',
+    note: 'Provides values for keys made with createEnvironmentKey; a component reads one with ctx.environment(key).'
+  }
 } as const;

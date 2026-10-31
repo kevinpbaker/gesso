@@ -143,6 +143,7 @@ function may ask of the framework while it runs.
 | `onUnmount(fn)`      | Runs once when the component leaves the tree                     |
 | `effect(source, fn)` | Follows a stream for as long as the component is in the tree     |
 | `bounds()`           | A cell holding a node's box, with the modifier that fills it     |
+| `environment(key)`   | The value a node above provides for a key, as the body runs      |
 
 Most values a component reads are bound into the tree, and a binding
 needs no lifecycle: it is torn down with the node it feeds. `effect` is

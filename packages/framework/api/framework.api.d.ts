@@ -265,6 +265,7 @@ import {
   LayoutBox,
   Reactive,
   UiChild,
+  UiEnvironmentKey,
   UiModifier
 } from "gesso-core";
 type Command = (...args: never[]) => void;
@@ -408,6 +409,7 @@ interface ComponentContext {
   onUnmount(hook: () => void): void;
   effect<T>(source: Observable<T>, run: (value: T) => void): Subscription;
   bounds(label?: string): BoundsCell;
+  environment<T>(key: UiEnvironmentKey<T>): T;
 }
 type Inputs<P> = { readonly [K in keyof P]-?: InputCell<InputValue<P[K]>>; };
 type InputValue<V> = [Exclude<V, undefined>] extends [Observable<infer T>] ? T | Extract<V, undefined> : V;
@@ -848,6 +850,7 @@ declare class OverlayLayer extends Component {
 declare class ComponentHost<P extends Record<string, unknown> = Record<string, unknown>> {
   private readonly services;
   private readonly channels;
+  private readonly anchor;
   readonly instance: Component | undefined;
   readonly element: ComponentElement<P>;
   readonly subscriptions: Subscription;
@@ -861,7 +864,8 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   private readonly mountHooks;
   private readonly unmountHooks;
   private rendering;
-  constructor(element: ComponentElement<P>, services?: ServiceRegistry, channels?: ChannelRegistry);
+  constructor(element: ComponentElement<P>, services?: ServiceRegistry, channels?: ChannelRegistry,
+  anchor?: UiNode | null);
   get component(): ComponentType;
   render(): UiChild;
   mount(): void;
@@ -885,7 +889,7 @@ declare class ComponentHostResolver implements ComponentResolver {
   private readonly hosts;
   private pendingMounts;
   constructor(services?: ServiceRegistry, channels?: ChannelRegistry);
-  resolve(element: ComponentLikeElement, anchorId: string): UiChild;
+  resolve(element: ComponentLikeElement, anchorId: string, anchor?: UiNode): UiChild;
   release(anchorId: string): void;
   flushMounts(): void;
   dispose(): void;

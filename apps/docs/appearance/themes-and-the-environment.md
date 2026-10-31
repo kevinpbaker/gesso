@@ -387,6 +387,29 @@ its text in that theme's.
 inherited and re-provided onto overlay content, and no element that
 ships resolves a colour from it today.
 
+A key of your own travels the same way. `createEnvironmentKey` makes
+one, `provide` on any element gives it a value for everything under
+that element, and a component reads the nearest one with
+`ctx.environment(key)`, or the key's default when nothing above
+provides it:
+
+```tsx
+const Place = createEnvironmentKey<string>({ name: 'app.place', defaultValue: 'page' });
+
+<box provide={[provided(Place, 'preview')]}>
+  <Card />
+</box>;
+
+function Card(_inputs: unknown, ctx: ComponentContext) {
+  const place = ctx.environment(Place); // 'preview'
+}
+```
+
+It is read as the body runs, from where the component is placed, so it
+is a value and not a stream. A value that changes is provided as a
+source to follow, such as a cell, which is also what keeps it from
+rebuilding the environment of the subtree each time it changes.
+
 Motion is deliberately not here. Durations, easings and springs are
 named the way colours are, but they are not a field on `UiTheme`,
 because a theme value is resolved per node and an animation drives a

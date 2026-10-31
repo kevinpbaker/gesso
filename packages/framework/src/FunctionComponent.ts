@@ -1,6 +1,6 @@
 import type { Observable, Subscription } from 'rxjs';
 
-import type { Reactive, UiChild } from 'gesso-core';
+import type { Reactive, UiChild, UiEnvironmentKey } from 'gesso-core';
 import type { BoundsCell } from './bounds';
 import { Component } from './Component';
 import type { InputCell, OutputTarget } from './Input';
@@ -77,6 +77,19 @@ export interface ComponentContext {
    *   <box modifiers={[track.modifier]} onPointerDown={e => seek(e.x - track.value.x)} />
    */
   bounds(label?: string): BoundsCell;
+
+  /**
+   * What the component is placed under for `key`: the nearest value a
+   * node above it provides (`provide={[provided(key, value)]}`), else
+   * the key's default.
+   *
+   * Read as the body runs, from where the component is placed, so it
+   * is a value rather than a stream: a component that has to follow a
+   * change is given a source to follow (a cell) rather than each value.
+   * A design tool tells the screen it plays from the same screen drawn
+   * on its board this way.
+   */
+  environment<T>(key: UiEnvironmentKey<T>): T;
 }
 
 /**

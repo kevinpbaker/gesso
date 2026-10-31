@@ -51,3 +51,28 @@ export function createEnvironmentKey<T>(options: {
 export function findEnvironmentKey(name: string): UiEnvironmentKey<unknown> | undefined {
   return keysByName.get(name);
 }
+
+/**
+ * A value a node provides for a key of your own, to everything under
+ * it: `provide={[provided(Session, session)]}`.
+ *
+ * The keys Gesso declares are provided by props of their own (`theme`,
+ * `pointer`, `contentColor`); this is how a key made with
+ * `createEnvironmentKey` is. A component under the node reads it with
+ * `ctx.environment(key)`. What the environment holds is compared by
+ * the key's `compare`, else by identity, so a value that changes often
+ * is better provided as a source (a cell) than as each new value: the
+ * source is set once and never compares unequal again.
+ */
+export interface UiProvision<T = unknown> {
+  readonly key: UiEnvironmentKey<T>;
+  readonly value: T;
+}
+
+/**
+ * A value for `key`, for a node's `provide`. Typed against the key
+ * here and erased in the result, so one list holds keys of any type.
+ */
+export function provided<T>(key: UiEnvironmentKey<T>, value: T): UiProvision {
+  return { key: key as UiEnvironmentKey<unknown>, value };
+}

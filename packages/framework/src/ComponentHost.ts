@@ -5,7 +5,7 @@ import { ServiceRegistry } from './service/ServiceRegistry';
 import type { ChannelReplica } from './channel/ChannelReplica';
 import type { ChannelToken, CommandMap } from './channel/ChannelToken';
 
-import { isObservable, type UiChild } from 'gesso-core';
+import { isObservable, type UiChild, type UiEnvironmentKey, type UiNode } from 'gesso-core';
 import { forceInput, InputCell, isOutputTarget, outputTargetOf, withBodyOf } from './Input';
 import type { Component } from './Component';
 import { type ComponentElement } from './ComponentElement';
@@ -81,7 +81,9 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   constructor(
     element: ComponentElement<P>,
     private readonly services: ServiceRegistry = new ServiceRegistry(),
-    private readonly channels: ChannelRegistry = new ChannelRegistry()
+    private readonly channels: ChannelRegistry = new ChannelRegistry(),
+    /** The slot's node, under its parent, for `ctx.environment`; null for a host made outside a tree. */
+    private readonly anchor: UiNode | null = null
   ) {
     this.element = element;
     if (isClassComponent(element.component)) {
@@ -297,6 +299,17 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
         const cell = bounds(label ?? `${this.element.tag}.bounds`);
         this.subscriptions.add(() => cell.complete());
         return cell;
+      },
+      environment: <T>(key: UiEnvironmentKey<T>): T => {
+        // The anchor is under its parent before the body runs, and a
+        // node the builder made in this pass already carries what it
+        // will inherit, so the nearest environment up is the one.
+        for (let at: UiNode | null = this.anchor; at !== null; at = at.parent) {
+          if (at.environment !== null) {
+            return at.environment.get(key);
+          }
+        }
+        return key.defaultValue;
       }
     };
   }

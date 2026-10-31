@@ -553,7 +553,7 @@ export class UiGraphBuilder {
       }
     }
 
-    this.reconcileChildren(anchor, [resolver.resolve(element, anchorId)]);
+    this.reconcileChildren(anchor, [resolver.resolve(element, anchorId, anchor)]);
     this.reconciledFrom.set(anchor, element);
     return anchor;
   }

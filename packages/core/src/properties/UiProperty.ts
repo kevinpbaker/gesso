@@ -6,7 +6,7 @@ import type { UiContainerSize } from '../environment/UiContainerSize';
 import type { UiInsetSource } from '../environment/UiInsets';
 import type { UiPointer } from '../environment/UiPointer';
 import { defineProperty, type UiPropertyDefinition } from './UiPropertyDefinition';
-import type { UiEnvironmentKey } from '../environment/UiEnvironmentKey';
+import type { UiEnvironmentKey, UiProvision } from '../environment/UiEnvironmentKey';
 import { UiBasicColors, colorValuesEqual } from './UiColor';
 import { UiBorderRadiuses, borderRadiusValuesEqual } from './UiBorderRadius';
 import type { UiBoxShadows } from './UiBoxShadow';
@@ -1801,6 +1801,14 @@ export const UiProperties = {
 
   contentColor: defineProperty<UiColorValue | undefined>({
     name: 'contentColor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: E
+  }),
+
+  /** Values for keys of the application's own, provided to the subtree; see `UiProvision`. */
+  provide: defineProperty<readonly UiProvision[] | undefined>({
+    name: 'provide',
     defaultValue: undefined,
     inherited: false,
     affects: E

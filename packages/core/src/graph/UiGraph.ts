@@ -7,7 +7,7 @@ import { type BindingId, UiBinding } from '../bindings/UiBinding';
 import type { UiChildrenBinding } from '../bindings/UiChildrenBinding';
 import type { UiEventBinding } from '../bindings/UiEventBinding';
 import { UiEnvironment } from '../environment/UiEnvironment';
-import { findEnvironmentKey, type UiEnvironmentKey } from '../environment/UiEnvironmentKey';
+import { findEnvironmentKey, type UiEnvironmentKey, type UiProvision } from '../environment/UiEnvironmentKey';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { withPointer } from '../environment/UiPointer';
 import { isTypographyRole } from '../environment/UiTypography';
@@ -906,6 +906,11 @@ export class UiGraph {
     const contentColor = node.getProperty<unknown>('contentColor');
     if (contentColor !== undefined) {
       env = env.set(UiEnvironmentKeys.contentColor as UiEnvironmentKey<unknown>, contentColor);
+    }
+
+    const provide = node.getProperty<readonly UiProvision[] | undefined>('provide');
+    for (const each of provide ?? []) {
+      env = env.set(each.key as UiEnvironmentKey<unknown>, each.value);
     }
 
     // The last two provide a *source* rather than a value: a size that

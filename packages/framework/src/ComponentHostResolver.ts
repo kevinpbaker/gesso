@@ -1,4 +1,4 @@
-import type { ComponentResolver, ComponentLikeElement, UiChild } from 'gesso-core';
+import type { ComponentResolver, ComponentLikeElement, UiChild, UiNode } from 'gesso-core';
 import type { ComponentElement } from './ComponentElement';
 import { ComponentHost } from './ComponentHost';
 import { ChannelRegistry } from './channel/ChannelRegistry';
@@ -25,7 +25,7 @@ export class ComponentHostResolver implements ComponentResolver {
     private readonly channels: ChannelRegistry = new ChannelRegistry()
   ) {}
 
-  resolve(element: ComponentLikeElement, anchorId: string): UiChild {
+  resolve(element: ComponentLikeElement, anchorId: string, anchor?: UiNode): UiChild {
     let host = this.hosts.get(anchorId);
 
     if (host !== undefined && host.component !== element.component) {
@@ -37,7 +37,7 @@ export class ComponentHostResolver implements ComponentResolver {
     }
 
     if (host === undefined) {
-      host = new ComponentHost(element as ComponentElement, this.services, this.channels);
+      host = new ComponentHost(element as ComponentElement, this.services, this.channels, anchor ?? null);
       this.hosts.set(anchorId, host);
       this.pendingMounts.push(host);
     } else {

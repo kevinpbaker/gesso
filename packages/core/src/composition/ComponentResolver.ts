@@ -1,3 +1,4 @@
+import type { UiNode } from '../graph/UiNode';
 import type { ComponentLikeElement, UiChild } from './UiElement';
 
 /**
@@ -23,8 +24,11 @@ export interface ComponentResolver {
    * Called on every reconcile pass that reaches the slot. Returning
    * the same value for an unchanged component is expected; the
    * builder reconciles it idempotently.
+   *
+   * `anchor` is the slot's node, already under its parent, so what
+   * the component is placed in can be read while its body runs.
    */
-  resolve(element: ComponentLikeElement, anchorId: string): UiChild;
+  resolve(element: ComponentLikeElement, anchorId: string, anchor?: UiNode): UiChild;
 
   /**
    * Tears down the host owning `anchorId`.
