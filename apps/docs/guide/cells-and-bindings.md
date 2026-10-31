@@ -255,3 +255,27 @@ What a cell must not become is the application's data layer. When state
 outlives a screen, is authoritative, or belongs on another thread, it
 goes behind a channel. The framework has an opinion about the barrier
 and none at all about what lives above it.
+
+## Values a few screens share
+
+A prototype has no application behind it, and still one screen hands
+the next what was typed: the email on Forgot password, shown by Check
+email. `sharedValue` is that, scoped to a node rather than to the app.
+A node provides a `SharedValues`, and every component under it asking
+for the same name has the same cell; with none above, each has a cell
+of its own at its own start.
+
+```tsx
+const values = new SharedValues();
+<box provide={[provided(SharedValuesKey, values)]}>{steps}</box>;
+
+function ForgotPassword(_inputs: unknown, ctx: ComponentContext) {
+  const email = sharedValue(ctx, 'email', '');
+  return <TextInput label="Email" {...bind(email)} />;
+}
+```
+
+The first component to ask makes the value at its start, `reset()`
+puts every value back at its start, and `values` lists them as they
+are. A design tool plays a screen this way after the screens before
+it, and draws the same screen on its board alone, as written.

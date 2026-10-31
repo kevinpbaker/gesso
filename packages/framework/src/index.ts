@@ -26,6 +26,7 @@ export { bind } from './bind';
 export { bounds, BoundsCell } from './bounds';
 export { themeTokenCell, ThemeTokenCell } from './themeTokenCell';
 export { controlled, type ControlledOptions, type ControlledValue } from './controlled';
+export { SharedValues, SharedValuesKey, sharedValue } from './sharedValue';
 export { Define, Input, Output, Inject, Channel } from './decorators';
 export * from './channel';
 export { structurallyEqual } from './channel/structuralEquals';

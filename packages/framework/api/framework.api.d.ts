@@ -773,6 +773,16 @@ interface ControlledOptions<T> {
   readonly heardBy?: readonly OutputCell<never>[];
 }
 declare function controlled<T>(options: ControlledOptions<T>): ControlledValue<T>;
+declare class SharedValues {
+  private readonly cells;
+  readonly values: InternalState<ReadonlyMap<string, unknown>>;
+  cell<T>(name: string, start: T): InternalState<T>;
+  set(name: string, value: unknown): void;
+  reset(): void;
+  private publish;
+}
+declare const SharedValuesKey: import("gesso-core").UiEnvironmentKey<SharedValues | null>;
+declare function sharedValue<T>(ctx: ComponentContext, name: string, start: T): InternalState<T>;
 declare function Define(tag: string): ClassDecorator;
 declare function Input(): PropertyDecorator;
 declare function Output(): PropertyDecorator;
@@ -3120,6 +3130,9 @@ export {
   SemanticsMirror,
   SemanticsMirrorSink,
   setPerformanceMarks$1,
+  sharedValue,
+  SharedValues,
+  SharedValuesKey,
   ShellFile,
   ShellFileRequest,
   ShellFileResult,
@@ -3436,6 +3449,9 @@ import {
   SemanticsMirror,
   SemanticsMirrorSink,
   setPerformanceMarks,
+  sharedValue,
+  SharedValues,
+  SharedValuesKey,
   ShellFile,
   ShellFileRequest,
   ShellFileResult,
@@ -3623,6 +3639,9 @@ export {
   servePorts,
   ServiceRegistry,
   setPerformanceMarks,
+  sharedValue,
+  SharedValues,
+  SharedValuesKey,
   ShellService,
   ShellStorage,
   shellStorageDenied,
