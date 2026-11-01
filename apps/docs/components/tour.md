@@ -55,7 +55,11 @@ The dim is the shadow of a rounded box laid over the target with
 `placement: 'over'`, the overlay placement that lays an entry over its
 anchor at the anchor's size, grown by the offset. So the hole follows
 the target through scrolling and layout, as a tooltip follows its
-anchor. Around the hole, boxes reaching past the screen take every
+anchor. From one step to the next the hole glides, over the design's
+`normal` motion, from where it was to the new target; a step with no
+target shrinks it to a point in the middle of the last one, and the
+target after grows out of one. On a settled clock, a design tool's
+board, it is there at once. Around the hole, boxes reaching past the screen take every
 press and wheel, so the page under the dim stays as the tour left it;
 the target itself, in the hole, can still be pressed. The card has the
 keyboard while it is open: Escape ends the tour, and the arrow keys
@@ -74,9 +78,10 @@ clock, a design tool's board, the dim and the card are drawn at rest.
 `Tour.spec.ts` mounts a tour of three steps and asserts that the hole
 is the first target grown by the padding, with the card under it; that
 a press on the dim reaches nothing while one in the hole reaches the
-target; that Next and Back move the hole and the card, a step with no
-target centres its card, and Done ends the tour, reporting each step
-asked for; that Escape ends it; and that a `null` step shows nothing.
+target; that Next glides the hole, the same dim, part way and then
+onto the next target, Back moves it back, a step with no target
+centres its card and shrinks the hole to a point in the middle of the
+last target, and Done ends the tour, reporting each step asked for; that Escape ends it; and that a `null` step shows nothing.
 A layout spec checks that `placement: 'over'` lays a node over its
 anchor, grown by the offset. The spec beside the example walks it to
 the end and starts it again.

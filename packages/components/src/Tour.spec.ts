@@ -68,28 +68,41 @@ describe('Tour', () => {
     const asked: (number | null)[] = [];
     const { ui } = mount({ defaultStep: 0, onStepChange: step => asked.push(step) });
     const dim = holeOf(ui.allNodes());
+    let time = 1000;
+    const settle = () => {
+      for (let i = 0; i < 30; i++) {
+        time += 16;
+        ui.frame(time);
+      }
+    };
     ui.fireEvent.click(ui.getByRole('button', { name: 'Next' }));
-    ui.frame();
-    // The same dim, moved: not made again, so it does not fade out and back in.
+    ui.frame(time);
+    time += 100;
+    ui.frame(time);
+    // The same dim, gliding: not made again, so it does not fade out and back in, and part way there.
     expect(holeOf(ui.allNodes())).toBe(dim);
-    expect(ui.getLayout(dim).y).toBe(200 - 8);
+    const partWay = ui.getLayout(dim).y;
+    expect(partWay).toBeGreaterThan(20 - 8);
+    expect(partWay).toBeLessThan(200 - 8);
+    settle();
+    expect(ui.getLayout(dim)).toEqual({ x: 12, y: 200 - 8, width: 116, height: 56 });
     // Opened above the target, as the step asks.
     const card = ui.getLayout(ui.getByRole('dialog', { name: 'Clear it away' }));
     expect(card.y + card.height).toBe(200 - 8 - 8);
 
     ui.fireEvent.click(ui.getByRole('button', { name: 'Back' }));
-    ui.frame();
+    settle();
     expect(ui.queryByRole('dialog', { name: 'Write a message' })).not.toBeNull();
 
     ui.fireEvent.click(ui.getByRole('button', { name: 'Next' }));
-    ui.frame();
+    settle();
     ui.fireEvent.click(ui.getByRole('button', { name: 'Next' }));
-    ui.frame();
+    settle();
     const last = ui.getLayout(ui.getByRole('dialog', { name: 'That is all' }));
     expect(last.x).toBe((400 - 280) / 2);
-    // Still the one dim, its hole shrunk to nothing.
+    // Still the one dim, its hole shrunk to a point in the middle of the last target.
     expect(holeOf(ui.allNodes())).toBe(dim);
-    expect(ui.getLayout(dim)).toMatchObject({ width: 0, height: 0 });
+    expect(ui.getLayout(dim)).toEqual({ x: 20 + 50, y: 200 + 20, width: 0, height: 0 });
 
     ui.fireEvent.click(ui.getByRole('button', { name: 'Done' }));
     ui.frame();

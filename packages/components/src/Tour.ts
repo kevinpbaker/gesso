@@ -1,16 +1,31 @@
 import { combineLatest, map, of, switchMap, type Observable, type Subscription } from 'rxjs';
 
-import { Box, Column, fade, motion, percent, Row, Text, type UiChild, type UiNode, type UiNodeRef } from 'gesso-core';
 import {
+  Box,
+  Column,
+  fade,
+  motion,
+  percent,
+  Row,
+  Text,
+  UiEnvironmentKeys,
+  type UiChild,
+  type UiNode,
+  type UiNodeRef
+} from 'gesso-core';
+import {
+  AnimationService,
   createComponent,
   FocusService,
+  InspectionService,
   input,
   internalState,
   themeTokenCell,
   type ComponentContext,
   type InternalState,
   type Inputs,
-  type OverlayPlacement
+  type OverlayPlacement,
+  type OverlayRect
 } from 'gesso-framework';
 import { Button } from './Button';
 import { controlled } from './controlled';
@@ -86,6 +101,10 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
   const padding = input(inputs.padding, 8);
   const doneLabel = input(inputs.doneLabel, 'Done');
   const focus = ctx.inject(FocusService);
+  const inspection = ctx.inject(InspectionService);
+  const animations = ctx.inject(AnimationService);
+  // Where it is drawn: a design tool's board settles the glide, its player may slow it.
+  const clock = ctx.environment(UiEnvironmentKeys.clock);
   const hole = useOverlay(ctx, 'tour-dim');
   const card = useOverlay(ctx, 'tour-card');
   const tokens = themeTokenCell(controlTokens);
@@ -218,26 +237,118 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
    * between steps.
    */
   let shownDim: UiChild | null = null;
-  const show = (now: { at: number; node: UiNode | null | undefined } | null): void => {
-    if (now === null || now.node === null) {
+  /**
+   * Where the hole is: over a target, or shrunk to a point (null for the
+   * middle of what the tour is drawn in, where it opens on a step with no
+   * target); and the
+   * glide moving it, if one is. Measured only when a step changes, by
+   * which time the tree has been laid out.
+   */
+  let holeIs: { readonly over: UiNode } | { readonly point: OverlayRect | null } | null = null;
+  let glide: { readonly from: OverlayRect; readonly to: OverlayRect; readonly progress: InternalState<number> } | null =
+    null;
+  const grownBox = (node: UiNode): OverlayRect => {
+    const box = inspection.box(node);
+    const gap = padding.value;
+    return { x: box.x - gap, y: box.y - gap, width: box.width + 2 * gap, height: box.height + 2 * gap };
+  };
+  const pointAt = (rect: OverlayRect): OverlayRect => ({
+    x: rect.x + rect.width / 2,
+    y: rect.y + rect.height / 2,
+    width: 0,
+    height: 0
+  });
+  /** The hole as it is drawn now, in the tree's coordinates and grown by the padding. */
+  const holeNow = (): OverlayRect | null => {
+    if (glide !== null) {
+      return between(glide.from, glide.to, glide.progress.getValue());
+    }
+    if (holeIs === null) {
+      return null;
+    }
+    // A tour that opened on a step with no target is in the middle of what it is drawn in.
+    return 'over' in holeIs
+      ? grownBox(holeIs.over)
+      : (holeIs.point ?? pointAt(inspection.box(placeholder!.parent ?? placeholder!)));
+  };
+
+  /**
+   * The hole's part of its anchor while it glides from `from` to `to`:
+   * the hole stays anchored, and so follows its anchor through a scroll,
+   * while it moves. Undefined once there for a target, which is then the
+   * whole of it, as it changes size.
+   */
+  const gliding = (
+    anchor: UiNode,
+    from: OverlayRect,
+    to: OverlayRect,
+    whole: boolean
+  ): Observable<OverlayRect | undefined> => {
+    const gap = padding.value;
+    const base = inspection.box(anchor);
+    const part = (hole: OverlayRect): OverlayRect => ({
+      x: hole.x + gap - base.x,
+      y: hole.y + gap - base.y,
+      width: hole.width - 2 * gap,
+      height: hole.height - 2 * gap
+    });
+    const progress = internalState(0);
+    const mine = { from, to, progress };
+    glide = mine;
+    animations.animate(progress as unknown as { value: number }, 1, { duration: 'normal', easing: 'standard', clock });
+    return progress.pipe(
+      map(t => {
+        if (t >= 1 && glide === mine) {
+          glide = null;
+        }
+        return t >= 1 && whole ? undefined : part(between(from, to, t));
+      })
+    );
+  };
+
+  const show = (next: { at: number; node: UiNode | null | undefined } | null): void => {
+    if (next === null || next.node === null) {
       // Closed, or its target not drawn yet: nothing over the page until it is.
       card.hide();
       hole.hide();
       shownDim = null;
+      holeIs = null;
+      glide = null;
       release();
       return;
     }
+    const was = shownDim === null ? null : holeNow();
     shownDim ??= dim();
-    const current = steps()[now.at]!;
-    if (now.node === undefined) {
-      // No target: the same dim, its hole shrunk to nothing, and the card in the middle.
-      hole.show(shownDim, { anchor: placeholder, placement: 'over', offset: 0, environment: placeholder });
-      card.show(cardFor(now.at), { center: 'both', environment: placeholder });
+    const current = steps()[next.at]!;
+    const gap = padding.value;
+    if (next.node === undefined) {
+      // No target: the same dim, its hole shrunk to a point in the middle
+      // of where it was, and the card in the middle.
+      const point = was === null ? null : pointAt(was);
+      holeIs = { point };
+      hole.show(shownDim, {
+        anchor: placeholder,
+        anchorRect:
+          was === null || point === null
+            ? { x: gap, y: gap, width: -2 * gap, height: -2 * gap }
+            : gliding(placeholder!, was, point, false),
+        placement: 'over',
+        offset: gap,
+        environment: placeholder
+      });
+      card.show(cardFor(next.at), { center: 'both', environment: placeholder });
       return;
     }
-    hole.show(shownDim, { anchor: now.node, placement: 'over', offset: padding.value, environment: placeholder });
-    card.show(cardFor(now.at), {
-      anchor: now.node,
+    holeIs = { over: next.node };
+    hole.show(shownDim, {
+      anchor: next.node,
+      anchorRect: was === null ? undefined : gliding(next.node, was, grownBox(next.node), true),
+      placement: 'over',
+      offset: gap,
+      environment: placeholder
+    });
+    card.show(cardFor(next.at), {
+      anchor: next.node,
       placement: (current.side ?? 'bottom') as OverlayPlacement,
       offset: padding.value + 8,
       environment: placeholder
@@ -256,4 +367,14 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
   });
 
   return Box({ position: 'absolute', width: 0, height: 0, ref: node => (placeholder = node) });
+}
+
+/** The rectangle a fraction `t` of the way from `a` to `b`. */
+function between(a: OverlayRect, b: OverlayRect, t: number): OverlayRect {
+  return {
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+    width: a.width + (b.width - a.width) * t,
+    height: a.height + (b.height - a.height) * t
+  };
 }
