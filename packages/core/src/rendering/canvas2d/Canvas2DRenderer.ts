@@ -10,7 +10,7 @@ import { gradientPaint } from '../../properties/UiGradient';
 import { colorToCss, computeObjectFitRect, createPaintState, isPaintVisible, resolvePaintState } from '../PaintState';
 import type { PaintBoxShadow, PaintState } from '../PaintState';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
-import { boxShadowRadius } from '../../properties/UiBoxShadow';
+import { boxShadowRadius, fittedShadowRadius } from '../../properties/UiBoxShadow';
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { RenderContext } from '../RenderContext';
 import {
@@ -793,7 +793,9 @@ export class Canvas2DRenderer implements UiRenderer {
    */
   private paintShadows(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState, inset: boolean): void {
     const shadows = paint.boxShadows;
-    const radius = borderRadiusIsZero(paint.borderRadius) ? 0 : uniformBorderRadius(paint.borderRadius);
+    const radius = borderRadiusIsZero(paint.borderRadius)
+      ? 0
+      : fittedShadowRadius(uniformBorderRadius(paint.borderRadius), rec.width, rec.height);
     const dpr = this.surface.dpr;
     const m = ctx.getTransform?.() ?? { a: dpr, b: 0, c: 0, d: dpr };
     const scale = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c));

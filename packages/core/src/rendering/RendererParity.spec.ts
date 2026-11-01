@@ -1117,6 +1117,31 @@ describe('renderer parity: Canvas2D and WebGPU paint the same draws', () => {
     expect(inset.clip).toEqual({ x: 60, y: 60, width: 200, height: 100 });
   });
 
+  it('a shadow around a rounded box of no size, which leaves no hole: its corners fit it', () => {
+    // A spotlight's hole shrunk to a point: 0 by 0, rounded 16, its
+    // shadow spread over everything. The hole under it is nothing, not
+    // a 16-pixel circle.
+    const h = harness(400, 300);
+    const root = h.createNode('app', UiNodeType.Box);
+    root.setProperty('width', 400);
+    root.setProperty('height', 300);
+    h.append(
+      root,
+      box(h, 'point', {
+        position: 'absolute',
+        left: 200,
+        top: 150,
+        width: 0,
+        height: 0,
+        borderRadius: 16,
+        boxShadows: [boxShadow(0, 0, 0, 500, '#000000')]
+      })
+    );
+    const draws = expectParity(h, root, Constraints.tight(400, 300));
+    expect(draws.map(d => d.kind)).toEqual(['shadow']);
+    expect(draws[0]!.cutout).toMatchObject({ width: 0, height: 0, radius: 0 });
+  });
+
   it('a shadow cast on screen by a box that is off it', () => {
     // Culled by its box, the card would take its shadow with it. Its
     // extent reaches as far as the shadow does, and the empty wrapper

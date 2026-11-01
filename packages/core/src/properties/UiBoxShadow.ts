@@ -121,6 +121,17 @@ export const BOX_SHADOW_BLUR_REACH = 1.5;
  * one's hole shrinks with it. A square corner stays square, as CSS
  * keeps it.
  */
+/**
+ * A box's corner radius as its shadows take it: no more than half its
+ * shorter side, as CSS shrinks radii to fit the box before a shadow is
+ * spread from them. A box of no size with a 16 radius has no corners,
+ * so the hole an outer shadow leaves under it is nothing: a spotlight's
+ * hole shrunk to a point showed a 16-pixel circle where there was none.
+ */
+export function fittedShadowRadius(boxRadius: number, width: number, height: number): number {
+  return Math.max(0, Math.min(boxRadius, width / 2, height / 2));
+}
+
 export function boxShadowRadius(boxRadius: number, spreadRadius: number, inset: boolean): number {
   if (boxRadius <= 0) {
     return 0;

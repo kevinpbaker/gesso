@@ -3547,9 +3547,27 @@ export class LayoutEngine {
   ): void {
     this.measure(child, new Constraints(0, Math.max(0, block.width), 0, Math.max(0, block.height)));
 
-    const part = child.properties.get('anchorRect') as
+    const given = child.properties.get('anchorRect') as
       | { x: number; y: number; width: number; height: number }
       | undefined;
+    // Over its anchor, the box covered is the anchor's (or its part's)
+    // grown by the offset, worked out in the anchor's own space and then
+    // carried to the node like any anchor box: so a gap under a zoom is
+    // zoomed with the anchor, and a part shrunk to less than nothing (a
+    // spotlight's hole closing to a point) covers nothing. Grown after
+    // the transforms, a zero-size part with a negative size was carried
+    // as a positive one, and a hole meant to be a point was a rounded
+    // square twice the offset across in a scaled frame.
+    const over = child.properties.get('placement') === 'over';
+    const gap = over ? (this.numberProp(child, 'anchorOffset') ?? 0) : 0;
+    const part = over
+      ? {
+          x: (given?.x ?? 0) - gap,
+          y: (given?.y ?? 0) - gap,
+          width: Math.max(0, (given?.width ?? anchorRec.width) + 2 * gap),
+          height: Math.max(0, (given?.height ?? anchorRec.height) + 2 * gap)
+        }
+      : given;
     // A transform is paint-only, so the record of an anchor inside a
     // panned or zoomed subtree is where it would be drawn untransformed:
     // a tooltip placed against it stood where a map card would be at
@@ -3565,6 +3583,10 @@ export class LayoutEngine {
           ? this.projectBox(anchor, anchorRec.x + part.x, anchorRec.y + part.y, part.width, part.height)
           : this.projectBox(anchor, anchorRec.x, anchorRec.y, anchorRec.width, anchorRec.height);
       const local = this.unprojectBox(child, seen);
+      if (over) {
+        this.placeOver(child, local.x, local.y, local.width, local.height);
+        return;
+      }
       this.placeBeside(child, cRec, local.x, local.y, local.width, local.height, block);
       return;
     }
@@ -3580,11 +3602,23 @@ export class LayoutEngine {
     const ay = anchorRec.y + stickyAnchor.y - scrollAnchor.y + scrollChild.y - stickyChild.y;
     // A part of the anchor, when one is named: the same placement against
     // a smaller box that moves with it.
+    if (over) {
+      this.placeOver(child, ax + part!.x, ay + part!.y, part!.width, part!.height);
+      return;
+    }
     if (part !== undefined && part !== null) {
       this.placeBeside(child, cRec, ax + part.x, ay + part.y, part.width, part.height, block);
       return;
     }
     this.placeBeside(child, cRec, ax, ay, anchorRec.width, anchorRec.height, block);
+  }
+
+  /** Lays a node exactly over a box, at its size, whatever size it asks for: `placement: 'over'`. */
+  private placeOver(child: UiNode, x: number, y: number, width: number, height: number): void {
+    const w = Math.max(0, width);
+    const h = Math.max(0, height);
+    this.measure(child, new Constraints(w, w, h, h));
+    this.assignBox(child, x, y, w, h);
   }
 
   /**
@@ -3637,14 +3671,10 @@ export class LayoutEngine {
     point = false
   ): void {
     const gap = this.numberProp(child, 'anchorOffset') ?? 0;
-    // Over the anchor rather than beside it: its box, grown by the gap,
-    // whatever the node's own size. Nothing to flip or keep inside the
-    // block; the node is wherever the anchor is.
+    // Over a point rather than beside it (an anchored node is placed
+    // over in `placeAnchored`): the point grown by the gap.
     if (child.properties.get('placement') === 'over') {
-      const overWidth = Math.max(0, aw + 2 * gap);
-      const overHeight = Math.max(0, ah + 2 * gap);
-      this.measure(child, new Constraints(overWidth, overWidth, overHeight, overHeight));
-      this.assignBox(child, ax - gap, ay - gap, overWidth, overHeight);
+      this.placeOver(child, ax - gap, ay - gap, aw + 2 * gap, ah + 2 * gap);
       return;
     }
     let width = cRec.measuredWidth;

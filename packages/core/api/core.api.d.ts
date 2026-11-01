@@ -1374,6 +1374,7 @@ declare function boxShadow(offsetX: number, offsetY: number, blurRadius: number,
 declare function boxShadowsEqual(a: UiBoxShadow, b: UiBoxShadow): boolean;
 declare function boxShadowArraysEqual(a: readonly UiBoxShadow[], b: readonly UiBoxShadow[]): boolean;
 declare const BOX_SHADOW_BLUR_REACH = 1.5;
+declare function fittedShadowRadius(boxRadius: number, width: number, height: number): number;
 declare function boxShadowRadius(boxRadius: number, spreadRadius: number, inset: boolean): number;
 declare function boxShadowReach(shadows: readonly UiBoxShadow[], out: {
   left: number;
@@ -3850,6 +3851,7 @@ declare class LayoutEngine {
   private placeAbsolute;
   private replaceStaleAbsolute;
   private placeAnchored;
+  private placeOver;
   private placeBeside;
   private trackAnchor;
   private forgetAnchoring;
@@ -5881,6 +5883,7 @@ export {
   findMatchesIn,
   FindOptions,
   findPropertyDefinition,
+  fittedShadowRadius,
   FixedMetricsOptions,
   flattenTextSpans,
   FlexContainerProps,
@@ -6853,6 +6856,7 @@ import {
   findMatchesIn,
   FindOptions,
   findPropertyDefinition,
+  fittedShadowRadius,
   FixedMetricsOptions,
   flattenTextSpans,
   FlexContainerProps,
@@ -7769,6 +7773,7 @@ export {
   findEnvironmentKey,
   findMatchesIn,
   findPropertyDefinition,
+  fittedShadowRadius,
   flattenTextSpans,
   FlexDirection,
   FocusNotifier,

@@ -30,7 +30,7 @@ import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
 import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
 import { gradientPaint, MAX_GRADIENT_STOPS, type ResolvedGradient } from '../../properties/UiGradient';
-import { BOX_SHADOW_BLUR_REACH, boxShadowRadius } from '../../properties/UiBoxShadow';
+import { BOX_SHADOW_BLUR_REACH, boxShadowRadius, fittedShadowRadius } from '../../properties/UiBoxShadow';
 import type { PaintState } from '../PaintState';
 import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
@@ -1532,7 +1532,9 @@ function pushShadows(
   inset: boolean
 ): void {
   const shadows = paint.boxShadows;
-  const radius = borderRadiusIsZero(paint.borderRadius) ? 0 : uniformBorderRadius(paint.borderRadius);
+  const radius = borderRadiusIsZero(paint.borderRadius)
+    ? 0
+    : fittedShadowRadius(uniformBorderRadius(paint.borderRadius), rec.width, rec.height);
   for (let i = shadows.length - 1; i >= 0; i--) {
     const shadow = shadows[i]!;
     if ((shadow.inset === true) !== inset || shadow.color.a <= 0) {

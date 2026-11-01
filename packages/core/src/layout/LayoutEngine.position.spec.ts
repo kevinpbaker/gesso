@@ -855,6 +855,20 @@ describe('LayoutEngine positioning', () => {
       expect(h.box(popup)).toEqual({ x: 160, y: 100, width: 40, height: 10 });
     });
 
+    it('lays a node over a transformed anchor with its offset zoomed too, and over a part shrunk past nothing, nothing', () => {
+      // The card is drawn at 140, 70, 60 by 40; 4 of offset round it is 8 on screen.
+      const over = cameraScene(panAndZoom, { placement: 'over', anchorOffset: 4 });
+      expect(over.h.box(over.popup)).toEqual({ x: 132, y: 62, width: 76, height: 56 });
+      // A spotlight's hole closed to a point in the card's middle: the part
+      // is the point less the offset all round, which grown by it is nothing.
+      const point = cameraScene(panAndZoom, {
+        placement: 'over',
+        anchorOffset: 4,
+        anchorRect: { x: 15 + 4, y: 10 + 4, width: -8, height: -8 }
+      });
+      expect(point.h.box(point.popup)).toEqual({ x: 170, y: 90, width: 0, height: 0 });
+    });
+
     it('follows the anchor when the transform above it pans and zooms', () => {
       const { h, lens, popup } = cameraScene({});
       expect(h.box(popup)).toEqual({ x: 20, y: 30, width: 40, height: 10 });
