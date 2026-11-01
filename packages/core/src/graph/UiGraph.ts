@@ -625,15 +625,10 @@ export class UiGraph {
     value: T,
     dirtyFlags: DirtyFlags = DirtyFlags.Properties
   ): boolean {
-    // A declared transition turns this write into a target rather than
-    // a value. It sits here, above the cascade, for the reason the
-    // cascade sits here at all: the builder's static
-    // writes and a binding's emissions both funnel through this one
-    // method, so it is the only place that catches both. One field
-    // read for every node that declares no transition.
-    if (node.transitions !== null && node.transitions.write(property, value, dirtyFlags)) {
-      return true;
-    }
+    // A declared transition is not consulted here but where the drawn
+    // value is settled (`applyResolvedProperty`), so it animates what
+    // is drawn whoever changed it: the element, or a modifier's hover
+    // or press over it.
     return this.updateNodePropertyNow(node, property, value, dirtyFlags);
   }
 
@@ -647,15 +642,10 @@ export class UiGraph {
   }
 
   /**
-   * Writes a property without consulting the node's transitions.
-   *
-   * What a transition's own per-frame writes go through: they are
-   * already the animation towards the target, so re-entering the
-   * transition check would have each frame start an animation towards
-   * the value it had just produced. Everything below this — the
-   * override cascade, the equality check, the dirty marking — is
-   * unchanged, so an animated value is overridable by a modifier
-   * exactly as a bound one is.
+   * Writes the element's value for a property: onto the node, or into
+   * the cascade under a modifier writing over it. The same as
+   * `updateNodeProperty`, kept by its name for the callers that write
+   * a value of the runtime's own, such as the root's pointer.
    */
   public updateNodePropertyNow<T>(
     node: UiNode,
@@ -679,14 +669,21 @@ export class UiGraph {
    * Removing rather than writing a default is what lets a detaching
    * modifier restore inheritance: a node that never declared `color`
    * reads it from the environment again, as it did before.
+   *
+   * `snap` draws it at once, past any transition the node declares;
+   * see `UiPropertyOverride.snap`.
    */
   public applyResolvedProperty(
     node: UiNode,
     property: NodeProperty,
     present: boolean,
     value: unknown,
-    dirtyFlags: DirtyFlags
+    dirtyFlags: DirtyFlags,
+    snap = false
   ): boolean {
+    if (snap) {
+      node.transitions?.cancel(property);
+    }
     if (!present) {
       if (!node.properties.has(property)) {
         return false;
@@ -695,6 +692,28 @@ export class UiGraph {
       this.markDirty(node, this.withProvidedFlags(property, dirtyFlags));
       return true;
     }
+    const previousValue = node.getProperty(property);
+    if (Object.is(previousValue, value)) {
+      return false;
+    }
+    // A declared transition turns a change of what is drawn into a
+    // target rather than a value: here, below the cascade, so it moves
+    // whether the element or a modifier over it made the change, as a
+    // CSS transition follows a :hover. One field read for every node
+    // that declares no transition.
+    if (!snap && node.transitions !== null && node.transitions.write(property, value, dirtyFlags)) {
+      return true;
+    }
+    return this.applyAnimatedValue(node, property, value, dirtyFlags);
+  }
+
+  /**
+   * Writes what a transition's frame drew, without consulting the
+   * transition again: the frame is already the animation towards the
+   * target, and re-entering it would start an animation towards the
+   * value it had just produced.
+   */
+  public applyAnimatedValue(node: UiNode, property: NodeProperty, value: unknown, dirtyFlags: DirtyFlags): boolean {
     const previousValue = node.getProperty(property);
     if (Object.is(previousValue, value)) {
       return false;

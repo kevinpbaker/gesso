@@ -64,6 +64,13 @@ export class NodeTransitions implements UiNodeTransitions {
     if (spec === undefined) {
       return false;
     }
+    if (this.driver.isAdvancing) {
+      // Written by an animation's frame (a `motion` state, a value an
+      // AnimationService tween drives): already moving, and the frame's
+      // value is the one to draw, so this one lets go.
+      this.stopProperty(property);
+      return false;
+    }
     if (!this.node.properties.has(property)) {
       return false;
     }
@@ -96,6 +103,10 @@ export class NodeTransitions implements UiNodeTransitions {
     this.specs = new Map();
   }
 
+  cancel(property: NodeProperty): void {
+    this.stopProperty(property);
+  }
+
   private stopProperty(property: NodeProperty): void {
     const cell = this.cells.get(property);
     if (cell !== undefined) {
@@ -110,10 +121,9 @@ export class NodeTransitions implements UiNodeTransitions {
    * node: the driver keys its running set by cell identity, so a fresh
    * adapter per write would leave the previous animation running.
    *
-   * Writing goes through `updateNodePropertyNow`, which is the path a
-   * plain write takes minus this class — so a modifier's override still
-   * sits on top of an animated value, exactly as it sits on top of a
-   * bound one.
+   * It writes what is drawn (`applyAnimatedValue`): the target already
+   * is the value the element and any modifier over it settled on, so a
+   * frame of the way there goes onto the node as it is.
    */
   private cellFor(property: NodeProperty, flags: DirtyFlags): AnimatedCell<unknown> {
     let cell = this.cells.get(property);
@@ -127,7 +137,7 @@ export class NodeTransitions implements UiNodeTransitions {
         return node.properties.get(property);
       },
       set value(next: unknown) {
-        graph.updateNodePropertyNow(node, property, next, flags);
+        graph.applyAnimatedValue(node, property, next, flags);
       }
     };
     this.cells.set(property, cell);

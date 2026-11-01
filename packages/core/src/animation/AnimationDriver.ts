@@ -31,6 +31,7 @@ export class AnimationDriver {
   private readonly clocks = new Map<object, UiClock>();
   private reducedMotion = false;
   private hidden = false;
+  private advancing = false;
   private wake: (() => void) | null = null;
 
   /**
@@ -45,6 +46,15 @@ export class AnimationDriver {
    */
   setWakeListener(listener: (() => void) | null): void {
     this.wake = listener;
+  }
+
+  /**
+   * Whether a frame of the running animations is being written now: a
+   * value written meanwhile is a step of an animation, not a change for
+   * a transition to animate again.
+   */
+  get isAdvancing(): boolean {
+    return this.advancing;
   }
 
   /** Whether anything is running, so the `ticks` phase can report 0. */
@@ -265,6 +275,15 @@ export class AnimationDriver {
    * behind.
    */
   advance(now: number): void {
+    this.advancing = true;
+    try {
+      this.advanceRunning(now);
+    } finally {
+      this.advancing = false;
+    }
+  }
+
+  private advanceRunning(now: number): void {
     for (const [cell, animation] of this.running) {
       const clock = this.clocks.get(cell);
       if (clock?.settled === true) {

@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { map } from 'rxjs';
 
-import { Box, Column, ScrollView, type UiNode, linear, spring, tween, animateLayout } from 'gesso-core';
+import { Box, Column, ScrollView, type UiNode, defineModifier, fade, linear, motion, spring, tween, animateLayout } from 'gesso-core';
 import { internalState } from '../InternalState';
 import { AnimationService } from './AnimationService';
+import { InspectionService } from './InspectionService';
 import { mountRuntime } from './RuntimeTestUtils';
 
 /**
@@ -133,6 +134,79 @@ describe('a declared transition', () => {
     }
     expect(seen.at(-1)).toBe(0);
     expect(seen.some(value => value > 0 && value < 1)).toBe(true);
+  });
+
+  /** Frames until nothing more is asked for, or `until` ms; the values `read` saw on each. */
+  function run(mounted: ReturnType<typeof mountRuntime>, from: number, read: () => unknown, until = 5000): { time: number; seen: unknown[] } {
+    let time = from;
+    const seen: unknown[] = [];
+    while (mounted.clock.isPending && time < from + until) {
+      time += 16;
+      mounted.clock.tick(time);
+      seen.push(read());
+    }
+    return { time, seen };
+  }
+
+  it('moves what a modifier draws over the element too, as a press eases in and back out', () => {
+    // A press as `interactive` writes one: an override over the element's own value.
+    let press!: (down: boolean) => void;
+    const pressing = defineModifier<void>({
+      name: 'specPress',
+      attach(host) {
+        press = down => (down ? host.set('opacity', 0.5) : host.clear('opacity'));
+      }
+    });
+    let node: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { ref: (n: UiNode | null) => (node = n) },
+        Box({ width: 20, height: 20, opacity: 1, modifiers: [pressing()], transition: { opacity: tween(200, { easing: linear }) } })
+      )
+    );
+    const { time } = run(mounted, 0, () => null);
+    const box = firstBox(node);
+
+    press(true);
+    expect(box.properties.get('opacity')).toBe(1);
+    const down = run(mounted, time, () => box.properties.get('opacity'));
+    expect(down.seen.at(-1)).toBe(0.5);
+    expect(down.seen.some(value => (value as number) > 0.5 && (value as number) < 1)).toBe(true);
+
+    press(false);
+    const up = run(mounted, down.time, () => box.properties.get('opacity'));
+    expect(up.seen.at(-1)).toBe(1);
+    expect(up.seen.some(value => (value as number) > 0.5 && (value as number) < 1)).toBe(true);
+  });
+
+  it('draws a preview at once both ways, past the transition, to keep up with a drag', () => {
+    let node: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column({ ref: (n: UiNode | null) => (node = n) }, Box({ width: 100, height: 20, transition: { width: 500 } }))
+    );
+    run(mounted, 0, () => null);
+    const box = firstBox(node);
+    const inspection = mounted.runtime.services.get(InspectionService);
+
+    inspection.preview(box, 'width', 160);
+    expect(box.properties.get('width')).toBe(160);
+    inspection.endPreview(box, 'width');
+    expect(box.properties.get('width')).toBe(100);
+  });
+
+  it('does not chase a motion state on the same node: the entrance is the movement', () => {
+    let node: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { ref: (n: UiNode | null) => (node = n) },
+        Box({ width: 20, height: 20, opacity: 1, modifiers: [motion({ initial: fade, duration: 100 })], transition: { opacity: 2000 } })
+      )
+    );
+    run(mounted, 0, () => null, 600);
+
+    // At rest by the entrance's 100 ms, not still easing towards each of its frames for two seconds.
+    expect(firstBox(node).properties.get('opacity')).toBe(1);
+    expect(mounted.clock.isPending).toBe(false);
   });
 
   it('a bare number is a duration in milliseconds', () => {

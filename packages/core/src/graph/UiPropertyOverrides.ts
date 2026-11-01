@@ -82,7 +82,7 @@ export function writeOverrideProperty(
     warnOnConflict(node, property, entries, override);
     entries.splice(insertionIndex(entries, override.order), 0, { ...override });
   }
-  return applyEffective(graph, node, property, overrides, flags);
+  return applyEffective(graph, node, property, overrides, flags, override.snap === true);
 }
 
 /**
@@ -114,8 +114,8 @@ export function clearOverrideProperty(
   if (index === -1) {
     return false;
   }
-  overrides.entries.splice(index, 1);
-  const changed = applyEffective(graph, node, property, overrides, flags);
+  const [removed] = overrides.entries.splice(index, 1);
+  const changed = applyEffective(graph, node, property, overrides, flags, removed?.snap === true);
   if (overrides.entries.length === 0) {
     // Nothing is overriding it any more: drop the record so the write
     // path goes back to being a single field read.
@@ -137,13 +137,14 @@ function applyEffective(
   node: UiNode,
   property: NodeProperty,
   overrides: UiPropertyOverrides,
-  flags: DirtyFlags
+  flags: DirtyFlags,
+  snap = false
 ): boolean {
   const last = overrides.entries[overrides.entries.length - 1];
   if (last !== undefined) {
-    return graph.applyResolvedProperty(node, property, true, last.value, flags);
+    return graph.applyResolvedProperty(node, property, true, last.value, flags, snap);
   }
-  return graph.applyResolvedProperty(node, property, overrides.declared.present, overrides.declared.value, flags);
+  return graph.applyResolvedProperty(node, property, overrides.declared.present, overrides.declared.value, flags, snap);
 }
 
 function overridesFor(node: UiNode, property: NodeProperty): UiPropertyOverrides {

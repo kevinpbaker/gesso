@@ -1453,7 +1453,7 @@ export class GessoRuntime {
       this.graph,
       node,
       property,
-      { source: PREVIEW, name: 'preview', order: Number.MAX_SAFE_INTEGER, value },
+      { source: PREVIEW, name: 'preview', order: Number.MAX_SAFE_INTEGER, value, snap: true },
       propertyEffects(property)
     );
   }

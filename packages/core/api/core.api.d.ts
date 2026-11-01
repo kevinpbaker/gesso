@@ -691,6 +691,7 @@ interface UiPropertyOverride {
   readonly name: string;
   order: number;
   value: unknown;
+  readonly snap?: boolean;
 }
 interface UiPropertyOverrides {
   declared: {
@@ -701,6 +702,7 @@ interface UiPropertyOverrides {
 }
 interface UiNodeTransitions {
   write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
+  cancel(property: NodeProperty): void;
   release(): void;
 }
 declare class UiNode {
@@ -746,8 +748,10 @@ declare class AnimationDriver {
   private readonly clocks;
   private reducedMotion;
   private hidden;
+  private advancing;
   private wake;
   setWakeListener(listener: (() => void) | null): void;
+  get isAdvancing(): boolean;
   get isRunning(): boolean;
   get size(): number;
   get isReducedMotion(): boolean;
@@ -761,6 +765,7 @@ declare class AnimationDriver {
   private landRunning;
   nextTickAt(now: number): number | undefined;
   advance(now: number): void;
+  private advanceRunning;
 }
 interface SharedClaim {
   readonly box: LayoutBox | null;
@@ -2351,7 +2356,8 @@ declare class UiGraph {
   updateNodeProperty<T>(node: UiNode, property: string, value: T, dirtyFlags?: DirtyFlags): boolean;
   removeNodeProperty(node: UiNode, property: string, dirtyFlags?: DirtyFlags): boolean;
   updateNodePropertyNow<T>(node: UiNode, property: string, value: T, dirtyFlags?: DirtyFlags): boolean;
-  applyResolvedProperty(node: UiNode, property: NodeProperty, present: boolean, value: unknown, dirtyFlags: DirtyFlags): boolean;
+  applyResolvedProperty(node: UiNode, property: NodeProperty, present: boolean, value: unknown, dirtyFlags: DirtyFlags, snap?: boolean): boolean;
+  applyAnimatedValue(node: UiNode, property: NodeProperty, value: unknown, dirtyFlags: DirtyFlags): boolean;
   private withProvidedFlags;
   processDirty(callback: (node: UiNode) => void): void;
   private traverseOnce;
@@ -2938,6 +2944,7 @@ declare class NodeTransitions implements UiNodeTransitions {
   get size(): number;
   write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
   release(): void;
+  cancel(property: NodeProperty): void;
   private stopProperty;
   private cellFor;
   private startAnimation;

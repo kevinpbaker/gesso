@@ -13,6 +13,12 @@ export interface UiPropertyOverride {
   readonly name: string;
   order: number;
   value: unknown;
+  /**
+   * Drawn at once, past any transition the node declares, and taken
+   * away at once too: a design tool's preview of a value being chosen,
+   * which has to keep up with the drag that chooses it.
+   */
+  readonly snap?: boolean;
 }
 
 /**
@@ -37,6 +43,8 @@ export interface UiPropertyOverrides {
 export interface UiNodeTransitions {
   /** Takes over a write by animating towards it, or declines it. */
   write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
+  /** Stops animating one property, leaving it where it stands, for a write that is drawn at once. */
+  cancel(property: NodeProperty): void;
   /** Cancels everything, for a node leaving the tree. */
   release(): void;
 }

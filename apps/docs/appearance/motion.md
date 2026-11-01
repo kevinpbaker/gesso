@@ -37,8 +37,23 @@ milliseconds; `tween()` and `spring()` build the longer forms.
 
 <<< @/src/examples/MotionExample.tsx#transition
 
-Three rules fall out of where it interposes, which is the same place
-the override cascade sits, on the write path for every property:
+It interposes where what is drawn is settled, below the override
+cascade, so it moves the value whoever changed it: the element, or a
+modifier writing over it. A press that `interactive` draws as
+`pressed: { opacity: 0.8 }` on an element that declares
+`transition={{ opacity: 120 }}` dims and comes back over 120 ms, as a
+CSS transition follows a `:hover`. A palette name cannot be blended (below),
+so a hover that should ease names a colour, or moves opacity or a
+transform.
+
+Five rules fall out of where it interposes:
+
+- **A frame of another animation is not a change.** A `motion` state or
+  an `AnimationService` tween writes a value on every frame; the
+  transition lets those through rather than chasing each one.
+- **A preview is drawn at once.** What `InspectionService.preview`
+  writes, and taking it away, skips the transition, so a design tool's
+  preview keeps up with the drag that chooses it.
 
 - **A node's first value is not a change.** The first write lands
   directly, because animating from a value the node never had would
