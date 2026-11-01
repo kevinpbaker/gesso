@@ -3,6 +3,7 @@ import {
   Box,
   Column,
   linearGradient,
+  measureFlow,
   percent,
   ScrollView,
   scrollPosition,
@@ -89,6 +90,10 @@ export function ScrollArea(inputs: Inputs<ScrollAreaProps>, ctx: ComponentContex
   const animations = ctx.inject(AnimationService);
   // Where it is drawn: a design tool's board settles the scroll back, its player may slow it.
   const clock = ctx.environment(UiEnvironmentKeys.clock);
+  // The sizes they were laid out at (`measureFlow`), not where they are
+  // drawn: a design tool's board zooming over the area scales where it is
+  // drawn, and read from that, the fades went on and off with the zoom,
+  // each a transition, on every step of a pinch.
   const viewport = ctx.bounds('ScrollArea.viewport');
   const content = ctx.bounds('ScrollArea.content');
   /** The offset as laid out, from `scrollPosition`. */
@@ -158,12 +163,12 @@ export function ScrollArea(inputs: Inputs<ScrollAreaProps>, ctx: ComponentContex
         width: percent(100),
         height: percent(100),
         scrollY: target.pipe(map(y => y ?? undefined)),
-        modifiers: [viewport.modifier, scrollPosition({ onChange: at => (offset.value = at.y) })]
+        modifiers: [measureFlow(viewport), scrollPosition({ onChange: at => (offset.value = at.y) })]
       },
       Column(
         {
           width: percent(100),
-          modifiers: [content.modifier],
+          modifiers: [measureFlow(content)],
           ...paddingOf(inputs)
         },
         followedChildren(inputs.children, () => Column())

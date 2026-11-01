@@ -1,6 +1,17 @@
+import { BehaviorSubject, map } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { Box, Column, percent, provided, UiClock, UiEnvironmentKeys, UiNodeType, type UiNode } from 'gesso-core';
+import {
+  Box,
+  Column,
+  percent,
+  provided,
+  transform,
+  UiClock,
+  UiEnvironmentKeys,
+  UiNodeType,
+  type UiNode
+} from 'gesso-core';
 import { createComponent } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 
@@ -57,6 +68,31 @@ describe('ScrollArea', () => {
     // At the end now: the top fades in, the bottom out.
     expect(opacity(top)).toBe(1);
     expect(opacity(bottom)).toBe(0);
+  });
+
+  it('keeps its fades as a zoom above it scales it, however small it is drawn', () => {
+    // A design tool's board: the area under a camera that zooms out to a
+    // thousandth, where the 800 left below it is under a pixel on screen.
+    const scale = new BehaviorSubject(1);
+    const ui = renderTest(
+      Box(
+        { width: 300, height: 200, transform: scale.pipe(map(by => transform({ scaleX: by, scaleY: by }))) },
+        createComponent(ScrollArea, {
+          width: percent(100),
+          height: percent(100),
+          children: Column({ width: percent(100), height: 1000 })
+        })
+      ),
+      { width: 300, height: 200 }
+    );
+    settle(ui);
+    const [top, bottom] = fades(ui);
+    for (const by of [0.5, 0.01, 0.001, 2]) {
+      scale.next(by);
+      settle(ui);
+      expect(opacity(top)).toBe(0);
+      expect(opacity(bottom)).toBe(1);
+    }
   });
 
   it('pads its content inside the scroll bar, so the area itself runs to the edges', () => {
