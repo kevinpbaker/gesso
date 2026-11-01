@@ -44,6 +44,11 @@ Like every stateful control, it is controlled by `step` and
 steps={…} />` with neither is shown from its first step and walks
 itself.
 
+A screen showing its tour at a later step, beside the screen as
+written, wraps the screen in
+[`StartingInputs`](/guide/cells-and-bindings#a-screen-at-a-moment)
+with `of` set to `{ Tour: { step: 1 } }`.
+
 ## The dim and the hole
 
 The dim is the shadow of a rounded box laid over the target with

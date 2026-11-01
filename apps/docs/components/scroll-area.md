@@ -19,6 +19,7 @@ the last row they see is the last row there is.
 
 | Prop             | Default         | What it does                                                           |
 | ---------------- | --------------- | ---------------------------------------------------------------------- |
+| `scrollY`        | none            | Where it is scrolled to, set at the start and whenever it changes      |
 | `padding`        | `0`             | Space around the content, inside the scroll bar, in pixels             |
 | `paddingX`       | `padding`       | Space at the content's left and right                                  |
 | `paddingY`       | `padding`       | Space at the content's top and bottom                                  |

@@ -68,6 +68,15 @@ describe('ScrollArea', () => {
     expect(ui.getLayout(rows)).toMatchObject({ x: 16, y: 24, width: 268 });
   });
 
+  it('starts where it is told to, with the fades and the button that belong there', () => {
+    const ui = mount({ scrollY: 600, backToTopAfter: 300 });
+    const [top, bottom] = fades(ui);
+    expect(offsetOf(ui).properties.get('scrollY')).toBe(600);
+    expect(opacity(top)).toBe(1);
+    expect(opacity(bottom)).toBe(1);
+    expect(ui.getByRole('button', { name: 'Back to top' })).toBeDefined();
+  });
+
   it('fades into its own colour at no opacity, not into transparent black', () => {
     const [top] = fades(mount({ fadeColor: 'surface' }));
     const gradient = top.properties.get('backgroundGradient') as { stops: { color: string; opacity?: number }[] };

@@ -46,6 +46,13 @@ import { followedChildren, layoutOf, modifiersOf, type ControlLayoutProps } from
  */
 export interface ScrollAreaProps extends ControlLayoutProps {
   children?: UiChild;
+  /**
+   * Where it is scrolled to, in pixels from the top: set where it starts,
+   * and again whenever the value changes. The person's scrolling moves
+   * it on from there. A design draws a moment of a list scrolled far
+   * down with it.
+   */
+  scrollY?: number;
   /** Space around the content, inside the scroll bar, in pixels. Defaults to 0. */
   padding?: number;
   /** Space at the content's left and right, over `padding`. */
@@ -93,6 +100,12 @@ export function ScrollArea(inputs: Inputs<ScrollAreaProps>, ctx: ComponentContex
     map(([y, after]) => y >= after),
     distinctUntilChanged()
   );
+
+  ctx.effect(inputs.scrollY, y => {
+    if (y !== undefined) {
+      target.value = y;
+    }
+  });
 
   const toTop = (): void => {
     target.value = offset.value;

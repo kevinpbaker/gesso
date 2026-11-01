@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Button, Column, type UiNode } from 'gesso-core';
-import { createComponent } from 'gesso-framework';
+import { createComponent, StartingInputs } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 
 import { Tour, tourTarget, type TourProps } from './Tour';
@@ -11,24 +11,25 @@ import { Tour, tourTarget, type TourProps } from './Tour';
  * and 100 by 40, the second at 20, 200; and a tour of three steps, the
  * last pointing at nothing.
  */
-function mount(props: Partial<TourProps> = {}) {
+function mount(props: Partial<TourProps> = {}, moment?: Record<string, Record<string, unknown>>) {
   const first = tourTarget();
   const second = tourTarget();
   const pressed: string[] = [];
+  const screen = Column(
+    { width: 400, height: 300, padding: 20, gap: 140 },
+    Button({ ref: first.ref, width: 100, height: 40, text: 'Compose', onClick: () => pressed.push('compose') }),
+    Button({ ref: second.ref, width: 100, height: 40, text: 'Archive', onClick: () => pressed.push('archive') }),
+    createComponent(Tour, {
+      steps: [
+        { target: first, title: 'Write a message', body: 'Start one here.' },
+        { target: second, title: 'Clear it away', side: 'top' },
+        { title: 'That is all' }
+      ],
+      ...props
+    })
+  );
   const ui = renderTest(
-    Column(
-      { width: 400, height: 300, padding: 20, gap: 140 },
-      Button({ ref: first.ref, width: 100, height: 40, text: 'Compose', onClick: () => pressed.push('compose') }),
-      Button({ ref: second.ref, width: 100, height: 40, text: 'Archive', onClick: () => pressed.push('archive') }),
-      createComponent(Tour, {
-        steps: [
-          { target: first, title: 'Write a message', body: 'Start one here.' },
-          { target: second, title: 'Clear it away', side: 'top' },
-          { title: 'That is all' }
-        ],
-        ...props
-      })
-    ),
+    moment === undefined ? screen : createComponent(StartingInputs, { of: moment, children: screen }),
     { width: 400, height: 300 }
   );
   ui.frame();
@@ -66,9 +67,12 @@ describe('Tour', () => {
   it('steps on to the next target and back, centres a step with none, and finishes with Done', () => {
     const asked: (number | null)[] = [];
     const { ui } = mount({ defaultStep: 0, onStepChange: step => asked.push(step) });
+    const dim = holeOf(ui.allNodes());
     ui.fireEvent.click(ui.getByRole('button', { name: 'Next' }));
     ui.frame();
-    expect(ui.getLayout(holeOf(ui.allNodes())).y).toBe(200 - 8);
+    // The same dim, moved: not made again, so it does not fade out and back in.
+    expect(holeOf(ui.allNodes())).toBe(dim);
+    expect(ui.getLayout(dim).y).toBe(200 - 8);
     // Opened above the target, as the step asks.
     const card = ui.getLayout(ui.getByRole('dialog', { name: 'Clear it away' }));
     expect(card.y + card.height).toBe(200 - 8 - 8);
@@ -83,6 +87,9 @@ describe('Tour', () => {
     ui.frame();
     const last = ui.getLayout(ui.getByRole('dialog', { name: 'That is all' }));
     expect(last.x).toBe((400 - 280) / 2);
+    // Still the one dim, its hole shrunk to nothing.
+    expect(holeOf(ui.allNodes())).toBe(dim);
+    expect(ui.getLayout(dim)).toMatchObject({ width: 0, height: 0 });
 
     ui.fireEvent.click(ui.getByRole('button', { name: 'Done' }));
     ui.frame();
@@ -97,6 +104,12 @@ describe('Tour', () => {
     ui.frame();
     expect(ui.queryByRole('dialog')).toBeNull();
     expect(holeOf(ui.allNodes())).toBeUndefined();
+  });
+
+  it('is drawn at a later step as a moment of the screen', () => {
+    const { ui } = mount({}, { Tour: { step: 1 } });
+    expect(ui.getByRole('dialog', { name: 'Clear it away' })).toBeDefined();
+    expect(ui.getByText('2 of 3')).toBeDefined();
   });
 
   it('is not shown at all with no step', () => {

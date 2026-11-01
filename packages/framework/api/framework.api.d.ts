@@ -547,6 +547,7 @@ import {
   UiEasingToken,
   UiEditingController,
   UiElement,
+  UiEnvironmentKey,
   UiFileDropMessage,
   UiFindController,
   UiFocusManager,
@@ -858,6 +859,13 @@ interface OverlayScopeProps {
   children?: UiChild;
 }
 declare function OverlayScope(inputs: Inputs<OverlayScopeProps>, _ctx: ComponentContext): UiChild;
+type StartingInputsByName = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+declare const StartingInputsKey: UiEnvironmentKey<StartingInputsByName>;
+interface StartingInputsProps {
+  of?: StartingInputsByName;
+  children?: UiChild;
+}
+declare function StartingInputs(inputs: Inputs<StartingInputsProps>, ctx: ComponentContext): UiChild;
 declare class OverlayLayer extends Component {
   runtimeOverlays: OverlayService;
   service: InputCell<OverlayService | null>;
@@ -877,6 +885,7 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   private readonly inputSources;
   private readonly inputSubscriptions;
   private readonly functionalCells;
+  private readonly started;
   private previewed;
   private readonly beforePreview;
   private readonly mountHooks;
@@ -3181,6 +3190,10 @@ export {
   Show,
   ShowProps,
   SpringOptions,
+  StartingInputs,
+  StartingInputsByName,
+  StartingInputsKey,
+  StartingInputsProps,
   StorageAdapter,
   storageErrorMessage,
   StorageOutcome,
@@ -3503,6 +3516,10 @@ import {
   Show,
   ShowProps,
   SpringOptions,
+  StartingInputs,
+  StartingInputsByName,
+  StartingInputsKey,
+  StartingInputsProps,
   StorageAdapter,
   storageErrorMessage,
   StorageOutcome,
@@ -3679,6 +3696,8 @@ export {
   shellStorageDenied,
   show,
   Show,
+  StartingInputs,
+  StartingInputsKey,
   storageErrorMessage,
   storageReadFailure,
   storageReadValue,
@@ -3826,6 +3845,8 @@ export {
   type ShellToRuntimeMessage,
   type ShowProps,
   type SpringOptions,
+  type StartingInputsByName,
+  type StartingInputsProps,
   type StorageAdapter,
   type StorageOutcome,
   type StorageRead,

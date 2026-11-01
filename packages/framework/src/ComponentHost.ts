@@ -17,6 +17,7 @@ import {
   isClassComponent
 } from './FunctionComponent';
 import { getComponentMetadata } from './metadata';
+import { startingInputsFor } from './startingInputsKey';
 
 /**
  * Owns a single component instance and its lifecycle.
@@ -68,6 +69,13 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
   /** A functional component's cells, by prop name, as they were handed out. */
   private readonly functionalCells = new Map<string, InputCell<unknown>>();
 
+  /**
+   * Inputs it is drawn with over its parent's, from a `StartingInputs`
+   * above it when it was made: a moment of a screen, a tour's second
+   * step. A preview goes over these, and ending one comes back to them.
+   */
+  private readonly started: Readonly<Record<string, unknown>> | null;
+
   /** Inputs a tool draws the component with over its parent's, until it ends them; see `previewInputs`. */
   private previewed: Readonly<Record<string, unknown>> | null = null;
 
@@ -86,6 +94,7 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     private readonly anchor: UiNode | null = null
   ) {
     this.element = element;
+    this.started = startingInputsFor(anchor, element.tag);
     if (isClassComponent(element.component)) {
       this.instance = new element.component();
       this.validateInputs();
@@ -209,10 +218,13 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     }
   }
 
-  /** What an input is fed from: a preview's value for it, else the parent's prop. */
+  /** What an input is fed from: a preview's value for it, else what it was started with, else the parent's prop. */
   private providedFor(name: string): unknown {
     if (this.previewed !== null && Object.hasOwn(this.previewed, name)) {
       return this.previewed[name];
+    }
+    if (this.started !== null && Object.hasOwn(this.started, name)) {
+      return this.started[name];
     }
     return (this.element.props as Record<string, unknown>)[name];
   }

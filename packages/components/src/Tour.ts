@@ -212,21 +212,30 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
     );
   };
 
+  /**
+   * The dim while the tour is open: made once when it opens and moved
+   * from step to step, never made again, so it does not fade out and in
+   * between steps.
+   */
+  let shownDim: UiChild | null = null;
   const show = (now: { at: number; node: UiNode | null | undefined } | null): void => {
     if (now === null || now.node === null) {
       // Closed, or its target not drawn yet: nothing over the page until it is.
       card.hide();
       hole.hide();
+      shownDim = null;
       release();
       return;
     }
+    shownDim ??= dim();
     const current = steps()[now.at]!;
     if (now.node === undefined) {
-      hole.hide();
-      card.show(cardFor(now.at), { center: 'both', modal: true, scrim: true, environment: placeholder });
+      // No target: the same dim, its hole shrunk to nothing, and the card in the middle.
+      hole.show(shownDim, { anchor: placeholder, placement: 'over', offset: 0, environment: placeholder });
+      card.show(cardFor(now.at), { center: 'both', environment: placeholder });
       return;
     }
-    hole.show(dim(), { anchor: now.node, placement: 'over', offset: padding.value, environment: placeholder });
+    hole.show(shownDim, { anchor: now.node, placement: 'over', offset: padding.value, environment: placeholder });
     card.show(cardFor(now.at), {
       anchor: now.node,
       placement: (current.side ?? 'bottom') as OverlayPlacement,

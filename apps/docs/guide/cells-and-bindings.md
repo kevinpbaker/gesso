@@ -279,3 +279,24 @@ The first component to ask makes the value at its start, `reset()`
 puts every value back at its start, and `values` lists them as they
 are. A design tool plays a screen this way after the screens before
 it, and draws the same screen on its board alone, as written.
+
+## A screen at a moment
+
+A screen as written is where it starts: the list at the top, the tour
+at its first step. A design shows other moments of it too, a list
+scrolled far enough for its back-to-top button or a tour at its
+second step, and a copy of the screen for each would drift from it.
+`StartingInputs` draws what it holds with the components in it
+started from inputs named by component, over what their parents pass:
+
+```tsx
+<StartingInputs of={{ ScrollArea: { scrollY: 600 }, Tour: { step: 1 } }}>
+  <Inbox />
+</StartingInputs>
+```
+
+A component reads them as it reads its parent's props, as each one is
+made, so they start it rather than steer it: a step given without a
+handler is where the tour starts, and the person moves it on from
+there. A preview of a component's inputs from the inspector goes over
+them, and ending the preview comes back to them.
