@@ -1,5 +1,42 @@
 # gesso-framework
 
+## 0.8.0
+
+### Minor Changes
+
+- cfd37de: For tools that write CSS from a live tree: `easingCss(easing)` names a curve made by `cubicBezier` or `linear` as CSS writes it, a node's `UiModifierSet.modifiers` lists what is attached with its arguments, and the inspector's node report has `interaction`, what the node draws while hovered and pressed.
+- 44fc232: `InspectionService.screenBox(node)` gives where a node is seen, with every transform above it applied, so an overlay can be laid over a frame drawn scaled. `box` is unchanged.
+- 2846e0b: `OverlayScope` gives a part of the tree overlays of its own: a dialog, menu or tooltip opened inside it is drawn inside it, dimmed, centred, placed, clipped and transformed with it, and what is outside stays pressable. `useOverlay` opens in the nearest scope, or the runtime's layer outside every scope. For a screen played inside another tool.
+- d2d860b: What a design tool needs to save a moment of a played screen: `liveInput(name, read)` says what a component holds now, `controlled` and `ScrollArea` say it, and the inspector reports it as an owner's `live`. `StartingInputs` takes a list per name for each instance in the order made, a started input is the parent's again once the parent passes something new, and nested, the outer one wins input by input.
+- 6eb71c2: `StartingInputs` draws what it holds with the components in it started from inputs named by component, over their parents': a screen at a moment, a list scrolled down or a tour at its second step, without a copy of the screen. `ScrollArea` takes `scrollY`, where it is scrolled to.
+- 3ac8a63: For a design tool's keyboard view and scrubber: `FocusService.tabStops(within)` lists the Tab stops under a node in order, and a paused `UiClock` can `seek` to a time while `holding` keeps finished animations at their end, so moving the time back plays them back.
+- 2846e0b: `Tour` walks a person through a screen one element at a time: everything but the element dims, through a rounded hole that follows it, and a card beside it explains it, with Back, Next and a count. Steps point at a `tourTarget()` given to the element as its `ref`. Underneath, an anchored node or overlay entry can be placed `over` its anchor, at the anchor's size grown by the offset, and such an entry leaves presses on the rest of the anchor to the anchor.
+- c6b56b6: A control handed a value and no `onChange` now starts at that value and changes when it is used, as it would with `defaultValue`. A new value from the parent starts it again. Before, it stayed where it was until the application moved it. A screen written as a picture of a moment, `<Switch checked={true} />`, is now one a person can use, and a component of your own that goes through `controlled()` gets the same behavior. A control that only the application may change should say so with `readOnly` or `disabled`. A control whose `onChange` declines a change is unchanged: it still shows what the application writes back. So is a `Drawer` whose owner listens only through `onClose`. A component of your own with a second output like that names it in `controlled()`'s new `heardBy`.
+
+### Patch Changes
+
+- 5b5e756: A `UiClock` decides how time passes for the animations under a node: `provide={[provided(UiEnvironmentKeys.clock, clock)]}`. On a `settled` clock every animation lands where it is going the moment it starts, a spinner included; on one with a `speed`, time runs at that rate (0 is paused), and the speed can change mid-flight. Transitions, `motion` states, hover and press read the clock from their node; `AnimationService.animate` and `spring` take a `clock` option, which `Dialog`, `Drawer`, `Skeleton`, `Spinner`, the progress bar and smooth scrolling pass. An overlay now keeps the clock it was opened under, and every environment key the application provides, so a component in a dialog reads with `ctx.environment` what its opener reads.
+- a304d6e: The accessibility mirror's boxes follow a pan or a zoom when it stops, not on every frame of it. The first frame of a run of moving frames sweeps every mirrored box as before; the frames after it send only the focused node's box, which the focus ring is drawn from, and the rest are swept once nothing has moved for 120 ms, or after a second of moving that never stops. In Atelier, a board of 36 screens panned at 15% spent 3 to 4 ms of each 4 to 6 ms frame sweeping the boxes and kept Chromium's main thread 62% busy writing them; it now spends 0.4 ms, and the main thread is 9% busy.
+- d048f25: Motion names resolve where they are drawn. A node can provide a vocabulary with `provide={[provided(UiEnvironmentKeys.motion, motion)]}`, and a name in a `transition`, a `motion` state or `animateLayout` resolves against the nearest one; `AnimationService.setMotion` now provides the app's at the root, so it reaches those too (a `motion` state used to resolve against Gesso's defaults whatever the app installed). `transition` takes a name, `transition={{ opacity: 'fast' }}` and `tween('fast')`, and keeps it as written (`node.transitions.declared`). `defineMotion` builds a vocabulary from Gesso's with only what a design changes, and `UiDurationExtensions`, `UiEasingExtensions` and `UiSpringExtensions` add names of its own, as typography roles are added. An overlay keeps the motion it was opened under. A name the vocabulary lacks is said once and takes the default.
+- 9f3f440: `InspectionService.previewInputs(anchorId, inputs)` draws a component as though its parent passed those inputs, until `endInputPreview(anchorId)` gives it back the ones it was written with. The component is the same live instance, named by an anchor from `inspect(node).owners`. This is for a design tool that jumps a component on a played screen to one of its states. Each input the preview starts or ends is handed its value again, so a control that owns its value starts again from it.
+- ec41942: A key made with `createEnvironmentKey` can now be provided by any element, `provide={[provided(key, value)]}`, and read by a component under it with `ctx.environment(key)`, or its default when nothing above provides it. It is read as the component's body runs, from where the component is placed, because the builder puts a component's node under its parent before the body runs. A value that changes is provided as a source to follow, such as a cell. `ComponentResolver.resolve` is handed the slot's node as a third argument for this.
+- ae9e83c: `sharedValue(ctx, name, start)` is a value a few screens share with no application behind them, such as an email typed on one screen of a prototype and shown on the next. A node provides a `SharedValues` under `SharedValuesKey`, and every component under it asking for the same name has the same cell, made at the first one's start; with none above, each component has a cell of its own. `reset()` puts every value back at its start, and `values` lists them as they are.
+- 8fe90de: A `transition` now animates what is drawn, whoever changed it: the element, or a modifier writing over it, so a press or hover that `interactive` draws eases in and out on an element that declares a transition for that property, as a CSS transition follows a `:hover`. A value written by another animation's frame (a `motion` state, an `AnimationService` tween) is let through rather than chased, and `InspectionService.preview` is drawn at once both ways. `AnimationDriver.isAdvancing` says whether a frame is being written.
+- Updated dependencies [cfd37de]
+- Updated dependencies [00c6f8b]
+- Updated dependencies [5b5e756]
+- Updated dependencies [d048f25]
+- Updated dependencies [33de404]
+- Updated dependencies [ec41942]
+- Updated dependencies [06350a6]
+- Updated dependencies [33de404]
+- Updated dependencies [60b4d52]
+- Updated dependencies [3ac8a63]
+- Updated dependencies [fdbf5be]
+- Updated dependencies [2846e0b]
+- Updated dependencies [8fe90de]
+  - gesso-core@0.8.0
+
 ## 0.7.0
 
 ### Minor Changes

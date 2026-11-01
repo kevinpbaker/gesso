@@ -1,5 +1,11 @@
 # gesso-vite-plugin
 
+## 0.8.0
+
+### Patch Changes
+
+- b80e4ab: The dev server's start says how to connect any agent, not only Claude Code: the endpoint, which any MCP client connects to, and the line to add it in Claude Code, Codex and Gemini CLI. `agentName` names the server in those lines, the root folder's name unless given.
+
 ## 0.7.0
 
 ### Minor Changes
