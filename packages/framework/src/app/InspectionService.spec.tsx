@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { transform, type UiChild, type UiNode } from 'gesso-core';
+import { EditableText, transform, type UiChild, type UiNode } from 'gesso-core';
 import { map } from 'rxjs';
 
 import { Component } from '../Component';
@@ -214,5 +214,36 @@ describe('InspectionService', () => {
     inspection.endInputPreview(anchor);
     mounted.frame();
     expect(text.getProperty('text')).toBe('neutral');
+  });
+
+  it('presses a node with no record of its own, and types into a field, as a person would', () => {
+    let inspection!: InspectionService;
+    const pressed: string[] = [];
+    const typed: string[] = [];
+    let row!: UiNode;
+    function Canvas(_inputs: unknown, ctx: ComponentContext): UiChild {
+      inspection = ctx.inject(InspectionService);
+      // A list's row, pressable and not a control, inside a frame that watches every press (a prototype player).
+      return (
+        <column padding={20} onClick={() => pressed.push('frame')}>
+          <box
+            width={200}
+            height={40}
+            ref={(node: UiNode | null) => void (node !== null && (row = node))}
+            onClick={() => pressed.push('row')}
+          />
+          {EditableText({ value: '', label: 'Email', onInput: event => typed.push(event.value) })}
+        </column>
+      );
+    }
+    const mounted = mountRuntime(<Canvas />);
+    mounted.frame();
+
+    inspection.act(row, 'click');
+    const field = inspection.nodesAt(30, 75).find(node => node.type !== 'column')!;
+    inspection.act(field, 'setValue', 'ada@example.com');
+
+    expect(pressed).toEqual(['row', 'frame']);
+    expect(typed.at(-1)).toBe('ada@example.com');
   });
 });

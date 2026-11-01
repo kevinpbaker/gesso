@@ -927,7 +927,13 @@ export class GessoRuntime {
       },
       preview: (node, property, value) => this.previewProperty(node, property, value),
       endPreview: (node, property) => this.endPreviews(node, property),
-      previewInputs: (anchorId, inputs) => this.resolver.hostFor(anchorId)?.previewInputs(inputs)
+      previewInputs: (anchorId, inputs) => this.resolver.hostFor(anchorId)?.previewInputs(inputs),
+      act: (node, action, value) => {
+        // A node this frame removed is a stale press, as a stale id is the mirror's.
+        if (this.graph.getNode(node.id) === node) {
+          this.actOn(node, value === undefined ? { action } : { action, value });
+        }
+      }
     });
     this.services.get(FocusService).setManager(this.input.focus);
     this.services.get(EditingService).setController(this.input.editing);
@@ -2702,6 +2708,11 @@ export class GessoRuntime {
       // A stale id: the mirror acted on a node this frame removed.
       return;
     }
+    this.actOn(node, action);
+  }
+
+  /** A semantics action on a node: the mirror's, or `InspectionService.act`'s on a node with no record of its own. */
+  private actOn(node: UiNode, action: Pick<UiSemanticsAction, 'action' | 'value'>): void {
     if (action.action === 'focus') {
       this.focusManager.focus(node);
       return;

@@ -1742,6 +1742,7 @@ declare class GessoRuntime {
   private semanticsIndexOf;
   applyFileDrop(message: UiFileDropMessage): void;
   applySemanticsAction(action: UiSemanticsAction): void;
+  private actOn;
   private applyTextRunAction;
   private updateSemantics;
   private rebuildSemantics;
@@ -2706,6 +2707,7 @@ declare class InspectionService {
   endPreview(node: UiNode, property?: string): void;
   previewInputs(anchorId: string, inputs: Readonly<Record<string, unknown>>): void;
   endInputPreview(anchorId: string): void;
+  act(node: UiNode, action: 'click' | 'setValue', value?: string): void;
 }
 interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
@@ -2725,6 +2727,7 @@ interface InspectionHost {
   preview?(node: UiNode, property: string, value: unknown): void;
   endPreview?(node: UiNode, property?: string): void;
   previewInputs?(anchorId: string, inputs: Readonly<Record<string, unknown>> | null): void;
+  act?(node: UiNode, action: 'click' | 'setValue', value?: string): void;
 }
 declare function audioClock(audio: AudioService, source: string): VideoClock;
 interface AudioElementLike extends EventTarget {

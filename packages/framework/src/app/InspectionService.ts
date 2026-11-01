@@ -114,6 +114,25 @@ export class InspectionService {
   endInputPreview(anchorId: string): void {
     this.host?.previewInputs?.(anchorId, null);
   }
+
+  /**
+   * Presses a node, or replaces the text of the field it is, as a
+   * person would: a click at the middle of where it is drawn, which
+   * its handlers and every handler above it get, or the edit a
+   * keyboard makes once it has focus. The path the accessibility
+   * mirror's actions take, for any node in the tree, record or not.
+   *
+   * What a design editor's agent does to play a prototype in its live
+   * frames: a row pressed, an email typed, by a node it found with
+   * `nodesAt` or by walking the tree. A node no longer in the tree is
+   * ignored.
+   */
+  act(node: UiNode, action: 'click' | 'setValue', value?: string): void {
+    if (this.host?.act === undefined) {
+      throw new Error('InspectionService cannot act before the runtime has built its tree.');
+    }
+    this.host.act(node, action, value);
+  }
 }
 
 /** What the runtime gives the service. */
@@ -128,4 +147,5 @@ export interface InspectionHost {
   endPreview?(node: UiNode, property?: string): void;
   /** Null ends the preview. */
   previewInputs?(anchorId: string, inputs: Readonly<Record<string, unknown>> | null): void;
+  act?(node: UiNode, action: 'click' | 'setValue', value?: string): void;
 }
