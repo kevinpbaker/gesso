@@ -928,12 +928,9 @@ export class GessoRuntime {
       preview: (node, property, value) => this.previewProperty(node, property, value),
       endPreview: (node, property) => this.endPreviews(node, property),
       previewInputs: (anchorId, inputs) => this.resolver.hostFor(anchorId)?.previewInputs(inputs),
-      act: (node, action, value) => {
-        // A node this frame removed is a stale press, as a stale id is the mirror's.
-        if (this.graph.getNode(node.id) === node) {
-          this.actOn(node, value === undefined ? { action } : { action, value });
-        }
-      }
+      // A node this frame removed is a stale press, as a stale id is the mirror's.
+      act: (node, action, value) =>
+        this.graph.getNode(node.id) === node && this.actOn(node, value === undefined ? { action } : { action, value })
     });
     this.services.get(FocusService).setManager(this.input.focus);
     this.services.get(EditingService).setController(this.input.editing);
@@ -2711,19 +2708,22 @@ export class GessoRuntime {
     this.actOn(node, action);
   }
 
-  /** A semantics action on a node: the mirror's, or `InspectionService.act`'s on a node with no record of its own. */
-  private actOn(node: UiNode, action: Pick<UiSemanticsAction, 'action' | 'value'>): void {
+  /**
+   * A semantics action on a node: the mirror's, or `InspectionService.act`'s
+   * on a node with no record of its own. False when it did not take: focus
+   * refused (an open dialog's trap holds it elsewhere), or a field that
+   * takes no text.
+   */
+  private actOn(node: UiNode, action: Pick<UiSemanticsAction, 'action' | 'value'>): boolean {
     if (action.action === 'focus') {
-      this.focusManager.focus(node);
-      return;
+      return this.focusManager.focus(node);
     }
     if (action.action === 'setValue') {
       // The editing controller edits whatever holds focus, so focus is
       // part of the action rather than a precondition the caller has
-      // to arrange.
-      this.focusManager.focus(node);
-      this.input.editing.replaceText(action.value ?? '');
-      return;
+      // to arrange. Refused, it is not: the text would go into whatever
+      // does hold it, another field than the one named.
+      return this.focusManager.focus(node) && this.input.editing.replaceText(action.value ?? '');
     }
     this.focusManager.focus(node);
     // The centre the node is drawn at, which is where a pointer press
@@ -2737,6 +2737,7 @@ export class GessoRuntime {
       new UiPointerEvent(UiEventType.Click, box.x + box.width / 2, box.y + box.height / 2, 1),
       node
     );
+    return true;
   }
 
   /**

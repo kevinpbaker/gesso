@@ -124,14 +124,15 @@ export class InspectionService {
    *
    * What a design editor's agent does to play a prototype in its live
    * frames: a row pressed, an email typed, by a node it found with
-   * `nodesAt` or by walking the tree. A node no longer in the tree is
-   * ignored.
+   * `nodesAt` or by walking the tree. False when it did not take: a
+   * node no longer in the tree, or a field that could not have focus
+   * because an open dialog's trap holds it, or takes no text.
    */
-  act(node: UiNode, action: 'click' | 'setValue', value?: string): void {
+  act(node: UiNode, action: 'click' | 'setValue', value?: string): boolean {
     if (this.host?.act === undefined) {
       throw new Error('InspectionService cannot act before the runtime has built its tree.');
     }
-    this.host.act(node, action, value);
+    return this.host.act(node, action, value);
   }
 }
 
@@ -147,5 +148,5 @@ export interface InspectionHost {
   endPreview?(node: UiNode, property?: string): void;
   /** Null ends the preview. */
   previewInputs?(anchorId: string, inputs: Readonly<Record<string, unknown>> | null): void;
-  act?(node: UiNode, action: 'click' | 'setValue', value?: string): void;
+  act?(node: UiNode, action: 'click' | 'setValue', value?: string): boolean;
 }

@@ -239,11 +239,14 @@ describe('InspectionService', () => {
     const mounted = mountRuntime(<Canvas />);
     mounted.frame();
 
-    inspection.act(row, 'click');
+    expect(inspection.act(row, 'click')).toBe(true);
     const field = inspection.nodesAt(30, 75).find(node => node.type !== 'column')!;
-    inspection.act(field, 'setValue', 'ada@example.com');
+    expect(inspection.act(field, 'setValue', 'ada@example.com')).toBe(true);
 
     expect(pressed).toEqual(['row', 'frame']);
+    expect(typed.at(-1)).toBe('ada@example.com');
+    // A row is no field: nothing is typed, and none other than the one named takes the text.
+    expect(inspection.act(row, 'setValue', 'grace')).toBe(false);
     expect(typed.at(-1)).toBe('ada@example.com');
   });
 });
