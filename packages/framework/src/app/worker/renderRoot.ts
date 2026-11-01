@@ -545,6 +545,10 @@ export class RenderWorkerApp {
       return;
     }
 
+    // The wheel's held step goes before any other input (see `GessoRuntime.wheel`).
+    if (message.type !== 'wheel' && isInputMessage(message)) {
+      runtime.releaseWheel();
+    }
     switch (message.type) {
       case 'pointerDown':
         runtime.input.pointer.pointerDown(message.x, message.y, message.buttons, message.modifiers, message.pointer);
@@ -559,7 +563,7 @@ export class RenderWorkerApp {
         runtime.input.pointer.pointerCancel(message.pointer);
         break;
       case 'wheel':
-        runtime.input.wheel.wheel(
+        runtime.wheel(
           message.x,
           message.y,
           message.deltaX,

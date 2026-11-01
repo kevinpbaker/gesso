@@ -1579,6 +1579,7 @@ declare class GessoRuntime {
   private earlyFrame;
   private lastEarlyFrame;
   private lastDiscreteInput;
+  private heldWheel;
   private frameTime;
   private frameBegan;
   private frameListener;
@@ -1656,6 +1657,8 @@ declare class GessoRuntime {
   onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
   noteInput(at: number | undefined): void;
   answerInput(): void;
+  wheel(...step: Parameters<UiWheelController['wheel']>): void;
+  releaseWheel(): void;
   private drawEarly;
   setInspectorEnabled(enabled: boolean): void;
   onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;

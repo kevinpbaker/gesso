@@ -1,8 +1,9 @@
+import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Component } from '../../Component';
 import { Define } from '../../decorators';
-import { Button, Column, EditableText, type CanvasHost } from 'gesso-core';
+import { Box, Button, Column, EditableText, type CanvasHost } from 'gesso-core';
 import { RenderWorkerApp } from './renderRoot';
 import { epochNow, type RuntimeToShellMessage, type ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
@@ -53,9 +54,29 @@ class LatencyRoot extends Component {
   }
 }
 
+/** What `WheelRoot` heard, in order. */
+const heard: string[] = [];
+
+@Define('latency-wheel-root')
+class WheelRoot extends Component {
+  override render() {
+    // A wheel that changes what is drawn, so a frame answers it.
+    const width = new BehaviorSubject(400);
+    return Box({
+      width,
+      height: 600,
+      onWheel: event => {
+        heard.push(`wheel ${event.deltaY}`);
+        width.next(width.value + event.deltaY);
+      },
+      onPointerDown: () => heard.push('press')
+    });
+  }
+}
+
 const NO_MODS = { shift: false, ctrl: false, alt: false, meta: false };
 
-function start() {
+function start(root: typeof LatencyRoot | typeof WheelRoot = LatencyRoot) {
   const sent: RuntimeToShellMessage[] = [];
   const listeners = new Map<string, (event: unknown) => void>();
   const host = {
@@ -70,7 +91,7 @@ function start() {
   const send = (message: ShellToRuntimeMessage): void => {
     host.onmessage?.({ data: message } as MessageEvent<ShellToRuntimeMessage>);
   };
-  new RenderWorkerApp(LatencyRoot, host);
+  new RenderWorkerApp(root, host);
   send({
     type: 'init',
     canvas: createMockCanvas() as unknown as OffscreenCanvas,
@@ -137,5 +158,34 @@ describe('RenderWorkerApp input latency', () => {
     const after = latencies().slice(before);
     expect(after.length).toBeGreaterThan(0);
     expect(after.every(value => value === null)).toBe(true);
+  });
+});
+
+describe('RenderWorkerApp wheel steps', () => {
+  it('hands on the steps before a frame as one, before the press that follows, measured from the first', async () => {
+    const { send, latencies } = start(WheelRoot);
+    await settle();
+    heard.length = 0;
+    const before = latencies().length;
+
+    send({
+      type: 'wheel',
+      x: 100,
+      y: 100,
+      deltaX: 0,
+      deltaY: 10,
+      deltaMode: 0,
+      modifiers: NO_MODS,
+      at: epochNow() - 50
+    });
+    send({ type: 'wheel', x: 100, y: 100, deltaX: 0, deltaY: 15, deltaMode: 0, modifiers: NO_MODS, at: epochNow() });
+    send({ type: 'pointerDown', x: 100, y: 100, buttons: 1, modifiers: NO_MODS });
+    await settle();
+
+    expect(heard).toEqual(['wheel 25', 'press']);
+    const reported = latencies()
+      .slice(before)
+      .filter(value => value !== null);
+    expect(reported[0]!).toBeGreaterThanOrEqual(50);
   });
 });

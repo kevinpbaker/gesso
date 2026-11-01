@@ -86,3 +86,69 @@ describe('GessoRuntime wheel containment', () => {
     runtime.dispose();
   });
 });
+
+/**
+ * The wheel's steps between two frames, as the render worker hands them
+ * on (`GessoRuntime.wheel`): one step at the frame, so a handler slower
+ * than a refresh runs once a frame rather than once a step.
+ */
+describe('GessoRuntime wheel steps between frames', () => {
+  function mount() {
+    let clock!: UiManualFrameClock;
+    const heard: string[] = [];
+    const runtime = new GessoRuntime({
+      root: Box({
+        width: 300,
+        height: 300,
+        onWheel: event => heard.push(`wheel ${event.deltaX},${event.deltaY}${event.modifiers.ctrl ? ' ctrl' : ''}`),
+        onPointerDown: () => heard.push('press')
+      }),
+      canvas: mockCanvas(300, 300),
+      width: 300,
+      height: 300,
+      clock: callback => (clock = new UiManualFrameClock(callback))
+    });
+    runtime.start();
+    let now = 0;
+    const frame = () => {
+      if (clock.isPending) {
+        clock.tick((now += 16));
+      }
+    };
+    frame();
+    return { runtime, frame, heard };
+  }
+  const CTRL = { ctrl: true, shift: false, alt: false, meta: false };
+
+  it('adds up the steps before a frame and hands them on as one, at the frame', () => {
+    const { runtime, frame, heard } = mount();
+    runtime.wheel(50, 50, 0, -4, CTRL);
+    runtime.wheel(50, 50, 0, -4, CTRL);
+    runtime.wheel(60, 60, 1, -4, CTRL);
+    expect(heard).toEqual([]);
+
+    frame();
+    expect(heard).toEqual(['wheel 1,-12 ctrl']);
+    runtime.dispose();
+  });
+
+  it('keeps a step with other keys held apart, in the order they came', () => {
+    const { runtime, frame, heard } = mount();
+    runtime.wheel(50, 50, 0, -4, CTRL);
+    runtime.wheel(50, 50, 0, 30);
+    runtime.wheel(50, 50, 0, 30);
+    frame();
+    expect(heard).toEqual(['wheel 0,-4 ctrl', 'wheel 0,60']);
+    runtime.dispose();
+  });
+
+  it('hands on the held step before an input that follows it', () => {
+    const { runtime, frame, heard } = mount();
+    runtime.wheel(50, 50, 0, -4, CTRL);
+    runtime.releaseWheel();
+    runtime.input.pointer.pointerDown(50, 50, 1);
+    frame();
+    expect(heard).toEqual(['wheel 0,-4 ctrl', 'press']);
+    runtime.dispose();
+  });
+});

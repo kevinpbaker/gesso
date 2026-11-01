@@ -423,6 +423,8 @@ export class GessoRuntime {
   private lastEarlyFrame = -Infinity;
   /** When the last discrete input was routed; see `answerInput`. */
   private lastDiscreteInput = -Infinity;
+  /** The wheel's steps since the last frame, added together; see `wheel`. */
+  private heldWheel: Parameters<UiWheelController['wheel']> | null = null;
   /** The display time the frame being drawn is for; see `FrameMetrics.time`. */
   private frameTime: number | null = null;
   /** When the frame's first phase began, before its changes were collected; see `FrameMetrics.durationMs`. */
@@ -1246,6 +1248,48 @@ export class GessoRuntime {
   answerInput(): void {
     this.lastDiscreteInput = now();
     this.drawEarly();
+  }
+
+  /**
+   * A step of the wheel, or of a trackpad's two fingers or its pinch,
+   * held until the frame and added to the others that arrive before it.
+   *
+   * A trackpad sends a step on every refresh, and a handler that takes
+   * longer than a refresh over one (a design tool's board zoomed over
+   * hundreds of frames, each of whose names it scales) fell behind for
+   * good: each step waited for the one before it, the frame waited for
+   * them all, and a pinch drew nothing until the fingers stopped, then
+   * jumped. Held, the steps that queue while the handler runs are one
+   * step at the next frame, so the handler runs once a frame however
+   * many arrive, and what it draws follows the fingers a frame at a
+   * time. A step with other modifiers or in another unit is not added
+   * to the held one but follows it, and any other input lets the held
+   * step go first (`releaseWheel`), so nothing is answered out of order.
+   */
+  wheel(...step: Parameters<UiWheelController['wheel']>): void {
+    const held = this.heldWheel;
+    if (held !== null && !sameWheel(held, step)) {
+      this.releaseWheel();
+    }
+    if (this.heldWheel === null) {
+      this.heldWheel = step;
+      this.scheduler.wake();
+      return;
+    }
+    const [, , deltaX, deltaY, modifiers, deltaMode, wheelDeltaY] = this.heldWheel;
+    const [x, y, moreX, moreY, , , moreWheelY, at] = step;
+    const legacy = wheelDeltaY === undefined || moreWheelY === undefined ? moreWheelY : wheelDeltaY + moreWheelY;
+    this.heldWheel = [x, y, deltaX + moreX, deltaY + moreY, modifiers, deltaMode, legacy, at];
+  }
+
+  /** Hands the held wheel step to the input now, before what follows it; see `wheel`. */
+  releaseWheel(): void {
+    const held = this.heldWheel;
+    if (held === null) {
+      return;
+    }
+    this.heldWheel = null;
+    this.input.wheel.wheel(...held);
   }
 
   /** Draws the pending frame in a task of its own, if the guards in `answerInput` allow. */
@@ -3532,6 +3576,9 @@ export class GessoRuntime {
     this.frameBegan = now();
     this.phaseTimings = emptyPhaseTimings();
     this.frameTime = time;
+    // The wheel's steps since the last frame, as one (see `wheel`), before
+    // anything reads what they change: a smooth scroll they start ticks below.
+    this.releaseWheel();
 
     // Animation first: every phase after this one reads values a tick
     // may have just written. `hasWork` is a set's size, so an app with
@@ -4551,6 +4598,19 @@ function boxesEqual(a: LayoutBox, b: LayoutBox): boolean {
  */
 function frameChangedTree(frame: UiFrame): boolean {
   return frameNeedsSemantics(frame);
+}
+
+/** Whether two wheel steps can be added together: the same keys held, in the same unit. */
+function sameWheel(a: Parameters<UiWheelController['wheel']>, b: Parameters<UiWheelController['wheel']>): boolean {
+  const [, , , , keysA, unitA] = a;
+  const [, , , , keysB, unitB] = b;
+  return (
+    unitA === unitB &&
+    (keysA?.ctrl ?? false) === (keysB?.ctrl ?? false) &&
+    (keysA?.shift ?? false) === (keysB?.shift ?? false) &&
+    (keysA?.alt ?? false) === (keysB?.alt ?? false) &&
+    (keysA?.meta ?? false) === (keysB?.meta ?? false)
+  );
 }
 
 function frameNeedsSemantics(frame: UiFrame): boolean {
