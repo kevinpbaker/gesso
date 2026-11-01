@@ -1,6 +1,7 @@
 import type { Observable } from 'rxjs';
 
 import type { UiAnimation, AnimatedCell } from './UiAnimation';
+import type { UiClock } from './UiClock';
 
 /** An animation of some value, with the value's type erased. */
 type AnyAnimation = UiAnimation<unknown>;
@@ -26,6 +27,8 @@ function erase<T>(animation: UiAnimation<T>): AnyAnimation {
  */
 export class AnimationDriver {
   private readonly running = new Map<object, AnyAnimation>();
+  /** The clock each running animation was started on, when it was not real time; see `UiClock`. */
+  private readonly clocks = new Map<object, UiClock>();
   private reducedMotion = false;
   private hidden = false;
   private wake: (() => void) | null = null;
@@ -68,8 +71,10 @@ export class AnimationDriver {
    * animation says its movement is the information rather than the
    * decoration.
    */
-  private lands(policy: AnyAnimation['reducedMotionPolicy']): boolean {
-    return policy === 'snap' && (this.reducedMotion || this.hidden);
+  private lands(policy: AnyAnimation['reducedMotionPolicy'], clock: UiClock | undefined): boolean {
+    // A settled clock is a picture: everything on it lands, a spinner
+    // included, where reduced motion and a hidden page spare `keep`.
+    return clock?.settled === true || (policy === 'snap' && (this.reducedMotion || this.hidden));
   }
 
   /**
@@ -82,16 +87,20 @@ export class AnimationDriver {
    * So a reduced-motion app runs no animation frames, rather than
    * running them and drawing the same thing sixty times.
    */
-  start<T>(animation: UiAnimation<T>): Observable<T> {
+  start<T>(animation: UiAnimation<T>, clock: UiClock | null = null): Observable<T> {
     const cell = animation.cell as object;
     this.running.get(cell)?.cancel();
     this.running.delete(cell);
-    if (this.lands(animation.reducedMotionPolicy)) {
+    this.clocks.delete(cell);
+    if (this.lands(animation.reducedMotionPolicy, clock ?? undefined)) {
       animation.snap();
       return animation.values;
     }
     const wasIdle = this.running.size === 0;
     this.running.set(cell, erase(animation));
+    if (clock !== null) {
+      this.clocks.set(cell, clock);
+    }
     if (wasIdle) {
       this.wake?.();
     }
@@ -117,6 +126,7 @@ export class AnimationDriver {
       return false;
     }
     this.running.delete(cell as object);
+    this.clocks.delete(cell as object);
     animation.cancel();
     return true;
   }
@@ -124,6 +134,7 @@ export class AnimationDriver {
   stopAll(): void {
     const animations = [...this.running.values()];
     this.running.clear();
+    this.clocks.clear();
     for (const animation of animations) {
       animation.cancel();
     }
@@ -193,8 +204,9 @@ export class AnimationDriver {
     // Deleting the current entry while iterating a Map is defined and
     // does not skip the next one.
     for (const [cell, animation] of this.running) {
-      if (this.lands(animation.reducedMotionPolicy)) {
+      if (this.lands(animation.reducedMotionPolicy, this.clocks.get(cell))) {
         this.running.delete(cell);
+        this.clocks.delete(cell);
         animation.snap();
       }
     }
@@ -213,7 +225,12 @@ export class AnimationDriver {
    */
   nextTickAt(now: number): number | undefined {
     let earliest: number | undefined;
-    for (const animation of this.running.values()) {
+    for (const [cell, animation] of this.running) {
+      const clock = this.clocks.get(cell);
+      if (clock?.settled === true) {
+        // Settled since it started: the next frame lands it.
+        return now;
+      }
       // Minus its slack, because this is the earliest moment a frame
       // would be *useful*, not the exact moment it is owed. Frames
       // arrive on the display's refreshes: a caller that waits for the
@@ -222,7 +239,14 @@ export class AnimationDriver {
       // a 60Hz display ends up playing at thirty. Asking a slack early
       // means the refresh at or just before due is the one that
       // serves it, and `advance` accepts it for the same reason.
-      const due = animation.dueAt(now) - animation.dueSlackMs;
+      // On a clock of its own, due in its time and asked for in real
+      // time; a paused clock asks for nothing.
+      const at = clock === undefined ? now : clock.local(now);
+      const dueAt = animation.dueAt(at) - animation.dueSlackMs;
+      const due = clock === undefined ? dueAt : clock.real(dueAt);
+      if (!Number.isFinite(due)) {
+        continue;
+      }
       if (earliest === undefined || due < earliest) {
         earliest = due;
       }
@@ -242,15 +266,24 @@ export class AnimationDriver {
    */
   advance(now: number): void {
     for (const [cell, animation] of this.running) {
+      const clock = this.clocks.get(cell);
+      if (clock?.settled === true) {
+        this.running.delete(cell);
+        this.clocks.delete(cell);
+        animation.snap();
+        continue;
+      }
+      const at = clock === undefined ? now : clock.local(now);
       // Early by less than its own slack counts as on time — the same
       // allowance `nextTickAt` asks the scheduler for, and for the
       // same reason. See `UiAnimation.dueSlackMs`.
-      if (animation.dueAt(now) - animation.dueSlackMs > now) {
+      if (animation.dueAt(at) - animation.dueSlackMs > at) {
         continue;
       }
-      animation.advance(now);
+      animation.advance(at);
       if (animation.isFinished && this.running.get(cell) === animation) {
         this.running.delete(cell);
+        this.clocks.delete(cell);
       }
     }
   }

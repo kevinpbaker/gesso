@@ -11,6 +11,7 @@ import type { UiContainerSize } from './UiContainerSize';
 import { unknownContainerSize } from './UiContainerSize';
 import type { UiInsetSource } from './UiInsets';
 import { UiInsetRegistry } from './UiInsets';
+import type { UiClock } from '../animation/UiClock';
 
 /**
  * Built-in environment keys.
@@ -110,5 +111,11 @@ export const UiEnvironmentKeys = {
   insets: createEnvironmentKey<UiInsetSource>({
     name: 'insets',
     defaultValue: new UiInsetRegistry()
+  }),
+
+  /** The clock the animations under a node run on; null is real time. See `UiClock`. */
+  clock: createEnvironmentKey<UiClock | null>({
+    name: 'clock',
+    defaultValue: null
   })
 } as const;

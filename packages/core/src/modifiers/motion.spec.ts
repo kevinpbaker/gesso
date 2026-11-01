@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { AnimationDriver } from '../animation/AnimationDriver';
+import { UiClock } from '../animation/UiClock';
+import { provided } from '../environment/UiEnvironmentKey';
+import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
 import { fade, slideUp } from '../animation/UiMotionState';
 import { Box } from '../composition/UiComponents';
 import { UiGraphBuilder } from '../composition/UiGraphBuilder';
@@ -52,5 +55,39 @@ describe('an entrance', () => {
     expect(node.properties.get('opacity')).toBeUndefined();
     expect(node.properties.get('transform')).toBeUndefined();
     expect(animations.isRunning).toBe(false);
+  });
+});
+
+describe('an entrance under a clock of its own', () => {
+  function mountUnder(animations: AnimationDriver, clock: UiClock) {
+    const graph = new UiGraph();
+    const builder = new UiGraphBuilder(graph, { animations });
+    builder.reconcileChildren(graph.root, [
+      Box(
+        { provide: [provided(UiEnvironmentKeys.clock, clock)] },
+        Box({ width: 100, height: 20, modifiers: [motion({ initial: [fade, slideUp(10)] })] })
+      )
+    ]);
+    return graph.root.firstChild!.firstChild!;
+  }
+
+  it('is at rest from the start on a settled clock, as a frame on a design tool’s board is', () => {
+    const animations = new AnimationDriver();
+    const node = mountUnder(animations, new UiClock({ settled: true }));
+
+    expect(animations.isRunning).toBe(false);
+    expect(node.properties.get('opacity')).toBeUndefined();
+  });
+
+  it('is still arriving on a slowed clock when real time says it is done', () => {
+    const animations = new AnimationDriver();
+    const node = mountUnder(animations, new UiClock({ speed: 0.1 }));
+
+    animations.advance(0);
+    animations.advance(1000);
+
+    expect(animations.isRunning).toBe(true);
+    expect(node.properties.get('opacity')).toBeGreaterThan(0);
+    expect(node.properties.get('opacity')).toBeLessThan(1);
   });
 });

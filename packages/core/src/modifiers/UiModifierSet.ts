@@ -4,6 +4,7 @@ import {
   AnimationDriver,
   UiSharedElements,
   UiSpring,
+  clockOf,
   createTween,
   type AnimatedCell,
   type UiSpringOptions,
@@ -470,7 +471,7 @@ class Host implements UiModifierHost {
       return EMPTY as Observable<T>;
     }
     this.animated.add(cell as AnimatedCell<unknown>);
-    return driver.start(tween);
+    return driver.start(tween, clockOf(this.node));
   }
 
   spring(cell: AnimatedCell<number>, to: number, options: UiSpringOptions): Observable<number> {
@@ -487,7 +488,7 @@ class Host implements UiModifierHost {
     // what a modifier re-aimed once a frame does.
     const previous = driver.animationFor(cell);
     const velocity = options.velocity ?? (previous instanceof UiSpring ? previous.currentVelocity : 0);
-    return driver.start(new UiSpring(cell, to, { ...options, velocity }));
+    return driver.start(new UiSpring(cell, to, { ...options, velocity }), clockOf(this.node));
   }
 
   own(teardown: UiModifierTeardown): void {

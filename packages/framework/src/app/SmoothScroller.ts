@@ -1,4 +1,4 @@
-import { DirtyFlags, UiSpring, type AnimatedCell, type UiGraph, type UiNode } from 'gesso-core';
+import { clockOf, DirtyFlags, UiSpring, type AnimatedCell, type UiGraph, type UiNode } from 'gesso-core';
 import type { AnimationService } from './AnimationService';
 
 /** Which offset is moving. */
@@ -121,7 +121,7 @@ export class SmoothScroller {
     if (pending !== undefined && target === pending) {
       return;
     }
-    this.animations.spring(cell, target, { spring: SCROLL_SPRING });
+    this.animations.spring(cell, target, { spring: SCROLL_SPRING, clock: clockOf(node) });
   }
 
   /**
@@ -154,7 +154,7 @@ export class SmoothScroller {
     // property, so adopt it as ours rather than reading it as someone
     // else's write and standing down.
     state.lastWritten = state.cell.value;
-    this.animations.spring(state.cell, pending + delta, { spring: SCROLL_SPRING });
+    this.animations.spring(state.cell, pending + delta, { spring: SCROLL_SPRING, clock: clockOf(node) });
   }
 
   /** Whether this container is being animated right now. */

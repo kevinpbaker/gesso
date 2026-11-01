@@ -8,6 +8,7 @@ import {
   type Inputs
 } from 'gesso-framework';
 import {
+  UiEnvironmentKeys,
   Box,
   Column,
   percent,
@@ -298,12 +299,15 @@ function breath(inputs: Inputs<{ shimmer?: boolean }>, ctx: ComponentContext): I
     return undefined;
   }
   const animations = ctx.inject(AnimationService);
+  // Where it is drawn: a design tool's board settles it, its player may slow it.
+  const clock = ctx.environment(UiEnvironmentKeys.clock);
   const opacity = internalState(SHIMMER_DIM);
   animations.animate(opacity, 1, {
     duration: SHIMMER_PERIOD_MS,
     easing: BREATH,
     stepMs: SHIMMER_STEP_MS,
-    repeat: true
+    repeat: true,
+    clock
   });
   ctx.onUnmount(() => animations.stop(opacity));
   return opacity;

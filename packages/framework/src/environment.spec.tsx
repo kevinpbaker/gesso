@@ -1,10 +1,11 @@
 import { BehaviorSubject, map } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
-import { createEnvironmentKey, provided, type UiChild } from 'gesso-core';
+import { createEnvironmentKey, provided, type UiChild, type UiNode } from 'gesso-core';
 
 import { mountRuntime } from './app/RuntimeTestUtils';
 import type { ComponentContext, Inputs } from './FunctionComponent';
+import { OverlayService } from './overlay/OverlayService';
 
 /** Where a screen is drawn: a design tool's board, or the player that plays it. */
 const Place = createEnvironmentKey<string>({ name: 'spec.place', defaultValue: 'nowhere' });
@@ -51,6 +52,30 @@ describe('ctx.environment', () => {
     );
     mounted.frame();
     shown.next(true);
+    mounted.frame();
+
+    expect(seen).toEqual(['player']);
+  });
+
+  it('is what the opener reads, for a component in an overlay it opens', () => {
+    const seen: string[] = [];
+    function InDialog(_inputs: unknown, ctx: ComponentContext): UiChild {
+      seen.push(ctx.environment(Place));
+      return <text text="in the dialog" />;
+    }
+    let overlays!: OverlayService;
+    let placeholder: UiNode | null = null;
+    function Opener(_inputs: unknown, ctx: ComponentContext): UiChild {
+      overlays = ctx.inject(OverlayService);
+      return <box ref={node => (placeholder = node)} width={10} height={10} />;
+    }
+    const mounted = mountRuntime(
+      <column provide={[provided(Place, 'player')]}>
+        <Opener />
+      </column>
+    );
+    mounted.frame();
+    overlays.open({ id: 'dialog', content: <InDialog />, environment: placeholder, center: 'both' });
     mounted.frame();
 
     expect(seen).toEqual(['player']);

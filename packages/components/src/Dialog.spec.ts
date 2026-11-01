@@ -11,7 +11,10 @@ import {
   lightColors,
   lightTheme,
   percent,
+  provided,
   ScrollView,
+  UiClock,
+  UiEnvironmentKeys,
   type UiNode
 } from 'gesso-core';
 import { AnimationService, createComponent } from 'gesso-framework';
@@ -208,11 +211,11 @@ describe("Dialog's scrim", () => {
     }
     return undefined;
   }
-  function mount(props: { scrim?: boolean } = {}, theme = lightTheme) {
+  function mount(props: { scrim?: boolean } = {}, theme = lightTheme, clock?: UiClock) {
     const open = new BehaviorSubject(false);
     const ui = renderTest(
       Box(
-        { width: 400, height: 300, theme },
+        { width: 400, height: 300, theme, provide: clock === undefined ? undefined : [provided(UiEnvironmentKeys.clock, clock)] },
         createComponent(Dialog, { open, title: 'Rename', content: Box({ height: 10 }), ...props })
       ),
       { width: 400, height: 300 }
@@ -284,6 +287,19 @@ describe("Dialog's scrim", () => {
     const drawn = fills(ui);
     expect(drawn).toContain(colorToCss(darkColors.surface));
     expect(drawn).not.toContain(colorToCss(lightColors.surface));
+  });
+
+  it('is there at once under a settled clock, as on a design tool’s board, and fades in on a slowed one', () => {
+    const settled = mount({}, lightTheme, new UiClock({ settled: true }));
+    settled.open.next(true);
+    settled.ui.frame();
+    expect(settled.scrim()!.properties.get('opacity') ?? 1).toBe(1);
+
+    const slowed = mount({}, lightTheme, new UiClock({ speed: 0.001 }));
+    slowed.open.next(true);
+    slowed.ui.frame();
+    slowed.ui.frame(10_000);
+    expect(slowed.scrim()!.properties.get('opacity')).toBeLessThan(0.5);
   });
 
   it('is there at once under reduced motion', () => {

@@ -13,6 +13,7 @@ import {
   ShellService
 } from 'gesso-framework';
 import {
+  UiEnvironmentKeys,
   steps,
   Box,
   Paint,
@@ -697,12 +698,15 @@ export function Spinner(inputs: Inputs<SpinnerProps>, ctx: ComponentContext): Ui
   const step = internalState(0);
 
   const animations = ctx.inject(AnimationService);
+  // Where it is drawn: a design tool's board settles it, its player may slow it.
+  const clock = ctx.environment(UiEnvironmentKeys.clock);
   animations.animate(step, SPINNER_BLADES, {
     duration: SPINNER_BLADES * SPINNER_STEP_MS,
     easing: steps(SPINNER_BLADES),
     stepMs: SPINNER_STEP_MS,
     repeat: true,
-    reducedMotion: 'keep'
+    reducedMotion: 'keep',
+    clock
   });
   ctx.onUnmount(() => animations.stop(step));
 
@@ -807,6 +811,8 @@ export function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentCont
   // from the left each time, so a bar that comes back to sweeping does
   // not resume wherever it was.
   const animations = ctx.inject(AnimationService);
+  // Where it is drawn: a design tool's board settles it, its player may slow it.
+  const clock = ctx.environment(UiEnvironmentKeys.clock);
   const sweeping = indeterminate.subscribe(on => {
     if (!on) {
       animations.stop(step);
@@ -818,7 +824,8 @@ export function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentCont
       easing: steps(PROGRESS_STEPS),
       stepMs: PROGRESS_STEP_MS,
       repeat: true,
-      reducedMotion: 'keep'
+      reducedMotion: 'keep',
+      clock
     });
   });
   ctx.onUnmount(() => {

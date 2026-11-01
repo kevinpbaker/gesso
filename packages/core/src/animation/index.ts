@@ -26,6 +26,7 @@ export {
   type UiTransitionValue
 } from './UiTransition';
 export { AnimationDriver } from './AnimationDriver';
+export { UiClock, clockOf } from './UiClock';
 export { UiSharedElements, type SharedClaim } from './UiSharedElements';
 export {
   MOTION_CHANNELS,

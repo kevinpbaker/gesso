@@ -540,6 +540,7 @@ import {
   UI_SEMANTIC_STATES,
   UiAnimation,
   UiChild,
+  UiClock,
   UiContrast,
   UiDurationToken,
   UiEasing,
@@ -1200,6 +1201,7 @@ interface AnimateOptions {
   repeat?: boolean;
   reducedMotion?: UiReducedMotionPolicy;
   delay?: number;
+  clock?: UiClock | null;
 }
 interface SpringOptions {
   spring?: UiSpringToken | UiSpringSpec;
@@ -1210,6 +1212,7 @@ interface SpringOptions {
   restDelta?: number;
   reducedMotion?: UiReducedMotionPolicy;
   delay?: number;
+  clock?: UiClock | null;
 }
 declare class AnimationService {
   readonly reducedMotion: InternalState<boolean>;

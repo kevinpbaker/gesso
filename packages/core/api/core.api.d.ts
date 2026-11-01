@@ -227,26 +227,6 @@ declare function spring(spec?: UiSpringToken | UiSpringSpec, options?: {
 }): UiTransitionSpec;
 declare function normalizeTransition(value: UiTransitionValue): UiTransitionSpec;
 declare function assertTransitionMap(nodeId: string, value: unknown, isKnownProperty: (name: string) => boolean): ReadonlyMap<string, UiTransitionSpec>;
-declare class AnimationDriver {
-  private readonly running;
-  private reducedMotion;
-  private hidden;
-  private wake;
-  setWakeListener(listener: (() => void) | null): void;
-  get isRunning(): boolean;
-  get size(): number;
-  get isReducedMotion(): boolean;
-  private lands;
-  start<T>(animation: UiAnimation<T>): Observable<T>;
-  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
-  stop<T>(cell: AnimatedCell<T>): boolean;
-  stopAll(): void;
-  setReducedMotion(reduced: boolean): void;
-  setHidden(hidden: boolean): void;
-  private landRunning;
-  nextTickAt(now: number): number | undefined;
-  advance(now: number): void;
-}
 declare enum DirtyFlags {
   None = 0,
   Content = 1,
@@ -301,6 +281,56 @@ declare class UiEnvironment {
   getOwn(name: string): unknown;
   providesOwn(name: string): boolean;
 }
+interface Size {
+  width: number;
+  height: number;
+}
+interface LayoutBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+interface TightenOptions {
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
+}
+declare class Constraints {
+  readonly minWidth: number;
+  readonly maxWidth: number;
+  readonly minHeight: number;
+  readonly maxHeight: number;
+  constructor(minWidth?: number, maxWidth?: number, minHeight?: number, maxHeight?: number);
+  static unbounded(): Constraints;
+  static tight(width: number, height: number): Constraints;
+  static loose(width: number, height: number): Constraints;
+  hasBoundedWidth(): boolean;
+  hasBoundedHeight(): boolean;
+}
+interface LayoutStats {
+  measured: number;
+  placed: number;
+  shifted: number;
+  relayoutRoots: number;
+  fullLayout: boolean;
+  measuredNodes: UiNode[];
+}
+interface LayoutResult {
+  root: UiNode;
+  box: LayoutBox;
+  contentWidth: number;
+  contentHeight: number;
+  scrollX: number;
+  scrollY: number;
+  clip: LayoutBox;
+}
+declare function clampSize(constraints: Constraints, width: number, height: number): Size;
+declare function constraintsEqual(a: Constraints, b: Constraints): boolean;
+declare function tightenConstraints(constraints: Constraints, options: TightenOptions): Constraints;
 type TextWrap = 'word' | 'char' | 'none';
 type TextOverflow = 'clip' | 'ellipsis';
 interface TextRunStyle {
@@ -696,56 +726,42 @@ declare class UiNode {
   setProperty<T>(property: NodeProperty, value: T): void;
   removeProperty(property: NodeProperty): boolean;
 }
-interface Size {
-  width: number;
-  height: number;
+declare class UiClock {
+  private rate;
+  private anchor;
+  private lastReal;
+  settled: boolean;
+  constructor(options?: {
+    readonly speed?: number;
+    readonly settled?: boolean;
+  });
+  get speed(): number;
+  set speed(next: number);
+  local(now: number): number;
+  real(at: number): number;
 }
-interface LayoutBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+declare function clockOf(node: UiNode | null | undefined): UiClock | null;
+declare class AnimationDriver {
+  private readonly running;
+  private readonly clocks;
+  private reducedMotion;
+  private hidden;
+  private wake;
+  setWakeListener(listener: (() => void) | null): void;
+  get isRunning(): boolean;
+  get size(): number;
+  get isReducedMotion(): boolean;
+  private lands;
+  start<T>(animation: UiAnimation<T>, clock?: UiClock | null): Observable<T>;
+  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
+  stop<T>(cell: AnimatedCell<T>): boolean;
+  stopAll(): void;
+  setReducedMotion(reduced: boolean): void;
+  setHidden(hidden: boolean): void;
+  private landRunning;
+  nextTickAt(now: number): number | undefined;
+  advance(now: number): void;
 }
-interface TightenOptions {
-  width?: number;
-  height?: number;
-  minWidth?: number;
-  maxWidth?: number;
-  minHeight?: number;
-  maxHeight?: number;
-}
-declare class Constraints {
-  readonly minWidth: number;
-  readonly maxWidth: number;
-  readonly minHeight: number;
-  readonly maxHeight: number;
-  constructor(minWidth?: number, maxWidth?: number, minHeight?: number, maxHeight?: number);
-  static unbounded(): Constraints;
-  static tight(width: number, height: number): Constraints;
-  static loose(width: number, height: number): Constraints;
-  hasBoundedWidth(): boolean;
-  hasBoundedHeight(): boolean;
-}
-interface LayoutStats {
-  measured: number;
-  placed: number;
-  shifted: number;
-  relayoutRoots: number;
-  fullLayout: boolean;
-  measuredNodes: UiNode[];
-}
-interface LayoutResult {
-  root: UiNode;
-  box: LayoutBox;
-  contentWidth: number;
-  contentHeight: number;
-  scrollX: number;
-  scrollY: number;
-  clip: LayoutBox;
-}
-declare function clampSize(constraints: Constraints, width: number, height: number): Size;
-declare function constraintsEqual(a: Constraints, b: Constraints): boolean;
-declare function tightenConstraints(constraints: Constraints, options: TightenOptions): Constraints;
 interface SharedClaim {
   readonly box: LayoutBox | null;
   yieldPrevious(): void;
@@ -2691,6 +2707,7 @@ declare const UiEnvironmentKeys: {
   readonly pointer: UiEnvironmentKey<UiPointer>;
   readonly containerSize: UiEnvironmentKey<UiContainerSize>;
   readonly insets: UiEnvironmentKey<UiInsetSource>;
+  readonly clock: UiEnvironmentKey<UiClock | null>;
 };
 interface UiEnvironmentProvider {
   readonly environment: UiEnvironment;
@@ -5707,6 +5724,7 @@ export {
   ClickOutsideOptions,
   CLIP_STRIDE_BYTES,
   CLIP_STRIDE_FLOATS,
+  clockOf,
   closestPropertyName,
   colorsEqual,
   colorsEqualPalette,
@@ -6333,6 +6351,7 @@ export {
   UiBoxShadows,
   UiChild,
   UiChildrenBinding,
+  UiClock,
   UiColor,
   UiColors,
   UiColorValue,
@@ -6665,6 +6684,7 @@ import {
   ClickOutsideOptions,
   CLIP_STRIDE_BYTES,
   CLIP_STRIDE_FLOATS,
+  clockOf,
   closestPropertyName,
   colorsEqual,
   colorsEqualPalette,
@@ -7291,6 +7311,7 @@ import {
   UiBoxShadows,
   UiChild,
   UiChildrenBinding,
+  UiClock,
   UiColor,
   UiColors,
   UiColorValue,
@@ -7600,6 +7621,7 @@ export {
   clickOutside,
   CLIP_STRIDE_BYTES,
   CLIP_STRIDE_FLOATS,
+  clockOf,
   closestPropertyName,
   colorsEqual,
   colorsEqualPalette,
@@ -8335,6 +8357,7 @@ export {
   UiBoxShadow,
   UiBoxShadows,
   UiChildrenBinding,
+  UiClock,
   UiColor,
   UiColors,
   UiColorValue,

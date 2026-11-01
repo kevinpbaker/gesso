@@ -14,7 +14,8 @@ import {
   type UiEasingToken,
   type UiMotion,
   type UiSpringSpec,
-  type UiSpringToken
+  type UiSpringToken,
+  type UiClock
 } from 'gesso-core';
 import { internalState } from '../InternalState';
 
@@ -36,6 +37,11 @@ export interface AnimateOptions {
   reducedMotion?: UiReducedMotionPolicy;
   /** Wait this long before the first sample; see `UiAnimationOptions.delay`. */
   delay?: number;
+  /**
+   * The clock it runs on, where it is drawn: `ctx.environment(UiEnvironmentKeys.clock)`
+   * in a component, `clockOf(node)` from a node. Real time without one. See `UiClock`.
+   */
+  clock?: UiClock | null;
 }
 
 export interface SpringOptions {
@@ -51,6 +57,11 @@ export interface SpringOptions {
   reducedMotion?: UiReducedMotionPolicy;
   /** Wait this long before the first sample; see `UiAnimationOptions.delay`. */
   delay?: number;
+  /**
+   * The clock it runs on, where it is drawn: `ctx.environment(UiEnvironmentKeys.clock)`
+   * in a component, `clockOf(node)` from a node. Real time without one. See `UiClock`.
+   */
+  clock?: UiClock | null;
 }
 
 /**
@@ -156,7 +167,7 @@ export class AnimationService {
       tween.snap();
       return tween.values;
     }
-    return driver.start(tween);
+    return driver.start(tween, options.clock ?? null);
   }
 
   /**
@@ -192,7 +203,7 @@ export class AnimationService {
       animation.snap();
       return animation.values;
     }
-    return driver.start(animation);
+    return driver.start(animation, options.clock ?? null);
   }
 
   /** Stops whatever is driving a cell, leaving it where it stands. */

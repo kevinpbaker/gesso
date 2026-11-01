@@ -4,12 +4,16 @@ import {
   Box,
   defineModifier,
   fade,
+  findEnvironmentKey,
   motion,
+  provided,
   UiEnvironmentKeys,
+  type UiEnvironment,
   type UiNode,
   type UiChild,
   type UiElement,
-  type UiModifier
+  type UiModifier,
+  type UiProvision
 } from 'gesso-core';
 import { Component } from '../Component';
 import { Define, Inject } from '../decorators';
@@ -206,8 +210,41 @@ function inheritedFrom(node: UiNode | null): Record<string, unknown> {
     // style's: a menu's plain text inherits the colour of where it was
     // declared.
     color: environment.get(UiEnvironmentKeys.color),
-    contentColor: environment.get(UiEnvironmentKeys.contentColor)
+    contentColor: environment.get(UiEnvironmentKeys.contentColor),
+    provide: providedFrom(environment)
   };
+}
+
+/** The built-in keys an entry's box carries by props of its own, or leaves to where it is drawn. */
+const CARRIED_BY_PROPS = new Set<string>(
+  Object.values(UiEnvironmentKeys)
+    .map(key => key.name)
+    .filter(name => name !== UiEnvironmentKeys.clock.name)
+);
+
+/**
+ * The rest of what the entry was opened under, re-provided: the clock
+ * its animations run on, so a dialog opened on a settled frame is at
+ * rest there and one opened in a slowed player slows, and every key the
+ * application provides itself, so a component in a dialog reads with
+ * `ctx.environment` what the one that opened it reads.
+ */
+function providedFrom(environment: UiEnvironment): UiProvision[] {
+  const out: UiProvision[] = [];
+  const seen = new Set<string>();
+  for (let at: UiEnvironment | null = environment; at !== null; at = at.parent) {
+    for (const name of at.providedKeys()) {
+      if (seen.has(name) || CARRIED_BY_PROPS.has(name)) {
+        continue;
+      }
+      seen.add(name);
+      const key = findEnvironmentKey(name);
+      if (key !== undefined) {
+        out.push(provided(key, environment.get(key)));
+      }
+    }
+  }
+  return out;
 }
 
 /** The node an entry's environment is read from, and the entry to place again when it changes (none for a backdrop). */
@@ -235,6 +272,9 @@ const followEnvironmentKind = defineModifier<Followed>({
       host.set('textStyle', textStyle);
       host.set('color', host.environment(UiEnvironmentKeys.color, from));
       host.set('contentColor', host.environment(UiEnvironmentKeys.contentColor, from));
+      if (from.environment !== null) {
+        host.set('provide', providedFrom(from.environment));
+      }
       // The direction comes with the text style, and an entry placed by
       // `start` or `end` is placed again by it: one opened before its
       // declaring tree was mounted read the default, left to right.

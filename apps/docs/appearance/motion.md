@@ -245,6 +245,40 @@ person who wants less motion in _this_ app should not have to change an
 operating system preference to get it. The last caller wins; there is no
 priority between the platform's answer and the app's.
 
+## A clock for one part of the tree
+
+Reduced motion is the person's, for the whole app. A `UiClock` is for
+one part of it: a node provides one, and every animation started under
+that node runs on it.
+
+```tsx
+const board = new UiClock({ settled: true });
+const player = new UiClock({ speed: 0.25 });
+
+<box provide={[provided(UiEnvironmentKeys.clock, board)]}>{frames}</box>;
+<box provide={[provided(UiEnvironmentKeys.clock, player)]}>{screen}</box>;
+```
+
+On a `settled` clock every animation lands where it is going the moment
+it starts, a spinner included, which is what a frame on a design tool's
+board wants: a picture of the screen at rest. On a clock with a `speed`,
+time passes at that rate, a quarter of it to watch a press, or none at
+`0`; the speed can change while things move, and they go on from where
+they stood. Each animation takes all its time from the driver, which
+hands it its clock's time and asks for the next frame in real time, so
+a slowed clock asks for frames as it needs them and a paused one asks
+for none.
+
+A `transition`, a `motion` state, hover and press read the clock from
+their node, and an overlay opened under a clock keeps it. An animation
+started with `AnimationService` has no node, so it is handed the clock
+where it is drawn, `ctx.environment(UiEnvironmentKeys.clock)` in a
+component or `clockOf(node)`:
+
+```ts
+animations.animate(enter, 1, { duration: 'slow', clock: ctx.environment(UiEnvironmentKeys.clock) });
+```
+
 ## What this page was checked against
 
 The spec beside the example mounts it with `gesso-testing`, which needs

@@ -9,7 +9,7 @@ import {
   FocusService,
   internalState
 } from 'gesso-framework';
-import { Column, percent, Row, Text, type UiChild, type UiNode } from 'gesso-core';
+import { Column, percent, Row, Text, UiEnvironmentKeys, type UiChild, type UiNode } from 'gesso-core';
 import { keymap } from './internals';
 import { controlTokens } from './tokens';
 import { useOverlay } from './overlay';
@@ -63,6 +63,8 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
   const width = input(inputs.width, 360);
   const focus = ctx.inject(FocusService);
   const animations = ctx.inject(AnimationService);
+  // Where it is drawn: a design tool's board settles it, its player may slow it.
+  const clock = ctx.environment(UiEnvironmentKeys.clock);
   const overlay = useOverlay(ctx, 'dialog');
   const tokens = themeTokenCell(controlTokens);
   /** The dialog's node while focus is trapped in it. */
@@ -257,7 +259,7 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
     // Under reduced motion this writes 1 here and completes, and the
     // dialog is simply present — the end state is identical, which
     // is the whole argument for snapping rather than skipping.
-    animations.animate(enter, 1, { duration: 'slow', easing: 'decelerate' });
+    animations.animate(enter, 1, { duration: 'slow', easing: 'decelerate', clock });
   }
   // The cell outlives the overlay's nodes — the component owns it —
   // so the animation has to be stopped with the component and not with

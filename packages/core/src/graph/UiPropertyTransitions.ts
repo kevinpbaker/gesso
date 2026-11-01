@@ -1,5 +1,5 @@
 import type { AnimatedCell, UiTransitionSpec } from '../animation';
-import { AnimationDriver, UiSpring, createTween } from '../animation';
+import { AnimationDriver, UiSpring, clockOf, createTween } from '../animation';
 import type { DirtyFlags } from './DirtyFlags';
 import type { UiGraph } from './UiGraph';
 import type { NodeProperty, UiNode, UiNodeTransitions } from './UiNode';
@@ -153,7 +153,8 @@ export class NodeTransitions implements UiNodeTransitions {
           velocity,
           restDelta: spec.restDelta,
           reducedMotion: spec.reducedMotion
-        })
+        }),
+        clockOf(this.node)
       );
       return true;
     }
@@ -167,7 +168,7 @@ export class NodeTransitions implements UiNodeTransitions {
       warnNotInterpolable(property);
       return false;
     }
-    this.driver.start(tween);
+    this.driver.start(tween, clockOf(this.node));
     return true;
   }
 }

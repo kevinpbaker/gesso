@@ -9,7 +9,7 @@ import {
   type ComponentContext,
   type Inputs
 } from 'gesso-framework';
-import { Box, Column, percent, resolveString, Row, Text, type UiChild, type UiNode } from 'gesso-core';
+import { Box, Column, percent, resolveString, Row, Text, UiEnvironmentKeys, type UiChild, type UiNode } from 'gesso-core';
 import { Button } from './Button';
 import { controlled } from './controlled';
 import { keymap } from './internals';
@@ -110,6 +110,8 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
   const label = input(inputs.label, '');
   const focus = ctx.inject(FocusService);
   const animations = ctx.inject(AnimationService);
+  // Where it is drawn: a design tool's board settles it, its player may slow it.
+  const clock = ctx.environment(UiEnvironmentKeys.clock);
   const open = controlled<boolean>({
     component: 'Drawer',
     name: 'open',
@@ -237,7 +239,7 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
       if (leaving.value) {
         leaving.value = false;
         if (panel !== null) takeKeyboard(panel);
-        animations.animate(slide, 1, { duration: 'normal', easing: 'decelerate' });
+        animations.animate(slide, 1, { duration: 'normal', easing: 'decelerate', clock });
       }
       return;
     }
@@ -285,7 +287,7 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
     });
     // Started after `show`, so the nodes it writes into exist. Under
     // reduced motion it writes 1 and completes.
-    animations.animate(slide, 1, { duration: 'normal', easing: 'decelerate' });
+    animations.animate(slide, 1, { duration: 'normal', easing: 'decelerate', clock });
   };
 
   const leave = (): void => {
@@ -294,7 +296,7 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
     }
     leaving.value = true;
     handBack();
-    animations.animate(slide, 0, { duration: 'normal', easing: 'accelerate' }).subscribe({
+    animations.animate(slide, 0, { duration: 'normal', easing: 'accelerate', clock }).subscribe({
       // Completion also means superseded: an opening that turned it
       // round ends this animation too, and must not lose the entry.
       complete: () => {
