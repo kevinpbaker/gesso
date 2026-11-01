@@ -90,6 +90,13 @@ export interface UiOwnerReport {
    * needs to write a component's use back as code: `label="Email"`.
    */
   readonly inputs?: Readonly<Record<string, UiOwnerInput>>;
+  /**
+   * What the component says its inputs hold now, as it keeps them
+   * (`liveInput`): a switch a person turned on, a list scrolled to 600.
+   * Plain values only. What a design tool saves a moment of a played
+   * screen from.
+   */
+  readonly live?: Readonly<Record<string, string | number | boolean | null>>;
 }
 
 /** One input's value in an owner report; see `UiOwnerReport.inputs`. */

@@ -298,5 +298,18 @@ started from inputs named by component, over what their parents pass:
 A component reads them as it reads its parent's props, as each one is
 made, so they start it rather than steer it: a step given without a
 handler is where the tour starts, and the person moves it on from
-there. A preview of a component's inputs from the inspector goes over
-them, and ending the preview comes back to them.
+there, and once the parent passes something new for an input (a
+dialog's owner closing it), it is the parent's again. A preview of a
+component's inputs from the inspector goes over them, and ending the
+preview comes back to them.
+
+A name takes one record for every instance of it, or a list for each
+in the order they are made, `null` for one left as written:
+`{ Toggle: [null, { on: true }] }` turns the second switch on. Nested,
+the outer one wins for an input both give, so a moment drawn from a
+moment is the later one.
+
+A component says what it holds now with `liveInput(name, read)` in its
+body, and `controlled` says it for its value, as `ScrollArea` does for
+its `scrollY`. The inspector reports it as an owner's `live`: what a
+design tool reads to save a moment of a played screen as one of these.

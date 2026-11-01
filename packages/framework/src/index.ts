@@ -64,7 +64,8 @@ export {
 } from './overlay/OverlayService';
 export { OverlayScope, type OverlayScopeProps } from './overlay/OverlayScope';
 export { StartingInputs, type StartingInputsProps } from './StartingInputs';
-export { StartingInputsKey, type StartingInputsByName } from './startingInputsKey';
+export { StartingInputsKey, type StartingInputsByName, type StartingInputsRecord } from './startingInputsKey';
+export { liveInput } from './liveInput';
 export { OverlayLayer } from './overlay/OverlayLayer';
 export { ComponentHostResolver } from './ComponentHostResolver';
 export { ComponentHost } from './ComponentHost';

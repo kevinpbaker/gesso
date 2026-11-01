@@ -2003,11 +2003,18 @@ export class GessoRuntime {
             inputs[name] = value;
           }
         }
+        const live: Record<string, string | number | boolean | null> = {};
+        for (const [name, value] of host.liveInputs()) {
+          if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            live[name] = value;
+          }
+        }
         owners.push({
           name: getComponentMetadata(host.component).tag,
           anchorId: current.id,
           ...(usedAt === undefined ? {} : { usedAt }),
-          ...(Object.keys(inputs).length === 0 ? {} : { inputs })
+          ...(Object.keys(inputs).length === 0 ? {} : { inputs }),
+          ...(Object.keys(live).length === 0 ? {} : { live })
         });
       }
     }

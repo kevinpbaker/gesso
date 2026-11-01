@@ -6,7 +6,11 @@ import type { ComponentContext, Inputs } from './FunctionComponent';
 import { StartingInputsKey, type StartingInputsByName } from './startingInputsKey';
 
 export interface StartingInputsProps {
-  /** Inputs by component name: `{ ScrollArea: { scrollY: 600 }, Tour: { step: 1 } }`. */
+  /**
+   * Inputs by component name: `{ ScrollArea: { scrollY: 600 }, Tour: { step: 1 } }`;
+   * or a list for each instance in the order they are made, `null` for
+   * one left as written: `{ Toggle: [null, { on: true }] }`.
+   */
   of?: StartingInputsByName;
   children?: UiChild;
 }
@@ -26,10 +30,15 @@ export interface StartingInputsProps {
  * previewInputs`) goes over them, and ending it comes back to them.
  *
  * They are read as each component is made, so they start a component
- * rather than steer one: a new `of` reaches components made after it.
- * Nested, the nearer one is the whole answer for a name it gives, and
- * the farther one's other names still reach through. It fills what
- * holds it.
+ * rather than steer one: a new `of` reaches components made after it,
+ * and once the parent passes something new for an input, it is the
+ * parent's again, as a dialog saved open closes when its owner closes
+ * it.
+ * Nested, the outer one wins for an input both give a component, and
+ * the inner one's other inputs and names still reach in: what draws a
+ * screen at a moment decides over what the screen starts itself with,
+ * so a moment saved from a moment is the later one. A list per instance
+ * is taken whole. It fills what holds it.
  */
 export function StartingInputs(inputs: Inputs<StartingInputsProps>, ctx: ComponentContext): UiChild {
   const outer = ctx.environment(StartingInputsKey);
@@ -39,8 +48,18 @@ export function StartingInputs(inputs: Inputs<StartingInputsProps>, ctx: Compone
       height: percent(100),
       x: 'stretch',
       y: 'stretch',
-      provide: inputs.of.pipe(map(of => [provided(StartingInputsKey, { ...outer, ...of })]))
+      provide: inputs.of.pipe(map(of => [provided(StartingInputsKey, merged(of ?? {}, outer))]))
     },
     inputs.children.pipe(map(children => children ?? []))
   );
+}
+
+/** `inner` with `outer` over it, input by input for a component both give one record. */
+function merged(inner: StartingInputsByName, outer: StartingInputsByName): StartingInputsByName {
+  const out: Record<string, StartingInputsByName[string]> = { ...inner };
+  for (const [name, given] of Object.entries(outer)) {
+    const under = out[name];
+    out[name] = under !== undefined && !Array.isArray(under) && !Array.isArray(given) ? { ...under, ...given } : given;
+  }
+  return out;
 }

@@ -859,13 +859,15 @@ interface OverlayScopeProps {
   children?: UiChild;
 }
 declare function OverlayScope(inputs: Inputs<OverlayScopeProps>, _ctx: ComponentContext): UiChild;
-type StartingInputsByName = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+type StartingInputsRecord = Readonly<Record<string, unknown>>;
+type StartingInputsByName = Readonly<Record<string, StartingInputsRecord | readonly (StartingInputsRecord | null)[]>>;
 declare const StartingInputsKey: UiEnvironmentKey<StartingInputsByName>;
 interface StartingInputsProps {
   of?: StartingInputsByName;
   children?: UiChild;
 }
 declare function StartingInputs(inputs: Inputs<StartingInputsProps>, ctx: ComponentContext): UiChild;
+declare function liveInput(name: string, read: () => unknown): void;
 declare class OverlayLayer extends Component {
   runtimeOverlays: OverlayService;
   service: InputCell<OverlayService | null>;
@@ -885,7 +887,10 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   private readonly inputSources;
   private readonly inputSubscriptions;
   private readonly functionalCells;
-  private readonly started;
+  private started;
+  private readonly startedOver;
+  private readonly startedStreams;
+  private readonly live;
   private previewed;
   private readonly beforePreview;
   private readonly mountHooks;
@@ -904,6 +909,7 @@ declare class ComponentHost<P extends Record<string, unknown> = Record<string, u
   private createInputRecord;
   private createContext;
   private wireInputs;
+  liveInputs(): ReadonlyMap<string, unknown>;
   suppliedInputs(): ReadonlyMap<string, unknown>;
   private applyInput;
   private validateInputs;
@@ -954,6 +960,7 @@ interface UiOwnerReport {
   readonly anchorId: string;
   readonly usedAt?: UiSourceLocation;
   readonly inputs?: Readonly<Record<string, UiOwnerInput>>;
+  readonly live?: Readonly<Record<string, string | number | boolean | null>>;
 }
 type UiOwnerInput = string | number | boolean | null | {
   readonly element: true;
@@ -3101,6 +3108,7 @@ export {
   Input,
   InspectionHost,
   InspectionService,
+  liveInput,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -3207,6 +3215,7 @@ export {
   StartingInputsByName,
   StartingInputsKey,
   StartingInputsProps,
+  StartingInputsRecord,
   StorageAdapter,
   storageErrorMessage,
   StorageOutcome,
@@ -3428,6 +3437,7 @@ import {
   Input,
   InspectionHost,
   InspectionService,
+  liveInput,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -3534,6 +3544,7 @@ import {
   StartingInputsByName,
   StartingInputsKey,
   StartingInputsProps,
+  StartingInputsRecord,
   StorageAdapter,
   storageErrorMessage,
   StorageOutcome,
@@ -3654,6 +3665,7 @@ export {
   isOutputTarget,
   isPortErrorMessage,
   isPortHandshake,
+  liveInput,
   MARK_PREFIX,
   markInstant,
   markNow,
@@ -3862,6 +3874,7 @@ export {
   type SpringOptions,
   type StartingInputsByName,
   type StartingInputsProps,
+  type StartingInputsRecord,
   type StorageAdapter,
   type StorageOutcome,
   type StorageRead,

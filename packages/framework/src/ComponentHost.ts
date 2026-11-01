@@ -1,4 +1,4 @@
-import { Subscription, type Observable } from 'rxjs';
+import { concat, of, skip, Subscription, type Observable } from 'rxjs';
 import { bounds, type BoundsCell } from './bounds';
 import { ChannelRegistry } from './channel/ChannelRegistry';
 import { ServiceRegistry } from './service/ServiceRegistry';
@@ -17,6 +17,7 @@ import {
   isClassComponent
 } from './FunctionComponent';
 import { getComponentMetadata } from './metadata';
+import { withLiveInputs } from './liveInput';
 import { startingInputsFor } from './startingInputsKey';
 
 /**
@@ -74,7 +75,13 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
    * above it when it was made: a moment of a screen, a tour's second
    * step. A preview goes over these, and ending one comes back to them.
    */
-  private readonly started: Readonly<Record<string, unknown>> | null;
+  private started: Record<string, unknown> | null;
+  /** What the parent passed for each started input at birth: a new value from it takes over. */
+  private readonly startedOver = new Map<string, unknown>();
+  /** A started input the parent passes as a stream: the start, then the stream's changes; one per input, so it is not resubscribed. */
+  private readonly startedStreams = new Map<string, Observable<unknown>>();
+  /** What the component says it holds now, by input; see `liveInput`. */
+  private readonly live = new Map<string, () => unknown>();
 
   /** Inputs a tool draws the component with over its parent's, until it ends them; see `previewInputs`. */
   private previewed: Readonly<Record<string, unknown>> | null = null;
@@ -94,7 +101,11 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     private readonly anchor: UiNode | null = null
   ) {
     this.element = element;
-    this.started = startingInputsFor(anchor, element.tag);
+    const started = startingInputsFor(anchor, element.tag);
+    this.started = started === null ? null : { ...started };
+    for (const name of Object.keys(this.started ?? {})) {
+      this.startedOver.set(name, (element.props as Record<string, unknown>)[name]);
+    }
     if (isClassComponent(element.component)) {
       this.instance = new element.component();
       this.validateInputs();
@@ -223,7 +234,24 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     if (this.previewed !== null && Object.hasOwn(this.previewed, name)) {
       return this.previewed[name];
     }
+    const parent = (this.element.props as Record<string, unknown>)[name];
     if (this.started !== null && Object.hasOwn(this.started, name)) {
+      // A start, not a hold: once the parent passes something new, it is
+      // the parent's again, as a dialog saved open closes when its owner
+      // closes it.
+      if (parent !== this.startedOver.get(name)) {
+        delete this.started[name];
+        this.startedStreams.delete(name);
+        return parent;
+      }
+      if (isObservable(parent)) {
+        let stream = this.startedStreams.get(name);
+        if (stream === undefined) {
+          stream = concat(of(this.started[name]), parent.pipe(skip(1)));
+          this.startedStreams.set(name, stream);
+        }
+        return stream;
+      }
       return this.started[name];
     }
     return (this.element.props as Record<string, unknown>)[name];
@@ -234,7 +262,9 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
     const context = this.createContext();
     this.rendering = true;
     try {
-      return withBodyOf(this.element.tag, () => component(this.createInputRecord(), context));
+      return withLiveInputs(this.live, () =>
+        withBodyOf(this.element.tag, () => component(this.createInputRecord(), context))
+      );
     } finally {
       this.rendering = false;
     }
@@ -333,6 +363,11 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
       cell.label ??= `${metadata.tag}.${inputName}`;
       this.applyInput(inputName, cell, this.providedFor(inputName), false, forced.has(inputName));
     }
+  }
+
+  /** What the component says each of its inputs holds now; see `liveInput`. */
+  liveInputs(): ReadonlyMap<string, unknown> {
+    return new Map([...this.live].map(([name, read]) => [name, read()]));
   }
 
   /**

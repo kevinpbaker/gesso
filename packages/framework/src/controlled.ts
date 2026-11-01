@@ -2,6 +2,7 @@ import { map, skip, type Observable } from 'rxjs';
 
 import type { InputCell, OutputCell } from './Input';
 import { internalState, type InternalState } from './InternalState';
+import { liveInput } from './liveInput';
 
 /** A value a control shows and changes, whoever owns it. */
 export interface ControlledValue<T> {
@@ -63,6 +64,7 @@ export function controlled<T>(options: ControlledOptions<T>): ControlledValue<T>
   // each render, and this look is not a body's snapshot of it.
   const heard = [onChange, ...heardBy].some(output => output.getValue() !== undefined);
   if (isControlled && heard) {
+    liveInput(name, () => (source.getValue() === undefined ? fallback : source.getValue()));
     return {
       value: source.pipe(map(value => (value === undefined ? fallback : value))),
       current: () => (source.value === undefined ? fallback : source.value),
@@ -71,6 +73,8 @@ export function controlled<T>(options: ControlledOptions<T>): ControlledValue<T>
   }
   const start = isControlled ? source.value : initial.value;
   const own: InternalState<T> = internalState(start === undefined ? fallback : start);
+  // What a person turned it to, for a tool saving the moment (`liveInput`).
+  liveInput(name, () => own.getValue());
   if (isControlled) {
     // The parent's later values, each a new start. The cell completes
     // with the component, which ends this with it; the host already

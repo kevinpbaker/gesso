@@ -17,6 +17,7 @@ import {
   createComponent,
   input,
   internalState,
+  liveInput,
   type ComponentContext,
   type Inputs
 } from 'gesso-framework';
@@ -101,6 +102,8 @@ export function ScrollArea(inputs: Inputs<ScrollAreaProps>, ctx: ComponentContex
     distinctUntilChanged()
   );
 
+  // Where a person has scrolled it, for a tool saving the moment.
+  liveInput('scrollY', () => offset.getValue());
   ctx.effect(inputs.scrollY, y => {
     if (y !== undefined) {
       target.value = y;
