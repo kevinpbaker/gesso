@@ -41,7 +41,7 @@ It interposes where what is drawn is settled, below the override
 cascade, so it moves the value whoever changed it: the element, or a
 modifier writing over it. A press that `interactive` draws as
 `pressed: { opacity: 0.8 }` on an element that declares
-`transition={{ opacity: 120 }}` dims and comes back over 120 ms, as a
+`transition={ { opacity: 120 } }` dims and comes back over 120 ms, as a
 CSS transition follows a `:hover`. A palette name cannot be blended (below),
 so a hover that should ease names a colour, or moves opacity or a
 transform.
