@@ -3679,7 +3679,21 @@ export class LayoutEngine {
     }
     let width = cRec.measuredWidth;
     let height = cRec.measuredHeight;
-    const { side, align } = this.parsePlacement(child.properties.get('placement'));
+    let { side, align } = this.parsePlacement(child.properties.get('placement'));
+    // Beside an anchor with room on neither side for even its narrowest
+    // (a tour's card beside a phone's full-width tab bar): above or below
+    // it instead, centered, rather than squeezed past the edge. A scroller
+    // can be narrowed to any room, and is, below.
+    const narrowest = this.minContentContribution(child, cRec);
+    if (
+      !point &&
+      (side === 'left' || side === 'right') &&
+      narrowest > block.x + block.width - (ax + aw + gap) &&
+      narrowest > ax - gap - block.x
+    ) {
+      side = ay - block.y > block.y + block.height - (ay + ah) ? 'top' : 'bottom';
+      align = 'center';
+    }
 
     const vertical = side === 'top' || side === 'bottom';
     let resolvedSide = side;

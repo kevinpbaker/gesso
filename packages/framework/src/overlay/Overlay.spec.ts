@@ -169,6 +169,28 @@ describe('overlays', () => {
     runtime.dispose();
   });
 
+  it('goes above or below when there is no room on either side of the anchor', () => {
+    const { runtime, overlays, layer, frame } = mount();
+    const open = findText(runtime.debugRoot(), 'Open')!;
+    // 390 wide fits neither the 300 right of the anchor nor the 20 left
+    // of it, as a tour's card beside a phone's full-width tab bar does
+    // not: below it, at its own width and inside the window, not
+    // squeezed off the edge.
+    overlays.open({
+      id: 'card',
+      anchor: open,
+      placement: 'right',
+      content: Box({ width: 390, height: 60 })
+    });
+    frame();
+    const box = runtime.debugLayoutBox(entryBox(layer)!);
+    expect(box.width).toBe(390);
+    expect(box.y).toBe(50);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(400);
+    runtime.dispose();
+  });
+
   it('hit-tests above the app and closes on an outside press', () => {
     pressed.length = 0;
     const { runtime, overlays, frame } = mount();
