@@ -2,6 +2,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { describe, expect, it } from 'vitest';
 
+import { DirtyFlags } from '../graph/DirtyFlags';
 import { LayoutEngine } from '../layout/LayoutEngine';
 import { Constraints } from '../layout/LayoutTypes';
 import { UiGraph } from '../graph/UiGraph';
@@ -101,6 +102,34 @@ describe('UiGraphBuilder observable children', () => {
       const children = getChildren(fragment);
       expect(children).toHaveLength(1);
       expect(children[0].getProperty('text')).toBe('A');
+    });
+  });
+
+  describe('the parent laid out again', () => {
+    it('only when the list it is bound under changes', () => {
+      const { graph, builder } = createBuilder();
+      const items$ = new BehaviorSubject<UiElement[]>([]);
+      const root = builder.build(Column(items$));
+      const settle = () => {
+        graph.getDirtyNodes().take();
+        root.dirtyFlags = DirtyFlags.None;
+      };
+      settle();
+
+      // The same empty list, as a stream following the zoom emits it.
+      items$.next([]);
+      expect(root.dirtyFlags & DirtyFlags.Children).toBe(0);
+
+      items$.next([Text({ key: 'a', text: 'A' })]);
+      expect(root.dirtyFlags & DirtyFlags.Children).not.toBe(0);
+      settle();
+
+      // The same keyed child again: its own words change, not the list.
+      items$.next([Text({ key: 'a', text: 'A2' })]);
+      expect(root.dirtyFlags & DirtyFlags.Children).toBe(0);
+
+      items$.next([]);
+      expect(root.dirtyFlags & DirtyFlags.Children).not.toBe(0);
     });
   });
 

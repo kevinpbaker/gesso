@@ -331,7 +331,8 @@ export class UiGraphBuilder {
     const deferred = this.deferredChildren.get(parent);
     if (deferred !== undefined) {
       this.deferredChildren.delete(parent);
-      return this.reconcileChildren(parent, deferred);
+      const again = this.reconcileChildren(parent, deferred);
+      return { nodes: again.nodes, changed: result.changed || again.changed };
     }
     // Deliberately outside the finally: a pass that threw left the
     // tree half-built, and mounting components onto it would only

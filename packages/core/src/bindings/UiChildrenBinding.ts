@@ -55,8 +55,13 @@ export class UiChildrenBinding {
   private handleValue(value: UiChild | readonly UiChild[]): void {
     const definitions = Array.isArray(value) ? (value as readonly UiChild[]) : [value as UiChild];
     const fragment = this.graph.requireNode(this.fragmentId);
-    this.builder.reconcileChildren(fragment, definitions);
-    const parent = this.graph.requireNode(this.parentId);
-    this.graph.markDirty(parent, DirtyFlags.Children);
+    // The same list again (an empty one, or one keyed as before) leaves
+    // the parent's layout alone: a stream that follows a value moving
+    // every frame, the zoom of a board, would otherwise lay out every
+    // parent it is bound under on each one. What changed in a kept
+    // child marks that child itself.
+    if (this.builder.reconcileChildren(fragment, definitions).changed) {
+      this.graph.markDirty(this.graph.requireNode(this.parentId), DirtyFlags.Children);
+    }
   }
 }
