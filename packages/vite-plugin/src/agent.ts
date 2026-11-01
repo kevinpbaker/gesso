@@ -94,6 +94,13 @@ export interface AgentBridgeOptions {
   /** Tools the server answers itself, page or no page. */
   local?: LocalTools;
   /**
+   * Whether a tool may be called now: undefined to let it through, or
+   * what the agent is told instead, as the tool's error. An application
+   * that charges for its agents on some projects refuses here, on the
+   * server, before the call reaches the page or its own tools.
+   */
+  gate?: (tool: string, args: Readonly<Record<string, unknown>> | undefined) => string | undefined;
+  /**
    * How long a page that says it takes requests may go without taking
    * one, in milliseconds (default 10 000), before the agent is told it
    * has gone quiet.
@@ -226,6 +233,12 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
       return undefined;
     }
     const { id, method, params } = request;
+    if (method === 'tools/call' && typeof params.name === 'string' && options.gate !== undefined) {
+      const refused = options.gate(params.name, params.arguments as Readonly<Record<string, unknown>> | undefined);
+      if (refused !== undefined) {
+        return Promise.resolve(failed(id, refused));
+      }
+    }
     if (
       local !== undefined &&
       method === 'tools/call' &&

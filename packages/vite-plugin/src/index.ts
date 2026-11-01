@@ -144,6 +144,12 @@ export interface GessoPluginOptions {
    */
   readonly agentInstructions?: string;
   /**
+   * Whether an agent's tool call may go ahead: undefined to let it, or
+   * what the agent is told instead. Checked on the server for every
+   * call, the page's tools and the catalog's alike.
+   */
+  readonly agentGate?: (tool: string, args: Readonly<Record<string, unknown>> | undefined) => string | undefined;
+  /**
    * Offer the project's components to an agent over the same endpoint,
    * as `library_overview`, `library_search` and `library_get` (default
    * true while `agent` is on). The components are the project's own,
@@ -335,6 +341,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
       }
       const bridge = createAgentBridge(server.ws as unknown as BridgeSocket, {
         memory: pageMemory(root),
+        ...(options.agentGate === undefined ? {} : { gate: options.agentGate }),
         ...(catalog === null
           ? {}
           : {

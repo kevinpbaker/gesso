@@ -170,6 +170,35 @@ describe('the agent endpoint', () => {
     expect(seen).toEqual([JSON.parse(ping)]);
   });
 
+  it('refuses a tool call its gate refuses, before the page sees it, and lets the rest through', async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket, {
+      gate: tool => (tool === 'paid_tool' ? 'This project needs a license for agents.' : undefined)
+    });
+    const seen: string[] = [];
+    emit(
+      EVENTS.ready,
+      {},
+      fakePage(emit, message => {
+        const { id, params } = message as { id: unknown; params?: { name?: string } };
+        if (!String(id).startsWith('gesso:') && params?.name !== undefined) {
+          seen.push(params.name);
+        }
+        return { jsonrpc: '2.0', id: 3, result: { content: [] } };
+      })
+    );
+
+    const call = (name: string) =>
+      JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name, arguments: {} } });
+    const refused = JSON.parse((await request(bridge, { body: call('paid_tool') })).body!);
+    expect(refused.result).toEqual({
+      content: [{ type: 'text', text: 'This project needs a license for agents.' }],
+      isError: true
+    });
+    await request(bridge, { body: call('free_tool') });
+    expect(seen).toEqual(['free_tool']);
+  });
+
   it('asks the newest page, and falls back to the one before when it closes', async () => {
     const { socket, emit } = fakeSocket();
     const bridge = createAgentBridge(socket);
