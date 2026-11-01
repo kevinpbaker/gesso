@@ -101,7 +101,10 @@ export function resolveGradient(node: UiNode, value: UiGradient | undefined): Re
     if (color === undefined) {
       return undefined;
     }
-    stops.push({ offset: stop.offset, color });
+    stops.push({
+      offset: stop.offset,
+      color: stop.opacity === undefined ? color : { ...color, a: color.a * stop.opacity }
+    });
   }
   if (value.kind === 'linear') {
     return { kind: 'linear', angle: value.angle, stops };

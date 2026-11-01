@@ -1144,6 +1144,18 @@ interface AvatarProps extends ControlLayoutProps {
   label?: string;
 }
 declare function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiChild;
+interface ScrollAreaProps extends ControlLayoutProps {
+  children?: UiChild;
+  padding?: number;
+  paddingX?: number;
+  paddingY?: number;
+  fade?: number;
+  fadeColor?: UiColorValue;
+  backToTopAfter?: number;
+  backToTopLabel?: string;
+  backToTop?: UiChild;
+}
+declare function ScrollArea(inputs: Inputs<ScrollAreaProps>, ctx: ComponentContext): UiChild;
 interface SkeletonProps extends ControlLayoutProps {
   radius?: number;
   shimmer?: boolean;
@@ -1396,6 +1408,7 @@ export {
   RichTextEditor,
   richTextShortcuts,
   RichTextView,
+  ScrollArea,
   SegmentedControl,
   Select,
   Skeleton,
@@ -1535,6 +1548,7 @@ export {
   type RichTextTrigger,
   type RichTextViewProps,
   type Schema,
+  type ScrollAreaProps,
   type SegmentedControlProps,
   type SegmentedOption,
   type SelectOption,

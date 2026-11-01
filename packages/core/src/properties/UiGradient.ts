@@ -47,6 +47,16 @@ export interface UiGradientStop {
    * does.
    */
   readonly color: UiColorValue;
+  /**
+   * How much of the colour shows, 0 to 1, multiplied into its alpha once
+   * a palette name has been resolved: `{ color: 'background', opacity: 0 }`.
+   *
+   * What a fade to nothing is made of. A canvas blends a gradient's stops
+   * without premultiplying, so a ramp from white to `transparent`, which
+   * is transparent *black*, passes through grey on its way out; a ramp to
+   * the same colour at no opacity stays that colour all the way.
+   */
+  readonly opacity?: number;
 }
 
 export interface UiLinearGradient {
@@ -157,6 +167,9 @@ export function validateGradient(value: unknown): string | undefined {
     if (stop === null || typeof stop !== 'object') {
       return `backgroundGradient: expected a stop object, got ${String(stop)}.`;
     }
+    if (stop.opacity !== undefined && !(stop.opacity >= 0 && stop.opacity <= 1)) {
+      return `backgroundGradient: a stop's opacity is a number from 0 to 1, got ${String(stop.opacity)}.`;
+    }
     if (stop.offset !== undefined) {
       placed++;
       if (!isGradientOffset(stop.offset)) {
@@ -224,7 +237,11 @@ export function gradientsEqual(a: UiGradient | undefined, b: UiGradient | undefi
     return false;
   }
   for (let i = 0; i < a.stops.length; i++) {
-    if (!offsetsEqual(a.stops[i].offset, b.stops[i].offset) || !colorValuesEqual(a.stops[i].color, b.stops[i].color)) {
+    if (
+      !offsetsEqual(a.stops[i].offset, b.stops[i].offset) ||
+      !colorValuesEqual(a.stops[i].color, b.stops[i].color) ||
+      a.stops[i].opacity !== b.stops[i].opacity
+    ) {
       return false;
     }
   }

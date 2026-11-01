@@ -4,7 +4,8 @@ import { darkTheme, lightTheme } from '../environment/UiTheme';
 import { UiGraph } from '../graph/UiGraph';
 import { UiNodeType } from '../graph/UiNodeType';
 import { UiProperties } from './UiProperty';
-import { colorValuesEqual, resolveColor } from './UiThemeColor';
+import { colorValuesEqual, resolveColor, resolveGradient } from './UiThemeColor';
+import { linearGradient } from './UiGradient';
 import { createPaintState, resolvePaintState } from '../rendering/PaintState';
 
 describe('theme color tokens', () => {
@@ -28,6 +29,17 @@ describe('theme color tokens', () => {
     node.setProperty('backgroundColor', 'surface');
     expect(resolveColor(node, UiProperties.color)).toEqual(darkTheme.colors.primary);
     expect(resolveColor(node, UiProperties.backgroundColor)).toEqual(darkTheme.colors.surface);
+  });
+
+  it('fades a gradient stop to nothing in its own colour, not through transparent black', () => {
+    const node = themedNode(darkTheme);
+    const resolved = resolveGradient(
+      node,
+      linearGradient(Math.PI, [{ color: 'background' }, { color: 'background', opacity: 0 }])
+    );
+    const [solid, gone] = resolved!.stops;
+    expect(solid!.color).toEqual(darkTheme.colors.background);
+    expect(gone!.color).toEqual({ ...darkTheme.colors.background, a: 0 });
   });
 
   it('says so once when a colour names nothing, rather than painting nothing in silence', () => {

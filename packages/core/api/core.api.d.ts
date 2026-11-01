@@ -1513,6 +1513,7 @@ type UiGradientOffset = number | PercentLength;
 interface UiGradientStop {
   readonly offset?: UiGradientOffset;
   readonly color: UiColorValue;
+  readonly opacity?: number;
 }
 interface UiLinearGradient {
   readonly kind: 'linear';

@@ -52,6 +52,12 @@ describe('gradient values', () => {
     expect(() => linearGradient(Math.PI, [{ color: '#000000' }])).toThrow(/at least two stops/);
   });
 
+  it('refuses a stop opacity outside 0 to 1', () => {
+    expect(() => linearGradient(0, [{ color: 'background' }, { color: 'background', opacity: 2 }])).toThrow(
+      /opacity is a number from 0 to 1/
+    );
+  });
+
   it('refuses more stops than a gradient record holds, and says the limit', () => {
     const stops: UiGradientStop[] = Array.from({ length: MAX_GRADIENT_STOPS + 1 }, () => ({ color: '#000000' }));
     expect(() => linearGradient(0, stops)).toThrow(
