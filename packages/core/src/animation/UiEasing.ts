@@ -7,8 +7,22 @@
  */
 export type UiEasing = (t: number) => number;
 
+/** The CSS each curve that has one was made from, for tools that write CSS. */
+const cssOfEasing = new WeakMap<UiEasing, string>();
+
+/**
+ * The easing as CSS writes it, `cubic-bezier(0.2, 0, 0, 1)` or `linear`,
+ * for an easing made by `cubicBezier` or `linear`; undefined for one
+ * that is only a function, which CSS cannot name. What a design tool's
+ * handoff writes into a `transition`.
+ */
+export function easingCss(easing: UiEasing): string | undefined {
+  return cssOfEasing.get(easing);
+}
+
 /** Progress equals time. What a spinner and a sweep want. */
 export const linear: UiEasing = t => t;
+cssOfEasing.set(linear, 'linear');
 
 /**
  * A cubic Bézier easing, in the CSS `cubic-bezier(x1, y1, x2, y2)`
@@ -31,7 +45,7 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): UiE
   const sampleY = (t: number): number => ((ay * t + by) * t + cy) * t;
   const slopeX = (t: number): number => (3 * ax * t + 2 * bx) * t + cx;
 
-  return (input: number): number => {
+  const easing = (input: number): number => {
     if (input <= 0) {
       return 0;
     }
@@ -68,6 +82,8 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): UiE
     }
     return sampleY(t);
   };
+  cssOfEasing.set(easing, `cubic-bezier(${x1}, ${y1}, ${x2}, ${y2})`);
+  return easing;
 }
 
 /**

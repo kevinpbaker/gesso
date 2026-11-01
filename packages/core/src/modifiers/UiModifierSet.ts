@@ -132,6 +132,11 @@ export class UiModifierSet {
     return this.attached.map(entry => entry.kind.name);
   }
 
+  /** What is attached, each kind with its current arguments, in order: for a tool reading what a node does. */
+  get modifiers(): readonly UiModifier[] {
+    return this.attached.map(entry => ({ kind: entry.kind, args: entry.args }));
+  }
+
   get size(): number {
     return this.attached.length;
   }

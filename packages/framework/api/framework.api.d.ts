@@ -939,6 +939,7 @@ interface UiNodeReport {
   readonly listens: readonly string[];
   readonly beneath: readonly UiBeneathReport[];
   readonly semantics?: UiSemanticsReport;
+  readonly interaction?: UiInteractionReport;
   readonly explanation: string;
   readonly source?: UiSourceLocation;
 }
@@ -994,6 +995,10 @@ interface UiEnvironmentReport {
   readonly key: string;
   readonly value: string;
   readonly provided: boolean;
+}
+interface UiInteractionReport {
+  readonly hovered?: Readonly<Record<string, unknown>>;
+  readonly pressed?: Readonly<Record<string, unknown>>;
 }
 interface UiSemanticsReport {
   readonly role?: string;
@@ -1690,6 +1695,7 @@ declare class GessoRuntime {
   private beneathAtPointer;
   private pathOf;
   private sourceReport;
+  private interactionOf;
   private ownersOf;
   private propsOf;
   private environmentOf;
@@ -3214,6 +3220,7 @@ export {
   UiEasingChoice,
   UiEnvironmentReport,
   UiFramePhase,
+  UiInteractionReport,
   UiNodeReport,
   UiOwnerInput,
   UiOwnerReport,
@@ -3540,6 +3547,7 @@ import {
   UiEasingChoice,
   UiEnvironmentReport,
   UiFramePhase,
+  UiInteractionReport,
   UiNodeReport,
   UiOwnerInput,
   UiOwnerReport,
@@ -3854,6 +3862,7 @@ export {
   type UiEasingChoice,
   type UiEnvironmentReport,
   type UiFramePhase,
+  type UiInteractionReport,
   type UiNodeReport,
   type UiOwnerInput,
   type UiOwnerReport,

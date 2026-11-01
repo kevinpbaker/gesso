@@ -6,6 +6,7 @@ import {
   formatNodePath,
   printPropValue,
   type UiEnvironmentReport,
+  type UiInteractionReport,
   type UiNodeReport,
   type UiBeneathReport,
   type UiOwnerInput,
@@ -30,6 +31,7 @@ import {
   isUiElement,
   linkOf,
   textRunOfRecordId,
+  type InteractiveOptions,
   type UiEnvironment,
   isObservable,
   type UiElement,
@@ -1895,6 +1897,7 @@ export class GessoRuntime {
       listens: this.dispatcher.listenerTypes(node),
       beneath: this.beneathAtPointer(node),
       semantics: this.semanticsOf(node),
+      ...this.interactionOf(node),
       explanation: formatExplanation(this.engine.explain(node)),
       ...this.sourceReport(node)
     };
@@ -1953,6 +1956,29 @@ export class GessoRuntime {
   private sourceReport(node: UiNode): { source?: UiSourceLocation } {
     const source = this.builder.sourceOf(node);
     return source === undefined ? {} : { source };
+  }
+
+  /** The props the node's `interactive` modifiers write while hovered and pressed, later ones over earlier. */
+  private interactionOf(node: UiNode): { interaction?: UiInteractionReport } {
+    let hovered: Record<string, unknown> | undefined;
+    let pressed: Record<string, unknown> | undefined;
+    for (const modifier of this.builder.modifiersFor(node)?.modifiers ?? []) {
+      if (modifier.kind.name !== 'interactive') {
+        continue;
+      }
+      const options = modifier.args as InteractiveOptions;
+      if (options.hovered !== undefined) {
+        hovered = { ...hovered, ...options.hovered };
+      }
+      if (options.pressed !== undefined) {
+        pressed = { ...pressed, ...options.pressed };
+      }
+    }
+    return hovered === undefined && pressed === undefined
+      ? {}
+      : {
+          interaction: { ...(hovered === undefined ? {} : { hovered }), ...(pressed === undefined ? {} : { pressed }) }
+        };
   }
 
   private ownersOf(node: UiNode): UiOwnerReport[] {

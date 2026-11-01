@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { Box, Button, Column, Text, darkTheme, defineModifier, hoverable, noKeyModifiers } from 'gesso-core';
+import {
+  Box,
+  Button,
+  Column,
+  Text,
+  darkTheme,
+  defineModifier,
+  hoverable,
+  interactive,
+  noKeyModifiers
+} from 'gesso-core';
 import { Component } from '../Component';
 import { Define } from '../decorators';
 import { createComponent } from '../createComponent';
@@ -166,6 +176,33 @@ describe('inspectNode', () => {
     mounted.frame();
 
     expect(mounted.runtime.inspectNode(mounted.runtime.debugRoot().firstChild!).modifiers).toEqual(['interactive']);
+  });
+
+  it('reports what the node draws while hovered and pressed, and nothing for one that changes nothing', () => {
+    const press = interactive({
+      hover: true,
+      press: true,
+      hovered: { opacity: 0.9 },
+      pressed: { opacity: 0.75, scale: 0.97 }
+    });
+    const mounted = mountRuntime(
+      Column(
+        {},
+        Box({ width: 10, height: 10, modifiers: [press] }),
+        Box({ width: 10, height: 10, modifiers: [hoverable()] })
+      )
+    );
+    mounted.frame();
+    const [styled, plain] = [
+      mounted.runtime.debugRoot().firstChild!,
+      mounted.runtime.debugRoot().firstChild!.nextSibling!
+    ];
+
+    expect(mounted.runtime.inspectNode(styled).interaction).toEqual({
+      hovered: { opacity: 0.9 },
+      pressed: { opacity: 0.75, scale: 0.97 }
+    });
+    expect(mounted.runtime.inspectNode(plain).interaction).toBeUndefined();
   });
 
   it('reports what the node inherits and who provided it', () => {

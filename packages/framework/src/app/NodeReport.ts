@@ -48,6 +48,13 @@ export interface UiNodeReport {
    */
   readonly beneath: readonly UiBeneathReport[];
   readonly semantics?: UiSemanticsReport;
+  /**
+   * What the node draws while hovered and while pressed, from its
+   * `interactive` modifiers: the props it writes then, as the element
+   * would write them. For a design tool's handoff, which writes them
+   * as `:hover` and `:active`. Absent when it changes nothing.
+   */
+  readonly interaction?: UiInteractionReport;
   /** `formatExplanation` of the node's layout, which is L8's answer. */
   readonly explanation: string;
   /**
@@ -241,6 +248,11 @@ export interface UiEnvironmentReport {
   readonly value: string;
   /** Whether this node provides the value rather than inheriting it. */
   readonly provided: boolean;
+}
+
+export interface UiInteractionReport {
+  readonly hovered?: Readonly<Record<string, unknown>>;
+  readonly pressed?: Readonly<Record<string, unknown>>;
 }
 
 export interface UiSemanticsReport {

@@ -1,4 +1,4 @@
-export { cubicBezier, easings, linear, steps, type UiEasing } from './UiEasing';
+export { cubicBezier, easingCss, easings, linear, steps, type UiEasing } from './UiEasing';
 export {
   interpolateColor,
   interpolateNumber,

@@ -11,6 +11,7 @@ import {
   Subject
 } from "rxjs";
 type UiEasing = (t: number) => number;
+declare function easingCss(easing: UiEasing): string | undefined;
 declare const linear: UiEasing;
 declare function cubicBezier(x1: number, y1: number, x2: number, y2: number): UiEasing;
 declare function steps(count: number): UiEasing;
@@ -1175,6 +1176,7 @@ declare class UiModifierSet {
   constructor(node: UiNode, graph: UiGraph, dispatcher?: UiInputDispatcher | undefined, layout?: UiModifierLayout | undefined, focus?: UiModifierFocus | undefined, environment?: UiModifierEnvironment | undefined, animations?: AnimationDriver | undefined, sharedElements?: UiSharedElements | undefined);
   private decorationsFor;
   get names(): string[];
+  get modifiers(): readonly UiModifier[];
   get size(): number;
   reconcile(modifiers: readonly UiModifier[]): void;
   detach(): void;
@@ -5844,6 +5846,7 @@ export {
   dropTarget,
   DropTargetOptions,
   durationIn,
+  easingCss,
   easingIn,
   easings,
   edgeField,
@@ -6813,6 +6816,7 @@ import {
   dropTarget,
   DropTargetOptions,
   durationIn,
+  easingCss,
   easingIn,
   easings,
   edgeField,
@@ -7738,6 +7742,7 @@ export {
   dropIndexShifts,
   dropTarget,
   durationIn,
+  easingCss,
   easingIn,
   easings,
   edgeField,

@@ -95,6 +95,7 @@ export {
   type NodePathTarget,
   type UiEnvironmentReport,
   type UiNodeReport,
+  type UiInteractionReport,
   type UiOwnerInput,
   type UiOwnerReport,
   type UiPropOrigin,
