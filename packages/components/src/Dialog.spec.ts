@@ -17,7 +17,7 @@ import {
   UiEnvironmentKeys,
   type UiNode
 } from 'gesso-core';
-import { AnimationService, createComponent } from 'gesso-framework';
+import { AnimationService, createComponent, OverlayScope } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 
 import { Dialog } from './Dialog';
@@ -494,5 +494,38 @@ describe('Dialog taking the keyboard as it opens', () => {
 
   it('puts focus on its first control under reduced motion too', () => {
     expect(opened(true)).toBe('a');
+  });
+});
+
+describe('Dialog in an OverlayScope', () => {
+  it('dims and centres in the scope, and leaves what is outside it pressable', () => {
+    // A design tool's played screen: 300 square, inside a window that
+    // keeps a button of its own beside it.
+    const open = new BehaviorSubject(false);
+    const pressed: string[] = [];
+    const ui = renderTest(
+      Box(
+        { width: 800, height: 600, position: 'relative' },
+        Button({ width: 100, height: 40, text: 'Close', onClick: () => pressed.push('tool') }),
+        Box(
+          { position: 'absolute', left: 400, top: 100, width: 300, height: 300 },
+          createComponent(OverlayScope, {
+            children: createComponent(Dialog, { open, title: 'Delete draft', width: 200, content: Box({ height: 10 }) })
+          })
+        )
+      ),
+      { width: 800, height: 600 }
+    );
+    open.next(true);
+    ui.frame();
+
+    const dialog = ui.getLayout(ui.getByRole('dialog', { name: 'Delete draft' }));
+    expect(dialog.x).toBe(400 + (300 - 200) / 2);
+    const scrim = ui.allNodes().find(node => node.properties.get('backgroundColor') === 'scrim')!;
+    expect(ui.getLayout(scrim)).toMatchObject({ x: 400, y: 100, width: 300, height: 300 });
+
+    ui.fireEvent.click(ui.getByRole('button', { name: 'Close' }));
+    expect(pressed).toEqual(['tool']);
+    expect(ui.queryByRole('dialog', { name: 'Delete draft' })).not.toBeNull();
   });
 });

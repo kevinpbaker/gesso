@@ -2,6 +2,7 @@ import { distinctUntilChanged, map, type Observable } from 'rxjs';
 
 import {
   type ComponentContext,
+  OverlayScopeKey,
   OverlayService,
   type OverlayEntry,
   type OverlayPlacement,
@@ -58,8 +59,12 @@ export interface OverlayOptions {
 
 let counter = 0;
 
+/**
+ * The handle for one component's entry, in the nearest `OverlayScope`
+ * above it, or in the runtime's layer outside every scope.
+ */
 export function useOverlay(ctx: ComponentContext, name: string): OverlayHandle {
-  const overlays = ctx.inject(OverlayService);
+  const overlays = ctx.environment(OverlayScopeKey) ?? ctx.inject(OverlayService);
   const id = `${name}-${counter++}`;
   ctx.onUnmount(() => overlays.close(id));
   return {

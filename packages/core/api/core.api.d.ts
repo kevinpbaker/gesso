@@ -651,7 +651,7 @@ declare const UI_SUBGRID_AXES: readonly UiSubgridAxis[];
 declare function validateSubgrid(value: unknown): string | undefined;
 type UiPosition = 'static' | 'relative' | 'absolute' | 'sticky';
 type UiOverflow = 'visible' | 'hidden' | 'scroll' | 'auto';
-type UiPlacement = 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end';
+type UiPlacement = 'over' | 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end';
 type UiTextWrapValue = 'word' | 'char' | 'none';
 type UiTextOverflowValue = 'clip' | 'ellipsis';
 type UiTextAlign = 'start' | 'end' | 'left' | 'center' | 'right';

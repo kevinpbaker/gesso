@@ -253,6 +253,23 @@ A modal entry's backdrop is also dimmed with the theme's `scrim`, which
 fades in as it opens; `scrim: false` keeps it clear. A backdrop that is
 only there to close a menu is never dimmed.
 
+**An `OverlayScope` keeps its overlays inside it.** A part of the tree
+wrapped in `OverlayScope` has a layer of its own, over its content, and
+`useOverlay` opens an entry in the nearest scope above the component
+that asks. A dialog there dims and centres in the scope rather than
+the window, a menu is flipped and shifted to stay inside it, and both
+are clipped, transformed and scrolled with it. Outside the scope
+nothing is covered, so a press beside it reaches the page. It is for a
+screen drawn inside another tool, a design tool's player above all:
+
+```tsx
+<box width={390} height={844} overflow="hidden" transform={scaled}>
+  <OverlayScope>
+    <CheckoutScreen />
+  </OverlayScope>
+</box>
+```
+
 **An entry inherits nothing from the tree that opened it.** The layer
 is mounted above the application root, so the content is nowhere near
 the component that asked for it and none of the scoped values reach it:
@@ -316,7 +333,9 @@ overlay starts beside where its anchor is seen rather than beside the
 flow position. Five specs count the placements the frame made: following an anchor
 costs the overlay's own placement and nothing else, a layout frame that
 leaves every box where it was places no overlay, and neither does a
-scroll frame that changes no sticky shift. The spec beside the example above asserts
+scroll frame that changes no sticky shift. A `Dialog` spec opens a dialog in an `OverlayScope` beside a
+button and asserts that it centres in the scope, that the scrim covers
+the scope alone, and that the button outside it still takes a press. The spec beside the example above asserts
 what this page claims about it, that the panel starts under its button,
 is shifted back inside the canvas, flips above the button when the
 scroll leaves no room below, returns underneath when the button moves

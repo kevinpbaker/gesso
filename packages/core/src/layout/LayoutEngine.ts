@@ -3636,9 +3636,19 @@ export class LayoutEngine {
     block: LayoutBox,
     point = false
   ): void {
+    const gap = this.numberProp(child, 'anchorOffset') ?? 0;
+    // Over the anchor rather than beside it: its box, grown by the gap,
+    // whatever the node's own size. Nothing to flip or keep inside the
+    // block; the node is wherever the anchor is.
+    if (child.properties.get('placement') === 'over') {
+      const overWidth = Math.max(0, aw + 2 * gap);
+      const overHeight = Math.max(0, ah + 2 * gap);
+      this.measure(child, new Constraints(overWidth, overWidth, overHeight, overHeight));
+      this.assignBox(child, ax - gap, ay - gap, overWidth, overHeight);
+      return;
+    }
     let width = cRec.measuredWidth;
     let height = cRec.measuredHeight;
-    const gap = this.numberProp(child, 'anchorOffset') ?? 0;
     const { side, align } = this.parsePlacement(child.properties.get('placement'));
 
     const vertical = side === 'top' || side === 'bottom';

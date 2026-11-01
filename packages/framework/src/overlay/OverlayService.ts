@@ -1,4 +1,4 @@
-import type { Reactive, UiChild, UiNode } from 'gesso-core';
+import { createEnvironmentKey, type Reactive, type UiChild, type UiNode } from 'gesso-core';
 import { internalState } from '../InternalState';
 
 /**
@@ -19,10 +19,15 @@ import { internalState } from '../InternalState';
  * edge of the screen whatever the language: an arrow drawn on a
  * diagram, a tooltip on a panel that is always on the left.
  *
+ * `over` lays the entry over the anchor at its size, grown by the
+ * offset on every side: the hole a spotlight leaves around what it
+ * shows. No direction turns it.
+ *
  * The direction is the entry's: the one its content reads in, which is
  * where its theme comes from too. See `OverlayEntry.environment`.
  */
 export type OverlayPlacement =
+  | 'over'
   | 'top'
   | 'top-start'
   | 'top-end'
@@ -57,6 +62,9 @@ export type OverlayPhysicalPlacement = Exclude<OverlayPlacement, `start${string}
  * declared the entry.
  */
 export function physicalPlacement(placement: OverlayPlacement, rtl: boolean): OverlayPhysicalPlacement {
+  if (placement === 'over') {
+    return placement;
+  }
   const [side, align] = placement.split('-') as [string, string | undefined];
   if (side === 'top' || side === 'bottom') {
     if (align === undefined || !rtl) {
@@ -225,3 +233,13 @@ export class OverlayService {
     return this.entries.value.some(entry => entry.id === id);
   }
 }
+
+/**
+ * The overlays of the `OverlayScope` a node is in: where an entry
+ * opened there goes instead of the runtime's layer. Null outside every
+ * scope.
+ */
+export const OverlayScopeKey = createEnvironmentKey<OverlayService | null>({
+  name: 'gesso.overlayScope',
+  defaultValue: null
+});

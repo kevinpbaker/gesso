@@ -814,7 +814,7 @@ declare function pick<T, K extends keyof T>(source: Observable<T>, key: K): Obse
 declare function pickKeys<T extends object, K extends keyof T>(source: Observable<T>, keys: readonly K[]): { readonly [P in K]: Observable<T[P]>; };
 declare function structurallyEqual<T>(a: T, b: T): boolean;
 declare function createComponent<C extends ComponentType>(component: C, ...args: ComponentArgs<C>): ComponentElement<ComponentProps<C>>;
-type OverlayPlacement = 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end' | 'start' | 'start-start' | 'start-end' | 'end' | 'end-start' | 'end-end';
+type OverlayPlacement = 'over' | 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end' | 'start' | 'start-start' | 'start-end' | 'end' | 'end-start' | 'end-end';
 interface OverlayRect {
   readonly x: number;
   readonly y: number;
@@ -853,8 +853,15 @@ declare class OverlayService {
   closeAll(): void;
   isOpen(id: string): boolean;
 }
+declare const OverlayScopeKey: import("gesso-core").UiEnvironmentKey<OverlayService | null>;
+interface OverlayScopeProps {
+  children?: UiChild;
+}
+declare function OverlayScope(inputs: Inputs<OverlayScopeProps>, _ctx: ComponentContext): UiChild;
 declare class OverlayLayer extends Component {
-  overlays: OverlayService;
+  runtimeOverlays: OverlayService;
+  service: InputCell<OverlayService | null>;
+  private get overlays();
   render(): UiElement;
   private renderEntries;
 }
@@ -3098,6 +3105,9 @@ export {
   OverlayLayer,
   OverlayPlacement,
   OverlayRect,
+  OverlayScope,
+  OverlayScopeKey,
+  OverlayScopeProps,
   OverlayService,
   parseUrl,
   PatchEntry,
@@ -3417,6 +3427,9 @@ import {
   OverlayLayer,
   OverlayPlacement,
   OverlayRect,
+  OverlayScope,
+  OverlayScopeKey,
+  OverlayScopeProps,
   OverlayService,
   parseUrl,
   PatchEntry,
@@ -3623,6 +3636,8 @@ export {
   output,
   Output,
   OverlayLayer,
+  OverlayScope,
+  OverlayScopeKey,
   OverlayService,
   parseUrl,
   performanceMarksEnabled,
@@ -3761,6 +3776,7 @@ export {
   type OverlayEntry,
   type OverlayPlacement,
   type OverlayRect,
+  type OverlayScopeProps,
   type Patch,
   type PatchEntry,
   type PatchPath,

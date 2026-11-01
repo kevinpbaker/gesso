@@ -717,7 +717,10 @@ export const UiProperties = {
    * Side and alignment against the anchor: 'bottom' (default),
    * 'bottom-start', 'bottom-end', 'top', 'top-start', 'top-end',
    * 'left', 'left-start', 'left-end', 'right', 'right-start',
-   * 'right-end'.
+   * 'right-end'; or 'over', which lays the node over the anchor at its
+   * size, grown by `anchorOffset` on every side: a spotlight's hole, a
+   * focus ring drawn above everything, following the anchor as any
+   * anchored node does.
    */
   placement: defineProperty<UiPlacement | undefined>({
     name: 'placement',

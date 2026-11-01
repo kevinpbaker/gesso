@@ -1144,6 +1144,26 @@ interface AvatarProps extends ControlLayoutProps {
   label?: string;
 }
 declare function Avatar(inputs: Inputs<AvatarProps>, _ctx: ComponentContext): UiChild;
+interface TourTarget {
+  readonly ref: UiNodeRef;
+  readonly node: InternalState<UiNode | null>;
+}
+declare function tourTarget(): TourTarget;
+interface TourStep {
+  readonly target?: TourTarget;
+  readonly title: string;
+  readonly body?: string;
+  readonly side?: 'bottom' | 'top' | 'start' | 'end';
+}
+interface TourProps {
+  readonly steps?: readonly TourStep[];
+  step?: number | null;
+  defaultStep?: number | null;
+  onStepChange?: (step: number | null) => void;
+  padding?: number;
+  doneLabel?: string;
+}
+declare function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild;
 interface ScrollAreaProps extends ControlLayoutProps {
   children?: UiChild;
   padding?: number;
@@ -1427,6 +1447,8 @@ export {
   tooltip,
   Tooltip,
   tooltipContent,
+  Tour,
+  tourTarget,
   trackFocus,
   Tree,
   type AccordionProps,
@@ -1569,6 +1591,9 @@ export {
   type TooltipArgs,
   type TooltipModifierOptions,
   type TooltipProps,
+  type TourProps,
+  type TourStep,
+  type TourTarget,
   type TreeDecoration,
   type TreeNode,
   type TreeProps,

@@ -55,7 +55,14 @@ export {
   type InputValue,
   type ComponentProps
 } from './FunctionComponent';
-export { OverlayService, type OverlayEntry, type OverlayPlacement, type OverlayRect } from './overlay/OverlayService';
+export {
+  OverlayScopeKey,
+  OverlayService,
+  type OverlayEntry,
+  type OverlayPlacement,
+  type OverlayRect
+} from './overlay/OverlayService';
+export { OverlayScope, type OverlayScopeProps } from './overlay/OverlayScope';
 export { OverlayLayer } from './overlay/OverlayLayer';
 export { ComponentHostResolver } from './ComponentHostResolver';
 export { ComponentHost } from './ComponentHost';

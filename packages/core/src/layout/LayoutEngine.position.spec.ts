@@ -468,6 +468,12 @@ describe('LayoutEngine positioning', () => {
       expect(h.box(popup).x).toBe(0);
     });
 
+    it('lays a node over its anchor, grown by the offset, whatever size it asks for', () => {
+      // A spotlight's hole: the anchor at 20, 20, 60 by 20, and 4 of room around it.
+      const { h, popup } = scene({}, { placement: 'over', anchorOffset: 4 });
+      expect(h.box(popup)).toEqual({ x: 16, y: 16, width: 68, height: 28 });
+    });
+
     it('flips above when there is no room below', () => {
       const { h, popup } = scene({ marginTop: 150 }, { placement: 'bottom-start' });
       // Anchor at y 170..190 in a 200 block: 10 below, 170 above.

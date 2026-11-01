@@ -77,8 +77,12 @@ export type UiPosition = 'static' | 'relative' | 'absolute' | 'sticky';
 
 export type UiOverflow = 'visible' | 'hidden' | 'scroll' | 'auto';
 
-/** Side and alignment of an anchored node against its anchor. */
+/**
+ * Side and alignment of an anchored node against its anchor, or `over`
+ * it: laid over the anchor's box, grown by the offset on every side.
+ */
 export type UiPlacement =
+  | 'over'
   | 'top'
   | 'top-start'
   | 'top-end'

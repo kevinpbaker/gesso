@@ -135,6 +135,7 @@ export {
 } from './Media';
 export { Badge, type BadgeProps, type BadgeTone } from './Badge';
 export { Avatar, type AvatarProps, type AvatarShape, type AvatarSize } from './Avatar';
+export { Tour, tourTarget, type TourProps, type TourStep, type TourTarget } from './Tour';
 export { ScrollArea, type ScrollAreaProps } from './ScrollArea';
 export { Skeleton, SkeletonText, type SkeletonProps, type SkeletonTextProps } from './Skeleton';
 export { useOverlay, type OverlayHandle, type OverlayOptions } from './overlay';

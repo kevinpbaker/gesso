@@ -16,7 +16,8 @@ import {
   type UiProvision
 } from 'gesso-core';
 import { Component } from '../Component';
-import { Define, Inject } from '../decorators';
+import { Define, Inject, Input } from '../decorators';
+import { input } from '../Input';
 import { OverlayService, physicalPlacement, type OverlayEntry, type OverlayPhysicalPlacement } from './OverlayService';
 
 /**
@@ -46,7 +47,13 @@ import { OverlayService, physicalPlacement, type OverlayEntry, type OverlayPhysi
  */
 @Define('gesso-overlay-layer')
 export class OverlayLayer extends Component {
-  @Inject(OverlayService) overlays!: OverlayService;
+  @Inject(OverlayService) runtimeOverlays!: OverlayService;
+  /** The entries to draw, when not the runtime's: an `OverlayScope`'s. */
+  @Input() service = input<OverlayService | null>(null);
+
+  private get overlays(): OverlayService {
+    return this.service.value ?? this.runtimeOverlays;
+  }
 
   override render(): UiElement {
     return Box(
@@ -103,6 +110,10 @@ export class OverlayLayer extends Component {
             top: entry.top,
             bottom: entry.bottom,
             zIndex: entry.zIndex,
+            // Laid over its anchor, the entry's box covers it; what it
+            // draws takes presses, and the anchor under the rest of it
+            // keeps its own, as a spotlight's target does.
+            ...(entry.placement === 'over' && entry.anchor != null ? { hitTestable: false } : {}),
             ...centering(entry),
             ...physicalEdges(entry, readsRightToLeft(environment)),
             ...inheritedFrom(environment),
