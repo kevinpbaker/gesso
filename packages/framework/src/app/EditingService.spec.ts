@@ -60,4 +60,19 @@ describe('EditingService', () => {
     service.setController(null);
     expect(service.caretRectOf({} as never)).toBeNull();
   });
+
+  it('asks the controller which caret position is nearest a point, and answers nothing without one', () => {
+    const service = new EditingService();
+    expect(service.offsetNear({} as never, 4, 5)).toBeNull();
+    const asked: number[][] = [];
+    service.setController({
+      offsetNear: (_node: unknown, x: number, y: number) => {
+        asked.push([x, y]);
+        return 3;
+      }
+    } as never);
+    expect(service.offsetNear(null, 4, 5)).toBeNull();
+    expect(service.offsetNear({} as never, 4, 5)).toBe(3);
+    expect(asked).toEqual([[4, 5]]);
+  });
 });

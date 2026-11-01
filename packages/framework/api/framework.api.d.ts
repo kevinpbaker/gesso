@@ -2849,6 +2849,7 @@ declare class EditingService {
   private controller;
   setController(controller: UiEditingController | null): void;
   caretRectOf(node: UiNode | null, offset?: number): CaretRect | null;
+  offsetNear(node: UiNode | null, x: number, y: number): number | null;
   select(anchor: UiTextPosition, focus: UiTextPosition): boolean;
 }
 declare class ScrollService {

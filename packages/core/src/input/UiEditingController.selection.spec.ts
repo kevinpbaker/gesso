@@ -192,4 +192,23 @@ describe('UiEditingController.caretRectOf', () => {
     const editing = h.createEditingController(h.createFocusManager());
     expect(editing.caretRectOf(node)).toBeNull();
   });
+
+  it('finds the caret position nearest a point, as a press there would', () => {
+    const h = laidOut('abcdef');
+    const third = h.editing.caretRectOf(h.node, 3)!;
+    expect(h.editing.offsetNear(h.node, third.x + 0.5, third.y + third.height / 2)).toBe(3);
+    expect(h.editing.offsetNear(h.node, 1000, third.y + third.height / 2)).toBe(6);
+    expect(h.editing.offsetNear(h.node, -10, third.y + third.height / 2)).toBe(0);
+  });
+
+  it('finds none for a node that is not a field, or one not laid out', () => {
+    const h = new InputTestHarness();
+    const box = h.node('box', UiNodeType.Box, { focusable: true });
+    const field = h.node('field', UiNodeType.EditableText, { value: 'abc', focusable: true });
+    h.add(h.root, box);
+    h.layoutTree();
+    const editing = h.createEditingController(h.createFocusManager());
+    expect(editing.offsetNear(box, 0, 0)).toBeNull();
+    expect(editing.offsetNear(field, 0, 0)).toBeNull();
+  });
 });

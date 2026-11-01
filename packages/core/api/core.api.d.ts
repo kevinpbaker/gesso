@@ -3486,6 +3486,7 @@ declare class UiEditingController {
   private focusField;
   private revealCaret;
   caretRectOf(node: UiNode, offset?: number): CaretRect | null;
+  offsetNear(node: UiNode, x: number, y: number): number | null;
   private drawnBox;
   private layoutOf;
 }

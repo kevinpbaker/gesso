@@ -285,6 +285,21 @@ point would stay where it was put. `anchorRect` can be an Observable
 too, so the list moves with its word when the word wraps onto the next
 line, without opening again.
 
+The other way round, `offsetNear` says which character a point is
+nearest, as a press there would put the caret. A field opened over
+text the person pointed at, to change it in place, starts its caret
+where they pointed: ask once the field is laid out, then select there.
+
+```tsx
+const offset = editing.offsetNear(fieldNode, pointer.x, pointer.y);
+if (offset !== null) {
+  editing.select({ node: fieldNode, offset }, { node: fieldNode, offset });
+}
+```
+
+The point is given as a pointer event gives it. Like `caretRectOf`, it
+answers null until the field is laid out.
+
 ## Next
 
 [Slider](/components/slider) and

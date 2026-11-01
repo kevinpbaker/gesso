@@ -54,6 +54,23 @@ export class EditingService {
   }
 
   /**
+   * The caret position nearest a point in a field, the point given as a
+   * pointer event gives it: where a press there would put the caret.
+   *
+   * What a field opened over text the person pointed at uses to start
+   * the caret where they pointed: ask once the field is laid out, then
+   * `select` that offset. Null when the node is not an editable, when it
+   * has not been laid out yet, or before the runtime has wired the
+   * controller: "ask again next frame", as for `caretRectOf`.
+   */
+  offsetNear(node: UiNode | null, x: number, y: number): number | null {
+    if (node === null || this.controller === null) {
+      return null;
+    }
+    return this.controller.offsetNear(node, x, y);
+  }
+
+  /**
    * Selects from `anchor` to `focus` and focuses the field the focus is
    * in: within one field, or across the fields of an editing group (see
    * `UiEditingGroup`). What an editor does after a command over a

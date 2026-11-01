@@ -1388,6 +1388,21 @@ export class UiEditingController {
       : layout.caretRect(Math.max(0, Math.min(offset, layout.model.text.length)));
   }
 
+  /**
+   * The caret position nearest a point, given as a pointer event gives
+   * it: where a press there would put the caret. For an application
+   * that opens a field over text the person pointed at, to start the
+   * caret where they pointed (`EditingService.select` puts it there).
+   *
+   * Null when the node is not an editable, or has not been laid out.
+   */
+  offsetNear(node: UiNode, x: number, y: number): number | null {
+    if (!isEditableNode(node) || this.host.recordFor(node) === undefined) {
+      return null;
+    }
+    return Math.min(this.offsetAt(node, x, y), editorFor(node).text.length);
+  }
+
   /** Where a field, or a part of it in its own coordinates, is drawn; see `EditingHost.screenBox`. */
   private drawnBox(node: UiNode, part?: LayoutBox): LayoutBox {
     if (this.host.screenBox !== undefined) {
