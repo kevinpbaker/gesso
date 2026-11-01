@@ -527,6 +527,11 @@ export class GessoRuntime {
    * them. Only populated while a listener is attached.
    */
   private semanticsBoxes = new Map<string, LayoutBox>();
+  /** When a frame last moved something, and when the boxes were last swept; see `updateSemantics`. */
+  private semanticsMovedAt = -Infinity;
+  private semanticsSweptAt = -Infinity;
+  /** The sweep owed once a run of moving frames stops. */
+  private semanticsSweepTimer: ReturnType<typeof setTimeout> | null = null;
   /** What each semantics walk leaves for the next; see `SemanticsMemory`. */
   private readonly semanticsMemory = semanticsMemory();
   private lastFocusedId: string | null = null;
@@ -2249,6 +2254,10 @@ export class GessoRuntime {
       clearTimeout(this.rendererTimer);
       this.rendererTimer = null;
     }
+    if (this.semanticsSweepTimer !== null) {
+      clearTimeout(this.semanticsSweepTimer);
+      this.semanticsSweepTimer = null;
+    }
     // The room the platform's insets took is given back: the default
     // registry is shared, and a disposed runtime must not go on
     // reporting a keyboard into it.
@@ -2523,7 +2532,7 @@ export class GessoRuntime {
     // the focus that go with it.
     listener({
       patches: [...this.orderedSemantics().values()].map(node => ({ op: 'add', node }) as const),
-      boxes: this.collectSemanticsBoxes(),
+      boxes: this.sweepSemanticsBoxes(),
       focused: this.focusManager.focusedNode?.id ?? null
     });
   }
@@ -2726,7 +2735,7 @@ export class GessoRuntime {
     if (listener === null) {
       return;
     }
-    const boxes = moved || patches.length > 0 ? this.collectSemanticsBoxes() : EMPTY_BOXES;
+    const boxes = patches.length > 0 ? this.sweepSemanticsBoxes() : moved ? this.movedSemanticsBoxes() : EMPTY_BOXES;
     const focused = this.focusManager.focusedNode?.id ?? null;
     const focusMoved = focused !== this.lastFocusedId;
     this.lastFocusedId = focused;
@@ -3136,6 +3145,88 @@ export class GessoRuntime {
       }
     }
     return ids;
+  }
+
+  /**
+   * The boxes for a frame that moved something but changed no meaning:
+   * all of them when it is the first move after a rest, and otherwise
+   * only the focused node's, with the sweep owed for when the moving
+   * stops (`SEMANTICS_SETTLE_MS`), or for when the boxes have been stale
+   * too long (`SEMANTICS_MOST_STALE_MS`).
+   *
+   * A pan or a zoom moves every box under the camera on every frame. In
+   * Atelier, a board of three dozen screens panned at 15%, the sweep was
+   * 3 to 4 ms of a 4 to 6 ms frame, with frames to 13 ms, past a 120 Hz
+   * display's 8.3; and the main thread wrote four styles on each of 545
+   * elements per frame, which in Chromium was 45% of that thread while
+   * it also had the wheel events to deliver. Nobody reads the rectangle
+   * of an element that is moving under a pan: a screen reader's cursor
+   * is on what it rests on. The focused node is the exception, since its
+   * focus ring is drawn from its element, so it moves every frame.
+   */
+  private movedSemanticsBoxes(): readonly UiSemanticsBox[] {
+    const at = now();
+    const resting = at - this.semanticsMovedAt > SEMANTICS_SETTLE_MS;
+    this.semanticsMovedAt = at;
+    if (resting || at - this.semanticsSweptAt > SEMANTICS_MOST_STALE_MS) {
+      return this.sweepSemanticsBoxes();
+    }
+    if (this.semanticsSweepTimer === null) {
+      this.scheduleSemanticsSweep(SEMANTICS_SETTLE_MS);
+    }
+    return this.focusedSemanticsBox();
+  }
+
+  /** Sweeps the boxes once the moving has stopped, and sends what changed. */
+  private scheduleSemanticsSweep(wait: number): void {
+    this.semanticsSweepTimer = setTimeout(
+      () => {
+        this.semanticsSweepTimer = null;
+        const listener = this.semanticsListener;
+        if (listener === null) {
+          return;
+        }
+        const left = this.semanticsMovedAt + SEMANTICS_SETTLE_MS - now();
+        if (left > 0) {
+          this.scheduleSemanticsSweep(left);
+          return;
+        }
+        const boxes = this.sweepSemanticsBoxes();
+        if (boxes.length > 0) {
+          listener({ patches: EMPTY_PATCHES, boxes });
+        }
+      },
+      Math.max(1, wait)
+    );
+  }
+
+  private sweepSemanticsBoxes(): UiSemanticsBox[] {
+    this.semanticsSweptAt = now();
+    if (this.semanticsSweepTimer !== null) {
+      clearTimeout(this.semanticsSweepTimer);
+      this.semanticsSweepTimer = null;
+    }
+    return this.collectSemanticsBoxes();
+  }
+
+  /** The focused node's box when it differs from the one last sent, as `collectSemanticsBoxes` would give it. */
+  private focusedSemanticsBox(): readonly UiSemanticsBox[] {
+    const focused = this.focusManager.focusedNode;
+    if (
+      focused === null ||
+      focused === undefined ||
+      !this.semantics.has(focused.id) ||
+      this.engine.recordFor(focused) === undefined
+    ) {
+      return EMPTY_BOXES;
+    }
+    const box = this.engine.screenBox(focused);
+    const last = this.semanticsBoxes.get(focused.id);
+    if (last !== undefined && boxesEqual(last, box)) {
+      return EMPTY_BOXES;
+    }
+    this.semanticsBoxes.set(focused.id, box);
+    return [{ id: focused.id, box }];
   }
 
   /**
@@ -4427,6 +4518,16 @@ function semanticIndices(list: readonly string[]): number[] {
  * one frame still hands the mirror the rows it is about to show.
  */
 const SEMANTICS_VIEWPORT_MARGIN = 400;
+
+/**
+ * How long a run of moving frames has to pause before the mirrored
+ * boxes are swept again; see `movedSemanticsBoxes`. Longer than the gap
+ * between a trackpad's wheel events, so a pan is one run.
+ */
+const SEMANTICS_SETTLE_MS = 120;
+
+/** The longest the mirrored boxes go unswept while something keeps moving: an endless animation still gets them. */
+const SEMANTICS_MOST_STALE_MS = 1000;
 
 const EMPTY_PATCHES: readonly UiSemanticsPatch[] = [];
 const EMPTY_BOXES: readonly UiSemanticsBox[] = [];

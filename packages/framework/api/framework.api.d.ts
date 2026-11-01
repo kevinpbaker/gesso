@@ -1608,6 +1608,9 @@ declare class GessoRuntime {
   private semanticsOrdered;
   private semanticsListener;
   private semanticsBoxes;
+  private semanticsMovedAt;
+  private semanticsSweptAt;
+  private semanticsSweepTimer;
   private readonly semanticsMemory;
   private lastFocusedId;
   private focusAfterReload;
@@ -1737,6 +1740,10 @@ declare class GessoRuntime {
   private attached;
   private semanticsOwnerOf;
   private semanticIdsUnder;
+  private movedSemanticsBoxes;
+  private scheduleSemanticsSweep;
+  private sweepSemanticsBoxes;
+  private focusedSemanticsBox;
   private collectSemanticsBoxes;
   private onScreen;
   private revealBox;
