@@ -81,6 +81,19 @@ describe('renderModule', () => {
     expect(resultText(board)).toBe('Board from src/mocks/Board.tsx, 200×600 at 1x, in the app theme.');
   });
 
+  it('draws a component’s examples, every one under its name, or one by its name', async () => {
+    const { deps } = project({
+      '/src/components/Pill.examples.tsx': { Pill: { Short: Box({ height: 20 }), Long: Box({ height: 30 }) } }
+    });
+
+    const all = await renderModule({ module: 'src/components/Pill.examples', width: 200 }, deps);
+    const one = await renderModule({ module: 'src/components/Pill.examples', export: 'Pill.Long', width: 200 }, deps);
+
+    expect(all.isError).not.toBe(true);
+    expect(resultText(all)).toContain('Pill from src/components/Pill.examples.tsx');
+    expect(resultText(one)).toContain('Pill.Long from src/components/Pill.examples.tsx, 200×30');
+  });
+
   it("draws light and dark in the application's own themes when it has them", async () => {
     const { deps } = project({ '/src/ui/Pill.tsx': { Pill } });
     let seen: unknown;

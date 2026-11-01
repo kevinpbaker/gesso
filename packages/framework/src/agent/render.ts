@@ -1,4 +1,4 @@
-import { isUiElement, type UiTheme } from 'gesso-core';
+import { Column, isUiElement, Text, type UiElement, type UiTheme } from 'gesso-core';
 
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
@@ -152,24 +152,60 @@ function chooseExport(
   wanted: string | undefined,
   module: string
 ): { name: string; value: unknown } | string {
-  const drawable = (value: unknown) => typeof value === 'function' || isUiElement(value);
+  const drawable = (value: unknown) => typeof value === 'function' || isUiElement(value) || examplesOf(value) !== null;
   if (wanted !== undefined) {
-    if (!drawable(exports[wanted])) {
+    // `Button.Primary`: one of the examples an object of them holds.
+    const [head, ...rest] = wanted.split('.');
+    let value: unknown = exports[head!];
+    for (const key of rest) {
+      value = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+    }
+    if (!drawable(value)) {
       return `${module} has no component or element exported as ${wanted}. It exports ${list(exports, drawable)}.`;
     }
-    return { name: wanted, value: exports[wanted] };
+    const examples = examplesOf(value);
+    return { name: wanted, value: examples === null ? value : examplesSheet(examples) };
   }
+  const asDrawn = (value: unknown) => {
+    const examples = examplesOf(value);
+    return examples === null ? value : examplesSheet(examples);
+  };
   if (drawable(exports.default)) {
-    return { name: 'default', value: exports.default };
+    return { name: 'default', value: asDrawn(exports.default) };
   }
   // A component's name is capitalised, which a helper's usually is not.
   const candidates = Object.keys(exports).filter(name => /^[A-Z]/.test(name) && drawable(exports[name]));
   if (candidates.length === 1) {
-    return { name: candidates[0]!, value: exports[candidates[0]!] };
+    return { name: candidates[0]!, value: asDrawn(exports[candidates[0]!]) };
   }
   return candidates.length === 0
     ? `${module} exports nothing to draw: no component, and no element.`
     : `${module} exports ${candidates.join(', ')}; say which with export.`;
+}
+
+/**
+ * An object of examples, as a component's states are kept for a design
+ * tool (`export const Button = { Primary: <Button … />, … }`): each
+ * element by its name, or null for anything else.
+ */
+function examplesOf(value: unknown): readonly [string, UiElement][] | null {
+  if (typeof value !== 'object' || value === null || isUiElement(value) || Array.isArray(value)) {
+    return null;
+  }
+  const entries = Object.entries(value as Record<string, unknown>).filter((entry): entry is [string, UiElement] =>
+    isUiElement(entry[1])
+  );
+  return entries.length === 0 ? null : entries;
+}
+
+/** Every example, each under its name, down the frame. */
+function examplesSheet(examples: readonly [string, UiElement][]): UiElement {
+  return Column(
+    { gap: 24, padding: 16 },
+    ...examples.map(([name, element]) =>
+      Column({ key: name, gap: 8 }, Text({ text: name, fontSize: 12, fontWeight: '600', color: 'textMuted' }), element)
+    )
+  );
 }
 
 function list(exports: Record<string, unknown>, keep: (value: unknown) => boolean): string {
