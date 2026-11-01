@@ -220,6 +220,41 @@ describe('a node under a panned, zoomed parent', () => {
     expect(flow).toEqual([{ x: 20, y: 10, width: 30, height: 20 }]);
   });
 
+  it('tells an `onFlowLayout` listener of a resize and not of a pan, as `onLayout` is told of both', () => {
+    // A design tool's board, its camera panned over thousands of these:
+    // a pan moves every one on screen and none of them in the layout.
+    const heard: string[] = [];
+    const watch = defineModifier<null>({
+      name: 'watch',
+      attach(host) {
+        host.onLayout(box => heard.push(`drawn ${box.x},${box.width}`));
+        host.onFlowLayout(box => heard.push(`laid out ${box.x},${box.width}`));
+      }
+    });
+    const camera$ = new BehaviorSubject<Record<string, number>>(CAMERA);
+    const width$ = new BehaviorSubject(30);
+    const { frame } = mountRuntime(
+      Box(
+        { position: 'relative', overflow: 'hidden', width: 800, height: 600 },
+        Box(
+          { position: 'absolute', top: 0, left: 0, width: 400, height: 300, transform: camera$ },
+          Box({ position: 'absolute', left: 20, top: 10, width: width$, height: 20, modifiers: [watch(null)] })
+        )
+      )
+    );
+    frame(0);
+    heard.length = 0;
+
+    camera$.next({ ...CAMERA, translateX: 0 });
+    frame();
+    expect(heard).toEqual(['drawn 40,60']);
+
+    heard.length = 0;
+    width$.next(50);
+    frame();
+    expect(heard).toEqual(['drawn 40,100', 'laid out 20,50']);
+  });
+
   it('is outlined where it is drawn when it has focus off screen', () => {
     // The mirror always sends the focused node's box, because the focus
     // ring is drawn from it, even when the walk passed over the subtree

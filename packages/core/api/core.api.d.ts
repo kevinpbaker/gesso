@@ -1123,6 +1123,7 @@ interface UiModifierHost {
     y: number;
   } | null;
   onLayout(listener: (box: LayoutBox) => void): void;
+  onFlowLayout(listener: (box: LayoutBox) => void): void;
   environment<T>(key: UiEnvironmentKey<T>, of?: UiNode): T;
   onEnvironment(listener: () => void, of?: UiNode): void;
   focus(options?: FocusOptions): void;
@@ -1162,6 +1163,7 @@ interface UiModifierLayout {
   } | null;
   viewport?(): LayoutBox | null;
   onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
+  onFlowLayout?(node: UiNode, listener: (box: LayoutBox) => void): () => void;
 }
 interface UiModifierFocus {
   isFocused(node: UiNode): boolean;
@@ -3772,7 +3774,10 @@ declare class LayoutEngine {
   private layoutRoot;
   private rootConstraints;
   private layoutVersion;
-  private boundsVersion;
+  private boundsWhole;
+  private readonly boundsMoved;
+  private readonly boundsShifted;
+  private transformMoves;
   constructor(textMeasurer?: TextMeasurer);
   recordFor(node: UiNode): LayoutRecord | undefined;
   allStickyNodes(): ReadonlySet<UiNode>;
@@ -3939,10 +3944,13 @@ interface NotifiedLayout {
 declare class LayoutNotifier {
   private readonly listeners;
   private readonly last;
+  private readonly flowListeners;
+  private readonly flowLast;
   add(node: UiNode, listener: (box: LayoutBox) => void): () => void;
+  addFlow(node: UiNode, listener: (box: LayoutBox) => void): () => void;
   get size(): number;
   isEmpty(): boolean;
-  notify(read: (node: UiNode) => NotifiedLayout): void;
+  notify(read: (node: UiNode) => NotifiedLayout, readFlow?: (node: UiNode) => NotifiedLayout): void;
   handleNodeRemoved(node: UiNode): void;
 }
 declare const ELLIPSIS = "…";

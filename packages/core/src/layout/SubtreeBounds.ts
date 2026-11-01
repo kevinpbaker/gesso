@@ -54,6 +54,99 @@ export function fillSubtreeBounds(root: UiNode, records: ReadonlyMap<UiNode, Lay
 }
 
 /**
+ * Fills in the bounds again where the tree changed, and nowhere else:
+ * every node in `moved` (its box written, its children changed, its
+ * transform changed) and every ancestor of one, from the bounds their
+ * children already hold; and every node in `shifted`, a subtree whose
+ * boxes all moved together, from the bottom up.
+ *
+ * A box that did not move, under nodes none of which moved, has the
+ * bounds it had: each is in its own record's space, which nothing
+ * above it touches, a transform included. Filling the whole tree again
+ * for any change was what a design tool's board paid on every step of
+ * a pan or a pinch: its camera's transform, or a zoom readout's text,
+ * threw away the bounds of hundreds of screens, and the 9 ms walk to
+ * fill them in again came before the hit test the wheel needs.
+ *
+ * Each node is filled once, deepest first, so an ancestor reads its
+ * children after any of them that changed.
+ */
+export function refreshSubtreeBounds(
+  moved: Iterable<UiNode>,
+  shifted: Iterable<UiNode>,
+  root: UiNode,
+  records: ReadonlyMap<UiNode, LayoutRecord>
+): void {
+  const depths = new Map<UiNode, number>();
+  const starts: UiNode[] = [];
+  for (const node of shifted) {
+    fillNode(node, records);
+    starts.push(node);
+  }
+  for (const node of moved) {
+    starts.push(node);
+  }
+  for (const node of starts) {
+    const path: UiNode[] = [];
+    let current: UiNode | null = node;
+    let depth = 0;
+    for (; current !== null && !depths.has(current); current = current === root ? null : current.parent) {
+      path.push(current);
+    }
+    depth = current === null ? -1 : depths.get(current)!;
+    for (let i = path.length - 1; i >= 0; i--) {
+      depths.set(path[i]!, ++depth);
+    }
+  }
+  const order = [...depths.keys()].sort((a, b) => depths.get(b)! - depths.get(a)!);
+  for (const node of order) {
+    refillOne(node, records);
+  }
+}
+
+/** One node's bounds from its own box and its children's bounds as they stand, as `fillNode` makes them. */
+function refillOne(node: UiNode, records: ReadonlyMap<UiNode, LayoutRecord>): void {
+  const rec = records.get(node);
+  if (rec === undefined) {
+    // A fragment: its parent's union reads its children directly.
+    return;
+  }
+  rec.boundsMinX = rec.x;
+  rec.boundsMinY = rec.y;
+  rec.boundsMaxX = rec.x + rec.width;
+  rec.boundsMaxY = rec.y + rec.height;
+  rec.boundsUnbounded = isUnbounded(node, rec);
+  if (!rec.clips) {
+    unionChildren(node, rec.paintOrder, records, rec);
+  }
+  const transform = node.properties.get('transform');
+  if (!rec.boundsUnbounded && typeof transform === 'object' && transform !== null) {
+    mapThroughTransform(node, rec);
+  }
+}
+
+function unionChildren(
+  parent: UiNode,
+  order: UiNode[] | null,
+  records: ReadonlyMap<UiNode, LayoutRecord>,
+  into: LayoutRecord
+): void {
+  if (order !== null) {
+    for (let i = 0; i < order.length; i++) {
+      union(into, records.get(order[i]!) ?? null);
+    }
+    return;
+  }
+  for (let child = parent.firstChild; child !== null; child = child.nextSibling) {
+    if (child.type === UiNodeType.Fragment) {
+      unionChildren(child, null, records, into);
+    } else {
+      union(into, records.get(child) ?? null);
+    }
+  }
+}
+
+/**
  * A node's bounds, and its whole subtree's on the way there. Returns
  * null for a node with no record, a fragment above all, which has
  * nothing of its own to contribute to its parent's box.

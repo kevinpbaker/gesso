@@ -744,6 +744,91 @@ describe('UiHitTester', () => {
       expect(tester.hitTest(50, 50)).toBeNull();
     });
 
+    it('follows a camera that pans and zooms, filling in only its own bounds and those above it', () => {
+      const h = new InputTestHarness();
+      const camera = h.node('camera', UiNodeType.Box, {
+        width: 100,
+        height: 100,
+        transform: { x: 0, y: 0, translateX: 0, scaleX: 1, scaleY: 1 }
+      });
+      const card = h.node('card', UiNodeType.Box, { width: 20, height: 20 });
+      h.add(camera, card);
+      h.add(h.root, camera);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+      expect(tester.hitTest(10, 10)?.node).toBe(card);
+      // What is under the camera is in its own space, which a pan or a
+      // zoom does not touch: a walk of the whole board would overwrite it.
+      const under = h.layout.record(card);
+      under.boundsMaxX = 21;
+
+      camera.setProperty('transform', { x: 0, y: 0, translateX: 200, scaleX: 2, scaleY: 2 });
+      h.layout.engine.layoutForFrame(
+        new UiFrame(1, 0, new Map([[camera, DirtyFlags.Transform]])),
+        Constraints.loose(400, 400)
+      );
+
+      expect(tester.hitTest(210, 10)?.node).toBe(card);
+      expect(tester.hitTest(10, 10)).toBeNull();
+      expect(h.layout.record(card).boundsMaxX).toBe(21);
+      // Nor is the camera taken for a scroll container, which every frame visits.
+      expect([...h.layout.engine.scrollContainers()]).not.toContain(camera);
+      const bounds = h.layout.engine.subtreeBoundsFor(camera)!;
+      expect([bounds.boundsMinX, bounds.boundsMinY, bounds.boundsMaxX, bounds.boundsMaxY]).toEqual([200, 0, 400, 200]);
+    });
+
+    it('fills in again only what a relayout moved, and hits it where it went', () => {
+      // A board beside a readout that changes size: laying the readout out
+      // again moves nothing on the board, whose bounds stand.
+      const h = new InputTestHarness();
+      const board = h.node('board', UiNodeType.Box, { width: 200, height: 200 });
+      const card = h.node('card', UiNodeType.Box, { width: 20, height: 20 });
+      const readout = h.node('readout', UiNodeType.Box, {
+        position: 'absolute',
+        left: 300,
+        top: 0,
+        width: 40,
+        height: 20
+      });
+      h.add(board, card);
+      h.add(h.root, board, readout);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+      expect(tester.hitTest(10, 10)?.node).toBe(card);
+      h.layout.record(card).boundsMaxX = 21;
+
+      readout.setProperty('width', 80);
+      h.layout.engine.layoutForFrame(
+        new UiFrame(1, 0, new Map([[readout, DirtyFlags.Layout]])),
+        Constraints.loose(400, 400)
+      );
+
+      expect(tester.hitTest(370, 10)?.node).toBe(readout);
+      expect(tester.hitTest(10, 10)?.node).toBe(card);
+      expect(h.layout.record(card).boundsMaxX).toBe(21);
+    });
+
+    it('hits a node back at its layout box once its transform is taken away', () => {
+      const h = new InputTestHarness();
+      const box = h.node('box', UiNodeType.Box, { width: 100, height: 100, transform: { translateY: 300 } });
+      h.add(h.root, box);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      const tester = h.createHitTester();
+      expect(tester.hitTest(50, 350)?.node).toBe(box);
+
+      box.setProperty('transform', undefined);
+      h.layout.engine.layoutForFrame(
+        new UiFrame(1, 0, new Map([[box, DirtyFlags.Transform]])),
+        Constraints.loose(400, 400)
+      );
+
+      expect(tester.hitTest(50, 50)?.node).toBe(box);
+      expect(tester.hitTest(50, 350)).toBeNull();
+    });
+
     it('hits an anchored overlay that moved after its frame had placed everything else', () => {
       const h = new InputTestHarness();
       const page = h.node('page', UiNodeType.Column);

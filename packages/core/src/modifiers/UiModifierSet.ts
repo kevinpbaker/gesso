@@ -66,6 +66,8 @@ export interface UiModifierLayout {
    */
   viewport?(): LayoutBox | null;
   onLayout(node: UiNode, listener: (box: LayoutBox) => void): () => void;
+  /** See `UiModifierHost.onFlowLayout`. Absent, `onLayout` stands in, which tells a listener more often, never less. */
+  onFlowLayout?(node: UiNode, listener: (box: LayoutBox) => void): () => void;
 }
 
 /**
@@ -413,6 +415,24 @@ class Host implements UiModifierHost {
       return;
     }
     this.own(layout.onLayout(this.node, listener));
+  }
+
+  onFlowLayout(listener: (box: LayoutBox) => void): void {
+    const layout = this.services.layout;
+    if (layout === undefined) {
+      warnMissingLayout(this.name);
+      return;
+    }
+    this.own(
+      layout.onFlowLayout === undefined
+        ? layout.onLayout(this.node, () => {
+            const box = layout.flowBox(this.node);
+            if (box !== null) {
+              listener(box);
+            }
+          })
+        : layout.onFlowLayout(this.node, listener)
+    );
   }
 
   environment<T>(key: UiEnvironmentKey<T>, of: UiNode = this.node): T {

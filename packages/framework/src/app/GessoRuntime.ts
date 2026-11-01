@@ -721,7 +721,8 @@ export class GessoRuntime {
         // in wants its accessibility record early, and wants its
         // decoder started when it actually arrives.
         viewport: () => ({ x: 0, y: 0, width: this.width, height: this.height }),
-        onLayout: (node, listener) => this.layoutNotifier.add(node, listener)
+        onLayout: (node, listener) => this.layoutNotifier.add(node, listener),
+        onFlowLayout: (node, listener) => this.layoutNotifier.addFlow(node, listener)
       },
       animations: this.animations,
       sharedElements: this.sharedElements
@@ -3843,12 +3844,22 @@ export class GessoRuntime {
         scrollY: record?.scrollY ?? 0
       };
     };
+    // The node's place in the layout, read off its record: what a pan
+    // or a scroll above it leaves alone (see `LayoutNotifier.addFlow`).
+    const readFlow = (node: UiNode) => {
+      const record = this.engine.recordFor(node);
+      return {
+        box: record === undefined ? NO_BOX : this.engine.worldBox(node),
+        scrollX: record?.scrollX ?? 0,
+        scrollY: record?.scrollY ?? 0
+      };
+    };
     this.deferredReveals = [];
     try {
       for (;;) {
         // Nothing listening means nothing walked.
         if (!this.layoutNotifier.isEmpty()) {
-          this.layoutNotifier.notify(read);
+          this.layoutNotifier.notify(read, readFlow);
         }
         if (!this.layoutPending()) {
           this.finishSettling(settled.passes > 0);
@@ -4611,6 +4622,9 @@ function boxesEqual(a: LayoutBox, b: LayoutBox): boolean {
 function frameChangedTree(frame: UiFrame): boolean {
   return frameNeedsSemantics(frame);
 }
+
+/** The box a node with no record reports. */
+const NO_BOX = { x: 0, y: 0, width: 0, height: 0 };
 
 /** Whether two wheel steps can be added together: the same keys held, in the same unit. */
 function sameWheel(a: Parameters<UiWheelController['wheel']>, b: Parameters<UiWheelController['wheel']>): boolean {

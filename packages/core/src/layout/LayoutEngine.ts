@@ -27,7 +27,7 @@ import type { UiLayoutChild, UiLayoutContext, UiLayoutProtocol } from './CustomL
 import { LayoutRecord } from './LayoutRecord';
 import type { ArrangementMemo, TextMemo } from './LayoutRecord';
 import { scrollBounds, scrollLeaderOf, scrollsFromRight } from './Scrollbars';
-import { fillSubtreeBounds } from './SubtreeBounds';
+import { fillSubtreeBounds, refreshSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
 import { CharacterCountTextMeasurer, fitsWidth, layoutFitsAnyWidth } from './TextMeasurer';
 import type { ParagraphLayout, TextMeasureRequest, TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
@@ -607,8 +607,21 @@ export class LayoutEngine {
    * from the first move to the last.
    */
   private layoutVersion = 0;
-  /** The version `subtreeBounds` on the records was filled from. */
-  private boundsVersion = -1;
+  /**
+   * Where the subtree bounds are out of date: everything, after a full
+   * pass; otherwise the nodes whose box or children or transform
+   * changed (`boundsMoved`) and the subtrees moved whole
+   * (`boundsShifted`), which `refreshSubtreeBounds` fills in again with
+   * their ancestors and nothing else.
+   */
+  private boundsWhole = true;
+  private readonly boundsMoved = new Set<UiNode>();
+  private readonly boundsShifted = new Set<UiNode>();
+  /**
+   * How many transforms changed: a transform moves no box, so it leaves
+   * `layoutVersion` alone, and `geometryVersion` adds these to it.
+   */
+  private transformMoves = 0;
 
   constructor(textMeasurer: TextMeasurer = new CharacterCountTextMeasurer()) {
     this.textMeasurer = textMeasurer;
@@ -649,11 +662,21 @@ export class LayoutEngine {
    * changed rather than a walk of the tree on every pointer move.
    */
   subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined {
-    if (this.boundsVersion !== this.layoutVersion) {
-      this.boundsVersion = this.layoutVersion;
+    if (this.boundsWhole || this.boundsMoved.size + this.boundsShifted.size > WHOLE_BOUNDS_REFILL) {
+      // A first pass, or one that moved so much that one walk of the
+      // tree is cheaper than walks up from each change.
       if (this.layoutRoot !== null) {
         fillSubtreeBounds(this.layoutRoot, this.records);
+        this.boundsWhole = false;
       }
+      this.boundsMoved.clear();
+      this.boundsShifted.clear();
+    } else if (this.boundsMoved.size > 0 || this.boundsShifted.size > 0) {
+      if (this.layoutRoot !== null) {
+        refreshSubtreeBounds(this.boundsMoved, this.boundsShifted, this.layoutRoot, this.records);
+      }
+      this.boundsMoved.clear();
+      this.boundsShifted.clear();
     }
     return this.records.get(node);
   }
@@ -673,7 +696,7 @@ export class LayoutEngine {
    * cost the walk the counter exists to avoid.
    */
   get geometryVersion(): number {
-    return this.layoutVersion;
+    return this.layoutVersion + this.transformMoves;
   }
 
   /** The node the last `layout` / `layoutForFrame` started from, if any. */
@@ -1026,6 +1049,7 @@ export class LayoutEngine {
   layout(node: UiNode, constraints: Constraints): LayoutResult {
     this.layoutPass++;
     this.layoutVersion++;
+    this.boundsWhole = true;
     this.layoutRoot = node;
     this.rootConstraints = constraints;
     // The pass starts with no records and re-adds what it touches, so
@@ -1098,10 +1122,22 @@ export class LayoutEngine {
 
     this.resetStats();
     this.relayoutRoots.clear();
+    if (this.boundsMoved.size + this.boundsShifted.size > WHOLE_BOUNDS_REFILL) {
+      // Frames that nothing hit-tested between: past this many, the
+      // next ask walks the whole tree anyway, and the nodes need not be
+      // held on to until then, removed ones above all.
+      this.boundsWhole = true;
+      this.boundsMoved.clear();
+      this.boundsShifted.clear();
+    }
     let anyLayout = false;
+    let transformed = false;
     for (const [node, flags] of frame.entries()) {
       if ((flags & (DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout)) !== 0) {
         anyLayout = true;
+        // Its box may not move and still mean something new for its
+        // bounds: children added or taken away, a clip let go.
+        this.boundsMoved.add(node);
         // A node whose own layout properties changed may have a new
         // size, so it cannot bound its own relayout; one whose children
         // changed keeps its size and can.
@@ -1115,32 +1151,43 @@ export class LayoutEngine {
       }
       if ((flags & DirtyFlags.Transform) !== 0) {
         // A transform is the one thing a hit test reads straight off
-        // the node rather than off the record, so a node that has just
-        // been given one is drawn and hit somewhere its cached subtree
-        // bounds never described. Asking whether it has one now is
-        // what keeps the far more common member of this flag, a scroll
-        // offset changing, from throwing the bounds away every frame a
-        // list is scrolled: a scroll container clips, so its bounds are
-        // its own box whatever its offset, and its descendants keep
-        // their pre-scroll coordinates. A node that has just *lost* its
-        // transform is left alone for the same reason it is safe to:
-        // its bounds say unbounded, which only costs a descent.
+        // the node rather than off the record, so a node whose transform
+        // changed is drawn and hit somewhere its cached subtree bounds
+        // never described: its own, carried out through the transform,
+        // and its ancestors'. Only those are filled again, on the next
+        // ask (`refreshSubtreeBounds`); the bounds beneath it are in its
+        // own space and stand. The far more common member of this flag,
+        // a scroll offset changing, asks nothing: a scroll container
+        // clips, so its bounds are its own box whatever its offset, and
+        // its descendants keep their pre-scroll coordinates.
         const transform = node.properties.get('transform');
-        if (typeof transform === 'object' && transform !== null) {
-          this.layoutVersion++;
+        const rec = this.record(node);
+        if ((typeof transform === 'object' && transform !== null) || !rec.scrollable) {
+          this.transformMoves++;
+          this.boundsMoved.add(node);
         }
-        this.record(node).transformDirty = true;
         if (node.type === UiNodeType.EditableText) {
+          rec.transformDirty = true;
           this.textScrollNodes.add(node);
           this.textScrollPending.add(node);
-        } else {
+        } else if (rec.scrollable) {
+          rec.transformDirty = true;
           this.scrollNodes.add(node);
         }
-        // An anchored node sits next to something that may just have
-        // scrolled; it is re-placed, cheaply, once the frame settles.
-        for (const anchored of this.anchoredNodes) {
-          this.movedAnchored.add(anchored);
-        }
+        // A node that does not scroll had its transform changed, which
+        // moves it on screen and nothing in the layout. Kept with the
+        // scroll containers, as it was, every name on a design tool's
+        // board that a zoom had scaled was visited by every frame's
+        // scroll pass after it, and by everything else that walks the
+        // scroll containers, for as long as the board was open.
+        transformed = true;
+      }
+    }
+    if (transformed) {
+      // An anchored node sits next to something that may just have
+      // scrolled or moved; it is re-placed, cheaply, once the frame settles.
+      for (const anchored of this.anchoredNodes) {
+        this.movedAnchored.add(anchored);
       }
     }
 
@@ -4600,6 +4647,9 @@ export class LayoutEngine {
       // a box, so nothing else here would tell the subtree bounds that
       // the tree they summarise has changed shape.
       this.layoutVersion++;
+      for (const node of this.stickyShifted) {
+        this.boundsMoved.add(node);
+      }
       if (this.anchorOf.size > 0) {
         this.followStickyShifts();
       }
@@ -4729,6 +4779,9 @@ export class LayoutEngine {
       rec = this.retiredRecords.get(node);
       if (rec === undefined) {
         rec = new LayoutRecord(node);
+        // Its bounds start unbounded, which is never wrong; filled in
+        // with the next refresh, they stop costing its ancestors a descent.
+        this.boundsMoved.add(node);
       } else {
         // Left where it is rather than deleted: the record is in the
         // live map from here on, so nothing looks for it here again,
@@ -5117,6 +5170,7 @@ export class LayoutEngine {
       // anchor it hangs off, invalidates them just as one written
       // inside the pass does.
       this.layoutVersion++;
+      this.boundsMoved.add(node);
       // Anything anchored to this node was placed against the box it
       // had a moment ago and has to be placed again. A box that did not
       // move asks nothing, and a tree with no anchored node at all does
@@ -5221,6 +5275,7 @@ export class LayoutEngine {
   private shiftSubtree(node: UiNode, dx: number, dy: number): void {
     this.stats.shifted++;
     this.layoutVersion++;
+    this.boundsShifted.add(node);
     // Absolute nodes left where they were, whose ancestors' extents just
     // moved away from them.
     let stayed: UiNode[] | undefined;
@@ -5561,3 +5616,10 @@ function hasPercentLength(props: ReadonlyMap<string, unknown>, names: readonly s
   }
   return false;
 }
+
+/**
+ * How many changed nodes the subtree bounds are filled in again from,
+ * one walk up from each, before one walk of the whole tree is the
+ * cheaper way: a resize or a new route writes every box.
+ */
+const WHOLE_BOUNDS_REFILL = 2000;

@@ -170,7 +170,7 @@ class DropTarget implements UiDropZone {
 
   attach(): this {
     this.registration.sync();
-    this.host.onLayout(() => this.registration.sync());
+    this.host.onFlowLayout(() => this.registration.sync());
     this.host.own(() => {
       this.stopScrolling();
       this.registration.dispose();

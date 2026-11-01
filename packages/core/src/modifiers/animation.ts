@@ -125,7 +125,7 @@ class LayoutAnimation {
     // does not. So a scroll wakes it and it correctly decides nothing
     // moved. This was found in the browser: with the visible box, every
     // row of the list lagged behind the page scroll and caught up.
-    this.host.onLayout(() => this.handleLayout());
+    this.host.onFlowLayout(() => this.handleLayout());
   }
 
   private makeCell(read: () => number, write: (offset: number) => void): AnimatedCell<number> {

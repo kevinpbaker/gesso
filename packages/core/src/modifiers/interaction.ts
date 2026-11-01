@@ -226,6 +226,6 @@ export const measureFlow = defineModifier<Subject<LayoutBox>>({
       target.next(box);
     };
     report();
-    host.onLayout(report);
+    host.onFlowLayout(report);
   }
 });

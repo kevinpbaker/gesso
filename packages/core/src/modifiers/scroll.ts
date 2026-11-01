@@ -125,7 +125,7 @@ export const scrollPosition = defineModifier<ScrollPositionArgs>({
         }
       });
     };
-    host.onLayout(() => {
+    host.onFlowLayout(() => {
       const offset = host.scrollOffset();
       if (offset === null || (last !== null && last.x === offset.x && last.y === offset.y)) {
         return;

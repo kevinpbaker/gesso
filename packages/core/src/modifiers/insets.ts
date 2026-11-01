@@ -65,7 +65,7 @@ export const publishInset = defineModifier<PublishInsetArgs>({
         write(insets);
       }
     };
-    host.onLayout(publish);
+    host.onFlowLayout(publish);
     publish();
     host.own(() => {
       write?.();

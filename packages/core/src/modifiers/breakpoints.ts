@@ -49,7 +49,7 @@ export const sizeContainer = defineModifier<SizeContainerArgs>({
       const vertical = inset('paddingTop', 'paddingY') + inset('paddingBottom', 'paddingY');
       args.source.report(Math.max(0, box.width - horizontal), Math.max(0, box.height - vertical));
     };
-    host.onLayout(report);
+    host.onFlowLayout(report);
     // The first layout may already have happened, for a node mounted
     // into a tree that is on screen; `onLayout` only reports changes.
     report();
@@ -127,7 +127,7 @@ export const breakpoint = defineModifier<BreakpointArgs>({
         host.set(name, value);
       }
     };
-    host.onLayout(apply);
+    host.onFlowLayout(apply);
     apply();
   }
 });

@@ -441,7 +441,7 @@ class MotionController {
     // The pivot is half the node's size, and the size is not known
     // until the first layout; until then a scale would grow out of the
     // corner. This also keeps the pivot right when the element resizes.
-    this.host.onLayout(() => this.layer.measure(this.host.flowBox()));
+    this.host.onFlowLayout(() => this.layer.measure(this.host.flowBox()));
     this.aim();
   }
 

@@ -32,7 +32,7 @@ const kind = defineModifier<FocusOptions>({
   name: 'autoFocus',
   attach(host, options) {
     let done = false;
-    host.onLayout(() => {
+    host.onFlowLayout(() => {
       if (done) {
         return;
       }

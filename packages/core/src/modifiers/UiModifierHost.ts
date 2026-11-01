@@ -146,6 +146,19 @@ export interface UiModifierHost {
    */
   onLayout(listener: (box: LayoutBox) => void): void;
   /**
+   * Called after any frame that changed the node's `flowBox` or its own
+   * scroll offset, with the `flowBox`; not when a scroll or a transform
+   * above it only moves it on screen. Removed on detach.
+   *
+   * The one to use when what the listener reads is the node's own place
+   * in the layout — its size for a breakpoint, its box for a layout
+   * animation, its offset for a scroll position — which a pan of a
+   * design tool's board, or a page's scroll, does not change. Asking
+   * nothing on those frames is most of what it is for. Runs where
+   * `onLayout` runs, with the same freedom to change layout.
+   */
+  onFlowLayout(listener: (box: LayoutBox) => void): void;
+  /**
    * The value the node inherits for an environment key: what the
    * nearest provider above it supplies, else the key's default.
    *

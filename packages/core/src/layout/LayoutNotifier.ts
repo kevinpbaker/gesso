@@ -35,6 +35,12 @@ export interface NotifiedLayout {
 export class LayoutNotifier {
   private readonly listeners = new Map<UiNode, Set<(box: LayoutBox) => void>>();
   private readonly last = new Map<UiNode, NotifiedLayout>();
+  /**
+   * Listeners told about the node's place in the layout and its scroll
+   * offset, and not about where it is drawn (`addFlow`).
+   */
+  private readonly flowListeners = new Map<UiNode, Set<(box: LayoutBox) => void>>();
+  private readonly flowLast = new Map<UiNode, NotifiedLayout>();
 
   /** Registers a listener; the returned function removes it. */
   add(node: UiNode, listener: (box: LayoutBox) => void): () => void {
@@ -57,37 +63,82 @@ export class LayoutNotifier {
     };
   }
 
+  /**
+   * Registers a listener told when the node's laid-out box or its own
+   * scroll offset changes, and not when a scroll or a transform above it
+   * moves it on screen; the returned function removes it.
+   *
+   * Most listeners are this kind: a size container, a breakpoint, a
+   * layout animation, a scroll position read only the node's own box
+   * and offset. Told of every move on screen, each of them was asked
+   * on every step of a pan over a design tool's board, 2,600 of them,
+   * to find nothing it reads had changed; and each answer was where
+   * the node was drawn, worked out through every ancestor. Its place in
+   * the layout is its record, read at once.
+   */
+  addFlow(node: UiNode, listener: (box: LayoutBox) => void): () => void {
+    let forNode = this.flowListeners.get(node);
+    if (forNode === undefined) {
+      forNode = new Set();
+      this.flowListeners.set(node, forNode);
+    }
+    forNode.add(listener);
+    return () => {
+      const set = this.flowListeners.get(node);
+      if (set === undefined) {
+        return;
+      }
+      set.delete(listener);
+      if (set.size === 0) {
+        this.flowListeners.delete(node);
+        this.flowLast.delete(node);
+      }
+    };
+  }
+
   get size(): number {
-    return this.listeners.size;
+    return this.listeners.size + this.flowListeners.size;
   }
 
   /** Whether anything is listening, so a frame can skip the walk. */
   isEmpty(): boolean {
-    return this.listeners.size === 0;
+    return this.listeners.size === 0 && this.flowListeners.size === 0;
   }
 
   /**
    * Calls the listeners of every watched node whose box or scroll
    * offset differs from what it was last told about.
    */
-  notify(read: (node: UiNode) => NotifiedLayout): void {
-    for (const [node, listeners] of this.listeners) {
-      const current = read(node);
-      const previous = this.last.get(node);
-      if (previous !== undefined && sameLayout(previous, current)) {
-        continue;
-      }
-      this.last.set(node, { box: { ...current.box }, scrollX: current.scrollX, scrollY: current.scrollY });
-      for (const listener of listeners) {
-        listener(current.box);
-      }
-    }
+  notify(read: (node: UiNode) => NotifiedLayout, readFlow: (node: UiNode) => NotifiedLayout = read): void {
+    notifyEach(this.listeners, this.last, read);
+    notifyEach(this.flowListeners, this.flowLast, readFlow);
   }
 
   /** Drops a removed node's listeners, so nothing keeps it alive. */
   handleNodeRemoved(node: UiNode): void {
     this.listeners.delete(node);
     this.last.delete(node);
+    this.flowListeners.delete(node);
+    this.flowLast.delete(node);
+  }
+}
+
+/** Calls the listeners of each node whose layout, as `read` gives it, differs from what they were last told. */
+function notifyEach(
+  listeners: ReadonlyMap<UiNode, ReadonlySet<(box: LayoutBox) => void>>,
+  last: Map<UiNode, NotifiedLayout>,
+  read: (node: UiNode) => NotifiedLayout
+): void {
+  for (const [node, forNode] of listeners) {
+    const current = read(node);
+    const previous = last.get(node);
+    if (previous !== undefined && sameLayout(previous, current)) {
+      continue;
+    }
+    last.set(node, { box: { ...current.box }, scrollX: current.scrollX, scrollY: current.scrollY });
+    for (const listener of forNode) {
+      listener(current.box);
+    }
   }
 }
 
