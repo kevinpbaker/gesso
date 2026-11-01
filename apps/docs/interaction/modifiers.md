@@ -50,6 +50,12 @@ resolves a colour from `visualState`, because what a hovered control
 looks like belongs to the application and its theme, so the property
 maps are how a modifier says what it looks like here.
 
+A design tool draws those states without a pointer: under a node that
+provides `ShownAsKey` as `'hovered'`, `'pressed'` or `'focused'`, every
+`interactive()` there shows its hover or press look and every
+`focusRing()` its ring, read as each attaches. Pressed is hovered as
+well, as a press under a pointer is, and a pointer still adds its own.
+
 ## The override cascade
 
 A modifier does not write onto the node. It writes into a cascade:

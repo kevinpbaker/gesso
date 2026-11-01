@@ -2,6 +2,7 @@ import { isObservable, type Observable, type Subscription } from 'rxjs';
 
 import type { DecorationShape } from '../rendering/Decorations';
 import type { UiColorValue } from '../properties/UiPropertyValues';
+import { ShownAsKey } from './interaction';
 import { defineModifier, type UiModifier } from './UiModifier';
 import type { UiModifierHost } from './UiModifierHost';
 
@@ -146,13 +147,15 @@ const kind = defineModifier<FocusRingOptions>({
   name: 'focusRing',
   attach(host, options) {
     const shapes = ringShapes(options);
+    // Drawn as focused by a tool (`ShownAsKey`), with no keyboard near it.
+    const shown = host.environment(ShownAsKey) === 'focused';
     // Drawn for focus the keyboard can see, not for every focus: a mouse
     // press focuses the control it lands on, and a ring there would mark
     // something nobody is about to drive with the keys. The host reports
     // the change when a key makes that focus visible, so the ring
     // appears then. This is `:focus-visible`, done where the focus is.
     const sync = (): void => {
-      host.decorate(host.isFocused() && host.isFocusVisible() ? shapes : null);
+      host.decorate(shown || (host.isFocused() && host.isFocusVisible()) ? shapes : null);
     };
     // A node may already hold focus when its ring attaches: a dialog
     // that auto-focused its first field re-renders, and the modifier

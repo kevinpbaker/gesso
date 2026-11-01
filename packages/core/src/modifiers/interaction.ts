@@ -3,7 +3,22 @@ import type { Subject } from 'rxjs';
 import { UiEventType } from '../input/UiInputEvent';
 import type { LayoutBox } from '../layout/LayoutTypes';
 import { UiVisualState, type UiVisualStateSet } from '../properties/UiVisualState';
+import { createEnvironmentKey } from '../environment/UiEnvironmentKey';
 import { defineModifier, type UiModifier } from './UiModifier';
+
+/** A pointer or keyboard state a tool draws an element in without the pointer or the keyboard. */
+export type UiShownAs = 'hovered' | 'pressed' | 'focused';
+
+/**
+ * Draws what is under a node as though it were hovered, pressed or
+ * focused: every `interactive` modifier there shows its hover or press
+ * look, and every `focusRing` its ring. What a design tool draws a
+ * component's pointer states with, beside its other states, where no
+ * pointer is over it. Read as each modifier attaches, so a node drawn
+ * under it starts so and stays so; the pointer still adds its own.
+ * Pressed is hovered too, as a press under a pointer is.
+ */
+export const ShownAsKey = createEnvironmentKey<UiShownAs | null>({ name: 'gesso.shownAs', defaultValue: null });
 
 /**
  * Pointer state, as a property anything can read, and the property
@@ -49,14 +64,20 @@ const kind = defineModifier<InteractiveOptions>({
     // Per-attachment state: one node's pointer, not the kind's.
     let hovered = false;
     let pressed = false;
+    // Drawn as hovered or pressed by a tool, whatever the pointer does.
+    const shown = host.environment(ShownAsKey);
+    const shownPressed = shown === 'pressed';
+    const shownHovered = shownPressed || shown === 'hovered';
     const styled = new Set([...Object.keys(options.hovered ?? {}), ...Object.keys(options.pressed ?? {})]);
 
     const sync = (): void => {
+      const isHovered = hovered || shownHovered;
+      const isPressed = pressed || shownPressed;
       const states = new Set<UiVisualState>();
-      if (hovered) {
+      if (isHovered) {
         states.add(UiVisualState.Hovered);
       }
-      if (pressed) {
+      if (isPressed) {
         states.add(UiVisualState.Pressed);
       }
       if (states.size === 0) {
@@ -68,7 +89,8 @@ const kind = defineModifier<InteractiveOptions>({
       }
       for (const property of styled) {
         const value =
-          (pressed ? options.pressed?.[property] : undefined) ?? (hovered ? options.hovered?.[property] : undefined);
+          (isPressed ? options.pressed?.[property] : undefined) ??
+          (isHovered ? options.hovered?.[property] : undefined);
         if (value === undefined) {
           host.clear(property);
         } else {
@@ -77,6 +99,9 @@ const kind = defineModifier<InteractiveOptions>({
       }
     };
 
+    if (shownHovered) {
+      sync();
+    }
     if (options.hover) {
       host.on(UiEventType.PointerEnter, () => {
         hovered = true;

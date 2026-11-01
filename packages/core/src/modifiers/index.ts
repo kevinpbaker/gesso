@@ -9,7 +9,9 @@ export {
   measure,
   measureFlow,
   BUTTON_INTERACTION,
-  type InteractiveOptions
+  ShownAsKey,
+  type InteractiveOptions,
+  type UiShownAs
 } from './interaction';
 export { borders, borderShapes, decorated, focusRing } from './decoration';
 export type { BorderEdge, BordersOptions, Decorations, FocusRingOptions } from './decoration';

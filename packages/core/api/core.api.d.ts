@@ -4034,6 +4034,8 @@ declare function accumulatedOffsetTo(node: UiNode, records: ReadonlyMap<UiNode, 
 type UiModifierBundle = readonly UiModifier[];
 declare function bundle(...parts: readonly (UiModifier | UiModifierBundle)[]): UiModifierBundle;
 declare const noModifiers: UiModifierBundle;
+type UiShownAs = 'hovered' | 'pressed' | 'focused';
+declare const ShownAsKey: UiEnvironmentKey<UiShownAs | null>;
 interface InteractiveOptions {
   readonly hover: boolean;
   readonly press: boolean;
@@ -6285,6 +6287,7 @@ export {
   ShortcutRegistryOptions,
   shortcuts,
   ShortcutsOptions,
+  ShownAsKey,
   Size,
   sizeContainer,
   SizeContainerArgs,
@@ -6539,6 +6542,7 @@ export {
   UiShortcutBinding,
   UiShortcutRegistry,
   UiShortcutStep,
+  UiShownAs,
   UiSourceLocation,
   UiSpacing,
   UiSpannedText,
@@ -7255,6 +7259,7 @@ import {
   ShortcutRegistryOptions,
   shortcuts,
   ShortcutsOptions,
+  ShownAsKey,
   Size,
   sizeContainer,
   SizeContainerArgs,
@@ -7509,6 +7514,7 @@ import {
   UiShortcutBinding,
   UiShortcutRegistry,
   UiShortcutStep,
+  UiShownAs,
   UiSourceLocation,
   UiSpacing,
   UiSpannedText,
@@ -8015,6 +8021,7 @@ export {
   shortcut,
   shortcutKeyCaps,
   shortcuts,
+  ShownAsKey,
   sizeContainer,
   sizeGridTracks,
   slideDown,
@@ -8365,6 +8372,7 @@ export {
   type UiShortcut,
   type UiShortcutBinding,
   type UiShortcutStep,
+  type UiShownAs,
   type UiSourceLocation,
   type UiSpringOptions,
   type UiTextInput,
