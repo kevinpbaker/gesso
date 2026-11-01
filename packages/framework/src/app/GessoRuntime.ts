@@ -21,6 +21,7 @@ import {
   type UiTreeSnapshot
 } from './DevtoolsProtocol';
 import {
+  provided,
   UiGraph,
   UiGraphBuilder,
   describeOverrides,
@@ -793,6 +794,13 @@ export class GessoRuntime {
       this.services.register(AnimationService);
     }
     this.services.get(AnimationService).setDriver(this.animations);
+    // The app's motion vocabulary, provided at the root, so a name in a
+    // transition or a motion state means what it means to AnimationService.
+    this.services.get(AnimationService).setMotionListener(motion => {
+      if (this.graph.updateNodePropertyNow(this.graph.root, 'provide', [provided(UiEnvironmentKeys.motion, motion)], DirtyFlags.Environment)) {
+        this.requestRepaint();
+      }
+    });
     // Sound reads the clock through the same driver, so a playback's
     // position moves between the shell's samples.
     this.services.get(AudioService).setAnimations(this.services.get(AnimationService));

@@ -138,14 +138,32 @@ with one small overshoot rather than creeping in. The easings are
 `linear`, `standard` (the default), `decelerate`, `accelerate` and
 `emphasized`, all cubic Bézier curves in CSS's own sense.
 
-This vocabulary is **not** a field on `UiTheme`, and that is deliberate
-rather than an omission. A theme value is resolved per node, and an
-animation drives a cell, which has no node to resolve against. An
-application with a different feel installs its own with
-`animations.setMotion(motion)`, which is per runtime, as everything else
-in front of the graph is. Per-subtree motion is not supported: see
-[themes and the environment](/appearance/themes-and-the-environment) for
-what does travel that way.
+This vocabulary is **not** a field on `UiTheme`: a theme is resolved
+per node at paint, and a name in an animation is resolved once, when it
+starts. An application with a different feel installs its own with
+`animations.setMotion(motion)`, for the whole runtime, and a part of the
+tree may provide another over it, as a design tool does for the design
+it draws. `defineMotion` changes only what it names, and a name of the
+design's own is declared as a typography role is:
+
+```tsx
+declare module 'gesso-core' {
+  interface UiDurationExtensions {
+    readonly press: unknown;
+  }
+}
+
+export const motion = defineMotion({ durations: { fast: 100, press: 90 } });
+
+<box provide={[provided(UiEnvironmentKeys.motion, motion)]}>
+  <box opacity={dimmed} transition={{ opacity: 'press' }} />
+</box>;
+```
+
+A name in a `transition`, a `motion` state or `tween('fast')` resolves
+against the motion where it is drawn; `AnimationService` resolves
+against the runtime's. A name the vocabulary lacks is said once and
+takes `normal`, `standard` or `snappy`.
 
 Two options are worth knowing beyond the timing. `stepMs` samples an
 animation no more often than that, so an eight-bladed spinner wakes

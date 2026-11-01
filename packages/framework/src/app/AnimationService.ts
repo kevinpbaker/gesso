@@ -4,7 +4,9 @@ import {
   AnimationDriver,
   UiSpring,
   createTween,
-  easings,
+  durationIn,
+  easingIn,
+  springIn,
   type AnimatedCell,
   type UiAnimation,
   type UiEasing,
@@ -111,6 +113,18 @@ export class AnimationService {
    */
   setMotion(motion: UiMotion): void {
     this.motionVocabulary = motion;
+    this.motionListener?.(motion);
+  }
+
+  private motionListener: ((motion: UiMotion) => void) | null = null;
+
+  /**
+   * Called by the runtime, which provides the vocabulary at its root so
+   * a name in a `transition` or a `motion` state resolves to it too; a
+   * part of the tree may provide its own over it (`UiEnvironmentKeys.motion`).
+   */
+  setMotionListener(listener: ((motion: UiMotion) => void) | null): void {
+    this.motionListener = listener;
   }
 
   get motion(): UiMotion {
@@ -177,10 +191,7 @@ export class AnimationService {
    * so a flick that changes direction bends rather than restarting.
    */
   spring(cell: AnimatedCell<number>, to: number, options: SpringOptions = {}): Observable<number> {
-    const base =
-      typeof options.spring === 'string' || options.spring === undefined
-        ? this.motionVocabulary.springs[options.spring ?? 'snappy']
-        : options.spring;
+    const base = springIn(this.motionVocabulary, options.spring);
     const driver = this.driver;
     const previous = driver?.animationFor(cell);
     const animation = new UiSpring(cell, to, {
@@ -225,13 +236,10 @@ export class AnimationService {
   }
 
   private resolveDuration(duration: UiDuration): number {
-    return typeof duration === 'number' ? duration : this.motionVocabulary.durations[duration];
+    return durationIn(this.motionVocabulary, duration);
   }
 
   private resolveEasing(easing: UiEasingChoice): UiEasing {
-    if (typeof easing === 'function') {
-      return easing;
-    }
-    return this.motionVocabulary.easings[easing] ?? easings.standard;
+    return easingIn(this.motionVocabulary, easing);
   }
 }

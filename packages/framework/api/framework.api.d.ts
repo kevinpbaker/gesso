@@ -1220,6 +1220,8 @@ declare class AnimationService {
   private motionVocabulary;
   setDriver(driver: AnimationDriver | null): void;
   setMotion(motion: UiMotion): void;
+  private motionListener;
+  setMotionListener(listener: ((motion: UiMotion) => void) | null): void;
   get motion(): UiMotion;
   applyReducedMotion(reduced: boolean): void;
   animate<T>(cell: AnimatedCell<T>, to: T, options?: AnimateOptions): Observable<T>;

@@ -1,4 +1,5 @@
-import { defaultMotion, type UiSpringSpec, type UiSpringToken } from '../environment/UiMotion';
+import { springIn, type UiSpringSpec, type UiSpringToken } from '../environment/UiMotion';
+import { motionOf } from '../animation/UiClock';
 import type { AnimatedCell, UiEasing } from '../animation';
 import type { UiNode } from '../graph/UiNode';
 import { defineModifier } from './UiModifier';
@@ -224,7 +225,7 @@ class LayoutAnimation {
     }
     const named = this.options.spring ?? 'snappy';
     this.host.spring(cell, 0, {
-      spring: typeof named === 'string' ? defaultMotion.springs[named] : named,
+      spring: springIn(motionOf(this.host.node), named),
       // Half a pixel: closer than this is the same pixel on a 1× screen
       // and within one on a 2×, so continuing to schedule frames for it
       // would be paying for a movement nobody can see.

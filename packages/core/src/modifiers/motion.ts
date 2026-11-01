@@ -1,7 +1,7 @@
 import { isObservable, type Observable, type Subscription } from 'rxjs';
 
-import { defaultMotion, type UiSpringSpec, type UiSpringToken } from '../environment/UiMotion';
-import { easings, type UiEasing } from '../animation/UiEasing';
+import { durationIn, easingIn, springIn } from '../environment/UiMotion';
+import { motionOf } from '../animation/UiClock';
 import type { AnimatedCell } from '../animation/UiAnimation';
 import {
   MOTION_CHANNELS,
@@ -321,7 +321,7 @@ class MotionLayer {
   private drive(cell: AnimatedCell<number>, to: number, timing: MotionTiming): Observable<number> {
     if (timing.spring !== undefined) {
       return this.host.spring(cell, to, {
-        spring: springSpec(timing.spring),
+        spring: springIn(motionOf(this.host.node), timing.spring),
         delay: timing.delay,
         reducedMotion: timing.reducedMotion,
         // These channels are opacities and scales as often as pixels,
@@ -330,8 +330,8 @@ class MotionLayer {
       });
     }
     return this.host.animate(cell, to, {
-      duration: resolveDuration(timing.duration),
-      easing: resolveEasing(timing.easing),
+      duration: durationIn(motionOf(this.host.node), timing.duration),
+      easing: easingIn(motionOf(this.host.node), timing.easing),
       delay: timing.delay,
       reducedMotion: timing.reducedMotion
     });
@@ -347,24 +347,6 @@ class MotionLayer {
  */
 function channelEpsilon(channel: MotionChannel): number {
   return channel === 'x' || channel === 'y' ? 0.01 : 1e-4;
-}
-
-function springSpec(spring: UiSpringToken | UiSpringSpec): UiSpringSpec {
-  return typeof spring === 'string' ? defaultMotion.springs[spring] : spring;
-}
-
-function resolveDuration(duration: MotionTiming['duration']): number {
-  if (duration === undefined) {
-    return defaultMotion.durations.normal;
-  }
-  return typeof duration === 'number' ? duration : defaultMotion.durations[duration];
-}
-
-function resolveEasing(easing: MotionTiming['easing']): UiEasing {
-  if (easing === undefined) {
-    return easings.standard;
-  }
-  return typeof easing === 'function' ? easing : (easings[easing] ?? easings.standard);
 }
 
 // ---------------------------------------------------------------------------
@@ -1008,7 +990,7 @@ class SharedElementController {
       const values =
         timing.spring !== undefined
           ? this.host.spring(cell, to, {
-              spring: springSpec(timing.spring),
+              spring: springIn(motionOf(this.host.node), timing.spring),
               delay: timing.delay,
               reducedMotion: timing.reducedMotion,
               // Half a pixel is the same pixel on a 1x screen;
@@ -1017,8 +999,8 @@ class SharedElementController {
               restDelta: 0.5
             })
           : this.host.animate(cell, to, {
-              duration: resolveDuration(timing.duration),
-              easing: resolveEasing(timing.easing),
+              duration: durationIn(motionOf(this.host.node), timing.duration),
+              easing: easingIn(motionOf(this.host.node), timing.easing),
               delay: timing.delay,
               reducedMotion: timing.reducedMotion
             });

@@ -1,4 +1,4 @@
-import { defaultMotion, type UiSpringSpec, type UiSpringToken } from '../environment/UiMotion';
+import type { UiDurationToken, UiEasingToken, UiSpringSpec, UiSpringToken } from '../environment/UiMotion';
 import type { UiEasing } from './UiEasing';
 import type { UiReducedMotionPolicy } from './UiAnimation';
 
@@ -9,14 +9,16 @@ import type { UiReducedMotionPolicy } from './UiAnimation';
 export type UiTransitionSpec =
   | {
       readonly kind: 'tween';
-      readonly duration: number;
-      readonly easing?: UiEasing;
+      /** Milliseconds, or a name resolved against the motion where it is drawn. */
+      readonly duration: number | UiDurationToken;
+      readonly easing?: UiEasing | UiEasingToken;
       readonly stepMs?: number;
       readonly reducedMotion?: UiReducedMotionPolicy;
     }
   | {
       readonly kind: 'spring';
-      readonly spring: UiSpringSpec;
+      /** Given outright, or a name resolved against the motion where it is drawn. */
+      readonly spring: UiSpringSpec | UiSpringToken;
       readonly restDelta?: number;
       readonly reducedMotion?: UiReducedMotionPolicy;
     };
@@ -29,12 +31,12 @@ export type UiTransitionSpec =
  * transition does. A spring is for a property that is one number, like
  * `opacity`: a transform only tweens (see `spring`).
  */
-export type UiTransitionValue = number | UiTransitionSpec;
+export type UiTransitionValue = number | UiDurationToken | UiTransitionSpec;
 
 /** A tween of `duration` milliseconds along `easing`. */
 export function tween(
-  duration: number,
-  options: { easing?: UiEasing; stepMs?: number; reducedMotion?: UiReducedMotionPolicy } = {}
+  duration: number | UiDurationToken,
+  options: { easing?: UiEasing | UiEasingToken; stepMs?: number; reducedMotion?: UiReducedMotionPolicy } = {}
 ): UiTransitionSpec {
   return { kind: 'tween', duration, ...options };
 }
@@ -51,13 +53,13 @@ export function spring(
 ): UiTransitionSpec {
   return {
     kind: 'spring',
-    spring: typeof spec === 'string' ? defaultMotion.springs[spec] : spec,
+    spring: spec,
     ...options
   };
 }
 
 export function normalizeTransition(value: UiTransitionValue): UiTransitionSpec {
-  return typeof value === 'number' ? { kind: 'tween', duration: value } : value;
+  return typeof value === 'number' || typeof value === 'string' ? { kind: 'tween', duration: value } : value;
 }
 
 /**
@@ -89,6 +91,12 @@ export function assertTransitionMap(
       specs.set(property, { kind: 'tween', duration: entry });
       continue;
     }
+    if (typeof entry === 'string' && entry !== '') {
+      // A name from the motion vocabulary, resolved where it is drawn; one
+      // it lacks is said there, once, and takes `normal`.
+      specs.set(property, { kind: 'tween', duration: entry as UiDurationToken });
+      continue;
+    }
     if (
       typeof entry === 'object' &&
       entry !== null &&
@@ -98,7 +106,7 @@ export function assertTransitionMap(
       continue;
     }
     throw new Error(
-      `The 'transition' for '${property}' on node '${nodeId}' must be a duration in milliseconds or a spec ` +
+      `The 'transition' for '${property}' on node '${nodeId}' must be a duration in milliseconds or by name, or a spec ` +
         `built by tween() or spring(), got ${describe(entry)}.`
     );
   }

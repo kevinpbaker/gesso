@@ -102,9 +102,12 @@ declare const interpolateNumber: UiInterpolator<number>;
 declare const interpolateColor: UiInterpolator<UiColor>;
 declare const interpolateTransform: UiInterpolator<Partial<UiTransform>>;
 declare function interpolatorFor(from: unknown, to: unknown): UiInterpolator<unknown> | undefined;
-type UiDurationToken = 'instant' | 'fast' | 'normal' | 'slow' | 'deliberate';
-type UiEasingToken = keyof typeof easings;
-type UiSpringToken = 'gentle' | 'snappy' | 'stiff';
+type UiDurationToken = 'instant' | 'fast' | 'normal' | 'slow' | 'deliberate' | (keyof UiDurationExtensions & string);
+type UiEasingToken = keyof typeof easings | (keyof UiEasingExtensions & string);
+type UiSpringToken = 'gentle' | 'snappy' | 'stiff' | (keyof UiSpringExtensions & string);
+interface UiDurationExtensions {}
+interface UiEasingExtensions {}
+interface UiSpringExtensions {}
 interface UiSpringSpec {
   readonly stiffness: number;
   readonly damping: number;
@@ -115,7 +118,16 @@ interface UiMotion {
   readonly easings: Readonly<Record<UiEasingToken, UiEasing>>;
   readonly springs: Readonly<Record<UiSpringToken, UiSpringSpec>>;
 }
+interface UiMotionChanges {
+  readonly durations?: Readonly<Partial<Record<UiDurationToken, number>>>;
+  readonly easings?: Readonly<Partial<Record<UiEasingToken, UiEasing>>>;
+  readonly springs?: Readonly<Partial<Record<UiSpringToken, UiSpringSpec>>>;
+}
 declare const defaultMotion: UiMotion;
+declare function defineMotion(changes: UiMotionChanges): UiMotion;
+declare function durationIn(motion: UiMotion, duration: number | UiDurationToken | undefined): number;
+declare function easingIn(motion: UiMotion, easing: UiEasing | UiEasingToken | undefined): UiEasing;
+declare function springIn(motion: UiMotion, spring: UiSpringSpec | UiSpringToken | undefined): UiSpringSpec;
 interface AnimatedCell<T> {
   value: T;
 }
@@ -205,19 +217,19 @@ declare class UiSpring extends UiAnimation<number> {
 declare function createTween<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): UiTween<T> | undefined;
 type UiTransitionSpec = {
   readonly kind: 'tween';
-  readonly duration: number;
-  readonly easing?: UiEasing;
+  readonly duration: number | UiDurationToken;
+  readonly easing?: UiEasing | UiEasingToken;
   readonly stepMs?: number;
   readonly reducedMotion?: UiReducedMotionPolicy;
 } | {
   readonly kind: 'spring';
-  readonly spring: UiSpringSpec;
+  readonly spring: UiSpringSpec | UiSpringToken;
   readonly restDelta?: number;
   readonly reducedMotion?: UiReducedMotionPolicy;
 };
-type UiTransitionValue = number | UiTransitionSpec;
-declare function tween(duration: number, options?: {
-  easing?: UiEasing;
+type UiTransitionValue = number | UiDurationToken | UiTransitionSpec;
+declare function tween(duration: number | UiDurationToken, options?: {
+  easing?: UiEasing | UiEasingToken;
   stepMs?: number;
   reducedMotion?: UiReducedMotionPolicy;
 }): UiTransitionSpec;
@@ -703,6 +715,7 @@ interface UiPropertyOverrides {
 interface UiNodeTransitions {
   write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
   cancel(property: NodeProperty): void;
+  readonly declared: ReadonlyMap<NodeProperty, UiTransitionSpec>;
   release(): void;
 }
 declare class UiNode {
@@ -742,6 +755,7 @@ declare class UiClock {
   local(now: number): number;
   real(at: number): number;
 }
+declare function motionOf(node: UiNode | null | undefined): UiMotion;
 declare function clockOf(node: UiNode | null | undefined): UiClock | null;
 declare class AnimationDriver {
   private readonly running;
@@ -2713,6 +2727,7 @@ declare const UiEnvironmentKeys: {
   readonly pointer: UiEnvironmentKey<UiPointer>;
   readonly containerSize: UiEnvironmentKey<UiContainerSize>;
   readonly insets: UiEnvironmentKey<UiInsetSource>;
+  readonly motion: UiEnvironmentKey<UiMotion>;
   readonly clock: UiEnvironmentKey<UiClock | null>;
 };
 interface UiEnvironmentProvider {
@@ -2945,6 +2960,7 @@ declare class NodeTransitions implements UiNodeTransitions {
   write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
   release(): void;
   cancel(property: NodeProperty): void;
+  get declared(): ReadonlyMap<NodeProperty, UiTransitionSpec>;
   private stopProperty;
   private cellFor;
   private startAnimation;
@@ -5800,6 +5816,7 @@ export {
   DefaultVideoResolverOptions,
   defaultVisualState,
   defineModifier,
+  defineMotion,
   defineProperty,
   defineThemeExtension,
   demuxMp4Audio,
@@ -5825,6 +5842,8 @@ export {
   dropIndexShifts,
   dropTarget,
   DropTargetOptions,
+  durationIn,
+  easingIn,
   easings,
   edgeField,
   Edges,
@@ -6030,6 +6049,7 @@ export {
   MOTION_REST,
   MotionArgs,
   MotionChannel,
+  motionOf,
   MotionState,
   MotionStateInput,
   MotionTiming,
@@ -6279,6 +6299,7 @@ export {
   spansDifferOnlyInPaint,
   splitMp3Frames,
   spring,
+  springIn,
   Stack,
   StackProps,
   statesEqual,
@@ -6377,8 +6398,10 @@ export {
   UiDropEffect,
   UiDroppedFile,
   UiDropZone,
+  UiDurationExtensions,
   UiDurationToken,
   UiEasing,
+  UiEasingExtensions,
   UiEasingToken,
   UiEditingController,
   UiEditingGroup,
@@ -6449,6 +6472,7 @@ export {
   UiModifierSet,
   UiModifierTeardown,
   UiMotion,
+  UiMotionChanges,
   UiNode,
   UiNodeRef,
   UiNodeTransitions,
@@ -6515,6 +6539,7 @@ export {
   UiSpacing,
   UiSpannedText,
   UiSpring,
+  UiSpringExtensions,
   UiSpringOptions,
   UiSpringSpec,
   UiSpringToken,
@@ -6760,6 +6785,7 @@ import {
   DefaultVideoResolverOptions,
   defaultVisualState,
   defineModifier,
+  defineMotion,
   defineProperty,
   defineThemeExtension,
   demuxMp4Audio,
@@ -6785,6 +6811,8 @@ import {
   dropIndexShifts,
   dropTarget,
   DropTargetOptions,
+  durationIn,
+  easingIn,
   easings,
   edgeField,
   Edges,
@@ -6990,6 +7018,7 @@ import {
   MOTION_REST,
   MotionArgs,
   MotionChannel,
+  motionOf,
   MotionState,
   MotionStateInput,
   MotionTiming,
@@ -7239,6 +7268,7 @@ import {
   spansDifferOnlyInPaint,
   splitMp3Frames,
   spring,
+  springIn,
   Stack,
   StackProps,
   statesEqual,
@@ -7337,8 +7367,10 @@ import {
   UiDropEffect,
   UiDroppedFile,
   UiDropZone,
+  UiDurationExtensions,
   UiDurationToken,
   UiEasing,
+  UiEasingExtensions,
   UiEasingToken,
   UiEditingController,
   UiEditingGroup,
@@ -7409,6 +7441,7 @@ import {
   UiModifierSet,
   UiModifierTeardown,
   UiMotion,
+  UiMotionChanges,
   UiNode,
   UiNodeRef,
   UiNodeTransitions,
@@ -7475,6 +7508,7 @@ import {
   UiSpacing,
   UiSpannedText,
   UiSpring,
+  UiSpringExtensions,
   UiSpringOptions,
   UiSpringSpec,
   UiSpringToken,
@@ -7681,6 +7715,7 @@ export {
   DefaultVideoResolver,
   defaultVisualState,
   defineModifier,
+  defineMotion,
   defineProperty,
   defineThemeExtension,
   demuxMp4Audio,
@@ -7701,6 +7736,8 @@ export {
   drawText,
   dropIndexShifts,
   dropTarget,
+  durationIn,
+  easingIn,
   easings,
   edgeField,
   EditableLayout,
@@ -7838,6 +7875,7 @@ export {
   motion,
   MOTION_CHANNELS,
   MOTION_REST,
+  motionOf,
   MOUSE_POINTER,
   Mp3Frames,
   nextCaretToggle,
@@ -7984,6 +8022,7 @@ export {
   spansDifferOnlyInPaint,
   splitMp3Frames,
   spring,
+  springIn,
   Stack,
   statesEqual,
   steps,
@@ -8377,7 +8416,9 @@ export {
   UiDensity,
   UiDirection,
   UiDragSession,
+  UiDurationExtensions,
   UiDurationToken,
+  UiEasingExtensions,
   UiEasingToken,
   UiEditingController,
   UiEnvironment,
@@ -8420,6 +8461,7 @@ export {
   UiManualFrameClock,
   UiModifierSet,
   UiMotion,
+  UiMotionChanges,
   UiNode,
   UiNodeType,
   UiObjectFit,
@@ -8460,6 +8502,7 @@ export {
   UiSpacing,
   UiSpannedText,
   UiSpring,
+  UiSpringExtensions,
   UiSpringSpec,
   UiSpringToken,
   UiSubgridAxis,

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { map } from 'rxjs';
 
-import { Box, Column, ScrollView, type UiNode, defineModifier, fade, linear, motion, spring, tween, animateLayout } from 'gesso-core';
+import { Box, Column, ScrollView, type UiNode, UiEnvironmentKeys, defineModifier, defineMotion, fade, linear, motion, provided, spring, tween, animateLayout } from 'gesso-core';
 import { internalState } from '../InternalState';
 import { AnimationService } from './AnimationService';
 import { InspectionService } from './InspectionService';
@@ -207,6 +207,46 @@ describe('a declared transition', () => {
     // At rest by the entrance's 100 ms, not still easing towards each of its frames for two seconds.
     expect(firstBox(node).properties.get('opacity')).toBe(1);
     expect(mounted.clock.isPending).toBe(false);
+  });
+
+  it('takes a duration by name, as the motion where it is drawn has it, or the app’s', () => {
+    // `fast` made a full second long, on a straight line, so halfway is easy to see.
+    const slowFast = defineMotion({ durations: { fast: 1000 }, easings: { standard: linear } });
+    const opacityOf = (provide: boolean) => {
+      const opacity = internalState(1);
+      let node: UiNode | null = null;
+      const mounted = mountRuntime(
+        Column(
+          { ref: (n: UiNode | null) => (node = n), provide: provide ? [provided(UiEnvironmentKeys.motion, slowFast)] : undefined },
+          Box({ width: 20, height: 20, opacity, transition: { opacity: 'fast' } })
+        )
+      );
+      if (!provide) {
+        mounted.runtime.services.get(AnimationService).setMotion(slowFast);
+      }
+      const { time } = run(mounted, 0, () => null);
+      opacity.value = 0;
+      mounted.clock.tick(time + 16);
+      mounted.clock.tick(time + 516);
+      return firstBox(node).properties.get('opacity') as number;
+    };
+
+    expect(opacityOf(true)).toBeCloseTo(0.5, 1);
+    expect(opacityOf(false)).toBeCloseTo(0.5, 1);
+  });
+
+  it('resolves a motion state’s duration by name where it is drawn too', () => {
+    let node: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { ref: (n: UiNode | null) => (node = n), provide: [provided(UiEnvironmentKeys.motion, defineMotion({ durations: { slow: 1000 }, easings: { standard: linear } }))] },
+        Box({ width: 20, height: 20, modifiers: [motion({ initial: fade, duration: 'slow' })] })
+      )
+    );
+    mounted.clock.tick(16);
+    mounted.clock.tick(516);
+
+    expect(firstBox(node).properties.get('opacity')).toBeCloseTo(0.5, 1);
   });
 
   it('a bare number is a duration in milliseconds', () => {

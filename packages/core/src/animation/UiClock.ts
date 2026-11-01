@@ -1,5 +1,6 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
+import type { UiMotion } from '../environment/UiMotion';
 
 /**
  * How time passes for the animations under a node: at a speed of its
@@ -76,6 +77,16 @@ function checkedSpeed(speed: number): number {
     throw new Error(`A clock's speed is a number of 0 or more (0 is paused, 1 real time), not ${speed}.`);
   }
   return speed;
+}
+
+/** The motion vocabulary names resolve to under `node`: the nearest provided above it, or Gesso's. */
+export function motionOf(node: UiNode | null | undefined): UiMotion {
+  for (let at: UiNode | null = node ?? null; at !== null; at = at.parent) {
+    if (at.environment !== null) {
+      return at.environment.get(UiEnvironmentKeys.motion);
+    }
+  }
+  return UiEnvironmentKeys.motion.defaultValue;
 }
 
 /** The clock the animations under `node` run on: the nearest one provided above it, or null for real time. */

@@ -1,5 +1,6 @@
 import type { AnimatedCell, UiTransitionSpec } from '../animation';
-import { AnimationDriver, UiSpring, clockOf, createTween } from '../animation';
+import { AnimationDriver, UiSpring, clockOf, createTween, motionOf } from '../animation';
+import { durationIn, easingIn, springIn } from '../environment/UiMotion';
 import type { DirtyFlags } from './DirtyFlags';
 import type { UiGraph } from './UiGraph';
 import type { NodeProperty, UiNode, UiNodeTransitions } from './UiNode';
@@ -107,6 +108,10 @@ export class NodeTransitions implements UiNodeTransitions {
     this.stopProperty(property);
   }
 
+  get declared(): ReadonlyMap<NodeProperty, UiTransitionSpec> {
+    return this.specs;
+  }
+
   private stopProperty(property: NodeProperty): void {
     const cell = this.cells.get(property);
     if (cell !== undefined) {
@@ -159,7 +164,7 @@ export class NodeTransitions implements UiNodeTransitions {
       const velocity = previous instanceof UiSpring ? previous.currentVelocity : 0;
       this.driver.start(
         new UiSpring(cell as AnimatedCell<number>, to, {
-          spring: spec.spring,
+          spring: springIn(motionOf(this.node), spec.spring),
           velocity,
           restDelta: spec.restDelta,
           reducedMotion: spec.reducedMotion
@@ -168,9 +173,11 @@ export class NodeTransitions implements UiNodeTransitions {
       );
       return true;
     }
+    const motion = motionOf(this.node);
     const tween = createTween(cell, to, {
-      duration: spec.duration,
-      easing: spec.easing,
+      duration: durationIn(motion, spec.duration),
+      // The motion's own `standard` when none is named, not Gesso's.
+      easing: easingIn(motion, spec.easing),
       stepMs: spec.stepMs,
       reducedMotion: spec.reducedMotion
     });

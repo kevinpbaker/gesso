@@ -1,6 +1,7 @@
 import { DirtyFlags } from './DirtyFlags';
 import { type UiNodeType } from './UiNodeType';
 import type { UiEnvironment } from '../environment/UiEnvironment';
+import type { UiTransitionSpec } from '../animation/UiTransition';
 import type { DecorationShape } from '../rendering/Decorations';
 
 export type NodeId = string;
@@ -45,6 +46,8 @@ export interface UiNodeTransitions {
   write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
   /** Stops animating one property, leaving it where it stands, for a write that is drawn at once. */
   cancel(property: NodeProperty): void;
+  /** What the element declares, by property, as written: a name stays a name. For a tool that reads it. */
+  readonly declared: ReadonlyMap<NodeProperty, UiTransitionSpec>;
   /** Cancels everything, for a node leaving the tree. */
   release(): void;
 }

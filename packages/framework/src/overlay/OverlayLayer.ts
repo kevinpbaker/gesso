@@ -219,13 +219,14 @@ function inheritedFrom(node: UiNode | null): Record<string, unknown> {
 const CARRIED_BY_PROPS = new Set<string>(
   Object.values(UiEnvironmentKeys)
     .map(key => key.name)
-    .filter(name => name !== UiEnvironmentKeys.clock.name)
+    .filter(name => name !== UiEnvironmentKeys.clock.name && name !== UiEnvironmentKeys.motion.name)
 );
 
 /**
  * The rest of what the entry was opened under, re-provided: the clock
  * its animations run on, so a dialog opened on a settled frame is at
- * rest there and one opened in a slowed player slows, and every key the
+ * rest there and one opened in a slowed player slows, the motion its
+ * names mean, and every key the
  * application provides itself, so a component in a dialog reads with
  * `ctx.environment` what the one that opened it reads.
  */
