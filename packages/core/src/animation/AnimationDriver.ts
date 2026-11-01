@@ -29,6 +29,8 @@ export class AnimationDriver {
   private readonly running = new Map<object, AnyAnimation>();
   /** The clock each running animation was started on, when it was not real time; see `UiClock`. */
   private readonly clocks = new Map<object, UiClock>();
+  /** Each clock's `moves` as last drawn: one moved since (a seek) is drawn at its new time at once. */
+  private readonly seenMoves = new WeakMap<UiClock, number>();
   private reducedMotion = false;
   private hidden = false;
   private advancing = false;
@@ -241,6 +243,10 @@ export class AnimationDriver {
         // Settled since it started: the next frame lands it.
         return now;
       }
+      if (clock !== undefined && clock.moves !== (this.seenMoves.get(clock) ?? 0)) {
+        // Moved to another time: drawn there on the next frame.
+        return now;
+      }
       // Minus its slack, because this is the earliest moment a frame
       // would be *useful*, not the exact moment it is owed. Frames
       // arrive on the display's refreshes: a caller that waits for the
@@ -284,6 +290,16 @@ export class AnimationDriver {
   }
 
   private advanceRunning(now: number): void {
+    // The clocks moved since the last frame are drawn at their new time
+    // this frame, and seen as moved no longer after it.
+    const moved = [...new Set(this.clocks.values())].filter(clock => clock.moves !== (this.seenMoves.get(clock) ?? 0));
+    this.advanceEach(now);
+    for (const clock of moved) {
+      this.seenMoves.set(clock, clock.moves);
+    }
+  }
+
+  private advanceEach(now: number): void {
     for (const [cell, animation] of this.running) {
       const clock = this.clocks.get(cell);
       if (clock?.settled === true) {
@@ -293,13 +309,15 @@ export class AnimationDriver {
         continue;
       }
       const at = clock === undefined ? now : clock.local(now);
+      const moved = clock !== undefined && clock.moves !== (this.seenMoves.get(clock) ?? 0);
       // Early by less than its own slack counts as on time — the same
       // allowance `nextTickAt` asks the scheduler for, and for the
-      // same reason. See `UiAnimation.dueSlackMs`.
-      if (animation.dueAt(at) - animation.dueSlackMs > at) {
+      // same reason. See `UiAnimation.dueSlackMs`. A clock moved to
+      // another time is drawn there whatever is due.
+      if (!moved && animation.dueAt(at) - animation.dueSlackMs > at) {
         continue;
       }
-      animation.advance(at);
+      animation.advance(at, clock?.holding === true);
       if (animation.isFinished && this.running.get(cell) === animation) {
         this.running.delete(cell);
         this.clocks.delete(cell);

@@ -94,6 +94,11 @@ shared value, and a ring given options is compared with the attached one
 by what those options say, so the ring survives the control's re-render
 either way.
 
+`FocusService.tabStops(within)` lists the stops under a node in the
+order Tab visits them, a hidden or disabled one left out and an editing
+group one stop: what a design tool numbers to show a screen's keyboard
+order.
+
 ## What the library binds
 
 Every one of these is covered by the component's own specs, and each

@@ -173,7 +173,7 @@ declare abstract class UiAnimation<T> {
   get hasBegun(): boolean;
   continueFrom(previous: UiAnimation<T>): void;
   protected onBegin(): void;
-  advance(now: number): void;
+  advance(now: number, hold?: boolean): void;
   private scheduleNext;
   snap(): void;
   cancel(): void;
@@ -747,12 +747,16 @@ declare class UiClock {
   private anchor;
   private lastReal;
   settled: boolean;
+  holding: boolean;
+  moves: number;
   constructor(options?: {
     readonly speed?: number;
     readonly settled?: boolean;
   });
   get speed(): number;
   set speed(next: number);
+  get now(): number;
+  seek(at: number): void;
   local(now: number): number;
   real(at: number): number;
 }
@@ -761,6 +765,7 @@ declare function clockOf(node: UiNode | null | undefined): UiClock | null;
 declare class AnimationDriver {
   private readonly running;
   private readonly clocks;
+  private readonly seenMoves;
   private reducedMotion;
   private hidden;
   private advancing;
@@ -781,6 +786,7 @@ declare class AnimationDriver {
   nextTickAt(now: number): number | undefined;
   advance(now: number): void;
   private advanceRunning;
+  private advanceEach;
 }
 interface SharedClaim {
   readonly box: LayoutBox | null;
@@ -1086,6 +1092,7 @@ declare class UiFocusManager {
   popScope(root?: UiNode): void;
   handleNodeRemoved(_node: UiNode): void;
   private moveFocus;
+  tabStops(within?: UiNode): UiNode[];
   private collectFocusable;
   private insideHidden;
   private groupOf;

@@ -35,6 +35,18 @@ export class UiClock {
   /** Every animation lands where it is going, and none runs. */
   settled: boolean;
 
+  /**
+   * Animations that reach their end stay, held there, rather than
+   * finishing: so moving the time back (`seek`) plays them back. What a
+   * design tool scrubs a transition with; let go, they finish as they
+   * would have. A spring, which is worked out step by step rather than
+   * from the time, holds but does not run back.
+   */
+  holding = false;
+
+  /** Bumped by `seek`, so a driver knows to draw again at the new time. */
+  moves = 0;
+
   constructor(options: { readonly speed?: number; readonly settled?: boolean } = {}) {
     this.rate = checkedSpeed(options.speed ?? 1);
     this.settled = options.settled ?? false;
@@ -51,6 +63,22 @@ export class UiClock {
       this.anchor = { real: this.lastReal, local: this.local(this.lastReal) };
     }
     this.rate = speed;
+  }
+
+  /** The local time now, as last asked: where a seek is measured from. */
+  get now(): number {
+    return this.lastReal === null ? 0 : this.local(this.lastReal);
+  }
+
+  /**
+   * Puts local time at `at`, from now on: forward, or back to replay
+   * what is held (`holding`). Paused, it stays there; running, it goes
+   * on from there.
+   */
+  seek(at: number): void {
+    const real = this.lastReal ?? 0;
+    this.anchor = { real, local: at };
+    this.moves += 1;
   }
 
   /** The local time at real time `now`. The first time asked, the two agree. */

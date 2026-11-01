@@ -432,7 +432,16 @@ export class UiFocusManager {
    * stops, which is what lets a dialog body be the keyboard's home of
    * last resort without becoming a stop of its own.
    */
-  private collectFocusable(): UiNode[] {
+  /**
+   * The tab stops under `within`, or in the active scope, in the order
+   * Tab visits them: what a design tool numbers to show a screen's
+   * keyboard order.
+   */
+  tabStops(within?: UiNode): UiNode[] {
+    return this.collectFocusable(within);
+  }
+
+  private collectFocusable(within: UiNode = this.scopeRoot): UiNode[] {
     const result: UiNode[] = [];
     // An editing group's fields are one stop, where its first field is:
     // a document of two hundred paragraphs is one place to Tab to and one
@@ -459,7 +468,7 @@ export class UiFocusManager {
         visit(child);
       }
     };
-    visit(this.scopeRoot);
+    visit(within);
     return result;
   }
 

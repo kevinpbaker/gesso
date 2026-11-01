@@ -97,6 +97,15 @@ export class FocusService {
   }
 
   /**
+   * The tab stops under `within` (the whole tree when not given), in
+   * the order Tab visits them: what a design tool numbers to show a
+   * screen's keyboard order. Empty before the runtime has a manager.
+   */
+  tabStops(within?: UiNode): UiNode[] {
+    return this.manager?.tabStops(within) ?? [];
+  }
+
+  /**
    * Confines focus to `scope` until `releaseTrap`, moving it inside if
    * it was elsewhere. Traps nest: a dialog opened over a dialog traps
    * again, and each release restores its own opener.

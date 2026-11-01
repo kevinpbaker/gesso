@@ -312,6 +312,14 @@ component or `clockOf(node)`:
 animations.animate(enter, 1, { duration: 'slow', clock: ctx.environment(UiEnvironmentKeys.clock) });
 ```
 
+A paused clock can be moved to a time with `seek`, and while it is
+`holding`, an animation that reaches its end stays there rather than
+finishing, so moving the time back plays it back: a design tool's
+scrubber. `clock.now` is where a seek is measured from. Let go (holding
+off, speed back above 0), what was held finishes as it would have. A
+spring is worked out step by step rather than from the time, so it is
+held but does not run back.
+
 ## What this page was checked against
 
 The spec beside the example mounts it with `gesso-testing`, which needs

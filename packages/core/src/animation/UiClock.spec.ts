@@ -89,4 +89,37 @@ describe('UiClock', () => {
     expect(() => new UiClock({ speed: -1 })).toThrow(/0 or more/);
     expect(() => new UiClock({ speed: Number.NaN })).toThrow(/0 or more/);
   });
+
+  it('plays a held animation back and forth when paused and moved, as a scrubber does', () => {
+    const driver = new AnimationDriver();
+    const clock = new UiClock();
+    const width = started(driver, clock);
+    clock.speed = 0;
+    clock.holding = true;
+    const from = clock.now;
+
+    clock.seek(from + 100);
+    expect(driver.nextTickAt(1000)).toBe(1000);
+    driver.advance(1000);
+    expect(width.value).toBeCloseTo(50, 5);
+
+    // Past its end: held there, not finished.
+    clock.seek(from + 400);
+    driver.advance(1000);
+    expect(width.value).toBe(100);
+    expect(driver.isRunning).toBe(true);
+
+    // Back again, which a finished one could not do.
+    clock.seek(from + 50);
+    driver.advance(1000);
+    expect(width.value).toBeCloseTo(25, 5);
+    expect(driver.nextTickAt(1000)).toBeUndefined();
+
+    // Let go, it finishes.
+    clock.holding = false;
+    clock.speed = 1;
+    driver.advance(2000);
+    expect(width.value).toBe(100);
+    expect(driver.isRunning).toBe(false);
+  });
 });

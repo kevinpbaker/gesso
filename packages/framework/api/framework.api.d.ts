@@ -2858,6 +2858,7 @@ declare class FocusService {
   blur(): void;
   focusNext(): void;
   focusPrevious(): void;
+  tabStops(within?: UiNode): UiNode[];
   trap(scope: UiNode): void;
   releaseTrap(scope?: UiNode): void;
   private run;

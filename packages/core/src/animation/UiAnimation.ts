@@ -225,7 +225,8 @@ export abstract class UiAnimation<T> {
 
   protected onBegin(): void {}
 
-  advance(now: number): void {
+  /** `hold`: at its end, stay there, unfinished, to be sampled again at an earlier time (`UiClock.holding`). */
+  advance(now: number, hold = false): void {
     if (this.finished) {
       return;
     }
@@ -250,7 +251,7 @@ export abstract class UiAnimation<T> {
       this.cell.value = value;
       this.subject.next(value);
     }
-    if (done) {
+    if (done && !hold) {
       this.finish();
     }
   }
