@@ -209,4 +209,44 @@ describe('UiFocusManager scopes', () => {
     focusManager.popScope();
     expect(focusManager.focusedNode).toBe(open);
   });
+
+  it("holds a scope inside a bound only for focus inside it: a dialog in one of a design tool's frames", () => {
+    // The tool's own field, and a frame holding a button and an open dialog.
+    const h = new InputTestHarness();
+    const tool = h.node('tool', UiNodeType.Button, { width: 200, height: 40 });
+    const frame = h.node('frame', UiNodeType.Box, { width: 200, height: 120 });
+    const press = h.node('press', UiNodeType.Button, { width: 200, height: 40 });
+    const dialog = h.node('dialog', UiNodeType.Box, { width: 200, height: 80 });
+    const field = h.node('field', UiNodeType.Button, { width: 200, height: 40 });
+    const close = h.node('close', UiNodeType.Button, { width: 200, height: 40 });
+    h.add(dialog, field, close);
+    h.add(frame, press, dialog);
+    h.add(h.root, tool, frame);
+    h.layoutTree();
+    const focusManager = h.createFocusManager();
+    focusManager.setFocusBounds(node => node === frame);
+
+    // Opened while the person is in the tool: it takes nothing from them.
+    focusManager.focus(tool);
+    focusManager.pushScope(dialog);
+    expect(focusManager.focusedNode).toBe(tool);
+    expect(focusManager.trapped).toBe(false);
+    expect(focusManager.focus(press)).toBe(false);
+    expect(focusManager.focus(field)).toBe(true);
+    expect(focusManager.trapped).toBe(true);
+    focusManager.focusNext();
+    focusManager.focusNext();
+    expect(focusManager.focusedNode).toBe(field);
+    expect(focusManager.focus(tool)).toBe(true);
+    // Closed, it hands the tool nothing back.
+    focusManager.popScope();
+    expect(focusManager.focusedNode).toBe(tool);
+
+    // Opened from a press in the frame: modal there, and back to the press when it closes.
+    focusManager.focus(press);
+    focusManager.pushScope(dialog);
+    expect(focusManager.focusedNode).toBe(field);
+    focusManager.popScope();
+    expect(focusManager.focusedNode).toBe(press);
+  });
 });

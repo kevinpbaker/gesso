@@ -64,6 +64,8 @@ export type FocusModality = 'pointer' | 'keyboard';
 interface FocusScope {
   readonly root: UiNode;
   readonly restore: UiNode | null;
+  /** The bound the scope is modal inside (`setFocusBounds`); null for the whole tree, undefined until found. */
+  within?: UiNode | null;
 }
 
 /**
@@ -89,6 +91,12 @@ interface FocusScope {
  * dialog modal for the keyboard. `popScope()` restores focus to
  * whatever held it when the scope was pushed. Components reach both
  * through `FocusService`, never directly.
+ *
+ * A scope inside a bound (`setFocusBounds`) is modal only inside it. A
+ * dialog open in one of a design tool's frames confines the keyboard in
+ * that frame, when it is there, and leaves the tool around it, and every
+ * other frame, to the person: it takes no focus from outside, and gives
+ * none back when it closes.
  */
 export class UiFocusManager {
   private root: UiNode;
@@ -104,6 +112,7 @@ export class UiFocusManager {
   private readonly listeners = new Set<(node: UiNode | null, source: FocusSource, options: FocusOptions) => void>();
   private readonly scopeListeners = new Set<() => void>();
   private readonly scopes: FocusScope[] = [];
+  private isBound: ((node: UiNode) => boolean) | null = null;
   /** The field of each editing group that last had focus, where Tab back into the group lands. */
   private readonly groupEntries = new WeakMap<UiNode, UiNode>();
 
@@ -118,6 +127,14 @@ export class UiFocusManager {
   setRoot(root: UiNode): void {
     this.root = root;
     this.scopes.length = 0;
+  }
+
+  /**
+   * Which nodes bound a scope taken inside them: a trap under one is
+   * modal only inside it. `OverlayScope`'s, set by the framework.
+   */
+  setFocusBounds(isBound: ((node: UiNode) => boolean) | null): void {
+    this.isBound = isBound;
   }
 
   /** The node that currently holds logical focus, or null. */
@@ -164,12 +181,12 @@ export class UiFocusManager {
    * or the whole tree when none is active.
    */
   get scopeRoot(): UiNode {
-    return this.scopes.length === 0 ? this.root : this.scopes[this.scopes.length - 1].root;
+    return this.scopeFor(this.focused)?.root ?? this.root;
   }
 
   /** Whether focus is confined to a subtree. */
   get trapped(): boolean {
-    return this.scopes.length > 0;
+    return this.scopeFor(this.focused) !== null;
   }
 
   /**
@@ -287,7 +304,8 @@ export class UiFocusManager {
   }
 
   /**
-   * Confines focus to `root` until the matching `popScope`.
+   * Confines focus to `root` until the matching `popScope`; inside a
+   * bound, only for focus inside it (see the class's note).
    *
    * Focus that is outside the new scope moves to its first focusable,
    * so the very next Tab stays inside; a scope with nothing focusable
@@ -325,10 +343,11 @@ export class UiFocusManager {
    * better admitted than faked.
    */
   settleScope(): void {
-    if (this.scopes.length === 0 || (this.focused !== null && this.withinScope(this.focused))) {
+    const scope = this.scopeFor(this.focused);
+    if (scope === null || (this.focused !== null && this.isWithin(this.focused, scope.root))) {
       return;
     }
-    if (!this.focusNext() && !this.focus(this.scopeRoot)) {
+    if (!this.focusNext() && !this.focus(scope.root)) {
       this.blur();
     }
   }
@@ -357,7 +376,10 @@ export class UiFocusManager {
     if (scope === undefined) {
       return;
     }
-    const restore = scope.restore;
+    // A bounded scope gives back only focus it took: none to what held it outside its bound.
+    const within = this.boundOf(scope);
+    const restore =
+      scope.restore !== null && (within === null || this.isWithin(scope.restore, within)) ? scope.restore : null;
     if (restore !== null && this.isAttached(restore) && this.focus(restore)) {
       this.notifyScope();
       return;
@@ -388,8 +410,12 @@ export class UiFocusManager {
     if (this.focused !== null && !this.isAttached(this.focused)) {
       this.focused = null;
     }
-    while (this.scopes.length > 0 && !this.isAttached(this.scopeRoot)) {
+    while (this.scopes.length > 0 && !this.isAttached(this.scopes.at(-1)!.root)) {
       this.popScope();
+    }
+    // One under another left too (a frame's dialog, drawn again): gone without handing focus anywhere.
+    for (const scope of this.scopes.filter(each => !this.isAttached(each.root))) {
+      this.popScope(scope.root);
     }
     if (hadFocus && this.focused === null) {
       this.notify(null, 'program');
@@ -489,7 +515,48 @@ export class UiFocusManager {
 
   /** Whether the node may hold focus given the active scope, if any. */
   private withinScope(node: UiNode): boolean {
-    return this.scopes.length === 0 || this.isWithin(node, this.scopeRoot);
+    const scope = this.scopeFor(node);
+    return scope === null || this.isWithin(node, scope.root);
+  }
+
+  /**
+   * The innermost scope that confines a node: a bounded one only inside
+   * its bound, so a node, or no focus at all, outside it answers to the
+   * scope under it.
+   */
+  private scopeFor(node: UiNode | null): FocusScope | null {
+    for (let at = this.scopes.length - 1; at >= 0; at -= 1) {
+      const scope = this.scopes[at]!;
+      const within = this.boundOf(scope);
+      if (within === null || (node !== null && this.isWithin(node, within))) {
+        return scope;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The bound above a scope's root, found once the root is in the tree
+   * (a trap is taken from a `ref`, which may fire before) and kept, so
+   * a scope whose subtree has gone still knows it.
+   */
+  private boundOf(scope: FocusScope): UiNode | null {
+    if (scope.within !== undefined) {
+      return scope.within;
+    }
+    if (this.isBound === null) {
+      return null;
+    }
+    for (let at = scope.root.parent; at !== null; at = at.parent) {
+      if (this.isBound(at)) {
+        return (scope.within = at);
+      }
+      if (at === this.root) {
+        return (scope.within = null);
+      }
+    }
+    // Not in the tree yet: unbounded until it is.
+    return null;
   }
 
   /** Whether the node is still connected to the traversal root. */

@@ -20,6 +20,14 @@ import { internalState } from '../InternalState';
  * It must stay on the render thread: its actions take `UiNode`s, which
  * never cross a worker boundary.
  */
+/** The nodes a trap taken inside is modal only within: each `OverlayScope`'s. */
+const focusBounds = new WeakSet<UiNode>();
+
+/** Makes a node one, for `OverlayScope`. */
+export function boundFocus(node: UiNode): void {
+  focusBounds.add(node);
+}
+
 export class FocusService {
   /** The node holding focus, or null. A control binds its focus ring to this. */
   readonly focused = internalState<UiNode | null>(null);
@@ -54,7 +62,10 @@ export class FocusService {
     const focusChange = manager.onFocusChange(node => {
       this.focused.value = node;
       this.focusVisible.value = manager.focusVisible;
+      // A trap inside an `OverlayScope` holds only focus inside it.
+      this.trapped.value = manager.trapped;
     });
+    manager.setFocusBounds(node => focusBounds.has(node));
     const scopeChange = manager.onScopeChange(() => {
       this.trapped.value = manager.trapped;
     });

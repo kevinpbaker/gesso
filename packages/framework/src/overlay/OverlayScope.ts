@@ -1,7 +1,8 @@
 import { map } from 'rxjs';
 
-import { percent, provided, Stack, type UiChild } from 'gesso-core';
+import { percent, provided, Stack, type UiChild, type UiNode } from 'gesso-core';
 
+import { boundFocus } from '../app/FocusService';
 import { createComponent } from '../createComponent';
 import type { ComponentContext, Inputs } from '../FunctionComponent';
 import { OverlayLayer } from './OverlayLayer';
@@ -27,6 +28,10 @@ export interface OverlayScopeProps {
  * It fills what holds it, and is the containing block of what it
  * holds. `useOverlay` finds the nearest scope above the component that
  * opens the entry; with none, it uses the runtime's `OverlayService`.
+ *
+ * A dialog's trap inside it holds the keyboard inside it only: the
+ * tool around it, and every other scope, keep their focus, and none is
+ * taken from them when it opens or handed to them when it closes.
  */
 export function OverlayScope(inputs: Inputs<OverlayScopeProps>, _ctx: ComponentContext): UiChild {
   const overlays = new OverlayService();
@@ -37,7 +42,12 @@ export function OverlayScope(inputs: Inputs<OverlayScopeProps>, _ctx: ComponentC
       height: percent(100),
       x: 'stretch',
       y: 'stretch',
-      provide: [provided(OverlayScopeKey, overlays)]
+      provide: [provided(OverlayScopeKey, overlays)],
+      ref: (node: UiNode | null) => {
+        if (node !== null) {
+          boundFocus(node);
+        }
+      }
     },
     inputs.children.pipe(map(children => children ?? [])),
     createComponent(OverlayLayer, { service: overlays })

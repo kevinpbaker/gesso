@@ -1068,9 +1068,11 @@ declare class UiFocusManager {
   private readonly listeners;
   private readonly scopeListeners;
   private readonly scopes;
+  private isBound;
   private readonly groupEntries;
   constructor(root: UiNode, dispatcher: UiInputDispatcher);
   setRoot(root: UiNode): void;
+  setFocusBounds(isBound: ((node: UiNode) => boolean) | null): void;
   get focusedNode(): UiNode | null;
   hasFocus(): boolean;
   get focusModality(): FocusModality;
@@ -1097,6 +1099,8 @@ declare class UiFocusManager {
   private insideHidden;
   private groupOf;
   private withinScope;
+  private scopeFor;
+  private boundOf;
   private isAttached;
   private isWithin;
 }
