@@ -10,6 +10,7 @@ import {
   type UiFrameClock,
   type UiFrameClockFactory
 } from 'gesso-core';
+import { FrameService } from './FrameService';
 import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice } from './GessoRuntime';
 import type { UiNodeReport } from './NodeReport';
 import type { DevtoolsEvent, DevtoolsRequest } from './DevtoolsProtocol';
@@ -214,12 +215,23 @@ export class GessoApp {
       dpr: devicePixelRatio()
     });
 
+    this.runtime.services.get(FrameService).setFlush(() => this.flushFrame());
+
     const input = this.runtime.input;
     this.adapter = new UiPlatformAdapter({
       pointerController: input.pointer,
       wheelController: input.wheel,
       keyboardController: input.keyboard
     });
+  }
+
+  /** Runs a pending frame now: see `FrameService.flush`. */
+  private flushFrame(): void {
+    if (this.framePending && this.clock !== undefined && this.frameCallback !== undefined) {
+      this.framePending = false;
+      this.clock.cancelFrame();
+      this.frameCallback(performance.now());
+    }
   }
 
   /**
@@ -237,13 +249,7 @@ export class GessoApp {
         runtime.input.keyboard.keyDown(key, modifiers);
         runtime.input.keyboard.keyUp(key, modifiers);
       },
-      flush: () => {
-        if (this.framePending && this.clock !== undefined && this.frameCallback !== undefined) {
-          this.framePending = false;
-          this.clock.cancelFrame();
-          this.frameCallback(performance.now());
-        }
-      },
+      flush: () => this.flushFrame(),
       theme: at => runtime.themeAt(at),
       render: request =>
         renderModule(request, {

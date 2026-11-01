@@ -18,6 +18,7 @@ import {
 import type { ChannelSource } from '../../channel/provide';
 import type { ChannelToken } from '../../channel/ChannelToken';
 import { UiHostFrameClock } from 'gesso-core';
+import { FrameService } from '../FrameService';
 import { GessoRuntime, type RendererChoice } from '../GessoRuntime';
 import { ServiceRegistry } from '../../service/ServiceRegistry';
 import type { MediaOptions } from '../MediaService';
@@ -758,6 +759,7 @@ export class RenderWorkerApp {
       height,
       dpr
     });
+    this.runtime.services.get(FrameService).setFlush(() => this.clock?.tick(performance.now()));
     this.runtime.deferPatchesFrom(this.channels.registry.all());
     this.runtime.onInspect(report => {
       this.host.postMessage({ type: 'inspect', report });

@@ -2468,6 +2468,7 @@ declare class GessoApp {
   private detachViewportInsets;
   private colorSchemePreference;
   constructor(options: GessoAppOptions);
+  private flushFrame;
   uiHost(): UiHost;
   get services(): ServiceRegistry;
   get input(): UiPlatformAdapter;
@@ -2683,8 +2684,11 @@ declare class PersistedState<T> {
 declare function persisted<T>(adapter: StorageAdapter, key: string, options: PersistedOptions<T>): PersistedState<T>;
 declare class FrameService {
   private readonly subject;
+  private flusher;
   readonly frames: Observable<FrameMetrics>;
   publish(metrics: FrameMetrics): void;
+  setFlush(flush: (() => void) | null): void;
+  flush(): void;
 }
 declare class InspectionService {
   private host;

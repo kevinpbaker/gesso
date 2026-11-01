@@ -2,12 +2,15 @@ import { BehaviorSubject } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Button, Column, Text, type CanvasHost } from 'gesso-core';
+import { Box, Button, Column, Text, type CanvasHost } from 'gesso-core';
 
 import { defineChannel } from '../channel/ChannelToken';
 import { resultText } from '../agent/AgentSurface';
 import { AGENT_PORT, remoteSurface } from '../agent/remote';
+import { createComponent } from '../createComponent';
+import type { ComponentContext } from '../FunctionComponent';
 import { createSyncApp } from './createSyncApp';
+import { FrameService } from './FrameService';
 import type { ModelContextLike } from '../agent/webmcp';
 
 /**
@@ -98,6 +101,31 @@ describe('a single-thread app, asked by an agent', () => {
     expect(count.value).toBe(3);
     expect(resultText(pressed)).toContain('text "Count 3"');
 
+    unmount();
+  });
+
+  it("draws a pending frame when a component asks: a design editor's own tools, in a background tab", () => {
+    // A box, not words: the mock canvas draws no text.
+    const color = new BehaviorSubject('#ffffff');
+    let frames!: FrameService;
+    const heard: number[] = [];
+    function Watcher(_inputs: unknown, ctx: ComponentContext) {
+      frames = ctx.inject(FrameService);
+      frames.frames.subscribe(metrics => heard.push(metrics.frame));
+      return Box({ width: 40, height: 40, backgroundColor: color });
+    }
+    const builder = createSyncApp(createComponent(Watcher));
+    const unmount = builder.mountSync(mockHost());
+    frames.flush();
+    const drawn = heard.length;
+
+    color.next('#000000');
+    expect(heard.length).toBe(drawn);
+    frames.flush();
+    expect(heard.length).toBe(drawn + 1);
+    // With nothing pending, nothing is drawn.
+    frames.flush();
+    expect(heard.length).toBe(drawn + 1);
     unmount();
   });
 
