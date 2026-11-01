@@ -83,8 +83,23 @@ describe('InspectionService', () => {
     let inspection!: InspectionService;
     let turn!: () => void;
     /** A field drawn with its error under it, and a switch that owns what it was started at. */
-    function Field(inputs: Inputs<{ label: string; error?: string; on?: boolean; defaultOn?: boolean; onChange?: (on: boolean) => void }>): UiChild {
-      const on = controlled({ component: 'Field', name: 'on', source: inputs.on, initial: inputs.defaultOn, fallback: false, onChange: inputs.onChange });
+    function Field(
+      inputs: Inputs<{
+        label: string;
+        error?: string;
+        on?: boolean;
+        defaultOn?: boolean;
+        onChange?: (on: boolean) => void;
+      }>
+    ): UiChild {
+      const on = controlled({
+        component: 'Field',
+        name: 'on',
+        source: inputs.on,
+        initial: inputs.defaultOn,
+        fallback: false,
+        onChange: inputs.onChange
+      });
       turn = () => on.change(!on.current());
       return (
         <column>

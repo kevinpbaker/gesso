@@ -8,7 +8,13 @@ import { easings, type UiEasing } from '../animation/UiEasing';
  * it has forty opinions. the rule for colour —
  * tokens only, never a literal in a component — applies to time.
  */
-export type UiDurationToken = 'instant' | 'fast' | 'normal' | 'slow' | 'deliberate' | (keyof UiDurationExtensions & string);
+export type UiDurationToken =
+  | 'instant'
+  | 'fast'
+  | 'normal'
+  | 'slow'
+  | 'deliberate'
+  | (keyof UiDurationExtensions & string);
 
 /** The named curves; see `UiEasing.ts` for what each one is for. */
 export type UiEasingToken = keyof typeof easings | (keyof UiEasingExtensions & string);
@@ -123,7 +129,9 @@ function missing(kind: string, name: string, instead: string): void {
   const said = `${kind}:${name}`;
   if (!warnedNames.has(said)) {
     warnedNames.add(said);
-    console.warn(`The motion vocabulary has no ${kind} named '${name}': ${instead} is used. Give it a value with defineMotion.`);
+    console.warn(
+      `The motion vocabulary has no ${kind} named '${name}': ${instead} is used. Give it a value with defineMotion.`
+    );
   }
 }
 

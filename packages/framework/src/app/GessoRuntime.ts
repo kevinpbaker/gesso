@@ -797,7 +797,14 @@ export class GessoRuntime {
     // The app's motion vocabulary, provided at the root, so a name in a
     // transition or a motion state means what it means to AnimationService.
     this.services.get(AnimationService).setMotionListener(motion => {
-      if (this.graph.updateNodePropertyNow(this.graph.root, 'provide', [provided(UiEnvironmentKeys.motion, motion)], DirtyFlags.Environment)) {
+      if (
+        this.graph.updateNodePropertyNow(
+          this.graph.root,
+          'provide',
+          [provided(UiEnvironmentKeys.motion, motion)],
+          DirtyFlags.Environment
+        )
+      ) {
         this.requestRepaint();
       }
     });

@@ -61,7 +61,10 @@ export class SharedValues {
 }
 
 /** Where a node provides a `SharedValues` to what it holds. */
-export const SharedValuesKey = createEnvironmentKey<SharedValues | null>({ name: 'gesso.sharedValues', defaultValue: null });
+export const SharedValuesKey = createEnvironmentKey<SharedValues | null>({
+  name: 'gesso.sharedValues',
+  defaultValue: null
+});
 
 /**
  * A value by name: the cell the nearest `SharedValues` above holds for

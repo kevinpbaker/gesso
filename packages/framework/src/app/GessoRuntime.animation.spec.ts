@@ -1,7 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { map } from 'rxjs';
 
-import { Box, Column, ScrollView, type UiNode, UiEnvironmentKeys, defineModifier, defineMotion, fade, linear, motion, provided, spring, tween, animateLayout } from 'gesso-core';
+import {
+  Box,
+  Column,
+  ScrollView,
+  type UiNode,
+  UiEnvironmentKeys,
+  defineModifier,
+  defineMotion,
+  fade,
+  linear,
+  motion,
+  provided,
+  spring,
+  tween,
+  animateLayout
+} from 'gesso-core';
 import { internalState } from '../InternalState';
 import { AnimationService } from './AnimationService';
 import { InspectionService } from './InspectionService';
@@ -137,7 +152,12 @@ describe('a declared transition', () => {
   });
 
   /** Frames until nothing more is asked for, or `until` ms; the values `read` saw on each. */
-  function run(mounted: ReturnType<typeof mountRuntime>, from: number, read: () => unknown, until = 5000): { time: number; seen: unknown[] } {
+  function run(
+    mounted: ReturnType<typeof mountRuntime>,
+    from: number,
+    read: () => unknown,
+    until = 5000
+  ): { time: number; seen: unknown[] } {
     let time = from;
     const seen: unknown[] = [];
     while (mounted.clock.isPending && time < from + until) {
@@ -161,7 +181,13 @@ describe('a declared transition', () => {
     const mounted = mountRuntime(
       Column(
         { ref: (n: UiNode | null) => (node = n) },
-        Box({ width: 20, height: 20, opacity: 1, modifiers: [pressing()], transition: { opacity: tween(200, { easing: linear }) } })
+        Box({
+          width: 20,
+          height: 20,
+          opacity: 1,
+          modifiers: [pressing()],
+          transition: { opacity: tween(200, { easing: linear }) }
+        })
       )
     );
     const { time } = run(mounted, 0, () => null);
@@ -199,7 +225,13 @@ describe('a declared transition', () => {
     const mounted = mountRuntime(
       Column(
         { ref: (n: UiNode | null) => (node = n) },
-        Box({ width: 20, height: 20, opacity: 1, modifiers: [motion({ initial: fade, duration: 100 })], transition: { opacity: 2000 } })
+        Box({
+          width: 20,
+          height: 20,
+          opacity: 1,
+          modifiers: [motion({ initial: fade, duration: 100 })],
+          transition: { opacity: 2000 }
+        })
       )
     );
     run(mounted, 0, () => null, 600);
@@ -217,7 +249,10 @@ describe('a declared transition', () => {
       let node: UiNode | null = null;
       const mounted = mountRuntime(
         Column(
-          { ref: (n: UiNode | null) => (node = n), provide: provide ? [provided(UiEnvironmentKeys.motion, slowFast)] : undefined },
+          {
+            ref: (n: UiNode | null) => (node = n),
+            provide: provide ? [provided(UiEnvironmentKeys.motion, slowFast)] : undefined
+          },
           Box({ width: 20, height: 20, opacity, transition: { opacity: 'fast' } })
         )
       );
@@ -239,7 +274,15 @@ describe('a declared transition', () => {
     let node: UiNode | null = null;
     const mounted = mountRuntime(
       Column(
-        { ref: (n: UiNode | null) => (node = n), provide: [provided(UiEnvironmentKeys.motion, defineMotion({ durations: { slow: 1000 }, easings: { standard: linear } }))] },
+        {
+          ref: (n: UiNode | null) => (node = n),
+          provide: [
+            provided(
+              UiEnvironmentKeys.motion,
+              defineMotion({ durations: { slow: 1000 }, easings: { standard: linear } })
+            )
+          ]
+        },
         Box({ width: 20, height: 20, modifiers: [motion({ initial: fade, duration: 'slow' })] })
       )
     );

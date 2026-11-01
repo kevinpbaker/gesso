@@ -215,7 +215,12 @@ describe("Dialog's scrim", () => {
     const open = new BehaviorSubject(false);
     const ui = renderTest(
       Box(
-        { width: 400, height: 300, theme, provide: clock === undefined ? undefined : [provided(UiEnvironmentKeys.clock, clock)] },
+        {
+          width: 400,
+          height: 300,
+          theme,
+          provide: clock === undefined ? undefined : [provided(UiEnvironmentKeys.clock, clock)]
+        },
         createComponent(Dialog, { open, title: 'Rename', content: Box({ height: 10 }), ...props })
       ),
       { width: 400, height: 300 }

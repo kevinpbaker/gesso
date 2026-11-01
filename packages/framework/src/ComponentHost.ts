@@ -343,7 +343,13 @@ export class ComponentHost<P extends Record<string, unknown> = Record<string, un
    * fallback)` supplies one — so a prop the parent stops passing is
    * pushed through as `undefined`, which re-applies the fallback.
    */
-  private applyInput(inputName: string, cell: InputCell<unknown>, provided: unknown, resetWhenAbsent: boolean, force = false): void {
+  private applyInput(
+    inputName: string,
+    cell: InputCell<unknown>,
+    provided: unknown,
+    resetWhenAbsent: boolean,
+    force = false
+  ): void {
     if (!force && this.inputSources.has(inputName) && this.inputSources.get(inputName) === provided) {
       return;
     }

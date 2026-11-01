@@ -77,7 +77,10 @@ describe('UiClock', () => {
     const driver = new AnimationDriver();
     driver.setReducedMotion(true);
     const spin = cell(0);
-    driver.start(createTween(spin, 360, { duration: 1000, easing: linear, repeat: true, reducedMotion: 'keep' })!, new UiClock({ settled: true }));
+    driver.start(
+      createTween(spin, 360, { duration: 1000, easing: linear, repeat: true, reducedMotion: 'keep' })!,
+      new UiClock({ settled: true })
+    );
 
     expect(driver.isRunning).toBe(false);
   });

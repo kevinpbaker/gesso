@@ -25,7 +25,13 @@ describe('sharedValue', () => {
     const step = new BehaviorSubject(1);
     const mounted = mountRuntime(
       <column provide={[provided(SharedValuesKey, values)]}>
-        {step.pipe(map(at => (at === 1 ? [<Screen key="1" name="forgot" start="" />] : [<Screen key="2" name="check" start="jordan@greenleaf.co" />])))}
+        {step.pipe(
+          map(at =>
+            at === 1
+              ? [<Screen key="1" name="forgot" start="" />]
+              : [<Screen key="2" name="check" start="jordan@greenleaf.co" />]
+          )
+        )}
       </column>
     );
     mounted.frame();
