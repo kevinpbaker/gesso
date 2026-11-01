@@ -2657,6 +2657,12 @@ declare class InspectionService {
     readonly width: number;
     readonly height: number;
   };
+  screenBox(node: UiNode): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
   preview(node: UiNode, property: string, value: unknown): void;
   endPreview(node: UiNode, property?: string): void;
   previewInputs(anchorId: string, inputs: Readonly<Record<string, unknown>>): void;
@@ -2666,6 +2672,12 @@ interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
   box?(node: UiNode): {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+  screenBox?(node: UiNode): {
     readonly x: number;
     readonly y: number;
     readonly width: number;

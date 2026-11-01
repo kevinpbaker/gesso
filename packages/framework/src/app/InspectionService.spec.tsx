@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { UiChild, UiNode } from 'gesso-core';
+import { transform, type UiChild, type UiNode } from 'gesso-core';
 import { map } from 'rxjs';
 
 import { Component } from '../Component';
@@ -47,6 +47,32 @@ describe('InspectionService', () => {
     // Its box alone is the box the report has.
     expect(inspection.box(stack[1]!)).toEqual(inspection.inspect(stack[1]!).box);
     expect(inspection.box(stack[1]!)).toMatchObject({ x: 20, y: 20, width: 200, height: 100 });
+  });
+
+  it('tells where a node is seen under a scaled parent, and where it is laid out', () => {
+    let inspection!: InspectionService;
+    function Canvas(_inputs: unknown, ctx: ComponentContext): UiChild {
+      inspection = ctx.inject(InspectionService);
+      // A frame drawn at half its size, as a design tool fits one to its window.
+      return (
+        <column padding={20}>
+          <column width={400} height={300} padding={40} transform={transform({ scaleX: 0.5, scaleY: 0.5 })}>
+            <box width={200} height={100} backgroundColor="surface" />
+          </column>
+        </column>
+      );
+    }
+    const mounted = mountRuntime(
+      <column>
+        <Canvas />
+      </column>
+    );
+    mounted.frame();
+
+    const box = inspection.nodesAt(50, 50).find(node => node.getProperty('width') === 200)!;
+
+    expect(inspection.box(box)).toMatchObject({ x: 60, y: 60, width: 200, height: 100 });
+    expect(inspection.screenBox(box)).toMatchObject({ x: 40, y: 40, width: 100, height: 50 });
   });
 
   it('previews a value over the element’s own until the preview ends', () => {

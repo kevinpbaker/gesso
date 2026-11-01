@@ -912,6 +912,10 @@ export class GessoRuntime {
         const box = this.engine.visibleBox(node);
         return { x: box.x, y: box.y, width: box.width, height: box.height };
       },
+      screenBox: node => {
+        const box = this.engine.screenBox(node);
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      },
       preview: (node, property, value) => this.previewProperty(node, property, value),
       endPreview: (node, property) => this.endPreviews(node, property),
       previewInputs: (anchorId, inputs) => this.resolver.hostFor(anchorId)?.previewInputs(inputs)

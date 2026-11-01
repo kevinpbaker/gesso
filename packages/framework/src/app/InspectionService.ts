@@ -58,6 +58,22 @@ export class InspectionService {
   }
 
   /**
+   * Where the node is seen on the screen: `box` with every transform
+   * above it applied, so a node in a frame drawn at half its size is
+   * half its size, where it is drawn. What an overlay laid over the
+   * live tree is placed by (an outline on the component under the
+   * pointer). `box` keeps the untransformed box, which is where the
+   * node is in the layout: what an editor reading a zoomed board in
+   * the board's own coordinates (a minimap) needs.
+   */
+  screenBox(node: UiNode): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } {
+    if (this.host === null) {
+      throw new Error('InspectionService has nothing to measure before the runtime has built its tree.');
+    }
+    return this.host.screenBox?.(node) ?? this.box(node);
+  }
+
+  /**
    * Draws a node as though it declared `value` for `property`, until
    * the preview is ended or the node leaves the tree.
    *
@@ -106,6 +122,8 @@ export interface InspectionHost {
   inspect(node: UiNode): UiNodeReport;
   /** The node's box alone, as `inspect` reports it. */
   box?(node: UiNode): { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  /** The node's box with the transforms above it applied. */
+  screenBox?(node: UiNode): { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   preview?(node: UiNode, property: string, value: unknown): void;
   endPreview?(node: UiNode, property?: string): void;
   /** Null ends the preview. */
