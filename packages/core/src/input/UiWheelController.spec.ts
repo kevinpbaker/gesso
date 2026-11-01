@@ -100,6 +100,54 @@ describe('UiWheelController', () => {
     expect(ancestor).toHaveBeenCalledTimes(1);
   });
 
+  describe('a gesture', () => {
+    /** A box at the left, and one that can be put over it: what a step's point lands on, changed mid-gesture. */
+    function scene() {
+      const h = new InputTestHarness();
+      const under = h.node('under', UiNodeType.Box, { position: 'absolute', left: 0, top: 0, width: 100, height: 100 });
+      const over = h.node('over', UiNodeType.Box, { position: 'absolute', left: 200, top: 0, width: 100, height: 100 });
+      h.add(h.root, under, over);
+      h.root.setProperty('hitTestable', false);
+      h.layoutTree();
+      let time = 0;
+      const controller = new UiWheelController(
+        h.createHitTester(),
+        h.dispatcher,
+        h.scrollSink,
+        () => h.root,
+        () => time
+      );
+      const heard: string[] = [];
+      h.dispatcher.addEventListener(under, UiEventType.Wheel, () => heard.push('under'));
+      h.dispatcher.addEventListener(over, UiEventType.Wheel, () => heard.push('over'));
+      const coverUnder = () => {
+        over.setProperty('left', 0);
+        h.layoutTree();
+      };
+      return { controller, heard, coverUnder, at: (ms: number) => (time = ms) };
+    }
+
+    it('keeps the node its first step landed on, as a browser latches one', () => {
+      const { controller, heard, coverUnder, at } = scene();
+      controller.wheel(50, 50, 0, 10);
+      coverUnder();
+      at(16);
+      controller.wheel(51, 50, 0, 10);
+      expect(heard).toEqual(['under', 'under']);
+    });
+
+    it('lands afresh after a pause, or once the pointer has moved', () => {
+      const { controller, heard, coverUnder, at } = scene();
+      controller.wheel(50, 50, 0, 10);
+      coverUnder();
+      at(400);
+      controller.wheel(50, 50, 0, 10);
+      at(410);
+      controller.wheel(80, 50, 0, 10);
+      expect(heard).toEqual(['under', 'over', 'over']);
+    });
+  });
+
   describe('a container that overflows on both axes', () => {
     it('takes a horizontal wheel, which a column-laid-out one used to drop', () => {
       const { h, scroll, controller } = setupBothAxes();

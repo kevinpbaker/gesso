@@ -3128,7 +3128,10 @@ declare class UiWheelController {
   private wheelUntil;
   private lastArrived;
   lastWheelTarget: UiNode | null;
+  private lastX;
+  private lastY;
   lastScrolled: UiNode | null;
+  private latched;
   wheel(x: number, y: number, deltaX: number, deltaY: number, modifiers?: UiKeyModifiers, deltaMode?: UiWheelDeltaMode, wheelDeltaY?: number,
   at?: number): UiWheelEvent;
   scrollabilityAt(x: number, y: number): UiScrollability;
@@ -3876,6 +3879,7 @@ declare class LayoutEngine {
   private parsePlacement;
   private stickyOffsetOf;
   private scrollOffsetOf;
+  private wholeBoundsRefill;
   private projectBox;
   private unprojectBox;
   private cornersOf;

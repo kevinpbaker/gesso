@@ -662,7 +662,7 @@ export class LayoutEngine {
    * changed rather than a walk of the tree on every pointer move.
    */
   subtreeBoundsFor(node: UiNode): SubtreeBounds | undefined {
-    if (this.boundsWhole || this.boundsMoved.size + this.boundsShifted.size > WHOLE_BOUNDS_REFILL) {
+    if (this.boundsWhole || this.boundsMoved.size + this.boundsShifted.size > this.wholeBoundsRefill()) {
       // A first pass, or one that moved so much that one walk of the
       // tree is cheaper than walks up from each change.
       if (this.layoutRoot !== null) {
@@ -1122,7 +1122,7 @@ export class LayoutEngine {
 
     this.resetStats();
     this.relayoutRoots.clear();
-    if (this.boundsMoved.size + this.boundsShifted.size > WHOLE_BOUNDS_REFILL) {
+    if (this.boundsMoved.size + this.boundsShifted.size > this.wholeBoundsRefill()) {
       // Frames that nothing hit-tested between: past this many, the
       // next ask walks the whole tree anyway, and the nodes need not be
       // held on to until then, removed ones above all.
@@ -3946,6 +3946,11 @@ export class LayoutEngine {
    * chain the renderer composes on the way down, walked up; a turned box
    * is the box its corners span.
    */
+  /** How many changed nodes are refilled one by one before the whole tree is; see `WHOLE_BOUNDS_REFILL`. */
+  private wholeBoundsRefill(): number {
+    return Math.max(WHOLE_BOUNDS_REFILL, this.records.size * WHOLE_BOUNDS_SHARE);
+  }
+
   private projectBox(node: UiNode, x: number, y: number, width: number, height: number): LayoutBox {
     const corners = this.cornersOf(x, y, width, height);
     for (let current: UiNode | null = node; current !== null; current = current.parent) {
@@ -5619,7 +5624,12 @@ function hasPercentLength(props: ReadonlyMap<string, unknown>, names: readonly s
 
 /**
  * How many changed nodes the subtree bounds are filled in again from,
- * one walk up from each, before one walk of the whole tree is the
- * cheaper way: a resize or a new route writes every box.
+ * one walk up from each, at the least, before one walk of the whole tree
+ * is the cheaper way: a resize or a new route writes every box. Past
+ * this, the share of the tree in `WHOLE_BOUNDS_SHARE` decides; a fixed
+ * 2,000 was passed by every step of a zoom that scaled 1,800 names on a
+ * board of 100,000 nodes, and each step walked all of them.
  */
 const WHOLE_BOUNDS_REFILL = 2000;
+/** The part of the tree, changed, past which filling it all in is cheaper; see `WHOLE_BOUNDS_REFILL`. */
+const WHOLE_BOUNDS_SHARE = 1 / 8;

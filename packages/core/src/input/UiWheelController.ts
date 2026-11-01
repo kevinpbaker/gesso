@@ -295,11 +295,48 @@ export class UiWheelController {
    */
   lastWheelTarget: UiNode | null = null;
 
+  /** Where the last wheel event was, for the latch; see `latched`. */
+  private lastX = NaN;
+  private lastY = NaN;
+
   /**
    * The container the wheel last scrolled, for a frame's report of where
    * scrolling put it. Null until the wheel has scrolled something.
    */
   lastScrolled: UiNode | null = null;
+
+  /**
+   * The node the last wheel event landed on, while this one belongs to
+   * the same gesture: close behind it, with the pointer where it was.
+   * Null when it does not, and the point is tested afresh.
+   *
+   * A browser does the same, latching a wheel gesture to the element its
+   * first step landed on, and for the reason it matters here: testing the
+   * point asks for bounds that the gesture's own last step may have made
+   * out of date. A pinch over a design tool's board scales every name on
+   * it, and each step of it filled in the bounds of 1,800 names again,
+   * 4 ms, to find what the step before had found.
+   */
+  private latched(x: number, y: number): UiNode | null {
+    const target = this.lastWheelTarget;
+    if (
+      target === null ||
+      this.now() - this.lastArrived > WHEEL_LATCH_MS ||
+      Math.abs(x - this.lastX) > WHEEL_LATCH_SLOP ||
+      Math.abs(y - this.lastY) > WHEEL_LATCH_SLOP
+    ) {
+      return null;
+    }
+    // Still in the application's tree: taken out of it, or never in it (an
+    // overlay's layer is beside it), the point is tested.
+    const root = this.rootNode?.() ?? null;
+    for (let node: UiNode | null = target; node !== null; node = node.parent) {
+      if (node === root) {
+        return target;
+      }
+    }
+    return null;
+  }
 
   wheel(
     x: number,
@@ -315,8 +352,10 @@ export class UiWheelController {
      */
     at?: number
   ): UiWheelEvent {
-    const target = this.hitTester.hitTest(x, y)?.node ?? null;
+    const target = this.latched(x, y) ?? this.hitTester.hitTest(x, y)?.node ?? null;
     this.lastWheelTarget = target;
+    this.lastX = x;
+    this.lastY = y;
     const event = new UiWheelEvent(UiEventType.Wheel, x, y, deltaX, deltaY, modifiers, deltaMode, wheelDeltaY);
     if (target !== null) {
       this.dispatcher.dispatch(event, target);
@@ -814,6 +853,16 @@ export function isScrollContainer(node: UiNode): boolean {
  * hand from a trackpad to a mouse.
  */
 const PRECISE_MEMORY_MS = 400;
+
+/**
+ * How long a wheel gesture holds its target between steps, in
+ * milliseconds; see `latched`. Its steps come a refresh apart, and its
+ * momentum as often; a pause longer than this starts a new one.
+ */
+const WHEEL_LATCH_MS = 250;
+
+/** How far, in pixels, the pointer may move and a wheel step still join the gesture. */
+const WHEEL_LATCH_SLOP = 4;
 
 /**
  * The smallest step, in pixels, taken for a wheel's notch on its size
