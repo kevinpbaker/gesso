@@ -1167,6 +1167,7 @@ declare function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild
 interface ScrollAreaProps extends ControlLayoutProps {
   children?: UiChild;
   scrollY?: number;
+  startAt?: 'top' | 'end';
   padding?: number;
   paddingX?: number;
   paddingY?: number;

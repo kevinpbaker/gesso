@@ -77,6 +77,14 @@ describe('ScrollArea', () => {
     expect(ui.getByRole('button', { name: 'Back to top' })).toBeDefined();
   });
 
+  it('starts at the end when told to, as a conversation shows its newest message', () => {
+    const ui = mount({ startAt: 'end' });
+    const [top, bottom] = fades(ui);
+    expect(offsetOf(ui).properties.get('scrollY')).toBe(800);
+    expect(opacity(top)).toBe(1);
+    expect(opacity(bottom)).toBe(0);
+  });
+
   it('fades into its own colour at no opacity, not into transparent black', () => {
     const [top] = fades(mount({ fadeColor: 'surface' }));
     const gradient = top.properties.get('backgroundGradient') as { stops: { color: string; opacity?: number }[] };

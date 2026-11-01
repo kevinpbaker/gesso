@@ -54,6 +54,13 @@ export interface ScrollAreaProps extends ControlLayoutProps {
    * down with it.
    */
   scrollY?: number;
+  /**
+   * Which end it starts at: `top`, or `end` for what reads from the
+   * bottom up, a conversation's newest message. At the end it stays
+   * there as the content grows, until the person scrolls away from it.
+   * Defaults to `top`.
+   */
+  startAt?: 'top' | 'end';
   /** Space around the content, inside the scroll bar, in pixels. Defaults to 0. */
   padding?: number;
   /** Space at the content's left and right, over `padding`. */
@@ -108,6 +115,20 @@ export function ScrollArea(inputs: Inputs<ScrollAreaProps>, ctx: ComponentContex
     if (y !== undefined) {
       target.value = y;
     }
+  });
+  // Started at the end: kept at it while the content or the area changes
+  // size, as long as it was at the end before; scrolled away, left where
+  // the person put it.
+  let lastEnd: number | null = null;
+  ctx.effect(combineLatest([input(inputs.startAt, 'top' as const), viewport, content]), ([at, port, inside]) => {
+    if (at !== 'end' || port.height <= 0 || inside.height <= 0) {
+      return;
+    }
+    const end = Math.max(0, inside.height - port.height);
+    if (lastEnd === null || offset.value >= lastEnd - AT_EDGE) {
+      target.value = end;
+    }
+    lastEnd = end;
   });
 
   const toTop = (): void => {

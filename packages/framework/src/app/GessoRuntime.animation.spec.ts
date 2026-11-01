@@ -323,6 +323,35 @@ describe('a declared transition', () => {
     expect(firstBox(node).properties.get('opacity')).toBe(0.5);
   });
 
+  it('sent back to where it started before a frame moved it, stops there rather than going on', () => {
+    // A fade told on and, before it moved, off again: a list that measured
+    // more below for one frame. Off is where it already is, so nothing
+    // moves, and the movement on must not go on without it.
+    const opacity = internalState(0);
+    let node: UiNode | null = null;
+    const mounted = mountRuntime(
+      Column(
+        { ref: (n: UiNode | null) => (node = n) },
+        Box({ width: 20, height: 20, opacity, transition: { opacity: tween(200, { easing: linear }) } })
+      )
+    );
+    let time = 0;
+    while (mounted.clock.isPending) {
+      time += 16;
+      mounted.clock.tick(time);
+    }
+    const box = firstBox(node);
+    opacity.value = 1;
+    opacity.value = 0;
+    const seen: number[] = [box.properties.get('opacity') as number];
+    while (mounted.clock.isPending && seen.length < 30) {
+      time += 16;
+      mounted.clock.tick(time);
+      seen.push(box.properties.get('opacity') as number);
+    }
+    expect(seen).toEqual(seen.map(() => 0));
+  });
+
   it('re-emitting the same target does not restart it', () => {
     const opacity = internalState(1);
     let node: UiNode | null = null;

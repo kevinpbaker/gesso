@@ -694,6 +694,10 @@ export class UiGraph {
     }
     const previousValue = node.getProperty(property);
     if (Object.is(previousValue, value)) {
+      // Back to what is drawn before a transition moved it (a fade told
+      // on, then off again within a frame): nothing to move, and one on
+      // its way to the other value stops rather than going on without it.
+      node.transitions?.cancel(property);
       return false;
     }
     // A declared transition turns a change of what is drawn into a
