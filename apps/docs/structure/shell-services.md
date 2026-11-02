@@ -136,6 +136,9 @@ application with its own light, dark and auto control keeps that choice
 as application state and combines it with this one; the
 [light and dark](/guide/appearance) page has that in three lines, along
 with mapping the signal onto a theme.
+An application that stores that choice, and must start in it, asks the
+shell to report it instead, with `preferColorScheme`: the shell stays
+the only writer, and does what it was asked.
 
 `reducedMotion` is not read-only, and `AnimationService.applyReducedMotion`
 is public for a reason: an application may legitimately offer a motion

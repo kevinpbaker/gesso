@@ -344,6 +344,27 @@ describe('GessoApp', () => {
    * address bar belongs to the host and is reachable only through the
    * host's own history object.
    */
+  it("reports the appearance the app asks for, and the platform's again for auto", () => {
+    const app = new GessoApp({
+      host: createMockHost(),
+      canvas: createMockCanvas(),
+      root: Text({ text: 'App' }),
+      colorScheme: 'light',
+      clock: callback => new UiTimerFrameClock(callback)
+    });
+    app.mount();
+    const shell = app.services.get(ShellService);
+    expect(shell.currentColorScheme).toBe('light');
+
+    shell.preferColorScheme('dark');
+    expect(shell.currentColorScheme).toBe('dark');
+
+    // No matchMedia here: the platform answers light.
+    shell.preferColorScheme('auto');
+    expect(shell.currentColorScheme).toBe('light');
+    app.dispose();
+  });
+
   describe('a history passed in ready-made', () => {
     const Inbox = route({ path: '/mail', component: () => Text({ text: 'Inbox' }) });
     const Message = route({ path: '/mail/:id', component: () => Text({ text: 'Message' }) });

@@ -1042,6 +1042,9 @@ type ShellRequest = {
   type: 'leaveWarning';
   on: boolean;
 } | {
+  type: 'colorScheme';
+  preference: ColorSchemePreference;
+} | {
   type: 'popup';
   id: number;
   url: string;
@@ -1142,6 +1145,7 @@ interface ShellStorageResult {
 declare class ShellService {
   private handler;
   private leaving;
+  private preferred;
   private readonly scheme;
   private readonly contrastState;
   private readonly pointerState;
@@ -1181,6 +1185,7 @@ declare class ShellService {
   readonly fullscreen: ReadableCell<boolean>;
   requestFullscreen(enter: boolean): void;
   warnOnLeave(on: boolean): void;
+  preferColorScheme(preference: ColorSchemePreference): void;
   applyFullscreen(active: boolean): void;
   openPopup(request: {
     readonly url: string;
@@ -2081,6 +2086,10 @@ type RuntimeToShellMessage = {
 {
   type: 'leaveWarning';
   on: boolean;
+} |
+{
+  type: 'preferColorScheme';
+  preference: ColorSchemePreference;
 } |
 {
   type: 'popup';

@@ -55,6 +55,16 @@ one thread owns it and a channel when it crosses one. [State and
 services](/guide/state-and-services) and [channels and the
 barrier](/structure/channels-and-the-barrier) are the two shapes.
 
+A stored setting has one more need: the first frame. Read only after
+the application starts, it arrives a frame or more after the platform's
+answer, and someone who chose light against a dark system sees dark
+first. The host reads it before mounting and passes it as `colorScheme`
+instead, and the application then hands every change to the shell with
+`ShellService.preferColorScheme`, rather than combining it as here:
+`colorScheme` is then the answer itself. [Light and
+dark](/guide/appearance#telling-the-shell-what-to-report) has both
+halves.
+
 ## Providing it at the root
 
 <<< @/src/examples/RecipeAppearanceExample.tsx#app

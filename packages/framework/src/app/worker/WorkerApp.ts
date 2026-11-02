@@ -1065,6 +1065,10 @@ export class WorkerApp {
       setLeaveWarning(window, message.on);
       return;
     }
+    if (message.type === 'preferColorScheme') {
+      this.setColorScheme(message.preference);
+      return;
+    }
     if (message.type === 'fullscreen') {
       // The canvas rather than the document body: what the application
       // draws on is what should fill the screen.

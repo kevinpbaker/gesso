@@ -2,7 +2,7 @@ import { insetsEqual, noInsets, type UiInsets } from 'gesso-core';
 
 import { internalState } from '../InternalState';
 import type { UiContrast, UiPointer } from 'gesso-core';
-import type { ColorScheme } from './colorScheme';
+import type { ColorScheme, ColorSchemePreference } from './colorScheme';
 import type { ReadableCell } from '../Input';
 
 /**
@@ -24,6 +24,7 @@ export type ShellRequest =
   | { type: 'redirect'; url: string }
   | { type: 'fullscreen'; enter: boolean }
   | { type: 'leaveWarning'; on: boolean }
+  | { type: 'colorScheme'; preference: ColorSchemePreference }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
   | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
   | { type: 'file'; id: number; request: ShellFileRequest }
@@ -175,6 +176,8 @@ export class ShellService {
   private handler: ((request: ShellRequest) => void) | null = null;
   /** What `warnOnLeave` last said. */
   private leaving = false;
+  /** What `preferColorScheme` last asked for; null until it is asked. */
+  private preferred: ColorSchemePreference | null = null;
   private readonly scheme = internalState<ColorScheme>('light');
   private readonly contrastState = internalState<UiContrast>('standard');
   private readonly pointerState = internalState<UiPointer>('fine');
@@ -298,6 +301,9 @@ export class ShellService {
     this.handler = handler;
     if (handler !== null && this.leaving) {
       handler({ type: 'leaveWarning', on: true });
+    }
+    if (handler !== null && this.preferred !== null) {
+      handler({ type: 'colorScheme', preference: this.preferred });
     }
   }
 
@@ -527,6 +533,33 @@ export class ShellService {
     }
     this.leaving = on;
     this.handler?.({ type: 'leaveWarning', on });
+  }
+
+  /**
+   * Asks the shell to report this appearance from now on: `light` or
+   * `dark` whatever the platform says, or `auto` to follow the platform
+   * again. `colorScheme` then reports the answer, as it does when the
+   * host calls `setColorScheme`, which is the same switch.
+   *
+   * For an application whose appearance setting is its own and stored:
+   * the host reads the stored choice before the first frame and starts
+   * with it (`createApp({ colorScheme })`), and the application, where
+   * the person changes it, says so here. Without this, an application in
+   * a render worker could not take back an override the host started it
+   * with, and `auto` would keep reporting the stored choice instead of
+   * the platform's. An application that stores nothing can combine its
+   * choice with `colorScheme` instead and never call this.
+   *
+   * A request, because the media query is the window's; and a state,
+   * like `warnOnLeave`, so a shell that arrives after it was asked is
+   * told. Asking for the same thing twice sends nothing.
+   */
+  preferColorScheme(preference: ColorSchemePreference): void {
+    if (preference === this.preferred) {
+      return;
+    }
+    this.preferred = preference;
+    this.handler?.({ type: 'colorScheme', preference });
   }
 
   /** Called by the runtime when the shell reports the state. Not for applications. */

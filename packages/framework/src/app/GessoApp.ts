@@ -603,6 +603,12 @@ export class GessoApp {
       }
       return;
     }
+    if (request.type === 'colorScheme') {
+      // Before the canvas check too: the preference is the host's
+      // switch, and an app with no window still reports what it was told.
+      this.setColorScheme(request.preference);
+      return;
+    }
     if (request.type === 'openRoute') {
       // Before the canvas check: a host's handler needs no document,
       // and an app with no window to open a tab from still follows the

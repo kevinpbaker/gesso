@@ -801,6 +801,8 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'fullscreen', enter: request.enter });
       } else if (request.type === 'leaveWarning') {
         this.host.postMessage({ type: 'leaveWarning', on: request.on });
+      } else if (request.type === 'colorScheme') {
+        this.host.postMessage({ type: 'preferColorScheme', preference: request.preference });
       } else if (request.type === 'popup') {
         this.host.postMessage({
           type: 'popup',

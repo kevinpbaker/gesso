@@ -8,7 +8,7 @@ import type { ComponentContext, Inputs } from '../FunctionComponent';
 import { observeColorScheme, type ColorScheme } from './colorScheme';
 import { observeMediaQuery } from './mediaQuery';
 import { mountRuntime } from './RuntimeTestUtils';
-import { ShellService } from './ShellService';
+import { ShellService, type ShellRequest } from './ShellService';
 
 /**
  * A `MediaQueryList` a spec can flip, in both the shapes the platform
@@ -129,6 +129,40 @@ describe('ShellService.colorScheme', () => {
 
     expect(seen).toEqual(['light', 'dark', 'light']);
     expect(shell.currentColorScheme).toBe('light');
+  });
+});
+
+describe('ShellService.preferColorScheme', () => {
+  it('asks the shell once for each change of preference', () => {
+    const shell = new ShellService();
+    const requests: ShellRequest[] = [];
+    shell.setHandler(request => requests.push(request));
+
+    shell.preferColorScheme('dark');
+    shell.preferColorScheme('dark');
+    shell.preferColorScheme('auto');
+
+    expect(requests).toEqual([
+      { type: 'colorScheme', preference: 'dark' },
+      { type: 'colorScheme', preference: 'auto' }
+    ]);
+  });
+
+  it('tells a shell that arrives after it was asked', () => {
+    const shell = new ShellService();
+    shell.preferColorScheme('light');
+    const requests: ShellRequest[] = [];
+    shell.setHandler(request => requests.push(request));
+
+    expect(requests).toEqual([{ type: 'colorScheme', preference: 'light' }]);
+  });
+
+  it('asks nothing of a shell when the app never chose', () => {
+    const shell = new ShellService();
+    const requests: ShellRequest[] = [];
+    shell.setHandler(request => requests.push(request));
+
+    expect(requests).toEqual([]);
   });
 });
 

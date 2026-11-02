@@ -96,6 +96,8 @@ class EditingRoot extends Component {
           this.shell.redirect('/api/auth/login');
           this.shell.warnOnLeave(true);
           this.shell.warnOnLeave(true);
+          this.shell.preferColorScheme('dark');
+          this.shell.preferColorScheme('dark');
         }
       })
     );
@@ -191,7 +193,7 @@ describe('RenderWorkerApp editing', () => {
     expect(values).toEqual(['abx']);
   });
 
-  it('forwards ShellService requests as clipboard, openUrl, openRoute, redirect and leaveWarning messages', async () => {
+  it('forwards ShellService requests as clipboard, openUrl, openRoute, redirect, leaveWarning and preferColorScheme messages', async () => {
     const { sent, press } = start();
     await settle();
     // The button sits 10px below the 16.8px field.
@@ -207,6 +209,10 @@ describe('RenderWorkerApp editing', () => {
     expect(sent.filter(m => m.type === 'redirect')).toEqual([{ type: 'redirect', url: '/api/auth/login' }]);
     // A state, so said once however many times it is set.
     expect(sent.filter(m => m.type === 'leaveWarning')).toEqual([{ type: 'leaveWarning', on: true }]);
+    // A state too: the shell hears the app's appearance once.
+    expect(sent.filter(m => m.type === 'preferColorScheme')).toEqual([
+      { type: 'preferColorScheme', preference: 'dark' }
+    ]);
   });
 
   it("settles a copy with the shell's answer to it", async () => {

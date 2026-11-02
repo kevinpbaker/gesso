@@ -71,6 +71,20 @@ reader did not choose.
 `GessoApp` and `createSyncApp(Root)` take the same option and the same
 method, so the single-thread configuration behaves identically.
 
+When the control is the application's own, drawn on the canvas, the
+application tells the shell instead, from whichever thread it runs on:
+
+```ts
+ctx.inject(ShellService).preferColorScheme('dark'); // or 'light', or 'auto'
+```
+
+The shell does what `setColorScheme` would, and `colorScheme` reports
+the answer. Together with the option above, that is how a stored
+setting reaches the first frame: the host reads it before mounting and
+passes it as `colorScheme`, and the application calls
+`preferColorScheme` when the person changes it, `auto` included, which
+the host's override could otherwise never be taken back to.
+
 ## The other two settings
 
 Light and dark is one axis of an appearance. `UiTheme` carries two

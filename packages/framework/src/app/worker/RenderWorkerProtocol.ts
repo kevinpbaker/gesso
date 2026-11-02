@@ -14,7 +14,7 @@ import type {
   UiPointer
 } from 'gesso-core';
 import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
-import type { ColorScheme } from '../colorScheme';
+import type { ColorScheme, ColorSchemePreference } from '../colorScheme';
 import type { ShellFileRequest, ShellFileResult, ShellStorageOp, ShellStorageResult } from '../ShellService';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
 
@@ -427,6 +427,13 @@ export type RuntimeToShellMessage =
    * otherwise.
    */
   | { type: 'leaveWarning'; on: boolean }
+  /**
+   * Report this appearance from now on (ShellService.preferColorScheme):
+   * `light` or `dark`, or `auto` to follow `prefers-color-scheme` again.
+   * The shell does what `WorkerApp.setColorScheme` does, and answers
+   * with `colorScheme`.
+   */
+  | { type: 'preferColorScheme'; preference: ColorSchemePreference }
   /**
    * Open a sized, named window and report back whether the browser
    * allowed it (ShellService.openPopup).
