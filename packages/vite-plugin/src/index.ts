@@ -125,11 +125,19 @@ export interface GessoPluginOptions {
    */
   readonly channelSchemas?: boolean;
   /**
-   * Serve MCP at `/__gesso/mcp` while the dev server runs, so an AI
-   * agent can read the open page's channels and send their commands
-   * (default true). Development only: a build carries none of it.
+   * Serve MCP at `/__gesso/mcp` (or `agentPath`) while the dev server
+   * runs, so an AI agent can read the open page's channels and send
+   * their commands (default true). Development only: a build carries
+   * none of it.
    */
   readonly agent?: boolean;
+  /**
+   * The path MCP is served at, and so the address the lines the dev
+   * server prints give (default `/__gesso/mcp`). `/__gesso/mcp` keeps
+   * answering too, so an agent connected before the path changed still
+   * reaches it.
+   */
+  readonly agentPath?: string;
   /**
    * The name an agent lists the endpoint under, and so the prefix of
    * its tools' names in most agents (`mcp__my-app__…`): the lines the
@@ -341,6 +349,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
       }
       const bridge = createAgentBridge(server.ws as unknown as BridgeSocket, {
         memory: pageMemory(root),
+        paths: [...new Set([options.agentPath ?? AGENT_PATH, AGENT_PATH])],
         ...(options.agentGate === undefined ? {} : { gate: options.agentGate }),
         ...(catalog === null
           ? {}
@@ -361,7 +370,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
       server.httpServer?.once('listening', () => {
         const base = server.resolvedUrls?.local[0];
         if (base !== undefined) {
-          const url = new URL(AGENT_PATH, base).href;
+          const url = new URL(options.agentPath ?? AGENT_PATH, base).href;
           server.config.logger.info(connectLines(options.agentName ?? agentName(server.config.root), url));
         }
       });

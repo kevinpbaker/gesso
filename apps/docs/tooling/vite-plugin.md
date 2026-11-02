@@ -312,7 +312,9 @@ the server starts, under `agentName` (the root folder's name unless
 given).
 [Agents and MCP](/structure/agents-and-mcp#in-development-with-nothing-to-write)
 has how it reaches the workers and what the agent sees. `agent: false`
-turns it off.
+turns it off. `agentPath` serves it at a path of the application's own,
+such as `/__my-app/mcp`; `/__gesso/mcp` keeps answering too, so an
+agent connected before still reaches it.
 
 The same endpoint offers the project's own components, read by the
 checker from the files its tsconfig includes, so an agent designing a
@@ -334,19 +336,20 @@ a desktop app's main process, opens the same catalog from
 
 ## Options
 
-| Option              | Default     | What it does                                                             |
-| ------------------- | ----------- | ------------------------------------------------------------------------ |
-| `renderWorker`      | discovered  | The render worker entry, as a specifier beside the shell                 |
-| `appLogicWorker`    | discovered  | The application worker entry, or `false` for an app with none            |
-| `overlay`           | `true`      | Wire the error overlay into `onError` while the dev server is running    |
-| `hmr`               | `true`      | Emit the `import.meta.hot.accept` wiring                                 |
-| `diagnostics`       | `true`      | Report a save that will reload the page                                  |
-| `workerConditions`  | `true`      | Resolve a dependency's `worker` build ahead of its `browser` one         |
-| `channelSchemas`    | `true`      | Describe each channel as JSON Schema, from its types and JSDoc           |
-| `agent`             | `true`      | Serve MCP at `/__gesso/mcp` in the dev server, for AI agents             |
-| `agentName`         | root folder | The name the printed lines add the endpoint under                        |
-| `agentInstructions` | none        | What an agent is told when it connects, after what the catalog says      |
-| `catalog`           | `true`      | Offer the project's components on that endpoint, and any libraries named |
+| Option              | Default        | What it does                                                             |
+| ------------------- | -------------- | ------------------------------------------------------------------------ |
+| `renderWorker`      | discovered     | The render worker entry, as a specifier beside the shell                 |
+| `appLogicWorker`    | discovered     | The application worker entry, or `false` for an app with none            |
+| `overlay`           | `true`         | Wire the error overlay into `onError` while the dev server is running    |
+| `hmr`               | `true`         | Emit the `import.meta.hot.accept` wiring                                 |
+| `diagnostics`       | `true`         | Report a save that will reload the page                                  |
+| `workerConditions`  | `true`         | Resolve a dependency's `worker` build ahead of its `browser` one         |
+| `channelSchemas`    | `true`         | Describe each channel as JSON Schema, from its types and JSDoc           |
+| `agent`             | `true`         | Serve MCP at `/__gesso/mcp` in the dev server, for AI agents             |
+| `agentPath`         | `/__gesso/mcp` | The path MCP is served at; the default keeps answering too               |
+| `agentName`         | root folder    | The name the printed lines add the endpoint under                        |
+| `agentInstructions` | none           | What an agent is told when it connects, after what the catalog says      |
+| `catalog`           | `true`         | Offer the project's components on that endpoint, and any libraries named |
 
 ## Is it required?
 

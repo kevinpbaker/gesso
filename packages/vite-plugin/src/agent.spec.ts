@@ -235,6 +235,15 @@ describe('the agent endpoint', () => {
     expect((await request(bridge, { url: '/src/main.ts' })).passed).toBe(true);
   });
 
+  it('answers at the paths it is given, and leaves the default alone when not given it', async () => {
+    const bridge = createAgentBridge(fakeSocket().socket, { paths: ['/__app/mcp', AGENT_PATH] });
+    expect((await request(bridge, { url: '/__app/mcp', method: 'GET' })).status).toBe(405);
+    expect((await request(bridge, { url: `${AGENT_PATH}?x=1`, method: 'GET' })).status).toBe(405);
+
+    const only = createAgentBridge(fakeSocket().socket, { paths: ['/__app/mcp'] });
+    expect((await request(only, { url: AGENT_PATH })).passed).toBe(true);
+  });
+
   it('gives a call of a tool that waits on purpose as long as the page listed, and any other its own limit', async () => {
     const { socket, emit } = fakeSocket();
     const bridge = createAgentBridge(socket, { timeoutMs: 10 });

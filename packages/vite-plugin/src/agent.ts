@@ -1,5 +1,6 @@
 /**
- * The dev server's half of the agent bridge: MCP at `/__gesso/mcp`.
+ * The dev server's half of the agent bridge: MCP at `/__gesso/mcp`, or
+ * the path the application asks for (`agentPath`).
  *
  * An agent such as Claude Code connects to an MCP server by URL, and
  * the dev server already has one. But the channels it should offer live
@@ -32,7 +33,7 @@
  * be in moments, not when the call would have timed out.
  */
 
-/** The path an agent is pointed at. */
+/** The path an agent is pointed at, unless the application names its own. */
 export const AGENT_PATH = '/__gesso/mcp';
 
 /**
@@ -108,6 +109,8 @@ export interface AgentBridgeOptions {
   receiveTimeoutMs?: number;
   /** Where what the page last listed is kept, so a restarted server still lists its tools. */
   memory?: PageMemory;
+  /** The paths MCP is answered at (default `AGENT_PATH` alone). */
+  paths?: readonly string[];
 }
 
 /** What a page last told an agent about itself: its tools, and its instructions. */
@@ -133,7 +136,7 @@ export interface LocalTools {
 }
 
 export interface AgentBridge {
-  /** Connect middleware: answers `AGENT_PATH`, passes everything else on. */
+  /** Connect middleware: answers its paths (`AgentBridgeOptions.paths`), passes everything else on. */
   middleware(request: BridgeRequest, response: BridgeResponse, next: () => void): void;
   /** Whether a page has announced itself. */
   readonly connected: boolean;
@@ -146,6 +149,7 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
   const timeoutMs = options.timeoutMs ?? 130_000;
   const receiveTimeoutMs = options.receiveTimeoutMs ?? 10_000;
   const local = options.local;
+  const paths = new Set(options.paths ?? [AGENT_PATH]);
   const localNames = new Set(local?.tools.map(tool => tool.name) ?? []);
   /** Pages that announced themselves, newest last. */
   const pages: BridgeClient[] = [];
@@ -387,7 +391,7 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
       return pages.length > 0;
     },
     middleware(request, response, next) {
-      if (request.url?.split('?')[0] !== AGENT_PATH) {
+      if (!paths.has(request.url?.split('?')[0] ?? '')) {
         next();
         return;
       }
