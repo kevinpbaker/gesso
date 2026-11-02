@@ -75,6 +75,48 @@ describe('InspectionService', () => {
     expect(inspection.screenBox(box)).toMatchObject({ x: 40, y: 40, width: 100, height: 50 });
   });
 
+  it('says which rule sized each axis: a length, a flex share, a stretch or the content', () => {
+    let inspection!: InspectionService;
+    function Canvas(_inputs: unknown, ctx: ComponentContext): UiChild {
+      inspection = ctx.inject(InspectionService);
+      return (
+        <column width={300}>
+          <box key="stretched" height={20} />
+          <box key="fixed" width={120} height={20} />
+          <row key="bar" x="start">
+            <box key="filling" flex={1} height={20} />
+          </row>
+          <row key="hugging" selfX="start">
+            <box width={40} height={20} />
+          </row>
+        </column>
+      );
+    }
+    const mounted = mountRuntime(
+      <column>
+        <Canvas />
+      </column>
+    );
+    mounted.frame();
+    const kids = (node: UiNode) => {
+      const out: UiNode[] = [];
+      for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+        out.push(child);
+      }
+      return out;
+    };
+    const [stretched, fixed, bar, hugging] = kids(
+      inspection.nodesAt(10, 10).find(node => node.getProperty('width') === 300)!
+    );
+    const width = (node: UiNode | null | undefined) => inspection.explain(node!)?.width.decidedBy;
+
+    expect(width(stretched)).toBe('stretch');
+    expect(width(fixed)).toBe('explicit');
+    expect(width(bar!.firstChild)).toBe('flex');
+    expect(width(hugging)).toBe('content');
+    expect(inspection.explain(fixed!)?.height.decidedBy).toBe('explicit');
+  });
+
   it('previews a value over the element’s own until the preview ends', () => {
     let inspection!: InspectionService;
     function Canvas(_inputs: unknown, ctx: ComponentContext): UiChild {

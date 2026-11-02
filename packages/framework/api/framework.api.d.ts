@@ -2704,6 +2704,7 @@ declare class InspectionService {
   attach(host: InspectionHost): void;
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  explain(node: UiNode): LayoutExplanation | null;
   box(node: UiNode): {
     readonly x: number;
     readonly y: number;
@@ -2725,6 +2726,7 @@ declare class InspectionService {
 interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  explain?(node: UiNode): LayoutExplanation | null;
   box?(node: UiNode): {
     readonly x: number;
     readonly y: number;

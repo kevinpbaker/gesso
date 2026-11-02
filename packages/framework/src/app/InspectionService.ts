@@ -1,4 +1,4 @@
-import type { UiNode } from 'gesso-core';
+import type { LayoutExplanation, UiNode } from 'gesso-core';
 
 import type { UiNodeReport } from './NodeReport';
 
@@ -42,6 +42,18 @@ export class InspectionService {
       throw new Error('InspectionService has nothing to inspect before the runtime has built its tree.');
     }
     return this.host.inspect(node);
+  }
+
+  /**
+   * Why the node has the size it has, as the layout decided it: for
+   * each axis, the rule that fixed it (`decidedBy`: its own length, a
+   * flex share, a stretch across its parent, its content, a clamp) and
+   * the sentences that say so. What a design tool needs to tell an
+   * element that fills its parent from one that only happens to be as
+   * wide, which the box alone cannot. Null before the node is laid out.
+   */
+  explain(node: UiNode): LayoutExplanation | null {
+    return this.host?.explain?.(node) ?? null;
   }
 
   /**
@@ -140,6 +152,8 @@ export class InspectionService {
 export interface InspectionHost {
   nodesAt(x: number, y: number): readonly UiNode[];
   inspect(node: UiNode): UiNodeReport;
+  /** Why the node has its size, as the layout engine explains it. */
+  explain?(node: UiNode): LayoutExplanation | null;
   /** The node's box alone, as `inspect` reports it. */
   box?(node: UiNode): { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
   /** The node's box with the transforms above it applied. */

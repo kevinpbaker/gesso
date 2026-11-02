@@ -918,6 +918,7 @@ export class GessoRuntime {
     this.services.get(InspectionService).attach({
       nodesAt: (x, y) => this.hitTester.hitStack(x, y),
       inspect: node => this.inspectNode(node),
+      explain: node => this.engine.explain(node),
       box: node => {
         const box = this.engine.visibleBox(node);
         return { x: box.x, y: box.y, width: box.width, height: box.height };
