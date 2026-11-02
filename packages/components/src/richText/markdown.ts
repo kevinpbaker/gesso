@@ -583,15 +583,18 @@ function write(current: Block, counters: readonly (number | undefined)[], column
         return current.type === 'task' ? `${lead} ${box}`.trimEnd() : lead;
       }
       const lines = escapeLines(current.text).split('\n');
-      const written = () =>
-        `${lead} ${box}${lines.map((line, i) => (i === 0 || line === '' ? line : ' '.repeat(column) + line)).join('\n')}`;
-      if (!readsAsItem(written(), current.type === 'task')) {
+      // `from` is the column the item's own line starts at: its parents'.
+      const written = (from: number) =>
+        `${lead} ${box}${lines.map((line, i) => (i === 0 || line === '' ? line : ' '.repeat(column - from) + line)).join('\n')}`;
+      // Read alone, so at the margin: a nested item's next lines, written
+      // past its parents' columns, would read as more than its own text.
+      if (!readsAsItem(written(columns[at - 1] ?? 0), current.type === 'task')) {
         // `- --` is a rule, and `- [ ] x` (or a `[` with `]` on the next
         // line) a task: the marker and the text together can read as
         // something else.
         lines[0] = `\\${lines[0]}`;
       }
-      return written();
+      return written(0);
     }
     case 'quote':
       return escapeLines(current.text)

@@ -295,3 +295,21 @@ describe('text that would read as a table', () => {
     }
   });
 });
+
+/** Found by the property spec: a nested item whose text spells a task's box over two lines. */
+describe('a nested item that would read as a task', () => {
+  it('is escaped so it reads back as the bullet it was', () => {
+    const doc = [
+      { ...block('bullet', 'a'), indent: 0, marker: '-' },
+      { ...block('bullet', '[\n] a'), indent: 1, marker: '-' }
+    ];
+    const written = serialize(doc);
+    const back = parse(written);
+    // A block's text is its source, escape and all.
+    expect(back.map(each => [each.type, each.text])).toEqual([
+      ['bullet', 'a'],
+      ['bullet', '\\[\n] a']
+    ]);
+    expect(serialize(back.map(detached))).toBe(written);
+  });
+});
