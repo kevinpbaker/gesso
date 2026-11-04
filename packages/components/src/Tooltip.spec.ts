@@ -316,6 +316,24 @@ describe('Escape on a tooltip', () => {
     expect(heard).toEqual(['Escape']);
   });
 
+  it('leaves the page the Escape that showed the focus of a clicked button', () => {
+    // A click focuses a button without a ring; the next key shows the
+    // ring and, with it, the tooltip. Escape was that key, so it opened
+    // the tooltip and closed it again, and the page never heard it: a
+    // player opened from a toolbar button took two presses to leave.
+    const escaped: string[] = [];
+    const ui = mount(Column({ onKeyDown: event => escaped.push(event.key) }, createComponent(Trigger, {})));
+    const box = ui.getLayout(ui.getByLabel('Save'));
+    ui.fireEvent.pointerDown(box.x + 4, box.y + 4);
+    ui.fireEvent.pointerUp(box.x + 4, box.y + 4);
+    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByLabel('Save'));
+    expect(ui.entries()).toHaveLength(0);
+
+    ui.fireEvent.keyDown('Escape');
+    expect(escaped).toEqual(['Escape']);
+    expect(ui.entries()).toHaveLength(0);
+  });
+
   it('leaves Escape to the page when no tooltip is open', () => {
     const escaped: string[] = [];
     const ui = mount(Column({ onKeyDown: event => escaped.push(event.key) }, createComponent(Trigger, {})));

@@ -229,17 +229,28 @@ const tooltipKind = defineModifier<TooltipArgs>({
     // say what the button does just after it was done, and stay there
     // over whatever it opened. The host reports a change of visibility
     // as a focus change, so a key pressed on a clicked button opens it.
+    //
+    // That key is the one being pressed now, and it is not the tooltip's:
+    // an Escape that showed the focus of a clicked button and spent itself
+    // closing the tooltip it had just opened never reached the page, so
+    // leaving a player opened from a toolbar button took two presses.
+    let held = false;
+    let shownByKey = false;
     host.onFocusChange(focused => {
       if (focused && host.isFocusVisible()) {
+        shownByKey = held && !current.overlay.isOpen();
         show();
       } else if (!focused) {
         hide();
       }
+      held = focused;
     });
     // Escape closes it, as the component's does: see `escapeCloses`.
-    host.onRoot(UiEventType.KeyDown, event =>
-      closeOnEscape(event, () => current.overlay.isOpen() && openedOn.get(current.overlay) === host.node, hide)
-    );
+    host.onRoot(UiEventType.KeyDown, event => {
+      const spend = !shownByKey;
+      shownByKey = false;
+      closeOnEscape(event, () => current.overlay.isOpen() && openedOn.get(current.overlay) === host.node, hide, spend);
+    });
     // The element can go while the component that rendered it stays —
     // a Run button that turns into Cancel — and an open tooltip is
     // then anchored to nothing, with no pointer left to leave and no
@@ -275,11 +286,15 @@ const escapeCloses = defineModifier<{ readonly isOpen: () => boolean; readonly c
   }
 });
 
-function closeOnEscape(event: UiInputEvent, isOpen: () => boolean, close: () => void): void {
+function closeOnEscape(event: UiInputEvent, isOpen: () => boolean, close: () => void, spend = true): void {
   if ((event as UiKeyboardEvent).key !== 'Escape' || event.defaultPrevented || !isOpen()) {
     return;
   }
   close();
+  // The key opened it (see the modifier's focus): it goes on to the page.
+  if (!spend) {
+    return;
+  }
   // A field being typed in keeps its Escape: there it already means "put
   // it back", and a tooltip its focus opened took the key for itself, so
   // cancelling a rename took two presses and the first did nothing the
