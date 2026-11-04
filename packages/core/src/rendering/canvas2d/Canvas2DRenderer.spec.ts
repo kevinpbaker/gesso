@@ -882,3 +882,38 @@ describe('Canvas2DRenderer lifted nodes', () => {
     ]);
   });
 });
+
+describe('Canvas2DRenderer after a frame that threw', () => {
+  it('draws the next frame through none of the clips the thrown one left open', () => {
+    // A frame that throws is abandoned and the next one drawn (see
+    // `UiScheduler`), but a canvas keeps its saved states from frame to
+    // frame. One that threw inside a clipped box left the clip on, and the
+    // frames after it, their clear included, were drawn through it: a
+    // design tool showed parts of its window, then nothing, until reload.
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const clipped = box(h, 'clipped', { width: 100, height: 100, overflow: 'hidden' });
+    const inside = box(h, 'inside', { width: 50, height: 50, backgroundColor: '#00f' });
+    h.append(clipped, inside);
+    h.append(root, clipped);
+    h.layout(root);
+    const fillRect = h.context.fillRect.bind(h.context);
+    h.context.fillRect = () => {
+      throw new Error('a draw that failed');
+    };
+    expect(() => h.render(root)).toThrow('a draw that failed');
+    expect(savedDepth(h.context)).toBeGreaterThan(0);
+    h.context.fillRect = fillRect;
+
+    h.render(root);
+    // Every state saved over both frames was restored, and the second
+    // frame's clear came after the thrown frame's clip was taken off.
+    expect(savedDepth(h.context)).toBe(0);
+    const names = callNames(h.context);
+    const secondClear = names.lastIndexOf('clearRect');
+    const firstClip = names.indexOf('clip');
+    expect(firstClip).toBeGreaterThan(-1);
+    const between = names.slice(firstClip, secondClear);
+    expect(between.filter(name => name === 'restore').length).toBe(between.filter(name => name === 'save').length + 1);
+  });
+});

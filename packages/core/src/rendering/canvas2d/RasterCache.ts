@@ -373,7 +373,9 @@ export class RasterCache {
       // Not the least recently drawn while room is made for it.
       entry.used = this.frame;
     }
+    let sized = false;
     if (entry === undefined || entry.canvasWidth !== canvasWidth || entry.canvasHeight !== canvasHeight) {
+      sized = true;
       const growth = canvasWidth * canvasHeight - (entry === undefined ? 0 : entry.canvasWidth * entry.canvasHeight);
       if (!this.make(growth)) {
         return null;
@@ -393,13 +395,16 @@ export class RasterCache {
       this.pixels += growth;
       entry.canvasWidth = canvasWidth;
       entry.canvasHeight = canvasHeight;
-    } else {
+    }
+    // Before it is cleared: what a draw that threw left saved on it is
+    // restored, so the clear is not clipped (see `PreciseContext.reset`).
+    const target = entry.ctx.reset(entry.raw);
+    if (!sized) {
       entry.raw.setTransform(1, 0, 0, 1, 0, 0);
       entry.raw.clearRect(0, 0, canvasWidth, canvasHeight);
     }
     const fractionX = x - Math.floor(x);
     const fractionY = y - Math.floor(y);
-    const target = entry.ctx.reset(entry.raw);
     // `paint` draws in layout coordinates; the area's corner lands on
     // the canvas's, at the fraction it lands at on the frame.
     target.setTransform(scaleX, 0, 0, scaleY, fractionX - scaleX * cornerX, fractionY - scaleY * cornerY);

@@ -48,8 +48,23 @@ export class PreciseContext implements Canvas2DContext, PaintContext2D {
     this.reset(inner);
   }
 
-  /** Points at a context for a new frame, holding nothing back. Returns itself. */
+  /**
+   * Points at a context for a new frame, holding nothing back. Returns itself.
+   *
+   * Pointed at the same context again, it first restores every state the
+   * last frame saved and never restored. A frame that throws partway (the
+   * scheduler abandons it and draws the next) left its clips and
+   * transforms on the canvas, and a canvas keeps its state stack from one
+   * frame to the next: every later frame, the clear that starts it
+   * included, was drawn through them, so the window showed only the parts
+   * of it inside the last clip, or nothing at all, until it was reloaded.
+   */
   reset(inner: Canvas2DContext): this {
+    if ((inner as Inner) === this.inner) {
+      for (let open = this.saved.length; open >= 2; open -= 2) {
+        this.inner.restore();
+      }
+    }
     this.inner = inner as Inner;
     this.dx = 0;
     this.dy = 0;
