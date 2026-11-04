@@ -503,6 +503,39 @@ describe('Menu', () => {
   });
 
   /**
+   * A menu of settings, as a view menu has: each on or off. The check was
+   * a "✓ " written into the label, so a setting that was off started
+   * further left than one that was on, and a screen reader heard a
+   * command, not a setting, and nothing of whether it was on.
+   */
+  it('lines up the labels of settings on and off, and says each is a checkbox and whether it is checked', () => {
+    const open = new BehaviorSubject(false);
+    const ui = mount(
+      createComponent(Menu, {
+        open,
+        at: { x: 20, y: 20 },
+        items: [
+          { value: 'expand', label: 'Expand frames', checked: false },
+          { value: 'notes', label: 'Notes', checked: true },
+          { value: 'keys', label: 'Keyboard shortcuts' }
+        ],
+        onOpenChange: (next: boolean) => open.next(next)
+      })
+    );
+    open.next(true);
+    ui.frame();
+
+    const settings = ui.getAllByRole('menuitemcheckbox').map(node => ui.getSemantics(node));
+    expect(settings.map(entry => [entry.label, entry.states])).toEqual([
+      ['Expand frames', undefined],
+      ['Notes', ['checked']]
+    ]);
+    expect(ui.getByRole('menuitem', { name: 'Keyboard shortcuts' })).toBeDefined();
+    const starts = ['Expand frames', 'Notes', 'Keyboard shortcuts'].map(text => ui.getLayout(ui.getByText(text)).x);
+    expect(new Set(starts).size).toBe(1);
+  });
+
+  /**
    * A menu with a submenu, as an editor's Reset ▸ Soft, Mixed, Hard:
    * Right opens it beside its item, Left goes back, and a choice in it
    * is the menu's, closing both. Compact, its rows are shorter.

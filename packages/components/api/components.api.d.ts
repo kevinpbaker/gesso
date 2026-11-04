@@ -564,6 +564,7 @@ interface MenuItem {
   readonly separator?: boolean;
   readonly shortcut?: string;
   readonly danger?: boolean;
+  readonly checked?: boolean;
   readonly items?: readonly MenuItem[];
 }
 interface MenuProps {

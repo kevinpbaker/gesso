@@ -34,6 +34,12 @@ export interface MenuItem {
   /** It cannot be undone: its label in the danger colour. */
   readonly danger?: boolean;
   /**
+   * A setting, on or off: a check before its label while it is on, and
+   * a checkbox to a screen reader, which hears whether it is. In a menu
+   * with one, every row keeps the check's room, so the labels line up.
+   */
+  readonly checked?: boolean;
+  /**
    * A submenu: the item opens these beside it, toward the end of the
    * row, rather than being chosen (on a press, the pointer resting on
    * it, Enter or Right), and one of them chosen is `onSelect`'s value.
@@ -301,7 +307,10 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
       Column(
         { overflow: 'auto', minHeight: 0, gap: compact ? 0 : 2, modifiers: [measureFlow(scrollerBox)] },
         inputs.items.pipe(
-          map(items => items.map((item, index) => row(item, index, active, sub, choose, pointAt, track, compact)))
+          map(items => {
+            const checks = items.some(item => item.checked !== undefined);
+            return items.map((item, index) => row(item, index, active, sub, choose, pointAt, track, compact, checks));
+          })
         )
       ),
       // The submenu, a menu of its own beside its item: its choice is this menu's, and closes both. Always here, an
@@ -414,11 +423,19 @@ function row(
   choose: (value: string) => void,
   pointAt: (index: number) => void,
   track: (index: number, node: UiNode, present: boolean) => void,
-  compact: boolean
+  compact: boolean,
+  checks: boolean
 ): UiElement {
   let mounted: UiNode | null = null;
   const nested = item.items !== undefined;
   const trailing = nested ? '›' : item.shortcut;
+  const label = Text({
+    text: item.label,
+    color: item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground',
+    selectable: false,
+    flex: 1,
+    ...(compact ? { textStyle: 'bodySmall' } : {})
+  });
   const command = Row(
     {
       key: item.value,
@@ -439,23 +456,36 @@ function row(
       borderRadius: 4,
       disabled: item.disabled === true,
       backgroundColor: active.pipe(map(current => (current === index ? 'controlBackgroundHovered' : 'transparent'))),
-      role: 'menuitem',
+      role: item.checked === undefined ? 'menuitem' : 'menuitemcheckbox',
       label: item.shortcut === undefined || nested ? item.label : `${item.label}, ${item.shortcut}`,
-      ...(nested ? { states: sub.pipe(map(open => (open?.index === index ? (['expanded'] as const) : []))) } : {}),
+      ...(nested
+        ? { states: sub.pipe(map(open => (open?.index === index ? (['expanded'] as const) : []))) }
+        : item.checked === true
+          ? { states: ['checked'] as const }
+          : {}),
       gap: 24,
       onClick: () => choose(item.value),
       // The pointer resting on an item highlights it and opens its submenu, and on another closes it, as a desktop's
       // menus do.
       onPointerEnter: () => pointAt(index)
     },
-    Text({
-      text: item.label,
-      color:
-        item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground',
-      selectable: false,
-      flex: 1,
-      ...(compact ? { textStyle: 'bodySmall' } : {})
-    }),
+    // In a menu with settings, the label after the check's room, so every label starts at one place.
+    ...(checks
+      ? [
+          Row(
+            { flex: 1, gap: 6, y: 'center' },
+            Text({
+              text: item.checked === true ? '✓' : '',
+              color: 'controlForeground',
+              selectable: false,
+              width: 12,
+              flexShrink: 0,
+              ...(compact ? { textStyle: 'bodySmall' } : {})
+            }),
+            label
+          )
+        ]
+      : [label]),
     ...(trailing === undefined
       ? []
       : [
