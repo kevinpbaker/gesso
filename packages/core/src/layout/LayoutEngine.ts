@@ -469,6 +469,12 @@ function stackDefault(node: UiNode): CrossAxisAlignment {
   return node.type === UiNodeType.Button ? CrossAxisAlignment.Center : CrossAxisAlignment.Start;
 }
 
+/** Where an absolute node was placed: against which positioned node, and that node's box then. */
+interface AbsoluteBlock {
+  readonly box: LayoutBox;
+  readonly of: UiNode;
+}
+
 export class LayoutEngine {
   private records = new Map<UiNode, LayoutRecord>();
   /** A box's corners on their way through `projectBox` and `unprojectBox`. */
@@ -539,9 +545,16 @@ export class LayoutEngine {
    * the one they were placed against are placed again once the pass
    * settles.
    */
-  private readonly absoluteBlocks = new Map<UiNode, LayoutBox>();
+  private readonly absoluteBlocks = new Map<UiNode, AbsoluteBlock>();
   /** A positioned node, or the root, took a new box this pass; see `absoluteBlocks`. */
   private blockResized = false;
+  /**
+   * Which positioned nodes took a new box this pass, so only the nodes
+   * placed against one of them are placed again. Checking every one
+   * walked up from each to its block: a design tool's board has ten
+   * thousand of them, and one comment pin's label growing checked all.
+   */
+  private readonly resizedBlocks = new Set<UiNode>();
   /**
    * The nodes asking for `lift`, in the order they asked.
    *
@@ -1071,6 +1084,7 @@ export class LayoutEngine {
     this.anchorDependents.clear();
     this.movedAnchored.clear();
     this.blockResized = false;
+    this.resizedBlocks.clear();
     this.resetStats();
     this.fullLayout(constraints);
     const rec = this.record(node);
@@ -1204,6 +1218,7 @@ export class LayoutEngine {
     // summary of it is thrown away.
     this.layoutVersion++;
     this.blockResized = false;
+    this.resizedBlocks.clear();
     this.relayout(constraints);
     this.replaceStaleAbsolute();
     this.applyScroll();
@@ -3488,7 +3503,7 @@ export class LayoutEngine {
       } else if (point !== undefined && point !== null) {
         this.anchoredNodes.delete(child);
         this.trackAnchor(child, null);
-        this.absoluteBlocks.set(child, block);
+        this.absoluteBlocks.set(child, { box: block, of: this.containingBlockNodeOf(child) });
         // A point is an anchor of no size, and is placed beside the same
         // way; it does not move, so there is nothing to follow.
         this.measure(child, new Constraints(0, Math.max(0, block.width), 0, Math.max(0, block.height)));
@@ -3498,7 +3513,7 @@ export class LayoutEngine {
         this.anchoredNodes.delete(child);
         this.trackAnchor(child, null);
       }
-      this.absoluteBlocks.set(child, block);
+      this.absoluteBlocks.set(child, { box: block, of: this.containingBlockNodeOf(child) });
 
       const marginH = cRec.marginLeft + cRec.marginRight;
       const marginV = cRec.marginTop + cRec.marginBottom;
@@ -3555,10 +3570,15 @@ export class LayoutEngine {
   private replaceStaleAbsolute(): void {
     for (let pass = 0; this.blockResized && pass < ANCHOR_CHAIN_LIMIT; pass++) {
       this.blockResized = false;
-      for (const [child, was] of this.absoluteBlocks) {
+      const resized = new Set(this.resizedBlocks);
+      this.resizedBlocks.clear();
+      for (const [child, { box: was, of }] of this.absoluteBlocks) {
         if (!this.records.has(child)) {
           // Not reached by a full layout, so no longer in the tree it laid out.
           this.absoluteBlocks.delete(child);
+          continue;
+        }
+        if (!resized.has(of)) {
           continue;
         }
         const block = this.containingBlockOf(child);
@@ -3572,6 +3592,7 @@ export class LayoutEngine {
       }
     }
     this.blockResized = false;
+    this.resizedBlocks.clear();
   }
 
   /**
@@ -4038,17 +4059,22 @@ export class LayoutEngine {
    * positioned ancestor's, else the layout root's.
    */
   private containingBlockOf(child: UiNode): LayoutBox {
+    const rec = this.record(this.containingBlockNodeOf(child));
+    return { x: rec.x, y: rec.y, width: rec.width, height: rec.height };
+  }
+
+  /** The positioned ancestor, or the root, that an absolute node is placed against. */
+  private containingBlockNodeOf(child: UiNode): UiNode {
     for (let current = child.parent; current !== null; current = current.parent) {
       if (this.isFragment(current)) {
         continue;
       }
       const rec = this.records.get(current);
       if (rec !== undefined && (rec.positioned || current === this.layoutRoot)) {
-        return { x: rec.x, y: rec.y, width: rec.width, height: rec.height };
+        return current;
       }
     }
-    const root = this.record(this.layoutRoot!);
-    return { x: root.x, y: root.y, width: root.width, height: root.height };
+    return this.layoutRoot!;
   }
 
   /**
@@ -5168,6 +5194,7 @@ export class LayoutEngine {
         // It may be the containing block of an absolute node further
         // down that nothing will place again; see `absoluteBlocks`.
         this.blockResized = true;
+        this.resizedBlocks.add(node);
       }
       // Subtree bounds are a summary of these four numbers, so this is
       // the one place that can promise they are never stale: a box

@@ -27,6 +27,44 @@ describe('LayoutEngine positioning', () => {
     node(h, id, UiNodeType.Column, props);
 
   describe('absolute', () => {
+    it('places again only what was placed against a block that took a new box', () => {
+      // A design tool's board: a hundred frames, each a positioned box with
+      // an absolute mark pinned inside it. One frame's box changing looked
+      // up the block of every mark on the board, a walk up from each.
+      const h = new LayoutHarness();
+      const root = column(h, 'board');
+      const frames: UiNode[] = [];
+      const marks: UiNode[] = [];
+      for (let at = 0; at < 100; at++) {
+        const frame = box(h, `frame${at}`, { position: 'relative', width: 100, height: 50 });
+        const inner = column(h, `inner${at}`);
+        const mark = box(h, `mark${at}`, { position: 'absolute', right: 0, top: 0, width: 10, height: 10 });
+        h.append(inner, mark);
+        h.append(frame, inner);
+        h.append(root, frame);
+        frames.push(frame);
+        marks.push(mark);
+      }
+      h.layout(root, Constraints.loose(400, 6000));
+      expect(h.box(marks[7]!).x).toBe(90);
+
+      const engine = h.engine as unknown as { containingBlockOf: (node: UiNode) => unknown };
+      const looked: UiNode[] = [];
+      const original = engine.containingBlockOf.bind(h.engine);
+      engine.containingBlockOf = (node: UiNode) => {
+        looked.push(node);
+        return original(node);
+      };
+      frames[7]!.setProperty('width', 200);
+      h.engine.layoutForFrame(
+        new UiFrame(1, 0, new Map([[frames[7]!, DirtyFlags.Layout]])),
+        Constraints.loose(400, 6000)
+      );
+      expect(h.box(marks[7]!).x).toBe(190);
+      expect(h.box(marks[8]!).x).toBe(90);
+      expect(looked.filter(node => node !== marks[7]).length).toBe(0);
+    });
+
     it('positions against the layout root by top/left and takes no space in the flow', () => {
       const h = new LayoutHarness();
       const root = column(h, 'top');
