@@ -1644,6 +1644,8 @@ declare class GessoRuntime {
   private phaseTimings;
   private started;
   private laidOutOnce;
+  private framesFailed;
+  private readonly holdable;
   constructor(options: GessoRuntimeOptions);
   deferPatchesFrom(sources: readonly PatchSource[]): void;
   start(): void;
@@ -1776,6 +1778,7 @@ declare class GessoRuntime {
   private layoutPending;
   private finishSettling;
   private warnLayoutPasses;
+  private updateHolds;
   private handleFrame;
   private scheduleAnimationTick;
   private scheduleRendererRepaint;

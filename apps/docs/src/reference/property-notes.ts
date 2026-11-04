@@ -290,6 +290,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Paint',
     note: 'Keeps the subtree as pixels and copies them while only what is above it moves or scales, as a camera does. Canvas2D only; drawn again when anything in it changes.'
   },
+  holdUnseen: {
+    group: 'Paint',
+    note: 'Holds the subtree as it last was while it is out of view, or with `belowScale` drawn smaller than that share of its size: changes inside wait, and it catches up the frame it can be read again. For a board of many live screens.'
+  },
   paint: {
     group: 'Paint',
     note: 'A painter given a drawing surface, the resolved box and the device scale, with the inputs it reads. Repainted when those change and not otherwise.'

@@ -53,6 +53,7 @@ import {
   setPerformanceMarks,
   resolveCursor,
   type UiNode,
+  type UiHoldUnseen,
   UiNodeType,
   UiInputDispatcher,
   UiPointerEvent,
@@ -580,6 +581,10 @@ export class GessoRuntime {
    * lays out, whichever comes first; see `resize`.
    */
   private laidOutOnce = false;
+  /** Frames in a row that threw; see `reportFrameError`. */
+  private framesFailed = 0;
+  /** Nodes that declare `holdUnseen`, as frames have found them; see `updateHolds`. */
+  private readonly holdable = new Set<UiNode>();
 
   constructor(options: GessoRuntimeOptions) {
     this.services = options.services ?? new ServiceRegistry();
@@ -1018,6 +1023,13 @@ export class GessoRuntime {
   }
 
   private reportFrameError(error: unknown): void {
+    // What it drew before it threw is on screen, and was all the frame
+    // collected: nothing is left dirty to draw it whole again. One frame
+    // is asked for, and one only, so a frame that throws every time is
+    // not drawn again and again at the display's rate.
+    if (this.framesFailed++ === 0) {
+      this.requestRepaint();
+    }
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack : undefined;
     if (this.frameErrorListener !== null) {
@@ -3411,6 +3423,12 @@ export class GessoRuntime {
           childX = x - (rec.scrollable ? rec.scrollX : 0);
           childY = y - (rec.scrollable ? rec.scrollY : 0);
         }
+        // A held subtree is out of view or too small to read, and stays
+        // where the mirror was last told it was until it is let go: a
+        // board's hundreds of frames are its node alone.
+        if (node.hold !== null && !(focused != null && focused.heldBy === node)) {
+          continue;
+        }
         // Last child first, so the boxes come out in document order.
         for (let child = node.lastChild; child !== null; child = child.previousSibling) {
           stack.push([child, childX, childY, transformed]);
@@ -3940,6 +3958,60 @@ export class GessoRuntime {
     );
   }
 
+  /**
+   * Holds each subtree that declares `holdUnseen` while it cannot be
+   * read, and lets it go on the frame it can (see `UiGraph.hold`).
+   *
+   * Decided after the frame is drawn, from where it was drawn: a subtree
+   * is only ever held once it has been laid out and painted, so what is
+   * kept of it is what it showed, and one let go catches up on the next
+   * frame, which its own marks arm. Only frames that moved or laid
+   * something out can change the answer, so the rest pay nothing.
+   */
+  private updateHolds(frame: UiFrame, laidOut: boolean): void {
+    let found = false;
+    // `holdUnseen` is written with `Properties`, so only a node marked so can have just declared it.
+    for (const [node, flags] of frame.entries()) {
+      if (
+        (flags & DirtyFlags.Properties) !== 0 &&
+        node.properties.get('holdUnseen') !== undefined &&
+        !this.holdable.has(node)
+      ) {
+        this.holdable.add(node);
+        found = true;
+      }
+    }
+    if (this.holdable.size === 0 || (!laidOut && !found)) {
+      return;
+    }
+    for (const node of this.holdable) {
+      const how = node.properties.get('holdUnseen') as UiHoldUnseen | undefined;
+      if (how === undefined || this.graph.getNode(node.id) !== node) {
+        this.graph.release(node);
+        this.holdable.delete(node);
+        continue;
+      }
+      const rec = this.engine.recordFor(node);
+      if (rec === undefined || !(rec.width > 0) || !(rec.height > 0)) {
+        continue;
+      }
+      const box = this.engine.screenBox(node);
+      const margin = how === true ? 0 : (how.margin ?? 0);
+      const below = how === true ? 0 : (how.belowScale ?? 0);
+      const seen =
+        box.x + box.width > -margin &&
+        box.y + box.height > -margin &&
+        box.x < this.width + margin &&
+        box.y < this.height + margin &&
+        box.width / rec.width >= below;
+      if (seen) {
+        this.graph.release(node);
+      } else {
+        this.graph.hold(node);
+      }
+    }
+  }
+
   private handleFrame(collected: UiFrame): void {
     const root = this.root;
     if (root === undefined) {
@@ -4031,6 +4103,7 @@ export class GessoRuntime {
           changes
         })
     );
+    this.updateHolds(frame, laidOut);
     if (overlay !== null) {
       if (laidOut) {
         this.sendInspection();
@@ -4039,6 +4112,7 @@ export class GessoRuntime {
     }
     this.sendDevtoolsUpdates(frame);
 
+    this.framesFailed = 0;
     const finished = now();
     // From the frame's first phase, before collection: the ticks, the
     // patches, the trackpad's pacing and the lazy lists' mounting are the

@@ -52,6 +52,17 @@ export interface UiNodeTransitions {
   release(): void;
 }
 
+/**
+ * What a held subtree is waiting to do: the marks its descendants were
+ * given while it was held, and the environment its descendants are to
+ * take again when it is let go. See `UiGraph.hold`.
+ */
+export interface UiHold {
+  readonly pending: Map<UiNode, DirtyFlags>;
+  /** The inherited-property flags a rebuild of the subtree's environment is owed, or None. */
+  environment: DirtyFlags;
+}
+
 export class UiNode {
   constructor(
     public readonly id: NodeId,
@@ -145,6 +156,20 @@ export class UiNode {
    * same shape, and the same argument, as `overrides` above.
    */
   public transitions: UiNodeTransitions | null = null;
+
+  /**
+   * Set on a node whose subtree is held (see `UiGraph.hold`): what its
+   * descendants were marked dirty with while it was, to be marked again
+   * when it is let go. Null on every node that holds nothing.
+   */
+  public hold: UiHold | null = null;
+
+  /**
+   * The held node this one is inside, or null. Kept on every descendant
+   * of a held node, so a mark finds out it is to wait with one field
+   * read rather than a walk up the tree.
+   */
+  public heldBy: UiNode | null = null;
 
   hasChildren(): boolean {
     return this.firstChild !== null;

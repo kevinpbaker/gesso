@@ -177,6 +177,7 @@ export type PaintProps = PropsOf<
   | 'visible'
   | 'transform'
   | 'rasterize'
+  | 'holdUnseen'
 >;
 
 /**

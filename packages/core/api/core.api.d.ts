@@ -719,6 +719,10 @@ interface UiNodeTransitions {
   readonly declared: ReadonlyMap<NodeProperty, UiTransitionSpec>;
   release(): void;
 }
+interface UiHold {
+  readonly pending: Map<UiNode, DirtyFlags>;
+  environment: DirtyFlags;
+}
 declare class UiNode {
   readonly id: NodeId;
   readonly type: UiNodeType;
@@ -736,6 +740,8 @@ declare class UiNode {
   environment: UiEnvironment | null;
   decorations: readonly DecorationShape[] | null;
   transitions: UiNodeTransitions | null;
+  hold: UiHold | null;
+  heldBy: UiNode | null;
   hasChildren(): boolean;
   isDirty(): boolean;
   getProperty<T>(property: NodeProperty): T | undefined;
@@ -2003,6 +2009,10 @@ declare function normalizeStates(states: UiSemanticStates): UiSemanticState[];
 declare function statesEqual(a: UiSemanticStates | undefined, b: UiSemanticStates | undefined): boolean;
 declare function validateRole(value: unknown): string | undefined;
 declare function validateStates(value: unknown): string | undefined;
+type UiHoldUnseen = true | {
+  readonly belowScale?: number;
+  readonly margin?: number;
+};
 declare const UiProperties: {
   readonly width: UiPropertyDefinition<UiLength | undefined>;
   readonly height: UiPropertyDefinition<UiLength | undefined>;
@@ -2147,6 +2157,7 @@ declare const UiProperties: {
   readonly columnCount: UiPropertyDefinition<number | undefined>;
   readonly transform: UiPropertyDefinition<Partial<UiTransform> | undefined>;
   readonly rasterize: UiPropertyDefinition<boolean>;
+  readonly holdUnseen: UiPropertyDefinition<UiHoldUnseen | undefined>;
   readonly text: UiPropertyDefinition<string | undefined>;
   readonly image: UiPropertyDefinition<ImageBitmap | undefined>;
   readonly video: UiPropertyDefinition<UiVideoSurface | undefined>;
@@ -2223,7 +2234,7 @@ type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'min
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY' | 'layoutData'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'anchorRect' | 'placement' | 'anchorOffset'>;
-type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform' | 'rasterize'>;
+type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform' | 'rasterize' | 'holdUnseen'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'touchEmulation' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
@@ -2377,6 +2388,8 @@ declare class UiGraph {
   unbindEvents(node: UiNode): void;
   markDirty(node: UiNode, flags: DirtyFlags): void;
   hasEnvironmentDirty(): boolean;
+  hold(node: UiNode): void;
+  release(node: UiNode): void;
   markDirtyById(id: NodeId, flags: DirtyFlags): void;
   clearDirty(node: UiNode): void;
   setDirtyListener(listener: (() => void) | null): void;
@@ -3615,6 +3628,8 @@ declare class UiHostFrameClock implements UiFrameClock {
   private readonly now;
   private local;
   private localHandle;
+  private localRefreshes;
+  private localWatch;
   private hidden;
   private readonly timeOrigin;
   private readonly localIntervals;
@@ -3634,6 +3649,7 @@ declare class UiHostFrameClock implements UiFrameClock {
   onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
   get isLocal(): boolean;
   requestFrame(): void;
+  private watchLocal;
   setHidden(hidden: boolean): void;
   displayInterval(ms: number, origin: number): void;
   get isDisplayLocked(): boolean;
@@ -3768,6 +3784,7 @@ declare class LayoutEngine {
   private readonly movedAnchored;
   private readonly absoluteBlocks;
   private blockResized;
+  private readonly resizedBlocks;
   private readonly liftedNodes;
   private readonly stickyNodes;
   private readonly stickyShifted;
@@ -3886,6 +3903,7 @@ declare class LayoutEngine {
   private cornersOf;
   private boundsOfCorners;
   private containingBlockOf;
+  private containingBlockNodeOf;
   private updatePaintOrder;
   private placeFlex;
   private distributeAutoMargins;
@@ -6474,6 +6492,7 @@ export {
   UiGridAutoFlow,
   UiGroupEdit,
   UiHitTester,
+  UiHoldUnseen,
   UiHostFrameClock,
   UiHostFrameClockOptions,
   UiImage,
@@ -7447,6 +7466,7 @@ import {
   UiGridAutoFlow,
   UiGroupEdit,
   UiHitTester,
+  UiHoldUnseen,
   UiHostFrameClock,
   UiHostFrameClockOptions,
   UiImage,
@@ -8489,6 +8509,7 @@ export {
   UiGraphBuilder,
   UiGridAutoFlow,
   UiHitTester,
+  UiHoldUnseen,
   UiHostFrameClock,
   UiInputDispatcher,
   UiInputEvent,

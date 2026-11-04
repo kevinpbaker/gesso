@@ -67,6 +67,14 @@ import type { UiRole, UiSemanticStates } from './UiSemantics';
 import { statesEqual, validateRole, validateStates } from './UiSemantics';
 import type { UiAutocomplete, UiLiveRegion, UiOrientation } from './UiSemantics';
 
+/**
+ * When a subtree is held (`holdUnseen`): out of view, or, with
+ * `belowScale`, also when drawn smaller than that share of its size.
+ * `margin` is how far outside the view, in screen pixels, still counts
+ * as in it, so a pan reaches it already caught up; 0 by default.
+ */
+export type UiHoldUnseen = true | { readonly belowScale?: number; readonly margin?: number };
+
 const L = DirtyFlags.Layout;
 const P = DirtyFlags.Paint;
 const C = DirtyFlags.Content;
@@ -1549,6 +1557,22 @@ export const UiProperties = {
     defaultValue: false,
     inherited: false,
     affects: P
+  }),
+
+  /**
+   * Hold this subtree while it cannot be read: out of view, or drawn
+   * smaller than `belowScale` of its size (a frame on a board zoomed
+   * far out). Held, nothing in it is laid out, described or drawn again,
+   * whatever its clocks and streams write; it is shown as it last was,
+   * which with `rasterize` is one copy of its pixels. It catches up on
+   * the frame it can be read again. `true` holds it only out of view.
+   * See `UiGraph.hold`.
+   */
+  holdUnseen: defineProperty<UiHoldUnseen | undefined>({
+    name: 'holdUnseen',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
   }),
 
   // -------------------------------------------------------------------------

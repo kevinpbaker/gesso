@@ -212,8 +212,10 @@ export class UiGraph {
       this.unbindEvents(current);
       // Remove it from the node index.
       this.nodes.delete(current.id);
-      // Remove any dirty state.
+      // Remove any dirty state, and any it was keeping for later.
       this.dirtyNodes.delete(current);
+      current.hold = null;
+      current.heldBy = null;
       for (let child = current.firstChild; child !== null; child = child.nextSibling) {
         stack.push(child);
       }
@@ -529,6 +531,13 @@ export class UiGraph {
   // ---------------------------------------------------------------------------
 
   public markDirty(node: UiNode, flags: DirtyFlags): void {
+    const holder = node.heldBy;
+    if (holder !== null) {
+      // Inside a held subtree: the mark waits for it to be let go.
+      const pending = holder.hold!.pending;
+      pending.set(node, (pending.get(node) ?? DirtyFlags.None) | flags);
+      return;
+    }
     const newlyDirty = this.dirtyNodes.mark(node);
     node.dirtyFlags |= flags;
     if ((flags & DirtyFlags.Environment) !== 0) {
@@ -547,6 +556,66 @@ export class UiGraph {
    */
   public hasEnvironmentDirty(): boolean {
     return this.environmentDirty;
+  }
+
+  /**
+   * Holds a subtree as it is: from now until `release`, nothing beneath
+   * `node` is marked dirty, so nothing there is laid out, described or
+   * drawn again, and a change to a provider above it stops at it. The
+   * marks are kept instead, and given again on release, so the subtree
+   * then catches up in one frame with everything that happened to it.
+   * `node` itself is not held: its own size and place still follow.
+   *
+   * For a subtree nobody can see, whose reactive sources would otherwise
+   * keep a whole tree busy: a design tool's board of hundreds of frames,
+   * each a live screen with its own clocks, most of them out of view or
+   * too small to read. Its bindings keep running and keep writing the
+   * values they produce, which costs a property write each; what it no
+   * longer costs is the layout, environment, semantics and paint every
+   * one of those writes set off. What the renderer has kept of it
+   * (`rasterize`) stays its picture, since nothing in it is dirty.
+   *
+   * Holding is not nested: a held node inside another's subtree is held
+   * by the outer one until that one is let go.
+   */
+  public hold(node: UiNode): void {
+    if (node.hold !== null) {
+      return;
+    }
+    node.hold = { pending: new Map(), environment: DirtyFlags.None };
+    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+      setHeldBy(child, node.heldBy ?? node);
+    }
+  }
+
+  /** Lets a held subtree go, and marks again what was marked while it was held. */
+  public release(node: UiNode): void {
+    const hold = node.hold;
+    if (hold === null) {
+      return;
+    }
+    node.hold = null;
+    // Back to the node that holds this one, if any, else to none.
+    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+      setHeldBy(child, node.heldBy, true);
+    }
+    if (hold.environment !== DirtyFlags.None && node.heldBy === null) {
+      for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+        this.rebuildEnvironment(child, hold.environment);
+      }
+    }
+    const into = node.heldBy;
+    for (const [marked, flags] of hold.pending) {
+      // Only what is still in the tree. A mark beneath a node that holds
+      // a subtree of its own waits on, for that one.
+      if (this.nodes.get(marked.id) !== marked) {
+        continue;
+      }
+      this.markDirty(marked, flags);
+    }
+    if (into !== null && hold.environment !== DirtyFlags.None) {
+      into.hold!.environment |= hold.environment;
+    }
   }
 
   public markDirtyById(id: NodeId, flags: DirtyFlags): void {
@@ -985,6 +1054,12 @@ export class UiGraph {
    * is what a mount costs anyway.
    */
   private inheritEnvironment(child: UiNode): void {
+    // Joining a held subtree, it is held with it: before the marks below.
+    const parent = child.parent;
+    const holder = parent === null ? null : parent.hold !== null ? parent : parent.heldBy;
+    if (holder !== null) {
+      setHeldBy(child, holder);
+    }
     if (child.parent?.environment == null) {
       return;
     }
@@ -1053,10 +1128,19 @@ export class UiGraph {
     }
   }
 
-  private rebuildEnvironment(node: UiNode, inheritedFlags: DirtyFlags): void {
+  private rebuildEnvironment(node: UiNode, inheritedFlags: DirtyFlags, above?: EnvironmentChange): void {
     const previous = node.environment;
     const next = this.buildNodeEnvironment(node);
-    const flags = previous === null ? inheritedFlags : this.environmentChangeFlags(previous, next, inheritedFlags);
+    // A node that provides nothing went from its parent's old environment
+    // to its parent's new one, which the parent has already compared: a
+    // theme changed over a board of hundreds of frames compared the two
+    // themes, key by key, once for every node under it.
+    const flags =
+      previous === null
+        ? inheritedFlags
+        : above !== undefined && previous === above.from && next === above.to
+          ? above.flags
+          : this.environmentChangeFlags(previous, next, inheritedFlags);
 
     // Keep the existing instance when the values match. Environments
     // are immutable snapshots, so holding identity steady is what lets
@@ -1068,9 +1152,15 @@ export class UiGraph {
       this.environmentChangedListener?.(node);
     }
 
+    if (node.hold !== null) {
+      // Held: what is beneath it takes the change when it is let go.
+      node.hold.environment |= inheritedFlags;
+      return;
+    }
+    const change = previous === null ? undefined : { from: previous, to: next, flags };
     let child = node.firstChild;
     while (child !== null) {
-      this.rebuildEnvironment(child, inheritedFlags);
+      this.rebuildEnvironment(child, inheritedFlags, change);
       child = child.nextSibling;
     }
   }
@@ -1192,4 +1282,33 @@ function textStyleFontsEqual(a: UiTextStyle, b: UiTextStyle): boolean {
 
 function positive(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/** One node's environment change, for a child that inherits it unchanged; see `rebuildEnvironment`. */
+interface EnvironmentChange {
+  readonly from: UiEnvironment;
+  readonly to: UiEnvironment;
+  readonly flags: DirtyFlags;
+}
+
+/**
+ * Points a subtree at the node holding it, or at none. Releasing, a node
+ * that holds a subtree of its own keeps it: what is beneath it stays
+ * pointed at it.
+ */
+function setHeldBy(root: UiNode, holder: UiNode | null, releasing = false): void {
+  const stack: UiNode[] = [root];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    node.heldBy = holder;
+    if (releasing && node.hold !== null) {
+      for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+        setHeldBy(child, holder ?? node);
+      }
+      continue;
+    }
+    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+      stack.push(child);
+    }
+  }
 }
