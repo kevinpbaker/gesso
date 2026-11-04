@@ -271,6 +271,8 @@ const MAX_QUEUED_REFRESHES = 8;
 const RETRY_LOCAL_MS = 2000;
 /** The most refreshes a frame is given: two, sixty at 120 Hz; slower than that is no smoother. */
 const MAX_STRIDE = 2;
+/** How many times faster than the display measured at start a refined beat may read before it is not believed. */
+const MAX_STRIDE_OFF = 4;
 
 function localAnimationFrame(): ((callback: (time: number) => void) => number) | null {
   const host = globalThis as { requestAnimationFrame?: (callback: (time: number) => void) => number };
@@ -635,6 +637,11 @@ export class UiHostFrameClock implements UiFrameClock {
     for (let pass = 0; pass < BEAT_PASSES; pass++) {
       interval = this.refineInterval(interval);
     }
+    // A reading no display gives is the refreshes' fault, not the display's:
+    // the interval measured at start stands.
+    if (!(interval >= this.display.interval / MAX_STRIDE_OFF && interval <= MAX_CADENCE_MS)) {
+      interval = this.display.interval;
+    }
     const latest = this.refreshes[this.refreshes.length - 1]!;
     let earliest = Infinity;
     for (const time of this.refreshes) {
@@ -683,9 +690,12 @@ export class UiHostFrameClock implements UiFrameClock {
     const beat = this.beat()!;
     const since = (((time - beat.start) % beat.interval) + beat.interval) % beat.interval;
     let refresh = time - since;
-    // Never a refresh already drawn for, nor fewer than a stride after it.
-    while (refresh < this.lastLocked + (this.stride - 0.5) * beat.interval) {
-      refresh += beat.interval;
+    // Never a refresh already drawn for, nor fewer than a stride after it:
+    // counted in whole refreshes rather than stepped to one at a time, so
+    // no reading, however wrong, keeps this thread here.
+    const after = this.lastLocked + (this.stride - 0.5) * beat.interval;
+    if (refresh < after) {
+      refresh += Math.ceil((after - refresh) / beat.interval) * beat.interval;
     }
     this.lastLocked = refresh;
     this.refreshesSinceFrame = 0;
@@ -854,6 +864,35 @@ export class UiHostFrameClock implements UiFrameClock {
     return cadence === null ? this.fallbackMs : Math.max(1, Math.min(this.fallbackMs, cadence));
   }
 
+  /**
+   * Draws the pending frame now, on this clock's timeline, and nothing
+   * when none is pending (`FrameService.flush`): for a tool that changed
+   * the screen and must read it drawn, in a window that may be sent no
+   * refreshes. It is not a refresh, so it teaches the clock nothing about
+   * the display. Handed to `tick` as one, with this thread's time, which
+   * is not the host's, it took the beat backwards; see `tick`.
+   */
+  flush(): void {
+    if (this.pending) {
+      this.drawNow();
+    }
+  }
+
+  /**
+   * Draws the pending frame now, without waiting for a refresh: on the
+   * display's beat when frames are timed on it, so its time is the next
+   * refresh's and never one already drawn for; else at this moment, on
+   * the timeline the clock's frames are on.
+   */
+  private drawNow(): void {
+    this.clearFallback();
+    if (this.locked && this.display !== null && this.refreshes.length > 0 && this.lastTickTime !== null) {
+      this.deliverOnBeat(this.lastTickTime);
+      return;
+    }
+    this.deliver(this.local !== null ? this.now() : this.hostTime());
+  }
+
   cancelFrame(): void {
     this.pending = false;
     if (this.localWatch !== null) {
@@ -888,15 +927,28 @@ export class UiHostFrameClock implements UiFrameClock {
    * it is needed rather than negotiating every frame.
    */
   tick(time: UiFrameTime): void {
+    // A host's refreshes only go forwards. One that does not is not a
+    // refresh, and taught to the clock it read as a display refreshing
+    // backwards: the beat came out negative, and a worker drawing on it
+    // stepped back towards a refresh it could never reach, for ever, with
+    // every message to it queued behind. It still draws a frame wanted.
+    const backwards = this.lastTickTime !== null && time < this.lastTickTime;
+    if (backwards && this.pending) {
+      this.idleTicks = 0;
+      this.drawNow();
+      return;
+    }
     this.hosted = true;
     this.stalled = false;
     // Every tick, not just the first: the two clocks drift, and a tab
     // that was suspended resumes with a different offset entirely.
     // Reading it here costs one subtraction and keeps a self-paced
     // frame on the same timeline as the ticks around it.
-    this.hostOffset = time - this.now();
-    this.recordCadence(time);
-    if (this.locked && this.display !== null) {
+    if (!backwards) {
+      this.hostOffset = time - this.now();
+      this.recordCadence(time);
+    }
+    if (this.locked && this.display !== null && !backwards) {
       this.refreshes.push(time);
       if (this.refreshes.length > BEAT_SAMPLES) {
         this.refreshes.shift();

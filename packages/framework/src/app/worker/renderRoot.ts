@@ -462,7 +462,7 @@ export class RenderWorkerApp {
             runtime.input.keyboard.keyDown(key, modifiers);
             runtime.input.keyboard.keyUp(key, modifiers);
           },
-          flush: () => this.clock?.tick(performance.now()),
+          flush: () => this.clock?.flush(),
           theme: at => runtime.themeAt(at),
           designThemes: () => this.renderThemes(),
           render: request =>
@@ -759,7 +759,7 @@ export class RenderWorkerApp {
       height,
       dpr
     });
-    this.runtime.services.get(FrameService).setFlush(() => this.clock?.tick(performance.now()));
+    this.runtime.services.get(FrameService).setFlush(() => this.clock?.flush());
     this.runtime.deferPatchesFrom(this.channels.registry.all());
     this.runtime.onInspect(report => {
       this.host.postMessage({ type: 'inspect', report });

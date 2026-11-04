@@ -3667,6 +3667,8 @@ declare class UiHostFrameClock implements UiFrameClock {
   private hostTime;
   private cadenceMs;
   private selfPaceMs;
+  flush(): void;
+  private drawNow;
   cancelFrame(): void;
   private clearFallback;
   private deliver;

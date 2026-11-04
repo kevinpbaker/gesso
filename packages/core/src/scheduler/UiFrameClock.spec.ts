@@ -930,6 +930,63 @@ describe('UiHostFrameClock on the display beat', () => {
     expect(frames).toHaveLength(1);
   });
 
+  it('keeps drawing forwards when a time from another clock arrives among the refreshes', () => {
+    // Found in a design tool drawing hundreds of live screens: the worker
+    // was asked to flush while a tool waited for a frame, and the flush
+    // handed `tick` this thread's own time, 680 ms behind the host's. Its
+    // refreshes then read as a display refreshing 22 ms *backwards*, and
+    // the step towards the next refresh never arrived: the worker spun in
+    // it, and the editor stopped drawing and answering until reloaded.
+    const { clock, frames, scroll } = lockedClock();
+    scroll();
+    frames.length = 0;
+    clock.requestFrame();
+    let host = 46_000;
+    for (let k = 0; k < 400; k++) {
+      host += 6;
+      // Behind: every tick waited in the queue behind a slow frame.
+      vi.setSystemTime(host + 40);
+      clock.tick(host);
+      if (k % 7 === 3) {
+        // The other clock's times, three in a row, as they came.
+        clock.tick(host - 680);
+        clock.tick(host - 680);
+        clock.tick(host - 679.8);
+      }
+    }
+    expect(frames.length).toBeGreaterThan(20);
+    for (let k = 1; k < frames.length; k++) {
+      expect(frames[k]!).toBeGreaterThanOrEqual(frames[k - 1]!);
+    }
+  });
+
+  it('draws a pending frame on a flush, and learns nothing from it about the display', () => {
+    const { clock, frames, scroll } = lockedClock();
+    scroll();
+    frames.length = 0;
+    clock.requestFrame();
+    let host = 8_000;
+    for (let k = 0; k < 40; k++) {
+      host += INTERVAL;
+      vi.setSystemTime(host + 0.2);
+      clock.tick(host);
+      if (k % 5 === 2) {
+        clock.flush();
+      }
+    }
+    const flushedAt = frames.length;
+    expect(flushedAt).toBeGreaterThan(30);
+    // Ticks after the flushes are still drawn on the display's beat.
+    const settled = frames.slice(-10);
+    for (let k = 1; k < settled.length; k++) {
+      expect(settled[k]! - settled[k - 1]!).toBeGreaterThan(0);
+    }
+    clock.cancelFrame();
+    const drawn = frames.length;
+    clock.flush();
+    expect(frames.length).toBe(drawn);
+  });
+
   it('draws on a waiting tick in the end, when every tick has waited', () => {
     const { clock, frames } = lockedClock();
     frames.length = 0;
