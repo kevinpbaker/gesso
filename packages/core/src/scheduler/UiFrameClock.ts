@@ -100,6 +100,12 @@ const MAX_CADENCE_MS = 50;
 const WATCH_REFRESHES = 2;
 
 const IDLE_TICKS_BEFORE_STOP = 4;
+/**
+ * How long a frame waits for this thread's own refresh before a timer
+ * draws it instead; see `watchLocal`. Far longer than any display's
+ * refresh, so it never stands in for one that is coming.
+ */
+const LOCAL_WATCH_MS = 250;
 
 export interface UiHostFrameClockOptions {
   /**
@@ -310,6 +316,10 @@ export class UiHostFrameClock implements UiFrameClock {
   /** This thread's own `requestAnimationFrame`, or null where there is none. */
   private local: ((callback: (time: number) => void) => number) | null;
   private localHandle: number | null = null;
+  /** This thread's own refreshes so far, which `watchLocal` counts on. */
+  private localRefreshes = 0;
+  /** The timer standing by for a refresh that does not come; see `watchLocal`. */
+  private localWatch: ReturnType<typeof setTimeout> | null = null;
   /** Whether the page is hidden, when this thread's refreshes do not come. */
   private hidden = false;
   private readonly timeOrigin: number;
@@ -370,12 +380,13 @@ export class UiHostFrameClock implements UiFrameClock {
         return;
       }
       // The compositor is answering directly, so there is no host to
-      // tell and no timer to arm: no message per refresh, and, on a page
-      // that is shown, no fallback to pace, because a missing frame here
-      // would mean the display itself had stopped.
+      // tell and no timer to pace: no message per refresh. Only a long
+      // watch stands by, for refreshes that have stopped (`watchLocal`).
+      this.watchLocal();
       if (this.localHandle === null) {
         this.localHandle = this.local(time => {
           this.localHandle = null;
+          this.localRefreshes++;
           // Drawn either way; the next frame is timed by the display's beat
           // if this refresh showed it keeps none.
           this.recordLocal(time);
@@ -392,6 +403,51 @@ export class UiHostFrameClock implements UiFrameClock {
     }
     this.setActive(true);
     this.armTimer();
+  }
+
+  /**
+   * Draws a wanted frame on a timer when this thread's own refreshes
+   * have stopped coming on a page that says it is shown.
+   *
+   * They do stop. A window that is shown but not composited (a browser
+   * pane hidden inside a desktop app, a window behind others on some
+   * systems) refreshes a page once a second or not at all, while
+   * `document.visibilityState` stays `visible`, so `setHidden` never
+   * hears of it; and a worker whose canvas the compositor is behind on
+   * is not given another refresh until it catches up. A frame asked for
+   * then waited for a refresh that did not come, and with no timer on
+   * this path, nothing else drew it: the application stopped answering,
+   * with its last frame on screen.
+   *
+   * One timer, a quarter of a second long, armed while frames are wanted
+   * and never more than one: it draws a frame only when not one refresh
+   * came in the whole of it. A compositor that is answering, however
+   * slowly the frames themselves run, always beats it, so it never
+   * stands in for a refresh that is coming (see the spec about a blocked
+   * host thread); it costs four wake-ups a second while something
+   * animates, against one per refresh for a per-frame watch.
+   */
+  private watchLocal(): void {
+    if (this.localWatch !== null) {
+      return;
+    }
+    const seen = this.localRefreshes;
+    this.localWatch = setTimeout(() => {
+      this.localWatch = null;
+      if (!this.pending || this.local === null) {
+        return;
+      }
+      if (this.localRefreshes === seen) {
+        // The refresh asked for may yet come, and finds nothing pending
+        // then; the next frame asks for one of its own.
+        this.localHandle = null;
+        this.deliver(this.now());
+        if (!this.pending) {
+          return;
+        }
+      }
+      this.watchLocal();
+    }, LOCAL_WATCH_MS);
   }
 
   /**
@@ -800,6 +856,10 @@ export class UiHostFrameClock implements UiFrameClock {
 
   cancelFrame(): void {
     this.pending = false;
+    if (this.localWatch !== null) {
+      clearTimeout(this.localWatch);
+      this.localWatch = null;
+    }
     // The local handle is deliberately left armed. There is no way to
     // cancel it without the matching `cancelAnimationFrame`, and one
     // refresh that finds nothing pending costs a comparison, which is
@@ -855,6 +915,11 @@ export class UiHostFrameClock implements UiFrameClock {
         const queued = this.now() - this.toLocal(time) > this.display.interval;
         if (this.refreshesSinceFrame >= this.stride && (!queued || this.refreshesSinceFrame >= MAX_QUEUED_REFRESHES)) {
           this.deliverOnBeat(time);
+        } else {
+          // Passed over, the frame is still wanted: should the host's ticks
+          // stop now, the watch draws it, as it would have had this tick
+          // not cleared it.
+          this.armTimer();
         }
         return;
       }

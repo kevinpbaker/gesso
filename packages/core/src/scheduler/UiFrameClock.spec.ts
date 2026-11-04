@@ -313,10 +313,12 @@ describe('UiHostFrameClock', () => {
       for (let frame = 1; frame <= 300; frame++) {
         clock.requestFrame();
         // The assertion this spec turns on: asking for a frame on the
-        // local path arms nothing that can go off. A watchdog added
-        // here fails on the first iteration, before any timing
-        // coincidence can hide it.
-        expect(vi.getTimerCount()).toBe(0);
+        // local path arms nothing that can go off while refreshes come.
+        // The one timer it may hold is the quarter-second watch for
+        // refreshes that have stopped altogether (see the spec after
+        // the next), which a refresh in it always beats; a per-frame
+        // watchdog would arm one per request and fail here.
+        expect(vi.getTimerCount()).toBeLessThanOrEqual(1);
         vi.advanceTimersByTime(16);
         callbacks.shift()!(refreshAt(frame));
         expected.push(refreshAt(frame));
@@ -373,11 +375,64 @@ describe('UiHostFrameClock', () => {
       // for before the page was hidden drawing what is asked for now.
       clock.setHidden(false);
       clock.requestFrame();
-      expect(vi.getTimerCount()).toBe(0);
+      // Only the long watch for refreshes that stop (see the next spec).
+      expect(vi.getTimerCount()).toBe(1);
       expect(callbacks).toHaveLength(1);
       callbacks.shift()!(5000);
       expect(frames).toHaveLength(3);
       expect(frames[2]).toBe(5000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('draws on a timer when its own refreshes stop on a page that says it is shown', () => {
+    // A design tool in a browser pane its desktop app had hidden: the
+    // page stayed `visible`, its refreshes came once a second or not at
+    // all, and a frame asked for waited on one with nothing else to draw
+    // it. The editor stopped answering until it was reloaded.
+    vi.useFakeTimers();
+    try {
+      const frames: number[] = [];
+      const callbacks: ((time: number) => void)[] = [];
+      const clock = new UiHostFrameClock(
+        time => {
+          frames.push(time);
+          // Something animating asks for its next frame while drawing this one.
+          clock.requestFrame();
+        },
+        () => {},
+        {
+          fallbackMs: 16,
+          now: () => Date.now(),
+          requestAnimationFrame: callback => {
+            callbacks.push(callback);
+            return callbacks.length;
+          }
+        }
+      );
+      clock.requestFrame();
+      callbacks.shift()!(16);
+      expect(frames).toEqual([16]);
+
+      // No refresh comes again. Nothing is drawn while one may yet...
+      vi.advanceTimersByTime(400);
+      expect(frames).toHaveLength(1);
+      // ...and a timer draws once a whole quarter of a second has passed with
+      // none (the watch running when the last one came counts it), and goes
+      // on drawing four a second for as long as none comes.
+      vi.advanceTimersByTime(110);
+      expect(frames).toHaveLength(2);
+      vi.advanceTimersByTime(1000);
+      expect(frames).toHaveLength(6);
+
+      // Refreshes come again: the clock is theirs, and the timer draws nothing.
+      const drawn = frames.length;
+      for (let k = 1; k <= 30; k++) {
+        vi.advanceTimersByTime(16);
+        callbacks.splice(0).forEach(callback => callback(10_000 + k * 16));
+      }
+      expect(frames.slice(drawn).every(time => time >= 10_000)).toBe(true);
     } finally {
       vi.useRealTimers();
     }
@@ -853,6 +908,26 @@ describe('UiHostFrameClock on the display beat', () => {
     // The refresh after: handled as it comes.
     clock.tick(2000 + 3 * INTERVAL);
     expect(frames.length).toBe(1);
+  });
+
+  it('draws a frame it passed over a tick for, should the ticks then stop', () => {
+    // A tick that waited behind a slow frame is passed over, which cleared
+    // the watch for a host gone quiet without setting it again: if the
+    // host's refreshes stopped there, the frame was never drawn.
+    const { clock, frames } = lockedClock();
+    vi.setSystemTime(5000);
+    for (let k = 0; k < 4; k++) {
+      clock.requestFrame();
+      vi.setSystemTime(5000 + k * 20);
+      clock.tick(5000 + k * 20);
+    }
+    frames.length = 0;
+    clock.requestFrame();
+    vi.setSystemTime(6000 + 3 * INTERVAL);
+    clock.tick(6000);
+    expect(frames).toEqual([]);
+    vi.advanceTimersByTime(200);
+    expect(frames).toHaveLength(1);
   });
 
   it('draws on a waiting tick in the end, when every tick has waited', () => {
