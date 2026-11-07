@@ -80,3 +80,51 @@ describe('hot replacement of a service', () => {
     expect(await serviceStamp('/worker.ts')).toBe(app);
   });
 });
+
+describe('a worker entry added while the dev server runs', () => {
+  it('is written into the shell without a restart', async () => {
+    // The shell's transform names the workers it found beside it, and
+    // Vite caches that transform. An `AppWorker.ts` written after the
+    // page first loaded was never constructed, so every channel it
+    // served failed with "registered with neither a worker nor a
+    // source" until the server was restarted.
+    files.set(`${ROOT}/framework.ts`, 'export function createApp() { return { mount() {} }; }\n');
+    files.set(`${ROOT}/worker.ts`, 'export {};\n');
+    files.set(`${ROOT}/main.ts`, "import { createApp } from 'gesso-framework';\ncreateApp().mount('#app');\n");
+    server = await createServer({
+      root: ROOT,
+      configFile: false,
+      logLevel: 'silent',
+      server: { middlewareMode: true, ws: false, watch: null },
+      plugins: [memory, gesso({ agent: false, channelSchemas: false, overlay: false })]
+    });
+    const watcher = server.watcher as unknown as { emit(event: string, file: string): boolean };
+    expect((await server.transformRequest('/main.ts'))?.code).not.toContain('appLogicWorker');
+
+    files.set(`${ROOT}/AppWorker.ts`, 'export {};\n');
+    watcher.emit('add', `${ROOT}/AppWorker.ts`);
+    expect((await server.transformRequest('/main.ts'))?.code).toContain('AppWorker.ts');
+
+    // And taken out again when the file goes.
+    files.delete(`${ROOT}/AppWorker.ts`);
+    watcher.emit('unlink', `${ROOT}/AppWorker.ts`);
+    expect((await server.transformRequest('/main.ts'))?.code).not.toContain('appLogicWorker');
+  });
+
+  it('leaves the shell alone when an unrelated file is added', async () => {
+    files.set(`${ROOT}/framework.ts`, 'export function createApp() { return { mount() {} }; }\n');
+    files.set(`${ROOT}/worker.ts`, 'export {};\n');
+    files.set(`${ROOT}/main.ts`, "import { createApp } from 'gesso-framework';\ncreateApp().mount('#app');\n");
+    server = await createServer({
+      root: ROOT,
+      configFile: false,
+      logLevel: 'silent',
+      server: { middlewareMode: true, ws: false, watch: null },
+      plugins: [memory, gesso({ agent: false, channelSchemas: false, overlay: false })]
+    });
+    const first = await server.transformRequest('/main.ts');
+    files.set(`${ROOT}/Notes.ts`, 'export {};\n');
+    (server.watcher as unknown as { emit(event: string, file: string): boolean }).emit('add', `${ROOT}/Notes.ts`);
+    expect(await server.transformRequest('/main.ts')).toBe(first);
+  });
+});

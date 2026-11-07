@@ -70,6 +70,12 @@ which has only `worker.ts`, still resolves. An application with no
 application worker gets no `appLogicWorker`, which is the shape the
 scaffold produces.
 
+Adding one later needs no restart. When a file under one of these names
+appears beside the shell, or goes, while the dev server runs, the
+server drops the shell it had transformed and reloads the page, so an
+`AppWorker.ts` written halfway through a session serves its channels on
+the next load.
+
 If your files are called something else, say so:
 
 ```ts

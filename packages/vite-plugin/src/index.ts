@@ -329,6 +329,24 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
      * one nobody connects to.
      */
     configureServer(server) {
+      // The shell's transform names the worker entries beside it, and the
+      // dev server caches it, so an entry written or deleted while the
+      // server runs would not be constructed (or would be constructed and
+      // missing) until a restart. Throw the cached shell away and reload.
+      const entryMoved = (file: string) => {
+        if (shellId === null || !isWorkerEntry(shellId, file, options)) {
+          return;
+        }
+        const graph = server.environments.client.moduleGraph;
+        const shell = graph.getModuleById(shellId);
+        if (shell !== undefined) {
+          graph.invalidateModule(shell);
+        }
+        server.ws.send({ type: 'full-reload' });
+      };
+      server.watcher.on('add', entryMoved);
+      server.watcher.on('unlink', entryMoved);
+
       if (options.agent === false) {
         return;
       }
@@ -640,6 +658,30 @@ async function resolveEntries(context: Resolver, id: string, options: GessoPlugi
           options.appLogicWorker === undefined ? APP_WORKER_NAMES : [options.appLogicWorker]
         );
   return { renderWorker, appLogicWorker };
+}
+
+/**
+ * Whether `file` is one of the names a worker entry is looked for under,
+ * beside the shell: what would change what the shell's transform writes
+ * if it appeared or went.
+ */
+function isWorkerEntry(shellId: string, file: string, options: GessoPluginOptions): boolean {
+  const shell = shellId.replace(/\?.*$/, '');
+  const directory = shell.slice(0, shell.lastIndexOf('/') + 1);
+  const path = file.replace(/\\/g, '/');
+  if (!path.startsWith(directory)) {
+    return false;
+  }
+  const name = `./${path.slice(directory.length)}`;
+  const names = [
+    ...(options.renderWorker === undefined ? RENDER_WORKER_NAMES : [options.renderWorker]),
+    ...(options.appLogicWorker === false
+      ? []
+      : options.appLogicWorker === undefined
+        ? APP_WORKER_NAMES
+        : [options.appLogicWorker])
+  ];
+  return names.includes(name);
 }
 
 /** The first specifier that resolves beside `importer`, as written. */
