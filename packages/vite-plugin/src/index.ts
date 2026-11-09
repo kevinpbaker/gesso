@@ -13,6 +13,7 @@ import {
   type BridgeRequest,
   type BridgeResponse,
   type BridgeSocket,
+  type LocalTools,
   type PageMemory,
   type RememberedPage
 } from './agent.ts';
@@ -369,18 +370,10 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         memory: pageMemory(root),
         paths: [...new Set([options.agentPath ?? AGENT_PATH, AGENT_PATH])],
         ...(options.agentGate === undefined ? {} : { gate: options.agentGate }),
-        ...(catalog === null
-          ? {}
-          : {
-              local: {
-                tools: CATALOG_TOOLS,
-                call: (name, args) => catalog!.call(name, args),
-                instructions: [
-                  CATALOG_INSTRUCTIONS,
-                  ...(options.agentInstructions === undefined ? [] : [options.agentInstructions])
-                ].join('\n\n')
-              }
-            })
+        ...(() => {
+          const local = localAgentPart(catalog, options.agentInstructions);
+          return local === null ? {} : { local };
+        })()
       });
       server.middlewares.use((request, response, next) =>
         bridge.middleware(request as unknown as BridgeRequest, response as unknown as BridgeResponse, next)
@@ -703,4 +696,31 @@ const pagesListed = new Map<string, RememberedPage>();
 
 function pageMemory(root: string): PageMemory {
   return { read: () => pagesListed.get(root), write: page => pagesListed.set(root, page) };
+}
+
+/**
+ * What the dev server tells and offers an agent itself, beside what the
+ * page does: the catalog's tools and their instructions while the
+ * catalog is on, and the application's own instructions either way. An
+ * application that turns the catalog off (one whose agents do not build
+ * with its components) still has what it wrote told to every agent.
+ */
+export function localAgentPart(
+  catalog: { call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<unknown> } | null,
+  agentInstructions: string | undefined
+): LocalTools | null {
+  if (catalog === null) {
+    return agentInstructions === undefined
+      ? null
+      : {
+          tools: [],
+          call: name => Promise.reject(new Error(`No tool ${name} is served here.`)),
+          instructions: agentInstructions
+        };
+  }
+  return {
+    tools: CATALOG_TOOLS,
+    call: (name, args) => catalog.call(name, args),
+    instructions: [CATALOG_INSTRUCTIONS, ...(agentInstructions === undefined ? [] : [agentInstructions])].join('\n\n')
+  };
 }

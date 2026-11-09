@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { gesso } from './index.ts';
+import { gesso, localAgentPart } from './index.ts';
 
 /** The plugin's `config` hook, called the way Vite calls it. */
 function configOf(plugin: ReturnType<typeof gesso>): unknown {
@@ -35,5 +35,17 @@ describe('the format workers are built in', () => {
     expect(hook({ worker: { format: 'iife' } }, { command: 'build', mode: 'production' }).worker).not.toHaveProperty(
       'format'
     );
+  });
+});
+
+describe('what the dev server tells an agent itself', () => {
+  it("tells the application's instructions with the catalog off as well as on", () => {
+    expect(localAgentPart(null, undefined)).toBeNull();
+    const alone = localAgentPart(null, 'Use the sheet_ tools.');
+    expect(alone?.instructions).toBe('Use the sheet_ tools.');
+    expect(alone?.tools).toEqual([]);
+    const both = localAgentPart({ call: async () => ({}) }, 'Use the sheet_ tools.');
+    expect(both?.instructions).toMatch(/components[\s\S]*\n\nUse the sheet_ tools\.$/);
+    expect(both?.tools.length).toBeGreaterThan(0);
   });
 });
