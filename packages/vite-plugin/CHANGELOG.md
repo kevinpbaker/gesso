@@ -1,5 +1,12 @@
 # gesso-vite-plugin
 
+## 0.8.1
+
+### Patch Changes
+
+- 294f893: `agentPath` serves the dev server's MCP endpoint at a path of the application's own, such as `/__my-app/mcp`, and the lines the server prints give that address. `/__gesso/mcp` keeps answering too, so an agent connected before the path changed still reaches it. `createAgentBridge` takes the paths it answers as `paths`.
+- 58309f0: A worker entry added beside the shell while the dev server runs, such as an `AppWorker.ts` written after the page first loaded, is now constructed on the next load. The dev server kept the shell it had transformed before the file existed, so every channel the new worker served failed with "registered with neither a worker nor a source" until a restart. Removing an entry is followed the same way.
+
 ## 0.8.0
 
 ### Patch Changes

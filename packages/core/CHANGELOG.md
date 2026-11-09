@@ -1,5 +1,13 @@
 # gesso-core
 
+## 0.8.1
+
+### Patch Changes
+
+- An absolutely positioned box placed by its top alone is as tall as what it holds, as in CSS, and overflows its containing block. It was capped at the room left below its top, which squeezed a column inside it: its flexible children shrank, and a drawing in one lost its lower part. Only both edges set make the height tight; the width is still the room beside the box, so text wraps as before.
+- 5df787f: `EditingService.offsetNear(node, x, y)` says which caret position in a field is nearest a point, as a press there would put the caret, so a field opened over text the person pointed at can start its caret there with `select`.
+- Hot replacement: when a module is replaced while the app runs, everything the replaced component rendered is mounted again with it. A child component from a module that was not replaced used to be kept, still holding the objects the old parent gave it, so part of the screen followed old state after a save.
+
 ## 0.8.0
 
 ### Minor Changes

@@ -1,5 +1,17 @@
 # gesso-components
 
+## 0.8.1
+
+### Patch Changes
+
+- 34a7ee4: Markdown: a nested list item whose text spells a task's box over two lines (`[`, then `] a` on the next line) is written escaped, so it reads back as the bullet it was instead of a task.
+- Updated dependencies
+- Updated dependencies [5df787f]
+- Updated dependencies [f2dc13c]
+- Updated dependencies
+  - gesso-core@0.8.1
+  - gesso-framework@0.8.1
+
 ## 0.8.0
 
 ### Minor Changes

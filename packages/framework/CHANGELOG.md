@@ -1,5 +1,17 @@
 # gesso-framework
 
+## 0.8.1
+
+### Patch Changes
+
+- 5df787f: `EditingService.offsetNear(node, x, y)` says which caret position in a field is nearest a point, as a press there would put the caret, so a field opened over text the person pointed at can start its caret there with `select`.
+- f2dc13c: `ShellService.preferColorScheme('light' | 'dark' | 'auto')` lets an application with an appearance setting of its own tell the shell which appearance to report, from the render worker too, as the host's `setColorScheme` does. A host can then start the app in a stored choice before the first frame (`createApp({ colorScheme })`) and the app can still go back to following the system.
+- Hot replacement: when a module is replaced while the app runs, everything the replaced component rendered is mounted again with it. A child component from a module that was not replaced used to be kept, still holding the objects the old parent gave it, so part of the screen followed old state after a save.
+- Updated dependencies
+- Updated dependencies [5df787f]
+- Updated dependencies
+  - gesso-core@0.8.1
+
 ## 0.8.0
 
 ### Minor Changes
