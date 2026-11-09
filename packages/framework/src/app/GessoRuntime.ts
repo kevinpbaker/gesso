@@ -2251,7 +2251,9 @@ export class GessoRuntime {
    * reconciles rather than recreating, so a component whose class is
    * the same object as before keeps its host and its `internalState`;
    * one whose module was replaced is a different class, and its host
-   * is disposed and mounted again. Scroll offsets on containers that
+   * is disposed and mounted again with everything it rendered: its body
+   * made new objects for its children, and a child kept from before
+   * would go on holding the old ones. Scroll offsets on containers that
    * survive are kept, because the node is kept. Component state in a
    * replaced module is lost, which is the honest cost and the reason
    * this is a development tool.
@@ -2426,7 +2428,20 @@ export class GessoRuntime {
           `Root component chain exceeded ${MAX_ROOT_COMPONENT_DEPTH} levels without producing an element.`
         );
       }
-      const output = this.resolver.resolve(definition, `app:component:${depth}`);
+      const anchorId = `app:component:${depth}`;
+      const before = this.resolver.hostFor(anchorId);
+      if (before !== undefined && before.component !== definition.component && this.root !== undefined) {
+        // A root component whose module was replaced. Its body runs again
+        // and makes new objects for what it renders, so the tree it
+        // rendered before cannot be reconciled into: a child of a class
+        // that did not change would be kept, still holding the old
+        // objects it read when it mounted. The tree goes first, before
+        // the new host is made, so nothing mounts onto a tree being
+        // cleared. Ids are positional, so the rebuilt tree has the same
+        // ones and the focus still finds its way back.
+        this.builder.reconcileChildren(this.root, []);
+      }
+      const output = this.resolver.resolve(definition, anchorId);
       return this.resolveRootElement(output as FrameworkChild, depth + 1);
     }
     return definition;

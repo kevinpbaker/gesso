@@ -5,6 +5,7 @@ import { Box, Column, ScrollView, Text, type UiElement, type UiNode } from 'gess
 import { Component } from '../Component';
 import { Define } from '../decorators';
 import { createComponent } from '../createComponent';
+import type { ComponentContext, Inputs } from '../index';
 import { internalState, type InternalState } from '../InternalState';
 import { mountRuntime } from './RuntimeTestUtils';
 
@@ -108,6 +109,30 @@ describe('reload', () => {
     mounted.frame();
 
     expect(texts(mounted.runtime.debugRoot())).toEqual(['second']);
+  });
+
+  it('remounts what a replaced component rendered, even a component whose own class did not change', () => {
+    // The parent's module was replaced, so its body ran again and made
+    // new objects for its children. A child from a module that was not
+    // replaced would otherwise be kept, still holding what the old
+    // parent gave it when it mounted: a screen half bound to state the
+    // new parent no longer has, which is what a model passed down as a
+    // plain object (a worksheet, a document) looks like.
+    const Child = (inputs: Inputs<{ model: { name: string } }>, _ctx: ComponentContext) => {
+      const model = inputs.model.value;
+      return Text({ text: model.name });
+    };
+    const before = (_inputs: Inputs<{}>, _ctx: ComponentContext) =>
+      Column({}, createComponent(Child, { model: { name: 'old model' } }));
+    const after = (_inputs: Inputs<{}>, _ctx: ComponentContext) =>
+      Column({}, createComponent(Child, { model: { name: 'new model' } }));
+    const mounted = mountRuntime(createComponent(before, {}));
+    mounted.frame();
+
+    mounted.runtime.reload(createComponent(after, {}));
+    mounted.frame();
+
+    expect(texts(mounted.runtime.debugRoot())).toEqual(['new model']);
   });
 
   it('keeps a scroll offset on a container that survived', () => {

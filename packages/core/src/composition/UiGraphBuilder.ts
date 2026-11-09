@@ -549,8 +549,25 @@ export class UiGraphBuilder {
       this.graph.insertBefore(parent, anchor, cursor);
     } else {
       matched.add(anchor);
-      if (this.reconciledFrom.get(anchor) === element) {
+      const previous = this.reconciledFrom.get(anchor);
+      if (previous === element) {
         return anchor;
+      }
+      if (previous !== undefined && isComponentLikeElement(previous) && previous.component !== element.component) {
+        // A different component in this slot. That happens when a module
+        // is replaced while the app runs: the new class's body runs again
+        // and makes new objects for what it renders, so nothing the old
+        // one rendered may be kept. A child component of a class that did
+        // not change would otherwise be reconciled in place and go on
+        // holding the old parent's objects, read once when it mounted.
+        // The anchor stays, since the caller's cursor may be on it; its
+        // host and everything under it go, from the outside in.
+        resolver.release(anchorId);
+        for (let child = anchor.firstChild; child !== null;) {
+          const next = child.nextSibling;
+          this.removeSubtree(child);
+          child = next;
+        }
       }
     }
 
