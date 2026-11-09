@@ -3525,14 +3525,19 @@ export class LayoutEngine {
       const tightHeight = cRec.top !== undefined && cRec.bottom !== undefined && !explicitHeight;
       // An explicit size is the box's own, as in CSS, and the block does
       // not cap it: a box that starts past the block's far edge has no
-      // room left there, and (0, 0) is a tight zero.
+      // room left there, and (0, 0) is a tight zero. Nor does it cap an
+      // auto height: as in CSS, a box placed by its top alone is as tall
+      // as what it holds and overflows the block, where a cap squeezed
+      // its column (a worksheet region near a page's foot lost the
+      // bottom of its drawing). Only the width is the room beside it, so
+      // text wraps there; both edges set make an axis tight.
       this.measure(
         child,
         new Constraints(
           tightWidth ? availableWidth : 0,
           explicitWidth ? Infinity : availableWidth,
           tightHeight ? availableHeight : 0,
-          explicitHeight ? Infinity : availableHeight
+          explicitHeight || !tightHeight ? Infinity : availableHeight
         )
       );
       const width = cRec.measuredWidth;

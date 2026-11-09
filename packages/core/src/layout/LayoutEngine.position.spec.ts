@@ -115,6 +115,27 @@ describe('LayoutEngine positioning', () => {
       expect(h.box(beyond)).toEqual({ x: 400, y: 0, width: 120, height: 80 });
     });
 
+    it('is as tall as what it holds when only its top is set, overflowing the block as CSS lets it', () => {
+      // A worksheet's region, placed by its top on a page near the
+      // page's foot: opened, it grew past the page, and capped at the
+      // room left it squeezed its column, so a drawing in it lost its
+      // lower part. In CSS an absolute box's auto height is its
+      // content's; only its width is limited to the room beside it.
+      const h = new LayoutHarness();
+      const root = column(h, 'top');
+      const page = box(h, 'page', { position: 'relative', width: 300, height: 100 });
+      const region = column(h, 'region', { position: 'absolute', top: 46, left: 10 });
+      const drawing = box(h, 'drawing', { width: 120, height: 60 });
+      const settings = box(h, 'settings', { width: 120, height: 60 });
+      h.append(region, drawing, settings);
+      h.append(page, region);
+      h.append(root, page);
+      h.layout(root, Constraints.loose(600, 400));
+      expect(h.box(region)).toEqual({ x: 10, y: 46, width: 120, height: 120 });
+      expect(h.box(drawing).height).toBe(60);
+      expect(h.box(settings)).toEqual({ x: 10, y: 106, width: 120, height: 60 });
+    });
+
     it('uses the nearest positioned ancestor as its containing block', () => {
       const h = new LayoutHarness();
       const root = column(h, 'top', { padding: 20 });
