@@ -251,10 +251,12 @@ export function combineSurfaces(surfaces: readonly AgentSurfaceLike[]): AgentSur
       const owner = toolOwners.get(name);
       if (owner === undefined) {
         const known = [...toolOwners.keys()].join(', ');
-        return {
-          content: [{ type: 'text', text: `There is no tool called ${name}. The tools are ${known}.` }],
-          isError: true
-        };
+        // Nothing offered at all is an app still starting (a desktop window's page not yet loaded), not a wrong name.
+        const text =
+          known === ''
+            ? `There is no tool called ${name} yet: the app offers no tools until its window has loaded. Try again in a moment.`
+            : `There is no tool called ${name}. The tools are ${known}.`;
+        return { content: [{ type: 'text', text }], isError: true };
       }
       return owner.call(name, args);
     },

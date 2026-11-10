@@ -134,4 +134,11 @@ describe('combined surfaces', () => {
       'There is no tool called counter_fly. The tools are counter_view, counter_add.'
     );
   });
+
+  it('says the app is still starting when it offers no tools at all', async () => {
+    const combined = combineSurfaces([across([])]);
+    expect(resultText(await combined.call('counter_add', {}))).toBe(
+      'There is no tool called counter_add yet: the app offers no tools until its window has loaded. Try again in a moment.'
+    );
+  });
 });
