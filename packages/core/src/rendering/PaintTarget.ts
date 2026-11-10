@@ -526,7 +526,8 @@ export class PaintTarget implements PaintSurface {
     const size = style?.fontSize ?? DEFAULT_FONT_SIZE;
     const weight = style?.fontWeight ?? DEFAULT_FONT_WEIGHT;
     const family = fontStackFor(style?.fontFamily ?? DEFAULT_FONT_FAMILY);
-    this.ctx.font = `${String(weight)} ${size}px ${family}`;
+    const slant = style?.fontStyle === undefined || style.fontStyle === 'normal' ? '' : `${style.fontStyle} `;
+    this.ctx.font = `${slant}${String(weight)} ${size}px ${family}`;
     this.ctx.textAlign = style?.align ?? 'left';
     this.ctx.textBaseline = 'alphabetic';
     this.ctx.fillText(value, x, y);

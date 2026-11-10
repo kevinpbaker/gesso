@@ -187,6 +187,8 @@ export interface PaintTextStyle {
   readonly fontSize?: number;
   readonly fontFamily?: string;
   readonly fontWeight?: number | string;
+  /** Upright by default; `italic` for an abstract class's name or a term set apart. */
+  readonly fontStyle?: 'normal' | 'italic' | 'oblique';
   /** Which end of the run `x` names. Defaults to `left`. */
   readonly align?: PaintTextAlign;
 }
