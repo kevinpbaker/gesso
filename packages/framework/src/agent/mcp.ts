@@ -11,7 +11,8 @@ import type { AgentSurfaceLike } from './AgentSurface';
  * Node server framework take, so the framework imports no server.
  *
  * What it implements is the part a channel needs: `initialize`, `ping`,
- * `tools/list`, `tools/call`, `resources/list` and `resources/read`.
+ * `tools/list`, `tools/call`, `resources/list` and `resources/read`,
+ * and `prompts/list` and `prompts/get` for an application's prompts.
  * Responses are plain JSON rather than an event stream, which the
  * transport allows, and the GET stream for server-initiated messages
  * is declined with 405, which it also allows: nothing here sends one,
@@ -35,6 +36,70 @@ export interface McpServerInfo {
   version?: string;
   /** Told to the agent on connecting: what this application is, in a sentence or two. */
   instructions?: string;
+  /**
+   * Prompts the person can run in their agent, which most agents offer
+   * as slash commands: the application's ways of working, ready to use,
+   * so the person need not know how to ask for them.
+   */
+  prompts?: readonly AgentPrompt[];
+}
+
+/**
+ * A prompt an application offers: a message to its agent, written once
+ * and run by the person with what they fill in.
+ *
+ *   { name: 'draw_problem', description: 'Draw a diagram for a problem',
+ *     arguments: [{ name: 'problem', required: true }],
+ *     text: 'Draw a diagram for this problem: {{problem}}' }
+ */
+export interface AgentPrompt {
+  /** How it is run: `draw_problem`, shown as `/draw_problem` in most agents. */
+  readonly name: string;
+  readonly title?: string;
+  readonly description?: string;
+  /** What the person fills in when they run it. */
+  readonly arguments?: readonly { readonly name: string; readonly description?: string; readonly required?: boolean }[];
+  /** The message it sends, `{{name}}` standing for an argument's value, and for nothing where it is left out. */
+  readonly text: string;
+}
+
+/** The prompts as MCP's `prompts/list` gives them: everything but their text. */
+export function listedPrompts(prompts: readonly AgentPrompt[] = []): readonly Omit<AgentPrompt, 'text'>[] {
+  return prompts.map(({ text: _text, ...listed }) => listed);
+}
+
+/**
+ * A prompt as MCP's `prompts/get` gives it, with the arguments put in,
+ * or why it cannot be: no such prompt, or an argument it needs left out.
+ */
+export function promptMessages(
+  prompts: readonly AgentPrompt[] = [],
+  name: unknown,
+  args: unknown
+): { readonly result: unknown } | { readonly error: string } {
+  const prompt = prompts.find(p => p.name === name);
+  if (prompt === undefined) {
+    const names = prompts.map(p => p.name);
+    return {
+      error: `There is no prompt ${String(name)}.${names.length === 0 ? '' : ` The prompts are ${names.join(', ')}.`}`
+    };
+  }
+  const given =
+    typeof args === 'object' && args !== null && !Array.isArray(args) ? (args as Record<string, unknown>) : {};
+  const missing = (prompt.arguments ?? []).filter(
+    a => a.required === true && (given[a.name] === undefined || String(given[a.name]).trim() === '')
+  );
+  if (missing.length > 0)
+    return { error: `The prompt ${prompt.name} needs ${missing.map(a => a.name).join(' and ')}.` };
+  const text = prompt.text.replace(/\{\{\s*([\w-]+)\s*\}\}/g, (_, key: string) =>
+    given[key] === undefined ? '' : String(given[key])
+  );
+  return {
+    result: {
+      ...(prompt.description === undefined ? {} : { description: prompt.description }),
+      messages: [{ role: 'user', content: { type: 'text', text } }]
+    }
+  };
 }
 
 type JsonRpcId = string | number;
@@ -84,7 +149,7 @@ export async function handleMcpMessage(
       const version = MCP_PROTOCOL_VERSIONS.find(supported => supported === asked) ?? MCP_PROTOCOL_VERSIONS[0];
       return ok(id, {
         protocolVersion: version,
-        capabilities: { tools: {}, resources: {} },
+        capabilities: { tools: {}, resources: {}, ...((info.prompts ?? []).length === 0 ? {} : { prompts: {} }) },
         serverInfo: { name: info.name ?? 'gesso', version: info.version ?? '0.0.0' },
         ...(info.instructions === undefined ? {} : { instructions: info.instructions })
       });
@@ -107,6 +172,12 @@ export async function handleMcpMessage(
       return ok(id, { resources: await surface.resources() });
     case 'resources/templates/list':
       return ok(id, { resourceTemplates: [] });
+    case 'prompts/list':
+      return ok(id, { prompts: listedPrompts(info.prompts) });
+    case 'prompts/get': {
+      const got = promptMessages(info.prompts, params.name, params.arguments);
+      return 'error' in got ? error(id, INVALID_PARAMS, got.error) : ok(id, got.result);
+    }
     case 'resources/read': {
       const uri = params.uri;
       const view = typeof uri === 'string' ? await surface.read(uri) : undefined;

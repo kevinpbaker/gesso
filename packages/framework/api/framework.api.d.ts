@@ -48,7 +48,25 @@ interface McpServerInfo {
   name?: string;
   version?: string;
   instructions?: string;
+  prompts?: readonly AgentPrompt[];
 }
+interface AgentPrompt {
+  readonly name: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly arguments?: readonly {
+    readonly name: string;
+    readonly description?: string;
+    readonly required?: boolean;
+  }[];
+  readonly text: string;
+}
+declare function listedPrompts(prompts?: readonly AgentPrompt[]): readonly Omit<AgentPrompt, 'text'>[];
+declare function promptMessages(prompts: readonly AgentPrompt[] | undefined, name: unknown, args: unknown): {
+  readonly result: unknown;
+} | {
+  readonly error: string;
+};
 type JsonRpcId = string | number;
 type JsonRpcResponse = {
   jsonrpc: '2.0';
@@ -204,10 +222,12 @@ export {
   DEV_AGENT_EVENTS,
   formatThemeTokens,
   handleMcpMessage,
+  listedPrompts,
   MCP_PROTOCOL_VERSIONS,
   mcpHandler,
   outline,
   pageModelContext,
+  promptMessages,
   registerWebMcpTools,
   remoteSurface,
   renderModule,
@@ -223,6 +243,7 @@ export {
   type AgentContent,
   type AgentPortRequest,
   type AgentPortResponse,
+  type AgentPrompt,
   type AgentResource,
   type AgentSurface,
   type AgentSurfaceLike,

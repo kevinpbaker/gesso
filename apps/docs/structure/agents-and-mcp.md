@@ -414,6 +414,32 @@ Bind to `127.0.0.1`, not to every interface, unless you mean it. The
 token is compared in constant time, so it cannot be guessed a character
 at a time from how quickly a wrong one is refused.
 
+### Prompts
+
+`prompts` offers the person ready-made messages to their agent, which
+most agents show as slash commands. Each is text the application wrote
+once, with `{{name}}` for each argument the person fills in:
+
+```ts
+mcpHandler(surface, {
+  name: 'notes',
+  prompts: [
+    {
+      name: 'summarise',
+      description: 'Summarise a notebook',
+      arguments: [{ name: 'notebook', required: true }],
+      text: 'Read the notebook {{notebook}} with notes_read and write a summary as a new note.'
+    }
+  ]
+});
+```
+
+A prompt is the way of working the application knows best, handed to
+whoever uses it: the person runs `/summarise` and their agent is told
+what to do and with which tools. `serveDesktopAgent` takes the same
+option, and the Vite plugin's `agentPrompts` offers them from the dev
+server, whether or not a page is open.
+
 ### Which agent is asking
 
 A command is called with its arguments and nothing else, so it cannot

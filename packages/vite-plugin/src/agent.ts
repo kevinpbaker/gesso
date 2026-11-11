@@ -22,7 +22,8 @@
  * A few tools are the server's own: the component catalog, which the
  * checker reads here and which an agent should be able to read before
  * any page is open. Those are answered here, and listed alongside the
- * page's; everything else still goes to the page.
+ * page's; so are the application's prompts, which are text it wrote and
+ * need no page. Everything else still goes to the page.
  *
  * A page that cannot answer is said to be one, rather than let the
  * agent wait or wonder. The tools the page last listed are remembered
@@ -133,6 +134,57 @@ export interface LocalTools {
   call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<unknown>;
   /** Added to what the page tells an agent when it connects. */
   readonly instructions?: string;
+  /** The application's prompts, answered here whether or not a page is open. */
+  readonly prompts?: readonly DevPrompt[];
+}
+
+/** A prompt the application offers, as `gesso-framework/agent`'s `AgentPrompt`: its message, `{{name}}` for each argument. */
+export interface DevPrompt {
+  readonly name: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly arguments?: readonly { readonly name: string; readonly description?: string; readonly required?: boolean }[];
+  readonly text: string;
+}
+
+/** `prompts/list` and `prompts/get` answered from the application's prompts, as the framework's MCP server answers them. */
+function answerPrompt(
+  id: string | number,
+  method: string,
+  params: Record<string, unknown>,
+  prompts: readonly DevPrompt[]
+): unknown {
+  if (method === 'prompts/list') {
+    return { jsonrpc: '2.0', id, result: { prompts: prompts.map(({ text: _text, ...listed }) => listed) } };
+  }
+  const prompt = prompts.find(p => p.name === params.name);
+  const refuse = (message: string) => ({ jsonrpc: '2.0', id, error: { code: -32602, message } });
+  if (prompt === undefined) {
+    const names = prompts.map(p => p.name);
+    return refuse(
+      `There is no prompt ${String(params.name)}.${names.length === 0 ? '' : ` The prompts are ${names.join(', ')}.`}`
+    );
+  }
+  const args = params.arguments;
+  const given =
+    typeof args === 'object' && args !== null && !Array.isArray(args) ? (args as Record<string, unknown>) : {};
+  const missing = (prompt.arguments ?? []).filter(
+    a => a.required === true && (given[a.name] === undefined || String(given[a.name]).trim() === '')
+  );
+  if (missing.length > 0) {
+    return refuse(`The prompt ${prompt.name} needs ${missing.map(a => a.name).join(' and ')}.`);
+  }
+  const text = prompt.text.replace(/\{\{\s*([\w-]+)\s*\}\}/g, (_, key: string) =>
+    given[key] === undefined ? '' : String(given[key])
+  );
+  return {
+    jsonrpc: '2.0',
+    id,
+    result: {
+      ...(prompt.description === undefined ? {} : { description: prompt.description }),
+      messages: [{ role: 'user', content: { type: 'text', text } }]
+    }
+  };
 }
 
 export interface AgentBridge {
@@ -237,6 +289,9 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
       return undefined;
     }
     const { id, method, params } = request;
+    if (method === 'prompts/list' || method === 'prompts/get') {
+      return Promise.resolve(answerPrompt(id, method, params, local?.prompts ?? []));
+    }
     if (method === 'tools/call' && typeof params.name === 'string' && options.gate !== undefined) {
       const refused = options.gate(params.name, params.arguments as Readonly<Record<string, unknown>> | undefined);
       if (refused !== undefined) {
@@ -269,7 +324,7 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           id,
           result: {
             protocolVersion: typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-06-18',
-            capabilities: { tools: {}, resources: {} },
+            capabilities: { tools: {}, resources: {}, ...((local?.prompts ?? []).length === 0 ? {} : { prompts: {} }) },
             serverInfo: { name: 'gesso', version: '0.0.0' },
             ...(instructions.length === 0 ? {} : { instructions: instructions.join('\n\n') })
           }
@@ -542,9 +597,18 @@ function mergeLocal(message: unknown, answer: unknown, local: LocalTools): unkno
     const added = local.tools.filter(tool => !taken.has(tool.name));
     return { ...(answer as object), result: { ...result, tools: [...result.tools, ...added] } };
   }
-  if (method === 'initialize' && local.instructions !== undefined) {
+  if (method === 'initialize') {
     const given = typeof result.instructions === 'string' ? `${result.instructions}\n\n` : '';
-    return { ...(answer as object), result: { ...result, instructions: `${given}${local.instructions}` } };
+    const capabilities =
+      typeof result.capabilities === 'object' && result.capabilities !== null ? result.capabilities : {};
+    return {
+      ...(answer as object),
+      result: {
+        ...result,
+        ...((local.prompts ?? []).length === 0 ? {} : { capabilities: { ...capabilities, prompts: {} } }),
+        ...(local.instructions === undefined ? {} : { instructions: `${given}${local.instructions}` })
+      }
+    };
   }
   return answer;
 }

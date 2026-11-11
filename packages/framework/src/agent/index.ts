@@ -14,8 +14,11 @@ export {
 } from './AgentSurface';
 export {
   handleMcpMessage,
+  listedPrompts,
   mcpHandler,
   MCP_PROTOCOL_VERSIONS,
+  promptMessages,
+  type AgentPrompt,
   type JsonRpcResponse,
   type McpCaller,
   type McpHandlerOptions,

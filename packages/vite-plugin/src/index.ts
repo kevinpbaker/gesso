@@ -13,6 +13,7 @@ import {
   type BridgeRequest,
   type BridgeResponse,
   type BridgeSocket,
+  type DevPrompt,
   type LocalTools,
   type PageMemory,
   type RememberedPage
@@ -36,6 +37,7 @@ export {
   type CatalogLibrary,
   type ComponentCatalogOptions
 } from './catalog.ts';
+export type { DevPrompt } from './agent.ts';
 export { transformRenderWorker, type RenderWiring } from './render.ts';
 export {
   findShellCall,
@@ -152,6 +154,12 @@ export interface GessoPluginOptions {
    * whose tools are best used in an order.
    */
   readonly agentInstructions?: string;
+  /**
+   * Prompts the person can run in their agent, most agents' slash
+   * commands: a message written once, `{{name}}` for each argument they
+   * fill in. Offered whether or not a page is open.
+   */
+  readonly agentPrompts?: readonly DevPrompt[];
   /**
    * Whether an agent's tool call may go ahead: undefined to let it, or
    * what the agent is told instead. Checked on the server for every
@@ -371,7 +379,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         paths: [...new Set([options.agentPath ?? AGENT_PATH, AGENT_PATH])],
         ...(options.agentGate === undefined ? {} : { gate: options.agentGate }),
         ...(() => {
-          const local = localAgentPart(catalog, options.agentInstructions);
+          const local = localAgentPart(catalog, options.agentInstructions, options.agentPrompts);
           return local === null ? {} : { local };
         })()
       });
@@ -707,20 +715,24 @@ function pageMemory(root: string): PageMemory {
  */
 export function localAgentPart(
   catalog: { call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<unknown> } | null,
-  agentInstructions: string | undefined
+  agentInstructions: string | undefined,
+  agentPrompts: readonly DevPrompt[] = []
 ): LocalTools | null {
+  const prompts = agentPrompts.length === 0 ? {} : { prompts: agentPrompts };
   if (catalog === null) {
-    return agentInstructions === undefined
+    return agentInstructions === undefined && agentPrompts.length === 0
       ? null
       : {
           tools: [],
           call: name => Promise.reject(new Error(`No tool ${name} is served here.`)),
-          instructions: agentInstructions
+          ...(agentInstructions === undefined ? {} : { instructions: agentInstructions }),
+          ...prompts
         };
   }
   return {
     tools: CATALOG_TOOLS,
     call: (name, args) => catalog.call(name, args),
-    instructions: [CATALOG_INSTRUCTIONS, ...(agentInstructions === undefined ? [] : [agentInstructions])].join('\n\n')
+    instructions: [CATALOG_INSTRUCTIONS, ...(agentInstructions === undefined ? [] : [agentInstructions])].join('\n\n'),
+    ...prompts
   };
 }

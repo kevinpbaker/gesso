@@ -57,10 +57,62 @@ describe('handleMcpMessage', () => {
     });
   });
 
+  it("offers the application's prompts, and gives one with its arguments put in", async () => {
+    const prompts = [
+      {
+        name: 'add_up',
+        description: 'Add a number to the counter',
+        arguments: [{ name: 'by', required: true }, { name: 'why' }],
+        text: 'Add {{by}} to the counter.{{ why }}'
+      }
+    ];
+    const started = await handleMcpMessage(surface(), rpc(1, 'initialize', {}), { prompts });
+    expect((started as { result: { capabilities: object } }).result.capabilities).toEqual({
+      tools: {},
+      resources: {},
+      prompts: {}
+    });
+    expect(await handleMcpMessage(surface(), rpc(2, 'prompts/list'), { prompts })).toEqual({
+      jsonrpc: '2.0',
+      id: 2,
+      result: {
+        prompts: [
+          {
+            name: 'add_up',
+            description: 'Add a number to the counter',
+            arguments: [{ name: 'by', required: true }, { name: 'why' }]
+          }
+        ]
+      }
+    });
+    expect(
+      await handleMcpMessage(surface(), rpc(3, 'prompts/get', { name: 'add_up', arguments: { by: '3' } }), { prompts })
+    ).toEqual({
+      jsonrpc: '2.0',
+      id: 3,
+      result: {
+        description: 'Add a number to the counter',
+        messages: [{ role: 'user', content: { type: 'text', text: 'Add 3 to the counter.' } }]
+      }
+    });
+    expect(await handleMcpMessage(surface(), rpc(4, 'prompts/get', { name: 'add_up' }), { prompts })).toMatchObject({
+      error: { code: -32602, message: 'The prompt add_up needs by.' }
+    });
+    expect(await handleMcpMessage(surface(), rpc(5, 'prompts/get', { name: 'nope' }), { prompts })).toMatchObject({
+      error: { message: 'There is no prompt nope. The prompts are add_up.' }
+    });
+    // An application with none says it has none.
+    expect(await handleMcpMessage(surface(), rpc(6, 'prompts/list'))).toEqual({
+      jsonrpc: '2.0',
+      id: 6,
+      result: { prompts: [] }
+    });
+  });
+
   it('answers a notification with nothing, and anything malformed with the JSON-RPC error for it', async () => {
     expect(await handleMcpMessage(surface(), { jsonrpc: '2.0', method: 'notifications/initialized' })).toBeNull();
     expect(await handleMcpMessage(surface(), { hello: 'there' })).toMatchObject({ error: { code: -32600 } });
-    expect(await handleMcpMessage(surface(), rpc(1, 'prompts/list'))).toMatchObject({ error: { code: -32601 } });
+    expect(await handleMcpMessage(surface(), rpc(1, 'completion/complete'))).toMatchObject({ error: { code: -32601 } });
     expect(await handleMcpMessage(surface(), rpc(1, 'tools/call', {}))).toMatchObject({ error: { code: -32602 } });
     expect(await handleMcpMessage(surface(), rpc(1, 'resources/read', { uri: 'gesso://x/view' }))).toMatchObject({
       error: { code: -32002 }

@@ -355,6 +355,7 @@ a desktop app's main process, opens the same catalog from
 | `agentPath`         | `/__gesso/mcp` | The path MCP is served at; the default keeps answering too               |
 | `agentName`         | root folder    | The name the printed lines add the endpoint under                        |
 | `agentInstructions` | none           | What an agent is told when it connects, after what the catalog says      |
+| `agentPrompts`      | none           | Prompts the person runs in their agent, as slash commands                |
 | `catalog`           | `true`         | Offer the project's components on that endpoint, and any libraries named |
 
 ## Is it required?

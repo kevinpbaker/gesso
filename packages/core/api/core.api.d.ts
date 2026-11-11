@@ -1629,6 +1629,7 @@ interface PaintTextStyle {
   readonly fontSize?: number;
   readonly fontFamily?: string;
   readonly fontWeight?: number | string;
+  readonly fontStyle?: 'normal' | 'italic' | 'oblique';
   readonly align?: PaintTextAlign;
 }
 interface PaintBox {

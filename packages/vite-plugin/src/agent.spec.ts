@@ -140,6 +140,48 @@ describe("the server's own tools", () => {
     expect(seen).toEqual(['initialize', 'tools/list', 'tools/call']);
   });
 
+  it("offers the application's prompts itself, with a page open or not, and says it has them as an agent connects", async () => {
+    const prompts = [
+      {
+        name: 'draw',
+        description: 'Draw a problem',
+        arguments: [{ name: 'problem', required: true }],
+        text: 'Draw this: {{problem}}'
+      }
+    ];
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket, { local: { ...local, prompts } });
+    const ask = async (id: number, method: string, params: Record<string, unknown> = {}) =>
+      JSON.parse((await request(bridge, { body: rpc(id, method, params) })).body!);
+
+    expect((await ask(1, 'initialize')).result.capabilities).toEqual({ tools: {}, resources: {}, prompts: {} });
+    expect((await ask(2, 'prompts/list')).result.prompts).toEqual([
+      { name: 'draw', description: 'Draw a problem', arguments: [{ name: 'problem', required: true }] }
+    ]);
+
+    const asked: string[] = [];
+    emit(
+      EVENTS.ready,
+      {},
+      fakePage(emit, message => {
+        const { id, method } = message as { id: number; method: string };
+        if (!String(id).startsWith('gesso:')) asked.push(method);
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: method === 'initialize' ? { capabilities: { tools: {}, resources: {} } } : { tools: [] }
+        };
+      })
+    );
+    expect((await ask(3, 'initialize')).result.capabilities).toEqual({ tools: {}, resources: {}, prompts: {} });
+    expect((await ask(4, 'prompts/get', { name: 'draw', arguments: { problem: 'a ladder' } })).result.messages).toEqual(
+      [{ role: 'user', content: { type: 'text', text: 'Draw this: a ladder' } }]
+    );
+    expect((await ask(5, 'prompts/get', { name: 'draw' })).error.message).toBe('The prompt draw needs problem.');
+    // The page is asked only for the handshake: the prompts are the server's.
+    expect(asked).toEqual(['initialize']);
+  });
+
   it('still says no page is open for what only a page can answer', async () => {
     const bridge = createAgentBridge(fakeSocket().socket, { local });
     const answer = JSON.parse((await request(bridge, { body: rpc(1, 'tools/call', { name: 'ui_snapshot' }) })).body!);
