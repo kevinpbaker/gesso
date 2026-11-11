@@ -1,5 +1,13 @@
 # gesso-devtools
 
+## 0.8.2
+
+### Patch Changes
+
+- Updated dependencies [c17fddb]
+- Updated dependencies [ca21c6f]
+  - gesso-framework@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes

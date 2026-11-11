@@ -1,5 +1,12 @@
 # gesso-vite-plugin
 
+## 0.8.2
+
+### Patch Changes
+
+- c6b74f1: `agentInstructions` reaches an agent with `catalog: false` too. The dev server only told an agent the application's own instructions alongside the catalog's, so an application that turned the catalog off had its instructions dropped.
+- c17fddb: MCP prompts. `mcpHandler`, `handleMcpMessage` and `serveDesktopAgent` take `prompts`, and the Vite plugin `agentPrompts`: messages the application wrote, with `{{name}}` for each argument, which the person runs in their agent as slash commands. Answered by `prompts/list` and `prompts/get`, and the server says it has them as an agent connects. The dev server answers them itself, so they are offered before any page is open.
+
 ## 0.8.1
 
 ### Patch Changes

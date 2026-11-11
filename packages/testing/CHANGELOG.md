@@ -1,5 +1,15 @@
 # gesso-testing
 
+## 0.8.2
+
+### Patch Changes
+
+- Updated dependencies [c17fddb]
+- Updated dependencies
+- Updated dependencies [ca21c6f]
+  - gesso-framework@0.8.2
+  - gesso-core@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes

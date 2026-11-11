@@ -1,5 +1,11 @@
 # gesso-core
 
+## 0.8.2
+
+### Patch Changes
+
+- Painted text can be set in italics: `PaintTextStyle` takes `fontStyle` (`normal`, `italic` or `oblique`), which the canvas target puts in its font.
+
 ## 0.8.1
 
 ### Patch Changes

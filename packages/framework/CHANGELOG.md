@@ -1,5 +1,14 @@
 # gesso-framework
 
+## 0.8.2
+
+### Patch Changes
+
+- c17fddb: MCP prompts. `mcpHandler`, `handleMcpMessage` and `serveDesktopAgent` take `prompts`, and the Vite plugin `agentPrompts`: messages the application wrote, with `{{name}}` for each argument, which the person runs in their agent as slash commands. Answered by `prompts/list` and `prompts/get`, and the server says it has them as an agent connects. The dev server answers them itself, so they are offered before any page is open.
+- ca21c6f: An agent that calls a tool before the app offers any is told the app is still starting, not "There is no tool called x. The tools are ." with an empty list. A desktop app's window offers its tools only once its page has loaded.
+- Updated dependencies
+  - gesso-core@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes
