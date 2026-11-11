@@ -1,5 +1,13 @@
 # gesso-components
 
+## 0.8.3
+
+### Patch Changes
+
+- 3eb2d34: A `MenuBar`'s titles are menu items now, named and marked `expanded` or `collapsed`, as the menubar pattern has them. They were rows with no role, so a screen reader read them as text and an agent's `ui_press` could not open a menu.
+- gesso-core@0.8.3
+  - gesso-framework@0.8.3
+
 ## 0.8.2
 
 ### Patch Changes
