@@ -1,10 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, map } from 'rxjs';
 
 import { Box, Button, Column, Row, Text, UiNodeType } from 'gesso-core';
-import { createComponent, type ComponentContext, type Inputs } from 'gesso-framework';
+import { createComponent, defineChannel, serve, Show, type ComponentContext, type Inputs } from 'gesso-framework';
 
+import { serveForTest } from './channels';
 import { renderTest } from './renderTest';
+
+/** A channel whose command comes back as a patch, for settle()'s test. */
+const Greeting = defineChannel('greeting', {
+  view: { text: 'Hello', note: '' },
+  commands: {} as { change(text: string): void }
+});
+
+function GreetingView(_inputs: Inputs<object>, ctx: ComponentContext) {
+  const greeting = ctx.channel(Greeting);
+  return Column(
+    Text({ text: greeting.view.text }),
+    Button({ text: 'Change', label: 'Change', onClick: () => greeting.send.change('Goodbye') }),
+    Show({
+      when: greeting.view.note.pipe(map(note => note !== '')),
+      children: () => Text({ text: greeting.view.note })
+    })
+  );
+}
 
 /**
  * The library's own suite.
@@ -49,6 +68,32 @@ describe('renderTest', () => {
     void Promise.resolve().then(() => text$.next('Ready'));
 
     expect(await ui.findByText('Ready')).toBeDefined();
+  });
+
+  it('waits for a served channel’s patch after a command', async () => {
+    const text = new BehaviorSubject('Hello');
+    const note = new BehaviorSubject('');
+    const served = serveForTest([
+      serve(Greeting, {
+        view: { text, note },
+        commands: {
+          change: next => {
+            note.next('Changed.');
+            text.next(next);
+          }
+        }
+      })
+    ]);
+    const ui = renderTest(createComponent(GreetingView, {}), { width: 200, height: 100, channels: served.registry });
+    await ui.settle();
+    expect(ui.getByText('Hello')).toBeDefined();
+
+    ui.fireEvent.click(ui.getByRole('button', { name: 'Change' }));
+    await ui.settle();
+
+    expect(ui.getByText('Goodbye')).toBeDefined();
+    expect(ui.getByText('Changed.')).toBeDefined();
+    served.dispose();
   });
 
   it('unmounts without leaving a frame armed', () => {

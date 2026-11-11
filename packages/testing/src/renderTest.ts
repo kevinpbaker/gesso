@@ -115,6 +115,8 @@ export interface RenderTestOptions extends Omit<Partial<GessoRuntimeOptions>, 'r
 const DEFAULT_WIDTH = 800;
 const DEFAULT_HEIGHT = 600;
 const DEFAULT_MAX_FRAMES = 100;
+/** Turns with no frame asked for, in a row, before settle() calls the tree quiet. */
+const QUIET_TURNS = 3;
 
 /**
  * Mounts a component or element tree with no browser and no DOM, and
@@ -190,19 +192,27 @@ export function renderTest(root: FrameworkChild, options: RenderTestOptions = {}
 
   const settle = async (settleOptions: { maxFrames?: number } = {}): Promise<void> => {
     const max = settleOptions.maxFrames ?? DEFAULT_MAX_FRAMES;
-    for (let index = 0; index <= max; index++) {
+    let frames = 0;
+    let quiet = 0;
+    for (;;) {
       // A macrotask, so a resolved fetch/decode chain gets to run too,
       // not just the microtasks a queued promise leaves behind.
       await new Promise(resolve => setTimeout(resolve, 0));
       if (!clock.isPending) {
-        return;
+        // Quiet for one turn is not quiet: a channel command and the
+        // patch it sends back each cross a message port, a turn apiece.
+        if (++quiet >= QUIET_TURNS) return;
+        continue;
+      }
+      quiet = 0;
+      if (++frames > max) {
+        throw new Error(
+          `settle() ran ${max} frames and the tree was still asking for another. ` +
+            `Something is scheduling a frame every frame; drive it with frame() instead.`
+        );
       }
       frame();
     }
-    throw new Error(
-      `settle() ran ${max} frames and the tree was still asking for another. ` +
-        `Something is scheduling a frame every frame; drive it with frame() instead.`
-    );
   };
 
   const base: RenderedBase = {
