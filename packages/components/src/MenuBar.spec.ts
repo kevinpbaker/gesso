@@ -39,6 +39,28 @@ function mount(checkedOf?: (item: Command) => boolean | undefined) {
   return { ui, record };
 }
 
+describe('MenuBar titles', () => {
+  it('are menu items a screen reader or an agent can open, marked expanded while open', () => {
+    const ui = renderTest(
+      Column(
+        createComponent(MenuBar<Command>, {
+          menus: [{ label: 'View', entries: ['light', 'dark'] }],
+          labelOf: (item: Command) => LABELS[item]
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    const title = ui.getByRole('menuitem', { name: 'View', states: ['collapsed'] });
+    expect(ui.queryByRole('menu')).toBeNull();
+
+    ui.fireEvent.click(title);
+    ui.frame();
+
+    expect(ui.getByRole('menu')).toBeDefined();
+    expect(ui.getByRole('menuitem', { name: 'View', states: ['expanded'] })).toBe(title);
+  });
+});
+
 describe('MenuBar checkedOf', () => {
   it('makes a setting a menuitemcheckbox, checked when it is on', () => {
     const { record } = mount(item => (item === 'zoomIn' ? undefined : item === 'dark'));

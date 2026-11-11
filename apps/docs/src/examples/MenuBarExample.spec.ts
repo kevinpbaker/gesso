@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createComponent } from 'gesso-framework';
-import { renderTest } from 'gesso-testing';
+import { nodesUnder, renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
 
 import { Bar } from './MenuBarExample';
@@ -15,9 +15,15 @@ function said(ui: Ui): string {
   return ui.textOf().join(' ');
 }
 
-/** The rows of whichever panel is open, in order. */
+/** The rows of whichever panel is open, in order: the menu items under the open menu, not the titles. */
 function openItems(ui: Ui): string[] {
-  return ui.getAllByRole('menuitem').map(node => ui.getSemantics(node).label ?? '');
+  const menu = ui.queryByRole('menu');
+  if (menu === null) return [];
+  const rows = new Set(nodesUnder(menu));
+  return ui
+    .getAllByRole('menuitem')
+    .filter(node => rows.has(node))
+    .map(node => ui.getSemantics(node).label ?? '');
 }
 
 describe('the menu bar example', () => {
@@ -26,7 +32,8 @@ describe('the menu bar example', () => {
     ui.frame();
 
     expect(ui.getByRole('menubar')).toBeTruthy();
-    expect(ui.queryByRole('menuitem')).toBeNull();
+    expect(ui.queryByRole('menu')).toBeNull();
+    expect(openItems(ui)).toEqual([]);
   });
 
   it('opens a menu from the keyboard and walks to the next one with the arrows', () => {
@@ -67,7 +74,7 @@ describe('the menu bar example', () => {
     ui.frame();
 
     expect(said(ui)).toContain('Undo chosen');
-    expect(ui.queryByRole('menuitem')).toBeNull();
+    expect(ui.queryByRole('menu')).toBeNull();
   });
 
   it('steps over the command that is unavailable, and stops once it is not', () => {

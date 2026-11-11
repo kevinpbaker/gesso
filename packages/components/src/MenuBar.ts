@@ -16,7 +16,8 @@ import {
   type UiChild,
   type UiInputEvent,
   type UiKeyboardEvent,
-  type UiNode
+  type UiNode,
+  type UiSemanticState
 } from 'gesso-core';
 
 import {
@@ -658,6 +659,13 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
             map(([current, focused]) => (focused && current.focused === index ? 'focusRing' : 'transparent'))
           ),
           cursor: 'pointer',
+          // A title is a menu item that opens its menu, as the menubar
+          // pattern has it, so a screen reader or an agent can open it too.
+          role: 'menuitem',
+          label: menu.label,
+          states: state.pipe(
+            map((current): UiSemanticState[] => [current.open && current.focused === index ? 'expanded' : 'collapsed'])
+          ),
           backgroundColor: combineLatest([state, hoveredTitle]).pipe(
             map(([current, hovered]) =>
               (current.open && current.focused === index) || hovered === index
