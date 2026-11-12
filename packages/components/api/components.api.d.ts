@@ -1163,6 +1163,7 @@ interface TourProps {
   onStepChange?: (step: number | null) => void;
   padding?: number;
   doneLabel?: string;
+  modal?: boolean;
 }
 declare function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild;
 interface ScrollAreaProps extends ControlLayoutProps {

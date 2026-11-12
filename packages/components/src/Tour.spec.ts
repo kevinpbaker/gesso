@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Button, Column, type UiNode } from 'gesso-core';
 import { createComponent, StartingInputs } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
+import 'gesso-testing/matchers';
 
 import { Tour, tourTarget, type TourProps } from './Tour';
 
@@ -108,6 +109,30 @@ describe('Tour', () => {
     ui.frame();
     expect(ui.queryByRole('dialog')).toBeNull();
     expect(asked).toEqual([1, 0, 1, 2, null]);
+  });
+
+  it('keeps the keyboard in the card, and lets it go to the target when it is not modal', async () => {
+    const modal = mount();
+    const compose = modal.ui.getByRole('button', { name: 'Compose' });
+    modal.ui.fireEvent.focus(compose);
+    modal.ui.frame();
+    // Refused: the keyboard stays in the card.
+    expect(compose).not.toHaveFocus();
+
+    const free = mount({ modal: false });
+    // The card takes the keyboard on the turn after it opens.
+    await new Promise(done => setTimeout(done, 0));
+    free.ui.frame();
+    expect(free.ui.getByRole('dialog', { name: 'Write a message' })).toHaveFocus();
+    const target = free.ui.getByRole('button', { name: 'Compose' });
+    free.ui.fireEvent.focus(target);
+    free.ui.frame();
+    expect(target).toHaveFocus();
+    // A press outside the hole is still the dim's.
+    free.ui.fireEvent.pointerDown(70, 220);
+    free.ui.fireEvent.pointerUp(70, 220);
+    free.ui.frame();
+    expect(free.pressed).toEqual([]);
   });
 
   it('closes on Escape', () => {

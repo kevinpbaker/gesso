@@ -75,6 +75,19 @@ export interface TourProps {
   padding?: number;
   /** The last step's button. Default "Done". */
   doneLabel?: string;
+  /**
+   * Whether the card keeps the keyboard. Default true: a walk through a
+   * screen, read a step at a time, where the target can be pressed but
+   * focus stays in the card.
+   *
+   * False is for a tutorial that has the person do each step: the card
+   * takes the keyboard as a step opens, but the target can take it from
+   * there, so a field in the hole can be typed in and a control that
+   * opens something by taking focus opens it. Presses outside the hole
+   * are still taken by the dim. Escape and the arrow keys work while the
+   * card has the keyboard.
+   */
+  modal?: boolean;
 }
 
 /** Far enough past any screen that the dim and the blockers reach every edge of it. */
@@ -100,6 +113,7 @@ const BEYOND = 10000;
 export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild {
   const padding = input(inputs.padding, 8);
   const doneLabel = input(inputs.doneLabel, 'Done');
+  const modal = input(inputs.modal, true);
   const focus = ctx.inject(FocusService);
   const inspection = ctx.inject(InspectionService);
   const animations = ctx.inject(AnimationService);
@@ -120,6 +134,8 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
   let placeholder: UiNode | null = null;
   /** The card's node while focus is kept in it. */
   let trapped: UiNode | null = null;
+  /** The card's node a tour that is not modal last gave the keyboard to, so it is given it once a step. */
+  let given: UiNode | null = null;
   const release = (): void => {
     if (trapped !== null) {
       const scope = trapped;
@@ -152,10 +168,20 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
     const current = all[at]!;
     const last = at === all.length - 1;
     const mine = (node: UiNode | null): void => {
-      if (node !== null && trapped !== node) {
+      if (node === null || trapped === node || given === node) {
+        return;
+      }
+      if (modal.value) {
         release();
         trapped = node;
         focus.trap(node);
+      } else {
+        // The keyboard to the card as the step opens, free to go to the target from there. On the next turn: a
+        // ref fires before the overlay holding the card is in the tree, where focus would be refused.
+        given = node;
+        setTimeout(() => {
+          if (given === node) focus.focus(node, { preventScroll: true });
+        }, 0);
       }
     };
     return Column(
