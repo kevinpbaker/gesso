@@ -230,7 +230,14 @@ export const matchers = {
 
 expect.extend(matchers);
 
-interface GessoMatchers<R = unknown> {
+/**
+ * The matchers as types, for a project that has to declare them on its own
+ * `vitest`: one that takes Gesso's packages from their source in another
+ * checkout, where the declaration below names that checkout's `vitest`.
+ * Such a project writes, in a `.d.ts` of its own,
+ * `declare module 'vitest' { interface Matchers<T = any> extends GessoMatchers<T> {} }`.
+ */
+export interface GessoMatchers<R = unknown> {
   toHaveBox: (expected: Partial<LayoutBox>) => R;
   toHaveVisibleBox: (expected: Partial<LayoutBox>) => R;
   toHaveText: (expected: string) => R;

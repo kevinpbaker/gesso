@@ -203,5 +203,6 @@ declare module 'vitest' {
 }
 export {
   ExpectedSemantics,
+  GessoMatchers,
   matchers
 };
