@@ -176,8 +176,8 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
           arrows(event);
         }
       }),
-      stepper('−', () => move(-step.value), disabled, tokens),
-      stepper('+', () => move(step.value), disabled, tokens)
+      stepper('−', label, () => move(-step.value), disabled, tokens),
+      stepper('+', label, () => move(step.value), disabled, tokens)
     ),
     controlMessage(error)
   );
@@ -195,6 +195,7 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
  */
 function stepper(
   glyph: string,
+  field: Observable<string>,
   press: () => void,
   disabled: Observable<boolean>,
   tokens: ThemeTokenCell<ControlTokens>
@@ -220,7 +221,11 @@ function stepper(
       borderColor: 'controlBorder',
       borderRadius: tokens.select(t => t.radius.field),
       role: 'button',
-      label: glyph === '+' ? 'Increase' : 'Decrease',
+      // Named for the field it moves, so a form with two number fields
+      // does not offer two buttons both called Increase.
+      label: field.pipe(
+        map(name => `${glyph === '+' ? 'Increase' : 'Decrease'}${name.length === 0 ? '' : ` ${name}`}`)
+      ),
       onClick: press
     },
     // A size rather than a role: the − and + are the button's icon, sized

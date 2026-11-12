@@ -36,8 +36,11 @@ describe('the docs number input example', () => {
       valueMax: 8,
       valueText: '2'
     });
-    expect(ui.getAllByRole('button', { name: 'Increase' })).toHaveLength(2);
-    expect(ui.getAllByRole('button', { name: 'Decrease' })).toHaveLength(2);
+    // Each named for its field, so the two fields' buttons are told apart.
+    for (const field of ['Guests', 'Tip']) {
+      expect(ui.getByRole('button', { name: `Increase ${field}` })).toBeDefined();
+      expect(ui.getByRole('button', { name: `Decrease ${field}` })).toBeDefined();
+    }
 
     // Tab walks through the two steppers on its way out of the field.
     // They were once skipped, on the grounds that the arrows do the
@@ -46,9 +49,9 @@ describe('the docs number input example', () => {
     // does not know the arrows work has no other way to press them.
     ui.fireEvent.focus(ui.getByRole('spinbutton', { name: 'Guests' }));
     ui.fireEvent.tab();
-    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getAllByRole('button', { name: 'Decrease' })[0]);
+    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByRole('button', { name: 'Decrease Guests' }));
     ui.fireEvent.tab();
-    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getAllByRole('button', { name: 'Increase' })[0]);
+    expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByRole('button', { name: 'Increase Guests' }));
     ui.fireEvent.tab();
     expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByRole('button', { name: 'Table for eight' }));
   });
@@ -72,7 +75,7 @@ describe('the docs number input example', () => {
     expect(value()).toBe(1);
 
     // The stepper beside the field is the same move, for a pointer.
-    ui.fireEvent.click(ui.getAllByRole('button', { name: 'Increase' })[0]!);
+    ui.fireEvent.click(ui.getByRole('button', { name: 'Increase Guests' }));
     expect(value()).toBe(2);
     expect(ui.getByText('2 × 45 = 90')).toBeDefined();
 
@@ -130,7 +133,7 @@ describe('the docs number input example', () => {
 
     ui.fireEvent.focus(field);
     ui.fireEvent.press('ArrowUp');
-    ui.fireEvent.click(ui.getByRole('button', { name: 'Increase' }));
+    ui.fireEvent.click(ui.getByRole('button', { name: 'Increase Guests' }));
     ui.frame();
     expect(ui.getSemantics(field).valueNow).toBe(4);
 

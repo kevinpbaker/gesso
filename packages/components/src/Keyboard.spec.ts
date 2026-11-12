@@ -179,7 +179,7 @@ describe('the keyboard gallery', () => {
       // Enter on each moves the field they belong to.
       {
         role: 'button',
-        name: 'Decrease',
+        name: 'Decrease Guests',
         operate: u => {
           const before = u.getSemantics(u.getByRole('spinbutton', { name: 'Guests' })).valueNow as number;
           u.fireEvent.keyDown('Enter');
@@ -189,7 +189,7 @@ describe('the keyboard gallery', () => {
       },
       {
         role: 'button',
-        name: 'Increase',
+        name: 'Increase Guests',
         operate: u => {
           const before = u.getSemantics(u.getByRole('spinbutton', { name: 'Guests' })).valueNow as number;
           u.fireEvent.keyDown('Enter');

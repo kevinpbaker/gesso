@@ -501,7 +501,7 @@ describe('NumberInput', () => {
     const ui = mount(createComponent(NumberInput, { label: 'Size', labelHidden: true, defaultValue: 13 }));
     ui.frame();
     const field = ui.getLayout(ui.getByRole('spinbutton'))!;
-    for (const name of ['Decrease', 'Increase']) {
+    for (const name of ['Decrease Size', 'Increase Size']) {
       const button = ui.getByRole('button', { name });
       const box = ui.getLayout(button)!;
       const glyph = ui.getLayout(button.firstChild!)!;

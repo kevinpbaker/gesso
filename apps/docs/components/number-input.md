@@ -131,9 +131,10 @@ not. It emits:
 - **`states`**: `invalid` while `error` is a non-empty string, and
   `required` while `required` is set.
 
-The two step buttons carry `role: 'button'` and the names `Increase`
-and `Decrease`, so they are announced and clickable while staying out
-of the tab order. The message under the field carries its own text into
+The two step buttons carry `role: 'button'` and are named for the
+field, `Increase Guests` and `Decrease Guests`, so two number fields in
+one form do not offer two buttons both called Increase. They are tab
+stops like any other button. The message under the field carries its own text into
 the tree.
 
 ## Next
