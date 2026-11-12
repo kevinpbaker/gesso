@@ -1728,6 +1728,12 @@ export class LayoutEngine {
     if (rec.aspectRatio !== undefined) {
       size = this.applyAspectRatio(size, rec.aspectRatio, effective);
     }
+    // A baseline the node declares, for content the layout cannot read one from (a painted figure, math).
+    const declared = this.numberProp(node, 'baseline');
+    if (declared !== undefined && Number.isFinite(declared)) {
+      rec.hasBaseline = true;
+      rec.baseline = declared;
+    }
     // The content's own size, before any explicit or parent size: the
     // "content size suggestion" a column uses for automatic minimums,
     // and what explain() reports the content asked for.

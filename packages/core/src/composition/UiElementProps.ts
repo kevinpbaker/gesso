@@ -139,6 +139,7 @@ export type BoxModelProps = PropsOf<
   | 'marginStart'
   | 'marginEnd'
   | 'aspectRatio'
+  | 'baseline'
 >;
 
 /** How an element behaves as a child of a Row, Column or ScrollView. */

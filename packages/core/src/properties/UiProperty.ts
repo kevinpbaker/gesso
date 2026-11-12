@@ -509,6 +509,20 @@ export const UiProperties = {
     affects: L
   }),
 
+  /**
+   * The node's first baseline, in pixels from its top edge, for a node
+   * whose content the layout cannot read one from: a painted figure, math
+   * set by a painter of its own. A row with `y: 'baseline'` lines it up
+   * with the text beside it, as it would its own text. Left out, a node
+   * has the baseline of its text or its first child, or its bottom edge.
+   */
+  baseline: defineProperty<number | undefined>({
+    name: 'baseline',
+    defaultValue: undefined,
+    inherited: false,
+    affects: L
+  }),
+
   flexGrow: defineProperty<number | undefined>({
     name: 'flexGrow',
     defaultValue: undefined,

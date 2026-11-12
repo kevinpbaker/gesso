@@ -185,6 +185,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   },
   selfX: { group: 'Flex', note: 'One child overriding the x alignment its parent set.' },
   selfY: { group: 'Flex', note: 'One child overriding the y alignment its parent set.' },
+  baseline: {
+    group: 'Flex',
+    note: 'The baseline a node declares, in pixels from its top, for content the layout cannot read one from, as a painted figure or math. A row aligned on baselines lines it up with the text beside it.'
+  },
   direction: { group: 'Flex', note: 'Which way a flex or scroll container runs.' },
 
   // Grid

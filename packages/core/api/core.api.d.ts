@@ -2059,6 +2059,7 @@ declare const UiProperties: {
   readonly layout: UiPropertyDefinition<UiLayoutProtocol | undefined>;
   readonly layoutData: UiPropertyDefinition<unknown>;
   readonly aspectRatio: UiPropertyDefinition<number | undefined>;
+  readonly baseline: UiPropertyDefinition<number | undefined>;
   readonly flexGrow: UiPropertyDefinition<number | undefined>;
   readonly flexShrink: UiPropertyDefinition<number | undefined>;
   readonly flexBasis: UiPropertyDefinition<UiLength | undefined>;
@@ -2231,7 +2232,7 @@ type IdentityProps = {
   key?: string | number;
   ref?: UiNodeRef;
 };
-type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingX' | 'paddingY' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'paddingStart' | 'paddingEnd' | 'margin' | 'marginX' | 'marginY' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'marginStart' | 'marginEnd' | 'aspectRatio'>;
+type BoxModelProps = PropsOf<'width' | 'height' | 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight' | 'padding' | 'paddingX' | 'paddingY' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft' | 'paddingStart' | 'paddingEnd' | 'margin' | 'marginX' | 'marginY' | 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'marginStart' | 'marginEnd' | 'aspectRatio' | 'baseline'>;
 type FlexItemProps = PropsOf<'flex' | 'flexGrow' | 'flexShrink' | 'flexBasis' | 'selfX' | 'selfY' | 'layoutData'>;
 type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'anchorRect' | 'placement' | 'anchorOffset'>;

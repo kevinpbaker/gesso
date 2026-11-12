@@ -274,6 +274,21 @@ describe('LayoutEngine text', () => {
       expect(harness.record(row).measuredHeight).toBe(22);
     });
 
+    it('takes the baseline a box without text declares', () => {
+      const harness = new LayoutHarness();
+      const row = harness.createNode('row', UiNodeType.Row);
+      row.setProperty('y', 'baseline');
+      // Math as a painter sets it: 50 high, its line of text 30 down, where a fraction's bar is.
+      const math = leaf(harness, 'math', 80, 50);
+      math.setProperty('baseline', 30);
+      const unit = text(harness, 'unit', 'ab');
+      harness.append(row, math, unit);
+      harness.layout(row, Constraints.unbounded());
+      expect(harness.box(math).y).toBe(0);
+      // The text's baseline, 9 below its top, on the math's: 30.
+      expect(harness.box(unit).y).toBe(21);
+    });
+
     it('synthesises a baseline from the bottom of a box without text', () => {
       const harness = new LayoutHarness();
       const row = harness.createNode('row', UiNodeType.Row);
