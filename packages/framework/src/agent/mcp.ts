@@ -119,6 +119,7 @@ const PARSE_ERROR = -32700;
 const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
+const INTERNAL_ERROR = -32603;
 /** MCP's code for a resource that does not exist. */
 const RESOURCE_NOT_FOUND = -32002;
 
@@ -142,6 +143,21 @@ export async function handleMcpMessage(
     return null;
   }
   const { id } = message;
+  try {
+    return await answerRequest(surface, id, message, info);
+  } catch (failure) {
+    // Never throws: whatever goes wrong reading a listing or a view is said as the JSON-RPC error for it.
+    return error(id, INTERNAL_ERROR, failure instanceof Error ? failure.message : String(failure));
+  }
+}
+
+/** One request answered: what `handleMcpMessage` does once it knows the message is a request, not a notification. */
+async function answerRequest(
+  surface: AgentSurfaceLike,
+  id: JsonRpcId,
+  message: JsonRpcRequest,
+  info: McpServerInfo
+): Promise<JsonRpcResponse> {
   const params = message.params ?? {};
   switch (message.method) {
     case 'initialize': {
@@ -166,7 +182,14 @@ export async function handleMcpMessage(
       if (args !== undefined && (args === null || typeof args !== 'object' || Array.isArray(args))) {
         return error(id, INVALID_PARAMS, 'tools/call arguments must be an object.');
       }
-      return ok(id, await surface.call(params.name, args as Record<string, unknown> | undefined));
+      // A tool that fails (its thread threw, or its answer could not be sent back) is the agent's to hear about,
+      // as a tool error it can read, not a request left unanswered.
+      try {
+        return ok(id, await surface.call(params.name, args as Record<string, unknown> | undefined));
+      } catch (failure) {
+        const said = failure instanceof Error ? failure.message : String(failure);
+        return ok(id, { content: [{ type: 'text', text: `${params.name} failed: ${said}` }], isError: true });
+      }
     }
     case 'resources/list':
       return ok(id, { resources: await surface.resources() });

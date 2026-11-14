@@ -118,6 +118,29 @@ describe('handleMcpMessage', () => {
       error: { code: -32002 }
     });
   });
+
+  it('answers a tool that fails as a tool error, and anything else that fails as an internal error, never leaving a request unanswered', async () => {
+    const failing = {
+      ...surface(),
+      call: () => Promise.reject(new Error("Failed to execute 'postMessage': a function could not be cloned.")),
+      tools: () => Promise.reject(new Error('The thread went away.'))
+    };
+    expect(await handleMcpMessage(failing, rpc(7, 'tools/call', { name: 'part_view', arguments: {} }))).toEqual({
+      jsonrpc: '2.0',
+      id: 7,
+      result: {
+        content: [
+          { type: 'text', text: "part_view failed: Failed to execute 'postMessage': a function could not be cloned." }
+        ],
+        isError: true
+      }
+    });
+    expect(await handleMcpMessage(failing, rpc(8, 'tools/list'))).toEqual({
+      jsonrpc: '2.0',
+      id: 8,
+      error: { code: -32603, message: 'The thread went away.' }
+    });
+  });
 });
 
 describe('mcpHandler', () => {
