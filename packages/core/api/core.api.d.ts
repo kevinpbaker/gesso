@@ -1618,6 +1618,7 @@ interface PaintSurface {
   stroke(): void;
   clip(rule?: PaintFillRule): void;
   text(value: string, x: number, y: number, style?: PaintTextStyle): void;
+  measureText(value: string, style?: PaintTextStyle): number;
   image(image: UiImage, x: number, y: number, width: number, height: number): void;
 }
 type PaintFillRule = 'nonzero' | 'evenodd';
@@ -4972,6 +4973,7 @@ declare class PaintRecorder implements PaintSurface {
   stroke(): void;
   clip(rule?: PaintFillRule): void;
   text(value: string, x: number, y: number, style?: PaintTextStyle): void;
+  measureText(value: string, style?: PaintTextStyle): number;
   image(image: UiImage, x: number, y: number, width: number, height: number): void;
 }
 declare function replayPaint(recording: PaintRecording, surface: PaintSurface): void;
@@ -4996,6 +4998,9 @@ interface PaintContext2D {
   stroke(): void;
   clip(fillRule?: PaintFillRule): void;
   fillText(text: string, x: number, y: number): void;
+  measureText(text: string): {
+    readonly width: number;
+  };
   drawImage(image: UiImage, dx: number, dy: number, dw: number, dh: number): void;
   setLineDash(segments: readonly number[]): void;
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): PaintGradient;
@@ -5096,6 +5101,7 @@ declare class PaintTarget implements PaintSurface {
   stroke(): void;
   clip(rule?: PaintFillRule): void;
   text(value: string, x: number, y: number, style?: PaintTextStyle): void;
+  measureText(value: string, style?: PaintTextStyle): number;
   image(image: UiImage, x: number, y: number, width: number, height: number): void;
 }
 interface PaintStats {

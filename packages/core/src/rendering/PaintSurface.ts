@@ -166,6 +166,12 @@ export interface PaintSurface {
    * for the labels a chart puts on its own axes.
    */
   text(value: string, x: number, y: number, style?: PaintTextStyle): void;
+  /**
+   * How wide `text` would draw a line, in the current coordinates: for
+   * the plate behind a label, or to keep labels off one another and off
+   * what they label. Measures; draws nothing.
+   */
+  measureText(value: string, style?: PaintTextStyle): number;
   /** Draws an image into a rectangle, stretched to fill it. */
   image(image: UiImage, x: number, y: number, width: number, height: number): void;
 }

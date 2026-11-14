@@ -3,8 +3,8 @@ import type { UiColorValue } from '../properties/UiPropertyValues';
 import type { ResolvedGradient, UiGradient } from '../properties/UiGradient';
 import { gradientPaint } from '../properties/UiGradient';
 import type { UiImage } from '../properties/UiImage';
-import { colorToCss, DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, DEFAULT_FONT_WEIGHT } from './PaintState';
-import { fontStackFor } from './FontStacks';
+import { colorToCss } from './PaintState';
+import { paintFont } from './PaintFont';
 import { tracePathData } from './PaintPathData';
 import type {
   PaintFillRule,
@@ -46,6 +46,7 @@ export interface PaintContext2D {
   stroke(): void;
   clip(fillRule?: PaintFillRule): void;
   fillText(text: string, x: number, y: number): void;
+  measureText(text: string): { readonly width: number };
   drawImage(image: UiImage, dx: number, dy: number, dw: number, dh: number): void;
   setLineDash(segments: readonly number[]): void;
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): PaintGradient;
@@ -523,14 +524,15 @@ export class PaintTarget implements PaintSurface {
     if (this.suppressed > 0) {
       return;
     }
-    const size = style?.fontSize ?? DEFAULT_FONT_SIZE;
-    const weight = style?.fontWeight ?? DEFAULT_FONT_WEIGHT;
-    const family = fontStackFor(style?.fontFamily ?? DEFAULT_FONT_FAMILY);
-    const slant = style?.fontStyle === undefined || style.fontStyle === 'normal' ? '' : `${style.fontStyle} `;
-    this.ctx.font = `${slant}${String(weight)} ${size}px ${family}`;
+    this.ctx.font = paintFont(style);
     this.ctx.textAlign = style?.align ?? 'left';
     this.ctx.textBaseline = 'alphabetic';
     this.ctx.fillText(value, x, y);
+  }
+
+  measureText(value: string, style?: PaintTextStyle): number {
+    this.ctx.font = paintFont(style);
+    return this.ctx.measureText(value).width;
   }
 
   image(image: UiImage, x: number, y: number, width: number, height: number): void {

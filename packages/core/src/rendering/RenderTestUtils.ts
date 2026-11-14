@@ -541,6 +541,12 @@ export class RecordingPaintContext implements PaintContext2D {
     this.record('fillText', [text, x, y, this.font, this.textAlign]);
   }
 
+  /** Eight units a character, as the canvas double measures: wide enough to tell texts apart, and recorded. */
+  measureText(text: string): { width: number } {
+    this.record('measureText', [text, this.font]);
+    return { width: text.length * 8 };
+  }
+
   drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void {
     this.record('drawImage', [image, dx, dy, dw, dh]);
   }

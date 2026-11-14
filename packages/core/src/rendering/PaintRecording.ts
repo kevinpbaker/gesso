@@ -1,6 +1,7 @@
 import type { UiColorValue } from '../properties/UiPropertyValues';
 import type { UiGradient } from '../properties/UiGradient';
 import type { UiImage } from '../properties/UiImage';
+import { measurePaintText } from './PaintFont';
 import { tracePathData } from './PaintPathData';
 import type {
   PaintFillRule,
@@ -290,6 +291,11 @@ export class PaintRecorder implements PaintSurface {
 
   text(value: string, x: number, y: number, style?: PaintTextStyle): void {
     this.recorded.push({ op: 'text', value, x, y, style });
+  }
+
+  /** Measured, not recorded: it draws nothing, and the picture is what was drawn. */
+  measureText(value: string, style?: PaintTextStyle): number {
+    return measurePaintText(value, style);
   }
 
   image(image: UiImage, x: number, y: number, width: number, height: number): void {
