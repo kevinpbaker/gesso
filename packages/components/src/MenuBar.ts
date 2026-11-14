@@ -1,6 +1,6 @@
-import { BehaviorSubject, combineLatest, map, Subject, type Observable } from 'rxjs';
+import { BehaviorSubject, combineLatest, distinctUntilChanged, map, Subject, type Observable } from 'rxjs';
 
-import { FocusService, input, ScrollService, type ComponentContext, type Inputs } from 'gesso-framework';
+import { each, FocusService, input, ScrollService, type ComponentContext, type Inputs } from 'gesso-framework';
 import {
   Box,
   Column,
@@ -115,7 +115,9 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
   const menus = (): readonly MenuBarMenu<T>[] => inputs.menus.value;
 
   /** The node each title is drawn as, so a panel can sit under it. */
-  const titles: (UiNode | null)[] = [];
+  /** Each title's node, by its menu's label: a title follows its menu when the menus change. */
+  const titleNodes = new Map<string, UiNode>();
+  const titleAt = (index: number): UiNode | null => titleNodes.get(menus()[index]?.label ?? '') ?? null;
 
   /**
    * The open panel's rows, by menu and index, so the row the keyboard
@@ -213,7 +215,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
       overlay.hide();
       swapping = false;
     }
-    const anchor = titles[next.focused] ?? null;
+    const anchor = titleAt(next.focused);
     overlay.show(panel(next.focused), {
       anchor,
       environment: anchor,
@@ -490,7 +492,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
         modifiers: [
           clickOutside({
             onOutside: () => show({ ...state.value, open: false, active: -1 }),
-            except: () => titles.filter((node): node is UiNode => node !== null)
+            except: () => [...titleNodes.values()]
           })
         ]
       },
@@ -641,70 +643,83 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
       onKeyDown,
       modifiers: [applicationKeys({ watch, heard, released })]
     },
-    ...menus().map((menu, index) =>
-      Row(
-        {
-          key: menu.label,
-          ref: (node: UiNode | null) => {
-            titles[index] = node;
-          },
-          paddingLeft: 9,
-          paddingRight: 9,
-          paddingTop: 4,
-          paddingBottom: 4,
-          borderRadius: 5,
-          // Paint only, inside the box: marking the title moves nothing.
-          borderWidth: 2,
-          borderColor: combineLatest([state, barFocused]).pipe(
-            map(([current, focused]) => (focused && current.focused === index ? 'focusRing' : 'transparent'))
-          ),
-          cursor: 'pointer',
-          // A title is a menu item that opens its menu, as the menubar
-          // pattern has it, so a screen reader or an agent can open it too.
-          role: 'menuitem',
-          label: menu.label,
-          states: state.pipe(
-            map((current): UiSemanticState[] => [current.open && current.focused === index ? 'expanded' : 'collapsed'])
-          ),
-          backgroundColor: combineLatest([state, hoveredTitle]).pipe(
-            map(([current, hovered]) =>
-              (current.open && current.focused === index) || hovered === index
-                ? 'controlBackgroundHovered'
-                : 'transparent'
-            )
-          ),
-          onPointerEnter: () => {
-            hoveredTitle.next(index);
-            // With a menu already open, moving along the bar opens the
-            // one under the pointer. Without that, a bar is something
-            // you have to click four times to read.
-            if (state.value.open && state.value.focused !== index) {
-              show({ focused: index, open: true, active: -1 });
+    // The titles follow the menus: one added, taken away or renamed is
+    // drawn, and each keeps its place in the bar by looking it up.
+    each(
+      inputs.menus.pipe(
+        map(list => list.map(menu => menu.label)),
+        distinctUntilChanged((a, b) => a.length === b.length && a.every((label, i) => label === b[i]))
+      ),
+      label => label,
+      label => {
+        const at = (): number => menus().findIndex(menu => menu.label === label);
+        return Row(
+          {
+            key: label,
+            ref: (node: UiNode | null) => {
+              if (node === null) titleNodes.delete(label);
+              else titleNodes.set(label, node);
+            },
+            paddingLeft: 9,
+            paddingRight: 9,
+            paddingTop: 4,
+            paddingBottom: 4,
+            borderRadius: 5,
+            // Paint only, inside the box: marking the title moves nothing.
+            borderWidth: 2,
+            borderColor: combineLatest([state, barFocused]).pipe(
+              map(([current, focused]) => (focused && current.focused === at() ? 'focusRing' : 'transparent'))
+            ),
+            cursor: 'pointer',
+            // A title is a menu item that opens its menu, as the menubar
+            // pattern has it, so a screen reader or an agent can open it too.
+            role: 'menuitem',
+            label,
+            states: state.pipe(
+              map((current): UiSemanticState[] => [current.open && current.focused === at() ? 'expanded' : 'collapsed'])
+            ),
+            backgroundColor: combineLatest([state, hoveredTitle]).pipe(
+              map(([current, hovered]) =>
+                (current.open && current.focused === at()) || hovered === at()
+                  ? 'controlBackgroundHovered'
+                  : 'transparent'
+              )
+            ),
+            onPointerEnter: () => {
+              const index = at();
+              hoveredTitle.next(index);
+              // With a menu already open, moving along the bar opens the
+              // one under the pointer. Without that, a bar is something
+              // you have to click four times to read.
+              if (state.value.open && state.value.focused !== index) {
+                show({ focused: index, open: true, active: -1 });
+              }
+            },
+            onPointerLeave: () => {
+              if (hoveredTitle.value === at()) {
+                hoveredTitle.next(-1);
+              }
+            },
+            onClick: () => {
+              const current = state.value;
+              const index = at();
+              // Clicking the menu that is already open closes it, which is
+              // what a title bar does everywhere.
+              show(
+                current.open && current.focused === index
+                  ? { focused: index, open: false, active: -1 }
+                  : { focused: index, open: true, active: -1 }
+              );
             }
           },
-          onPointerLeave: () => {
-            if (hoveredTitle.value === index) {
-              hoveredTitle.next(-1);
-            }
-          },
-          onClick: () => {
-            const current = state.value;
-            // Clicking the menu that is already open closes it, which is
-            // what a title bar does everywhere.
-            show(
-              current.open && current.focused === index
-                ? { focused: index, open: false, active: -1 }
-                : { focused: index, open: true, active: -1 }
-            );
-          }
-        },
-        Text({
-          text: menu.label,
-          textStyle: 'bodySmall',
-          color: 'text',
-          selectable: false
-        })
-      )
+          Text({
+            text: label,
+            textStyle: 'bodySmall',
+            color: 'text',
+            selectable: false
+          })
+        );
+      }
     )
   );
 }

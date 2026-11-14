@@ -1,3 +1,4 @@
+import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
 import { createComponent } from 'gesso-framework';
@@ -40,6 +41,26 @@ function mount(checkedOf?: (item: Command) => boolean | undefined) {
 }
 
 describe('MenuBar titles', () => {
+  it('follow the menus: a menu added later gets its title, and it opens', () => {
+    const menus = new BehaviorSubject<readonly { label: string; entries: readonly Command[] }[]>([
+      { label: 'View', entries: ['light'] }
+    ]);
+    const ui = renderTest(
+      Column(createComponent(MenuBar<Command>, { menus, labelOf: (item: Command) => LABELS[item] })),
+      { width: 400, height: 400 }
+    );
+    expect(ui.queryByRole('menuitem', { name: 'Zoom' })).toBeNull();
+    menus.next([
+      { label: 'View', entries: ['light'] },
+      { label: 'Zoom', entries: ['zoomIn'] }
+    ]);
+    ui.frame();
+    ui.fireEvent.click(ui.getByRole('menuitem', { name: 'Zoom' }));
+    ui.frame();
+    expect(ui.getByRole('menuitem', { name: 'Zoom in' })).toBeDefined();
+    expect(ui.getByRole('menuitem', { name: 'Zoom', states: ['expanded'] })).toBeDefined();
+  });
+
   it('are menu items a screen reader or an agent can open, marked expanded while open', () => {
     const ui = renderTest(
       Column(
