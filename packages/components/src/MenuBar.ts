@@ -254,10 +254,24 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
    */
   let entered = false;
   let returnTo: UiNode | null = null;
+  /** The open menu's panel, while one is up. */
+  let panelNode: UiNode | null = null;
+  /** Whether a node is the bar, one of its titles, or in the open panel. */
+  const ours = (node: UiNode): boolean => {
+    for (let at: UiNode | null = node; at !== null; at = at.parent) {
+      if (at === barNode || at === panelNode) return true;
+    }
+    return false;
+  };
   ctx.effect(focus.focused, node => {
     if (node !== barNode) {
       entered = false;
       returnTo = null;
+    }
+    // Focus taken somewhere else while a menu is open (a dialog a shortcut opened, a field clicked into) leaves the
+    // menu behind it: it closes, as a press outside does, rather than float over what took the focus.
+    if (node !== null && state.value.open && !ours(node)) {
+      show({ ...state.value, open: false, active: -1 });
     }
   });
 
@@ -481,6 +495,9 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
   const panel = (index: number): UiChild =>
     Column(
       {
+        ref: (node: UiNode | null) => {
+          panelNode = node;
+        },
         minWidth: 232,
         padding: 4,
         backgroundColor: 'surface',

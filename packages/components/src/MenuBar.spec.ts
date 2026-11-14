@@ -82,6 +82,31 @@ describe('MenuBar titles', () => {
   });
 });
 
+describe('MenuBar when focus goes elsewhere', () => {
+  it('closes an open menu, as a dialog a shortcut opens takes the focus', () => {
+    const ui = renderTest(
+      Column(
+        createComponent(MenuBar<Command>, {
+          menus: [{ label: 'View', entries: ['light', 'dark'] }],
+          labelOf: (item: Command) => LABELS[item]
+        }),
+        createComponent(Button, { label: 'Elsewhere' })
+      ),
+      { width: 400, height: 400 }
+    );
+    ui.fireEvent.click(ui.getByRole('menuitem', { name: 'View' }));
+    ui.frame();
+    expect(ui.getByRole('menuitem', { name: 'Light' })).toBeDefined();
+    // Walking the open menu keeps it open.
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    expect(ui.getByRole('menuitem', { name: 'Light' })).toBeDefined();
+    ui.fireEvent.focus(ui.getByRole('button', { name: 'Elsewhere' }));
+    ui.frame();
+    expect(ui.queryByRole('menuitem', { name: 'Light' })).toBeNull();
+  });
+});
+
 describe('MenuBar checkedOf', () => {
   it('makes a setting a menuitemcheckbox, checked when it is on', () => {
     const { record } = mount(item => (item === 'zoomIn' ? undefined : item === 'dark'));
