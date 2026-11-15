@@ -161,14 +161,15 @@ const TOOLS: readonly AgentTool[] = [
       "you ask for, in the theme being designed in. The pixels are the application's own: the same layout, " +
       'text and paint. Draw what you build, at a phone width and a desktop one, and look before you call it done. ' +
       'Without a height it is as tall as its content, which suits a component or a section; give one for a whole ' +
-      'screen, which then fills it. Example: {"module": "src/mocks/Settings", "width": 390, "height": 844}, or ' +
-      '{"module": "src/components/Button", "inputs": {"label": "Save"}, "width": 200}.',
+      'screen, which then fills it. Example: {"module": "<module>", "width": 390, "height": 844}, or ' +
+      '{"module": "<module>", "export": "<Component>", "inputs": {"<input>": "<value>"}, "width": 200}.',
     inputSchema: {
       type: 'object',
       properties: {
         module: {
           type: 'string',
-          description: 'The module, from the project root, as library_overview gives it: "src/mocks/Settings".'
+          description:
+            "The module's path from the project root, with or without its extension, as library_overview gives it."
         },
         export: {
           type: 'string',
@@ -366,7 +367,7 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
           }
           if (typeof args.module !== 'string' || args.module === '') {
             return failure(
-              'render_frame needs module: the module, from the project root, such as "src/mocks/Settings".'
+              "render_frame needs module: the module's path from the project root, as library_overview gives it."
             );
           }
           if (typeof args.width !== 'number' || !(args.width > 0)) {
