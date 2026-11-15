@@ -140,7 +140,7 @@ describe('the docs toast example', () => {
     expect(reached).toEqual(['Save it badly', 'Dismiss', 'Save the note']);
   });
 
-  it('takes its accessible name at the moment it opens', () => {
+  it('keeps its accessible name to the message it shows', () => {
     const open = new BehaviorSubject(true);
     const message = new BehaviorSubject('Note saved');
     const ui = renderTest(createComponent(Toast, { open, message, duration: 0 }), SIZE);
@@ -150,11 +150,10 @@ describe('the docs toast example', () => {
     message.next('Note saved to the server');
     ui.frame();
 
-    // The text drawn follows the cell, because it is bound; the name
-    // was read once, when the box was built. Raise a new toast rather
-    // than editing the message of one that is up.
+    // The name is bound like the text drawn, so a screen reader hears
+    // the message the toast shows, not the one it opened with.
     expect(ui.getByText('Note saved to the server')).toBeDefined();
-    expect(ui.getByRole('status')).toHaveSemantics({ name: 'Note saved' });
+    expect(ui.getByRole('status')).toHaveSemantics({ name: 'Note saved to the server' });
   });
 
   it('is pinned to the bottom start corner rather than placed in the layout', () => {

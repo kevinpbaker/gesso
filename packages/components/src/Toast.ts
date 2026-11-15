@@ -1,4 +1,6 @@
-import { FocusService, input, type ComponentContext, type Inputs } from 'gesso-framework';
+import { distinctUntilChanged, map, skip } from 'rxjs';
+
+import { FocusService, input, show, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Button, Row, Text, type UiChild, type UiNode } from 'gesso-core';
 import { useOverlay } from './overlay';
 
@@ -17,10 +19,15 @@ import { useOverlay } from './overlay';
  * toast must not close under somebody reading it or about to press its
  * action.
  *
+ * A toast kept up while its `message` changes is showing a new notice,
+ * so the new one has the whole duration from then. Its action, tone and
+ * label follow their inputs as they change, whenever they change.
+ *
  * Writing `open` true again while it is up is not a change, so it does
  * not restart the timer: an input cell passes on a value that differs
- * from the last, and there is nothing here to hear. To raise a notice
- * anew, close it first or mount a fresh toast keyed by the notice.
+ * from the last, and there is nothing here to hear. The same message a
+ * second time is not heard either. To raise that notice anew, close it
+ * first or mount a fresh toast keyed by the notice.
  */
 export interface ToastProps {
   open?: boolean;
@@ -107,6 +114,13 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
     close();
   };
 
+  // A new notice in a toast that is up: its own whole duration.
+  ctx.effect(message.pipe(distinctUntilChanged(), skip(1)), () => {
+    if (overlay.isOpen()) start();
+  });
+
+  const isError = tone.pipe(map(t => t === 'error'));
+
   const body = (): UiChild =>
     Row(
       {
@@ -116,10 +130,10 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
         minWidth: 240,
         backgroundColor: 'surface',
         borderWidth: 1,
-        borderColor: tone.value === 'error' ? 'danger' : 'border',
+        borderColor: isError.pipe(map(error => (error ? 'danger' : 'border'))),
         borderRadius: 8,
-        role: tone.value === 'error' ? 'alert' : 'status',
-        label: message.value,
+        role: isError.pipe(map(error => (error ? 'alert' : 'status'))),
+        label: message,
         ref: (node: UiNode | null) => (shown = node),
         onPointerEnter: () => {
           pointed = true;
@@ -132,17 +146,18 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
       },
       Text({
         text: message,
-        color: tone.value === 'error' ? 'danger' : 'text',
+        color: isError.pipe(map(error => (error ? 'danger' : 'text'))),
         textStyle: 'body',
         flexGrow: 1,
         selectable: false
       }),
       // An ordinary button, so it's a tab stop after the screen's own
       // controls, like the ✕ beside it.
-      action.value === ''
-        ? Row({ width: 0 })
-        : Button({
-            text: action.value,
+      show(
+        action.pipe(map(text => text !== '')),
+        () =>
+          Button({
+            text: action,
             paddingLeft: 8,
             paddingRight: 8,
             paddingTop: 4,
@@ -152,11 +167,15 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
             fontWeight: 600,
             color: 'primary',
             role: 'button',
-            label: action.value,
+            label: action,
             onClick: act
           }),
-      dismissible.value
-        ? Button({
+        () => Row({ width: 0 })
+      ),
+      show(
+        dismissible,
+        () =>
+          Button({
             text: '✕',
             padding: 4,
             borderRadius: 4,
@@ -164,8 +183,9 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
             role: 'button',
             label: 'Dismiss',
             onClick: close
-          })
-        : Row({ width: 0 })
+          }),
+        () => Row({ width: 0 })
+      )
     );
 
   let wanted = false;

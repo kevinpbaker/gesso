@@ -172,3 +172,70 @@ describe('a toast in right-to-left text', () => {
     expect(box.x + box.width).toBe(600 - 24);
   });
 });
+
+describe('a toast kept up for a second notice', () => {
+  // Found in Gesso Cut, whose one toast gets a second notice before the
+  // first has gone: it showed the new words with the first notice's
+  // button, tone and label, and closed on the first notice's timer.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function kept(first: ToastProps) {
+    const message = new BehaviorSubject(first.message);
+    const action = new BehaviorSubject(first.action);
+    const tone = new BehaviorSubject(first.tone);
+    const onAction = new BehaviorSubject<(() => void) | undefined>(first.onAction);
+    const ui = mount({ ...first, message, action, tone, onAction } as unknown as ToastProps);
+    const next = (props: Pick<ToastProps, 'message' | 'action' | 'tone' | 'onAction'>) => {
+      message.next(props.message);
+      action.next(props.action);
+      tone.next(props.tone);
+      onAction.next(props.onAction);
+      ui.frame();
+    };
+    return { ...ui, next };
+  }
+
+  it('shows the new notice’s button, tone and label', () => {
+    const undone = vi.fn();
+    const retried = vi.fn();
+    const ui = kept({ message: 'Moved 3 parts', action: 'Undo', onAction: undone });
+    expect(ui.getSemantics(ui.getByRole('status')).label).toBe('Moved 3 parts');
+
+    ui.next({ message: 'Could not save', action: 'Retry', tone: 'error', onAction: retried });
+
+    expect(ui.queryByRole('status')).toBeNull();
+    expect(ui.getSemantics(ui.getByRole('alert')).label).toBe('Could not save');
+    expect(ui.queryByRole('button', { name: 'Undo' })).toBeNull();
+    ui.fireEvent.click(ui.getByRole('button', { name: 'Retry' }));
+    ui.frame();
+    expect(retried).toHaveBeenCalledTimes(1);
+    expect(undone).not.toHaveBeenCalled();
+  });
+
+  it('drops the button when the new notice has no action, and shows one when it has', () => {
+    const ui = kept({ message: 'Moved 3 parts', action: 'Undo' });
+    ui.next({ message: 'Saved' });
+    expect(ui.getAllByRole('button').map(button => ui.getSemantics(button).label)).toEqual(['Dismiss']);
+    ui.next({ message: 'Moved 1 part', action: 'Undo' });
+    expect(ui.getAllByRole('button').map(button => ui.getSemantics(button).label)).toEqual(['Undo', 'Dismiss']);
+  });
+
+  it('gives the new notice the whole duration', () => {
+    const ui = kept({ message: 'Moved 3 parts', action: 'Undo', duration: 1000 } as ToastProps);
+    vi.advanceTimersByTime(800);
+    ui.next({ message: 'Moved 1 part', action: 'Undo' });
+
+    vi.advanceTimersByTime(999);
+    ui.frame();
+    expect(ui.entries()).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    ui.frame();
+    expect(ui.entries()).toHaveLength(0);
+    expect(ui.closed).toHaveBeenCalledTimes(1);
+  });
+});
