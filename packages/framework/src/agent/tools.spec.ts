@@ -105,6 +105,64 @@ describe("an application's own agent tools", () => {
     });
   });
 
+  it('take JSON text with a line break left raw in a string, as a file written out', async () => {
+    const seen: unknown[] = [];
+    const surface = toolSurface(() => [
+      {
+        name: 'files_write',
+        description: 'Writes files.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            files: {
+              type: 'array',
+              items: { type: 'object', properties: { path: { type: 'string' }, contents: { type: 'string' } } }
+            }
+          }
+        },
+        run: args => {
+          seen.push(args);
+          return agentText('written');
+        }
+      }
+    ]);
+    await surface.call('files_write', {
+      files: '[{"path": "a.tsx", "contents": "line one\n\tline two \\"quoted\\""}]'
+    });
+    expect(seen[0]).toEqual({ files: [{ path: 'a.tsx', contents: 'line one\n\tline two "quoted"' }] });
+  });
+
+  it('leave out an optional value an agent sent as null, where null is not taken', async () => {
+    const seen: unknown[] = [];
+    const surface = toolSurface(() => [
+      {
+        name: 'comment_add',
+        description: 'Adds a comment.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            text: { type: 'string' },
+            thread: { type: 'string' },
+            at: { type: 'object', properties: { x: { type: 'number' } } },
+            status: { type: ['string', 'null'] }
+          },
+          required: ['text', 'at'],
+          additionalProperties: false
+        },
+        run: args => {
+          seen.push(args);
+          return agentText('added');
+        }
+      }
+    ]);
+    await surface.call('comment_add', { text: 'Hi', thread: null, at: { x: 1 }, status: null });
+    expect(seen[0]).toEqual({ text: 'Hi', at: { x: 1 }, status: null });
+    const missing = await surface.call('comment_add', { text: 'Hi', at: null });
+    expect(JSON.stringify(missing)).toContain('input.at must be an object');
+    await surface.call('comment_add', { text: 'Hi', at: { x: 1 }, thread: 'null' });
+    expect(seen[1]).toEqual({ text: 'Hi', at: { x: 1 }, thread: 'null' });
+  });
+
   it('leave text that is not the JSON the schema wants for the checks to refuse', async () => {
     const surface = toolSurface(() => [
       {

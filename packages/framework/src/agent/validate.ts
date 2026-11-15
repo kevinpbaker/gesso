@@ -188,7 +188,7 @@ export function repairedArguments(schema: JsonSchema, value: unknown, root: Json
     const text = value.trim();
     if ((kinds.has('object') || kinds.has('array')) && /^[[{]/.test(text)) {
       try {
-        const parsed: unknown = JSON.parse(text);
+        const parsed: unknown = parseLeniently(text);
         if (
           (Array.isArray(parsed) && kinds.has('array')) ||
           (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && kinds.has('object'))
@@ -213,12 +213,18 @@ export function repairedArguments(schema: JsonSchema, value: unknown, root: Json
     return next.some((each, i) => each !== value[i]) ? next : value;
   }
   if (value !== null && typeof value === 'object') {
-    const properties =
-      (optionWith(schema, root, 'object', value)?.properties as Record<string, JsonSchema> | undefined) ?? {};
+    const shape = optionWith(schema, root, 'object', value);
+    const properties = (shape?.properties as Record<string, JsonSchema> | undefined) ?? {};
+    const required = new Set(Array.isArray(shape?.required) ? (shape.required as string[]) : []);
     let changed = false;
     const out: Record<string, unknown> = {};
     for (const [key, each] of Object.entries(value as Record<string, unknown>)) {
       const declared = properties[key];
+      // An optional value sent as null (or "null" where text is not taken), as small models fill in every field: left out.
+      if (declared !== undefined && !required.has(key) && isNullish(each, declared, root)) {
+        changed = true;
+        continue;
+      }
       const next = declared === undefined ? each : repairedArguments(declared, each, root);
       changed ||= next !== each;
       out[key] = next;
@@ -226,6 +232,40 @@ export function repairedArguments(schema: JsonSchema, value: unknown, root: Json
     return changed ? out : value;
   }
   return value;
+}
+
+/** Whether a value stands for no value where the schema does not take null: null, or the word null where text is not taken. */
+function isNullish(value: unknown, schema: JsonSchema, root: JsonSchema): boolean {
+  const kinds = kindsOf(schema, root);
+  if (kinds.has('null')) return false;
+  return value === null || (value === 'null' && !kinds.has('string'));
+}
+
+/**
+ * JSON text as a model writes it: JSON, or JSON with a line break or tab
+ * left raw inside a string (a file's contents, written out), which
+ * JSON.parse refuses. Anything else throws, as JSON.parse does.
+ */
+function parseLeniently(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    let out = '';
+    let inString = false;
+    let escaped = false;
+    for (const char of text) {
+      if (inString && !escaped && (char === '\n' || char === '\r' || char === '\t')) {
+        out += char === '\n' ? '\\n' : char === '\r' ? '\\r' : '\\t';
+        continue;
+      }
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = inString;
+      else if (char === '"') inString = !inString;
+      out += char;
+    }
+    if (out === text) throw error;
+    return JSON.parse(out);
+  }
 }
 
 /** The JSON types a schema allows, through its anyOf; every type when it does not say. A string allowed only as an enum's words is not a free string. */
