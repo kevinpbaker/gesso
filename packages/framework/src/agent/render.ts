@@ -24,6 +24,16 @@ import { designedTheme, type AgentThemeName, type DesignThemes } from './designe
  * wrote, as Vite serves it.
  */
 
+/**
+ * Said under every picture. A model that cannot see pictures is given a
+ * note from its client in the picture's place ("this model does not
+ * support images"), and small ones were seen to act on that note as if
+ * it were the tool's answer: giving up, or telling the person the frame
+ * is broken.
+ */
+export const BLIND =
+  ' A model that cannot see pictures gets a note from its client in the picture’s place: that note says nothing about the frame. Read the screen as text with the app’s own tools instead.';
+
 export interface RenderRequest {
   /** The module, from the project root, with or without its extension: `src/mocks/Settings`. */
   readonly module: string;
@@ -107,7 +117,7 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
       { type: 'image', data, mimeType: 'image/png' },
       {
         type: 'text',
-        text: `${chosen.name} from ${module.path}, ${frame.width}×${frame.height} at ${scale}x, in the ${themeName} theme.${note}${thrown}`
+        text: `${chosen.name} from ${module.path}, ${frame.width}×${frame.height} at ${scale}x, in the ${themeName} theme.${note}${thrown}${BLIND}`
       }
     ],
     structuredContent: {

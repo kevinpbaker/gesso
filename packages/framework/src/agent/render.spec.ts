@@ -5,7 +5,7 @@ import type { Inputs } from '../FunctionComponent';
 import { mockCanvas } from '../app/RuntimeTestUtils';
 import type { PictureCanvas } from '../app/renderFrame';
 import { resultText } from './AgentSurface';
-import { renderModule, type RenderDependencies } from './render';
+import { BLIND, renderModule, type RenderDependencies } from './render';
 
 /**
  * `render_frame`'s rules, over the mock canvas: which export it draws,
@@ -62,7 +62,8 @@ describe('renderModule', () => {
     });
     expect(resultText(result)).toBe(
       'Pill from src/ui/Pill.tsx, 390×32 at 1x, in the app theme. As tall as its content; give a height to draw a ' +
-        'whole screen that fills the window.'
+        'whole screen that fills the window.' +
+        BLIND
     );
     expect(result.structuredContent).toMatchObject({ export: 'Pill', width: 390, height: 32, clipped: false });
   });
@@ -78,7 +79,7 @@ describe('renderModule', () => {
     const board = await renderModule({ module: 'src/mocks/Board', width: 200, height: 600 }, deps);
 
     expect(resultText(settings)).toContain('default from src/mocks/Settings.ts, 200×50');
-    expect(resultText(board)).toBe('Board from src/mocks/Board.tsx, 200×600 at 1x, in the app theme.');
+    expect(resultText(board)).toBe(`Board from src/mocks/Board.tsx, 200×600 at 1x, in the app theme.${BLIND}`);
   });
 
   it('draws a component’s examples, every one under its name, or one by its name', async () => {
@@ -134,6 +135,8 @@ describe('renderModule', () => {
     const drawn = await renderModule({ module: 'src/Probe', width: 100 }, designing);
     expect(seen).toBe(designed);
     expect(resultText(drawn)).toContain('in the light theme.');
+    // A model that cannot see the picture is told the note in its place is not about the frame.
+    expect(resultText(drawn)).toContain('cannot see pictures');
 
     await renderModule({ module: 'src/Probe', width: 100, theme: 'app' }, designing);
     expect(seen).toBe(app);
