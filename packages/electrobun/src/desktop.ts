@@ -43,6 +43,7 @@ import type { GessoFrame } from './frames';
 import { serveChannelsToWindow, type ChannelHost } from './main';
 
 export { withWindowRoute } from './route';
+export { keepRunningWhenCovered, type BunFfi } from './awake';
 
 /** What the application does with the window it opened. */
 export interface DesktopWindowTransport {

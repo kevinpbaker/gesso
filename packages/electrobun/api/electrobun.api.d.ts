@@ -25,6 +25,11 @@ import {
 import {
   Observable
 } from "rxjs";
+declare function keepRunningWhenCovered(view: number | bigint | null, ffi: BunFfi, platform?: string): string | null;
+interface BunFfi {
+  readonly dlopen: (...args: never[]) => unknown;
+  readonly FFIType: object;
+}
 interface ScreenAgentOptions {
   readonly windowChannels?: boolean;
   readonly confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
@@ -131,10 +136,12 @@ export {
   DesktopWindowsCommands,
   DesktopWindowsView,
   DesktopWindowTransport,
+  keepRunningWhenCovered,
   MenuItem,
   messageBoxConfirm,
   serveDesktopAgent,
   standardMenu,
+  type BunFfi,
   type DesktopAgent,
   type DesktopAgentOptions,
   type DesktopServe,

@@ -28,7 +28,7 @@ createDesktopApp({ channels: [{ token: Notes, source }] }).open('/');
 - `gesso-electrobun` -- the shared vocabulary, including the frame protocol
 - `gesso-electrobun/main` -- the main process side
 - `gesso-electrobun/view` -- inside a window
-- `gesso-electrobun/desktop` -- `createDesktopApp` and `windowsChannel`
+- `gesso-electrobun/desktop` -- `createDesktopApp`, `windowsChannel`, the agent server, and `keepRunningWhenCovered` (a covered window keeps running on macOS)
 
 ## What is checked, and what is not
 

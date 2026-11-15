@@ -368,6 +368,31 @@ project from `create-gesso-app --template electrobun` has all of this
 wired: every script that builds runs `gesso-channels` first, and
 `hutch run typecheck` checks the module is current.
 
+### A window behind another app's, on macOS
+
+An agent usually works while the person is in their AI app, with the
+window behind it. WebKit takes a covered window's page for a hidden one
+and stops it after four minutes, so anything an agent asks of the
+window (the screen tools, a window's own channels) waits until the
+window comes forward. Channels served from the main process do not
+cross into the window and are not affected. `keepRunningWhenCovered`
+turns WebKit's occlusion detection off for the window's web view, so a
+covered window keeps running; pass it `bun:ffi`, once the page has
+loaded:
+
+```ts
+import * as ffi from 'bun:ffi';
+import { keepRunningWhenCovered } from 'gesso-electrobun/desktop';
+
+window.webview.on('dom-ready', () => {
+  const why = keepRunningWhenCovered(window.webview.ptr, ffi);
+  if (why !== null) console.warn(`The window may stop while covered: ${why}`);
+});
+```
+
+A minimized window, or an app hidden with ⌘H, is still hidden, and its
+page still stops.
+
 ### The project's components, on the desktop
 
 The catalog of
