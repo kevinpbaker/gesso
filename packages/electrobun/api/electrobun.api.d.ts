@@ -20,6 +20,7 @@ import {
 } from "gesso-framework/agent";
 import {
   ChannelToken,
+  ColorSchemePreference,
   ServedChannel
 } from "gesso-framework";
 import {
@@ -30,6 +31,7 @@ interface BunFfi {
   readonly dlopen: (...args: never[]) => unknown;
   readonly FFIType: object;
 }
+declare function showAppearance(window: number | bigint | null | undefined, preference: ColorSchemePreference, ffi: BunFfi, platform?: string): string | null;
 interface ScreenAgentOptions {
   readonly windowChannels?: boolean;
   readonly confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
@@ -80,6 +82,7 @@ declare function messageBoxConfirm(showMessageBox: ShowMessageBox): (request: Ag
 interface DesktopWindowTransport {
   send: (frame: GessoFrame) => void;
   close: () => void;
+  nativeWindow?: number | bigint | null;
 }
 interface DesktopWindowHandle {
   readonly id: number;
@@ -95,6 +98,7 @@ interface DesktopAppOptions {
   onOpenUrl?: (url: string, window: DesktopWindowHandle) => void;
   onOpenRoute?: (url: string, window: DesktopWindowHandle) => void;
   colorScheme?: Observable<'light' | 'dark'>;
+  ffi?: BunFfi;
   onLastWindowClosed?: () => void;
   chunkBytes?: number;
 }
@@ -140,6 +144,7 @@ export {
   MenuItem,
   messageBoxConfirm,
   serveDesktopAgent,
+  showAppearance,
   standardMenu,
   type BunFfi,
   type DesktopAgent,

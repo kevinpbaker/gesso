@@ -2315,6 +2315,7 @@ interface AppLogicEndpoint {
   addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
   removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
   start?: () => void;
+  colorSchemePreference?: (preference: ColorSchemePreference) => void;
 }
 interface WorkerAppOptions {
   renderWorker: (() => Worker) | URL | string;
@@ -4079,7 +4080,8 @@ import {
   ServedChannel
 } from "../tools.js";
 import {
-  AppLogicEndpoint
+  AppLogicEndpoint,
+  ColorSchemePreference
 } from "../index.js";
 declare const DEFAULT_CHUNK_BYTES = 1048576;
 type GessoFrame = {
@@ -4128,6 +4130,7 @@ interface RemoteChannelHostOptions {
   chunkBytes?: number;
   onOpenUrl?: (url: string) => void;
   onOpenRoute?: (url: string) => void;
+  onColorSchemePreference?: (preference: ColorSchemePreference) => void;
 }
 interface RemoteChannelHost {
   receive(frame: GessoFrame): void;

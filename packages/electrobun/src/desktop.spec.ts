@@ -10,7 +10,7 @@
  * application hears about.
  */
 import { BehaviorSubject } from 'rxjs';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChannel } from 'gesso-framework';
 
@@ -26,6 +26,11 @@ import {
 import type { GessoFrame } from './frames';
 import { createElectrobunBridge, windowRoute } from './view';
 import { serveChannelsToWindow, type ChannelHost } from './main';
+import { showAppearance } from './appearance';
+import type { BunFfi } from './awake';
+
+// The native call is `appearance.spec.ts`'s; here it is when, and with what.
+vi.mock('./appearance', () => ({ showAppearance: vi.fn(() => null) }));
 
 interface CounterView {
   count: number;
@@ -443,6 +448,117 @@ describe('the shell adaptations a window needs', () => {
 
     scheme.next('light');
     expect(seen).toEqual(['dark']);
+  });
+});
+
+describe("a window's title bar", () => {
+  // Found in Gesso Cut: a page asked for Light sat under a dark title
+  // bar whenever macOS was dark, because the frame is AppKit's and
+  // nothing told it what the page was asked for.
+  const ffi = { dlopen: () => undefined, FFIType: {} } as unknown as BunFfi;
+  const drawn = vi.mocked(showAppearance);
+  beforeEach(() => {
+    drawn.mockReset();
+    drawn.mockReturnValue(null);
+  });
+
+  /** An application whose windows are each a bridge, with the page's half handed back. */
+  function standWindows(options: { ffi?: BunFfi; nativeWindow?: (id: number) => number | bigint | null } = {}) {
+    const pages: Array<ReturnType<typeof createElectrobunBridge>> = [];
+    const app = createDesktopApp({
+      channels: [],
+      ffi: options.ffi,
+      open: (receive, handle) => {
+        const bridge = createElectrobunBridge({ send: frame => receive(frame) });
+        pages.push(bridge);
+        return {
+          send: frame => bridge.receive(frame),
+          close: () => {},
+          nativeWindow: options.nativeWindow?.(handle.id)
+        };
+      }
+    });
+    /** What the page's shell does when it is asked for an appearance. */
+    const ask = (window: number, preference: 'light' | 'dark' | 'auto') =>
+      pages[window]!.endpoint.colorSchemePreference!(preference);
+    return { app, ask };
+  }
+
+  it('is drawn in the appearance its page is asked for, and the system’s for auto', () => {
+    const { app, ask } = standWindows({ ffi, nativeWindow: () => 42n });
+    app.openWindow();
+
+    ask(0, 'light');
+    ask(0, 'dark');
+    ask(0, 'auto');
+
+    expect(drawn.mock.calls).toEqual([
+      [42n, 'light', ffi],
+      [42n, 'dark', ffi],
+      [42n, 'auto', ffi]
+    ]);
+  });
+
+  it('is not drawn again for the appearance it is already in', () => {
+    const { app, ask } = standWindows({ ffi, nativeWindow: () => 42n });
+    app.openWindow();
+    ask(0, 'dark');
+    ask(0, 'dark');
+    expect(drawn).toHaveBeenCalledTimes(1);
+  });
+
+  it('follows its own page, apart from another window’s', () => {
+    const { app, ask } = standWindows({ ffi, nativeWindow: id => id * 100 });
+    app.openWindow();
+    app.openWindow();
+    ask(1, 'dark');
+    ask(0, 'light');
+    expect(drawn.mock.calls).toEqual([
+      [200, 'dark', ffi],
+      [100, 'light', ffi]
+    ]);
+  });
+
+  it('is drawn for a page that spoke while its window was being opened', () => {
+    let page: ReturnType<typeof createElectrobunBridge> | undefined;
+    const app = createDesktopApp({
+      channels: [],
+      ffi,
+      open: receive => {
+        page = createElectrobunBridge({ send: frame => receive(frame) });
+        page.endpoint.colorSchemePreference!('light');
+        return { send: frame => page!.receive(frame), close: () => {}, nativeWindow: 42 };
+      }
+    });
+    app.openWindow();
+    expect(drawn.mock.calls).toEqual([[42, 'light', ffi]]);
+  });
+
+  it('keeps the system’s without ffi, or without a native window, or before its page has said anything', () => {
+    const withoutFfi = standWindows({ nativeWindow: () => 42n });
+    withoutFfi.app.openWindow();
+    withoutFfi.ask(0, 'dark');
+
+    const withoutWindow = standWindows({ ffi });
+    withoutWindow.app.openWindow();
+    withoutWindow.ask(0, 'dark');
+
+    standWindows({ ffi, nativeWindow: () => 42n }).app.openWindow();
+
+    expect(drawn).not.toHaveBeenCalled();
+  });
+
+  it('says once why it could not be drawn', () => {
+    drawn.mockReturnValue('The window is not an NSWindow: Electrobun has changed.');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { app, ask } = standWindows({ ffi, nativeWindow: () => 42n });
+    app.openWindow();
+    ask(0, 'dark');
+    ask(0, 'light');
+    expect(warn.mock.calls).toEqual([
+      ["A window's title bar keeps the system's appearance: The window is not an NSWindow: Electrobun has changed."]
+    ]);
+    warn.mockRestore();
   });
 });
 

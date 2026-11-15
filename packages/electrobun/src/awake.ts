@@ -122,7 +122,7 @@ export interface BunFfi {
 }
 
 /** What is used of it. */
-interface Ffi {
+export interface Ffi {
   dlopen(
     path: string,
     symbols: Record<string, { args: readonly unknown[]; returns: unknown }>

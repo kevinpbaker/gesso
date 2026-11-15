@@ -16,6 +16,7 @@
  * side of the bridge, and if that ever changes here, the wrong thing
  * is happening on the thread that must stay free for input.
  */
+import type { ColorSchemePreference } from '../app/colorScheme';
 import type { AppLogicEndpoint } from '../app/worker/WorkerApp';
 import { isHubMessage, isPortHandshake } from '../worker/WorkerPorts';
 
@@ -134,7 +135,15 @@ export function createRemoteBridge(options: RemoteBridgeOptions): RemoteBridge {
       // other side of the bridge speaks that protocol yet, so a
       // listener would never be called and is not kept.
     },
-    removeEventListener(): void {}
+    removeEventListener(): void {},
+    // The appearance the page is asked for, for what the other process
+    // draws around it: `createDesktopApp` draws a window's title bar in
+    // it. Sent whenever the shell is asked, which is seldom.
+    colorSchemePreference(preference: ColorSchemePreference): void {
+      if (!disposed) {
+        options.send(frameControl('colorSchemePreference', { preference }));
+      }
+    }
   };
 
   return {

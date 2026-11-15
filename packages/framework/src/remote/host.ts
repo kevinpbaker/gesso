@@ -12,6 +12,7 @@
  * learn it is talking to a page in another process, whether that page
  * is a desktop window or a browser tab on a WebSocket.
  */
+import type { ColorSchemePreference } from '../app/colorScheme';
 import { serveChannels, type ServedChannel } from '../channel/serveChannels';
 import type { PortHost } from '../worker/WorkerPorts';
 
@@ -47,6 +48,15 @@ export interface RemoteChannelHostOptions {
    * decides for itself.
    */
   onOpenRoute?: (url: string) => void;
+  /**
+   * The appearance the page's shell is asked for, when the page starts
+   * and each time it is asked again (`ShellService.preferColorScheme`):
+   * `light`, `dark`, or `auto` for the platform's.
+   *
+   * For what this process draws around the page and the page cannot:
+   * `createDesktopApp` draws a window's title bar in it.
+   */
+  onColorSchemePreference?: (preference: ColorSchemePreference) => void;
 }
 
 export interface RemoteChannelHost {
@@ -93,6 +103,11 @@ export function serveRemoteChannels(
           const payload = JSON.parse(frame.body) as { url?: string };
           if (typeof payload.url === 'string') {
             (frame.name === 'openUrl' ? options.onOpenUrl : options.onOpenRoute)?.(payload.url);
+          }
+        } else if (frame.name === 'colorSchemePreference') {
+          const { preference } = JSON.parse(frame.body) as { preference?: unknown };
+          if (preference === 'light' || preference === 'dark' || preference === 'auto') {
+            options.onColorSchemePreference?.(preference);
           }
         }
         return;

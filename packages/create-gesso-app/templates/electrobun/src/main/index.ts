@@ -11,6 +11,7 @@
  * what that window has already seen, so two windows agree by
  * construction rather than by synchronising.
  */
+import * as ffi from 'bun:ffi';
 import { ApplicationMenu, BrowserView, BrowserWindow, Utils } from 'electrobun/main';
 import { BehaviorSubject, map } from 'rxjs';
 
@@ -83,10 +84,14 @@ const app = createDesktopApp({
     });
     return {
       send: (frame: GessoFrame) => window.webview.rpc?.send.gessoFrame(frame),
-      close: () => window.close()
+      close: () => window.close(),
+      // With `ffi` below, the title bar is drawn in the page's appearance.
+      nativeWindow: window.ptr
     };
   },
   colorScheme: dark.pipe(map(on => (on ? 'dark' : 'light'))),
+  // For the title bar, on macOS: this package does not import `bun:ffi` itself.
+  ffi,
   onOpenUrl: url => {
     // The application decides what it is willing to hand to the
     // operating system; the adapter only carries the request.

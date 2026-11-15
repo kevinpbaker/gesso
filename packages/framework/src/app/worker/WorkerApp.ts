@@ -74,6 +74,17 @@ export interface AppLogicEndpoint {
   removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
   /** A `MessagePort` delivers nothing until this is called; a `Worker` has no such method. */
   start?: () => void;
+  /**
+   * Told the appearance the shell is asked for (`createApp({ colorScheme })`,
+   * `ShellService.preferColorScheme`, `setColorScheme`) when it mounts
+   * and each time it is asked again: `light`, `dark`, or `auto` for the
+   * platform's.
+   *
+   * A remote bridge passes it to the process outside the page, which
+   * owns what the page cannot draw: a desktop window's title bar. A
+   * worker has no such method, and is not told.
+   */
+  colorSchemePreference?: (preference: ColorSchemePreference) => void;
 }
 
 export interface WorkerAppOptions {
@@ -813,6 +824,8 @@ export class WorkerApp {
     this.detachColorScheme?.();
     this.detachColorScheme = null;
     this.colorSchemePreference = preference;
+    // Undefined until `mount`, which calls this again once it is there.
+    this.appLogicWorker?.colorSchemePreference?.(preference);
     if (this.renderWorker === undefined) {
       return;
     }

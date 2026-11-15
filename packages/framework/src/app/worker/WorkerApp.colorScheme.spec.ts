@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { WorkerApp } from './WorkerApp';
+import { WorkerApp, type AppLogicEndpoint } from './WorkerApp';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
 
 /**
@@ -12,6 +12,7 @@ import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorke
  */
 interface Internals {
   renderWorker: Pick<Worker, 'postMessage' | 'removeEventListener' | 'terminate'>;
+  appLogicWorker: AppLogicEndpoint | undefined;
   handleWorkerMessage(event: MessageEvent<RuntimeToShellMessage>): void;
 }
 
@@ -48,7 +49,7 @@ function shell() {
   const fromWorker = (message: RuntimeToShellMessage): void =>
     internals.handleWorkerMessage({ data: message } as MessageEvent<RuntimeToShellMessage>);
   const schemes = (): string[] => posts.flatMap(message => (message.type === 'colorScheme' ? [message.scheme] : []));
-  return { fromWorker, schemes };
+  return { app, internals, fromWorker, schemes };
 }
 
 describe("WorkerApp and the app's own appearance", () => {
@@ -73,5 +74,44 @@ describe("WorkerApp and the app's own appearance", () => {
     platform.set(false);
 
     expect(schemes()).toEqual(['dark', 'light', 'dark']);
+  });
+});
+
+describe('WorkerApp telling its application endpoint the appearance it is asked for', () => {
+  // So a desktop window's main process can draw the title bar the page
+  // cannot, in the appearance the page is in (`createDesktopApp`).
+  function told() {
+    darkPlatform();
+    const { app, internals, fromWorker } = shell();
+    const asked: string[] = [];
+    internals.appLogicWorker = {
+      postMessage: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      colorSchemePreference: preference => asked.push(preference)
+    };
+    return { app, fromWorker, asked };
+  }
+
+  it('tells it each preference, auto included, as the app or the host asks', () => {
+    const { app, fromWorker, asked } = told();
+    fromWorker({ type: 'preferColorScheme', preference: 'dark' });
+    fromWorker({ type: 'preferColorScheme', preference: 'auto' });
+    app.setColorScheme('light');
+    expect(asked).toEqual(['dark', 'auto', 'light']);
+  });
+
+  it('tells nothing to an endpoint that does not ask, as a worker does not', () => {
+    darkPlatform();
+    const { internals, fromWorker, schemes } = shell();
+    const posted: unknown[] = [];
+    internals.appLogicWorker = {
+      postMessage: message => posted.push(message),
+      addEventListener: () => {},
+      removeEventListener: () => {}
+    };
+    fromWorker({ type: 'preferColorScheme', preference: 'dark' });
+    expect(posted).toEqual([]);
+    expect(schemes()).toEqual(['dark']);
   });
 });

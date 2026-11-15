@@ -195,3 +195,37 @@ describe('the bridge, end to end', () => {
     expect(frames.toWindow.length + frames.toMain.length).toBe(before);
   });
 });
+
+describe('the appearance the page is asked for', () => {
+  // What `createDesktopApp` draws a window's title bar in.
+  function pair() {
+    const preferences: string[] = [];
+    let host: RemoteChannelHost | undefined;
+    const bridge: RemoteBridge = createRemoteBridge({ send: frame => host!.receive(frame) });
+    host = serveRemoteChannels([], {
+      send: frame => bridge.receive(frame),
+      onColorSchemePreference: preference => preferences.push(preference)
+    });
+    return { bridge, host, preferences };
+  }
+
+  it('crosses from the page to the other process, auto included', () => {
+    const { bridge, preferences } = pair();
+    bridge.endpoint.colorSchemePreference!('light');
+    bridge.endpoint.colorSchemePreference!('auto');
+    expect(preferences).toEqual(['light', 'auto']);
+  });
+
+  it('is not sent once the bridge is disposed', () => {
+    const { bridge, preferences } = pair();
+    bridge.dispose();
+    bridge.endpoint.colorSchemePreference!('dark');
+    expect(preferences).toEqual([]);
+  });
+
+  it('is ignored when it is not one the host knows', () => {
+    const { host, preferences } = pair();
+    host.receive({ kind: 'control', name: 'colorSchemePreference', body: JSON.stringify({ preference: 'sepia' }) });
+    expect(preferences).toEqual([]);
+  });
+});

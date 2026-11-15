@@ -36,14 +36,17 @@
  * window is a replica of the same channels, so two windows agree by
  * construction rather than by synchronisation.
  */
-import { channel, type ChannelToken, type ServedChannel } from 'gesso-framework';
+import { channel, type ChannelToken, type ColorSchemePreference, type ServedChannel } from 'gesso-framework';
 import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 
+import { showAppearance } from './appearance';
+import type { BunFfi } from './awake';
 import type { GessoFrame } from './frames';
 import { serveChannelsToWindow, type ChannelHost } from './main';
 
 export { withWindowRoute } from './route';
 export { keepRunningWhenCovered, type BunFfi } from './awake';
+export { showAppearance } from './appearance';
 
 /** What the application does with the window it opened. */
 export interface DesktopWindowTransport {
@@ -51,6 +54,12 @@ export interface DesktopWindowTransport {
   send: (frame: GessoFrame) => void;
   /** Closes the native window. The adapter calls this; the platform may also close it on its own. */
   close: () => void;
+  /**
+   * The native window, Electrobun's `window.ptr`: with `ffi`, its title
+   * bar is drawn in the appearance its page is asked for. See
+   * `DesktopAppOptions.ffi`.
+   */
+  nativeWindow?: number | bigint | null;
 }
 
 /** A window this application opened. */
@@ -136,6 +145,25 @@ export interface DesktopAppOptions {
    */
   colorScheme?: Observable<'light' | 'dark'>;
   /**
+   * The `bun:ffi` module, for drawing each window's title bar in the
+   * appearance its page is asked for, on macOS.
+   *
+   * The page draws itself in the appearance its shell is asked for
+   * (`createApp({ colorScheme })`, `ShellService.preferColorScheme`), and
+   * says so to this process; the frame around it is AppKit's, and keeps
+   * the system's unless it is told. Given this and each window's
+   * `nativeWindow`, the frame follows the page: Light, Dark, or the
+   * system's for `auto`. A window whose page has said nothing keeps the
+   * system's. See `showAppearance`.
+   *
+   *   import * as ffi from 'bun:ffi';
+   *   createDesktopApp({ ffi, open: … ({ send, close, nativeWindow: window.ptr }) });
+   *
+   * Passed in because this package does not import `bun:ffi`, which is
+   * not every runtime's.
+   */
+  ffi?: BunFfi;
+  /**
    * Called when the last window closes. A desktop application usually
    * stops here; one with a tray or a menu bar does not, which is why
    * this is a callback rather than an exit.
@@ -211,6 +239,28 @@ export function createDesktopApp(options: DesktopAppOptions): DesktopApp {
       // deliver a frame synchronously and a window whose first
       // handshake was dropped never replicates anything.
       let transport: DesktopWindowTransport | undefined;
+      /** What the page last asked for, and what its frame was last drawn in. */
+      let preferred: ColorSchemePreference | undefined;
+      let drawn: ColorSchemePreference | undefined;
+      let warned = false;
+      const drawFrame = (): void => {
+        const native = transport?.nativeWindow;
+        if (
+          options.ffi === undefined ||
+          preferred === undefined ||
+          preferred === drawn ||
+          native === undefined ||
+          native === null
+        ) {
+          return;
+        }
+        drawn = preferred;
+        const why = showAppearance(native, preferred, options.ffi);
+        if (why !== null && !warned) {
+          warned = true;
+          console.warn(`A window's title bar keeps the system's appearance: ${why}`);
+        }
+      };
       const host = serveChannelsToWindow(
         typeof options.channels === 'function' ? options.channels(handle) : options.channels,
         {
@@ -223,6 +273,10 @@ export function createDesktopApp(options: DesktopAppOptions): DesktopApp {
             } else if (!disposed) {
               app.openWindow({ route: url });
             }
+          },
+          onColorSchemePreference: preference => {
+            preferred = preference;
+            drawFrame();
           }
         }
       );
@@ -249,6 +303,8 @@ export function createDesktopApp(options: DesktopAppOptions): DesktopApp {
         host.receive(frame);
       }, handle);
       entries.set(id, { handle, transport, host });
+      // A page that spoke while `open` was still running.
+      drawFrame();
       const appearance = options.colorScheme?.subscribe(scheme => {
         latest = scheme;
         if (greeted) {
