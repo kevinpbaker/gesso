@@ -68,6 +68,7 @@ export interface UiSurfaceOptions {
 }
 
 const THEME: JsonSchema = {
+  type: 'string',
   enum: ['app', 'light', 'dark'],
   description:
     "The light or dark theme of what is being designed, or the running application's own (app). By default the " +
@@ -147,7 +148,8 @@ const TOOLS: readonly AgentTool[] = [
     description:
       "The theme's colours, type styles, corner radii, spacing scale and shadows, by name and value, as the screen " +
       'draws them. Read it before designing, and write the names rather than raw values. Name a control, by ref or ' +
-      'by role and name, to read the theme where it is: part of a screen may have a theme of its own.',
+      'by role and name, to read the theme where it is: part of a screen may have a theme of its own. Example: {}, ' +
+      'or {"theme": "dark"}.',
     inputSchema: { type: 'object', properties: { ...TARGET, theme: THEME }, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false }
   },
@@ -159,7 +161,8 @@ const TOOLS: readonly AgentTool[] = [
       "you ask for, in the theme being designed in. The pixels are the application's own: the same layout, " +
       'text and paint. Draw what you build, at a phone width and a desktop one, and look before you call it done. ' +
       'Without a height it is as tall as its content, which suits a component or a section; give one for a whole ' +
-      'screen, which then fills it.',
+      'screen, which then fills it. Example: {"module": "src/mocks/Settings", "width": 390, "height": 844}, or ' +
+      '{"module": "src/components/Button", "inputs": {"label": "Save"}, "width": 200}.',
     inputSchema: {
       type: 'object',
       properties: {

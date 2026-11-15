@@ -100,7 +100,7 @@ export const CATALOG_TOOLS: readonly CatalogTool[] = [
     title: 'Find components',
     description:
       'The components whose name, purpose or inputs match a few words, such as "date range" or "avatar". ' +
-      'Best matches first.',
+      'Best matches first. Example: {"query": "date range"}.',
     inputSchema: {
       type: 'object',
       properties: { query: { type: 'string', description: 'A few words for what the component should be or do.' } },
@@ -114,7 +114,7 @@ export const CATALOG_TOOLS: readonly CatalogTool[] = [
     title: 'Read a component',
     description:
       'One component in full: what it is for, every input it takes with its type, default and meaning, examples, ' +
-      'and the files that already use it, which show how this project writes it.',
+      'and the files that already use it, which show how this project writes it. Example: {"name": "Button"}.',
     inputSchema: {
       type: 'object',
       properties: {
