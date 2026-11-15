@@ -63,8 +63,9 @@ channel's schema from its types and JSDoc, and the surface uses it:
   array as JSON text, even with a line break left raw in a string, a
   number as a string, `"true"`), is put back in the type the schema
   asks for first, where the schema does not take that string as it is,
-  and an optional value sent as `null` where the schema takes no null
-  is taken as left out;
+  and an optional value sent as `null` where the schema takes no null,
+  or as `""` where it must be an enum's word or match a pattern `""`
+  does not (an id), is taken as left out;
 - `@destructive` and `@idempotent` become the hints a client shows
   beside the tool;
 - `@hidden` keeps a command away from agents altogether, and on a view

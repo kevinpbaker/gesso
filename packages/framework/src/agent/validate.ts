@@ -234,10 +234,20 @@ export function repairedArguments(schema: JsonSchema, value: unknown, root: Json
   return value;
 }
 
-/** Whether a value stands for no value where the schema does not take null: null, or the word null where text is not taken. */
+/**
+ * Whether a value stands for no value where the schema does not take null:
+ * null, the word null where text is not taken, or "" where the text must
+ * be one of an enum's words or match a pattern "" does not (an id, as
+ * `after: ""`): an empty id names nothing, so it can only mean not given.
+ */
 function isNullish(value: unknown, schema: JsonSchema, root: JsonSchema): boolean {
   const kinds = kindsOf(schema, root);
   if (kinds.has('null')) return false;
+  if (value === '') {
+    const text = resolve(schema, root);
+    if (Array.isArray(text.enum)) return !text.enum.includes('');
+    return typeof text.pattern === 'string' && !new RegExp(text.pattern, 'u').test('');
+  }
   return value === null || (value === 'null' && !kinds.has('string'));
 }
 

@@ -163,6 +163,38 @@ describe("an application's own agent tools", () => {
     expect(seen[1]).toEqual({ text: 'Hi', at: { x: 1 }, thread: 'null' });
   });
 
+  it('leave out an optional id or word an agent sent as "", which names nothing', async () => {
+    const seen: unknown[] = [];
+    const surface = toolSurface(() => [
+      {
+        name: 'region_add',
+        description: 'Adds a region.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            text: { type: 'string' },
+            note: { type: 'string' },
+            after: { type: 'string', pattern: '^r[0-9]+$' },
+            kind: { type: 'string', enum: ['math', 'text'] },
+            id: { type: 'string', pattern: '^r[0-9]+$' }
+          },
+          required: ['text', 'id'],
+          additionalProperties: false
+        },
+        run: args => {
+          seen.push(args);
+          return agentText('added');
+        }
+      }
+    ]);
+    await surface.call('region_add', { text: 'x', note: '', after: '', kind: '', id: 'r1' });
+    // Free text keeps its "": it is a value there.
+    expect(seen[0]).toEqual({ text: 'x', note: '', id: 'r1' });
+    // A required one is not guessed at.
+    await surface.call('region_add', { text: 'x', id: '' });
+    expect(seen[1]).toEqual({ text: 'x', id: '' });
+  });
+
   it('leave text that is not the JSON the schema wants for the checks to refuse', async () => {
     const surface = toolSurface(() => [
       {
