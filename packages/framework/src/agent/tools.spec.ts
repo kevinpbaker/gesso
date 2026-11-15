@@ -64,4 +64,126 @@ describe("an application's own agent tools", () => {
     const tools = await combined.tools();
     expect(tools.map(tool => tool.description)).toEqual(['How wide a screen is.']);
   });
+
+  it('take an object or array an agent sent as JSON text as the object or array', async () => {
+    const seen: unknown[] = [];
+    const place: AgentToolDefinition = {
+      name: 'part_place',
+      description: 'Places a part.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          at: { type: 'array', items: { type: 'number' } },
+          profile: { type: ['object', 'null'], properties: { id: { type: 'string' } } },
+          holes: {
+            type: 'array',
+            items: { type: 'object', properties: { shape: { type: 'object', properties: { d: { type: 'number' } } } } }
+          },
+          note: { anyOf: [{ type: 'string' }, { type: 'object' }] }
+        }
+      },
+      run: args => {
+        seen.push(args);
+        return agentText('placed');
+      }
+    };
+    const surface = toolSurface(() => [place]);
+    await surface.call('part_place', {
+      name: '{not parsed: a string may be any text}',
+      at: '[10, 20]',
+      profile: ' {"id": "sendcutsend"} ',
+      holes: [{ shape: '{"d": 6}' }],
+      note: '{"left": "as it came"}'
+    });
+    expect(seen[0]).toEqual({
+      name: '{not parsed: a string may be any text}',
+      at: [10, 20],
+      profile: { id: 'sendcutsend' },
+      holes: [{ shape: { d: 6 } }],
+      note: '{"left": "as it came"}'
+    });
+  });
+
+  it('leave text that is not the JSON the schema wants for the checks to refuse', async () => {
+    const surface = toolSurface(() => [
+      {
+        name: 'list_take',
+        description: 'Takes a list.',
+        inputSchema: { type: 'object', properties: { ids: { type: 'array', items: { type: 'string' } } } },
+        run: () => agentText('taken')
+      }
+    ]);
+    const broken = await surface.call('list_take', { ids: '[1, 2' });
+    expect(broken).toMatchObject({ isError: true });
+    expect(JSON.stringify(broken)).toContain('input.ids must be an array');
+    const wrongKind = await surface.call('list_take', { ids: '{"a": 1}' });
+    expect(JSON.stringify(wrongKind)).toContain('input.ids must be an array');
+  });
+
+  it('take a number or a boolean an agent sent as a string as the number or boolean', async () => {
+    const seen: unknown[] = [];
+    const surface = toolSurface(() => [
+      {
+        name: 'box_make',
+        description: 'Makes a box.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            width: { type: 'number' },
+            count: { type: 'integer' },
+            lid: { type: 'boolean' },
+            label: { type: 'string' },
+            depth: { type: ['number', 'string'] },
+            at: {
+              anyOf: [
+                { type: 'array', items: { type: 'number' } },
+                { type: 'string', enum: ['center'] }
+              ]
+            },
+            side: { type: 'string', enum: ['left', 'right'] }
+          }
+        },
+        run: args => {
+          seen.push(args);
+          return agentText('made');
+        }
+      }
+    ]);
+    await surface.call('box_make', {
+      width: ' 120.5 ',
+      count: '6',
+      lid: 'false',
+      label: '42',
+      depth: '30',
+      at: '[10, 20]',
+      side: 'left'
+    });
+    expect(seen[0]).toEqual({
+      width: 120.5,
+      count: 6,
+      lid: false,
+      label: '42',
+      depth: '30',
+      at: [10, 20],
+      side: 'left'
+    });
+    await surface.call('box_make', { at: 'center' });
+    expect(seen[1]).toEqual({ at: 'center' });
+    const half = await surface.call('box_make', { count: '2.5' });
+    expect(JSON.stringify(half)).toContain('input.count must be an integer');
+  });
+
+  it('say how to send JSON that would not parse', async () => {
+    const surface = toolSurface(() => [
+      {
+        name: 'list_take',
+        description: 'Takes a list.',
+        inputSchema: { type: 'object', properties: { add: { type: 'array', items: { type: 'object' } } } },
+        run: () => agentText('taken')
+      }
+    ]);
+    const r = await surface.call('list_take', { add: "[{id: 'vent'}]" });
+    expect(JSON.stringify(r)).toContain('Send the array itself, not text, and as JSON');
+  });
 });

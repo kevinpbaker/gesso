@@ -4,7 +4,7 @@ import type { Subscription } from 'rxjs';
 import { channelSchema, type CommandSchema, type JsonSchema } from '../channel/ChannelSchema';
 import type { ServedChannel } from '../channel/serveChannels';
 import { decodeBinary } from './binary';
-import { validate } from './validate';
+import { validate, repairedArguments } from './validate';
 
 /**
  * An application's channels, as an AI agent sees them.
@@ -295,7 +295,9 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
   ): Promise<AgentToolResult> => {
     follow();
     const channel = entry.served.token.name;
-    const input = args ?? {};
+    const input = (described === null ? (args ?? {}) : repairedArguments(described.input, args ?? {})) as Readonly<
+      Record<string, unknown>
+    >;
     let positional: unknown[];
     if (described === null) {
       const list = input.arguments ?? [];

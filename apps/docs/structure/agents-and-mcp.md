@@ -58,7 +58,11 @@ channel's schema from its types and JSDoc, and the surface uses it:
   description;
 - each command's parameters become the tool's input, by name, and
   arguments that do not fit are refused with a sentence saying which
-  field and why, before the command is sent;
+  field and why, before the command is sent; a value written in the
+  wrong JSON type, as smaller models often write them (an object or
+  array as JSON text, a number as a string, `"true"`), is put back in
+  the type the schema asks for first, where the schema does not take
+  that string as it is;
 - `@destructive` and `@idempotent` become the hints a client shows
   beside the tool;
 - `@hidden` keeps a command away from agents altogether, and on a view

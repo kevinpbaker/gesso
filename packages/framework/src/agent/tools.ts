@@ -6,7 +6,7 @@ import {
   type AgentTool,
   type AgentToolResult
 } from './AgentSurface';
-import { validate } from './validate';
+import { validate, repairedArguments } from './validate';
 
 /**
  * Tools an application offers an agent of its own accord, beside the
@@ -105,7 +105,7 @@ export function toolSurface(definitions: () => readonly AgentToolDefinition[]): 
       if (definition === undefined) {
         return agentError(`There is no tool called ${name}.`);
       }
-      const input = args ?? {};
+      const input = repairedArguments(definition.inputSchema, args ?? {}) as Readonly<Record<string, unknown>>;
       const problem = validate(definition.inputSchema, input);
       if (problem !== null) {
         return agentError(`${name}: ${problem}`);
