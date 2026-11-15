@@ -186,4 +186,44 @@ describe("an application's own agent tools", () => {
     const r = await surface.call('list_take', { add: "[{id: 'vent'}]" });
     expect(JSON.stringify(r)).toContain('Send the array itself, not text, and as JSON');
   });
+  it('say what is wrong with the option of a tagged union a value was meant as', async () => {
+    const seen: unknown[] = [];
+    const shape = {
+      anyOf: [
+        {
+          type: 'object',
+          properties: { kind: { const: 'circle' }, x: { type: 'number' }, d: { type: 'number' } },
+          required: ['kind', 'x', 'd'],
+          additionalProperties: false
+        },
+        {
+          type: 'object',
+          properties: { kind: { const: 'rect' }, w: { type: 'number' }, h: { type: 'number' } },
+          required: ['kind', 'w', 'h'],
+          additionalProperties: false
+        }
+      ]
+    };
+    const surface = toolSurface(() => [
+      {
+        name: 'shape_add',
+        description: 'Adds a shape.',
+        inputSchema: { type: 'object', properties: { shape: { $ref: '#/$defs/shape' } }, $defs: { shape } },
+        run: args => {
+          seen.push(args);
+          return agentText('added');
+        }
+      }
+    ]);
+    const said = async (shape: unknown) => JSON.stringify(await surface.call('shape_add', { shape }));
+    expect(await said({ kind: 'circle', x: 1, w: 4 })).toContain('input.shape.d is required.');
+    expect(await said({ kind: 'circle', x: 1, d: 4, w: 4 })).toContain(
+      'input.shape.w is not expected; the fields are kind, x, d.'
+    );
+    expect(await said({ x: 1, d: 4 })).toContain('input.shape.kind must be one of \\"circle\\", \\"rect\\".');
+    expect(await said({ kind: 'square', w: 4 })).toContain('input.shape.kind must be one of \\"circle\\", \\"rect\\".');
+    // The option a value was meant as is followed for repairs too: "4" is a number in a rect.
+    expect(await said({ kind: 'rect', w: '4', h: 2 })).toContain('added');
+    expect(seen.at(-1)).toEqual({ shape: { kind: 'rect', w: 4, h: 2 } });
+  });
 });

@@ -33,10 +33,18 @@ export function validate(schema: JsonSchema, value: unknown, root: JsonSchema = 
   }
   if (Array.isArray(schema.anyOf)) {
     const options = schema.anyOf as JsonSchema[];
-    if (options.every(option => validate(option, value, root, at) !== null)) {
-      return `${at} does not match any of the ${options.length} shapes it may take.`;
+    if (options.some(option => validate(option, value, root, at) === null)) {
+      return null;
     }
-    return null;
+    // Say what is wrong with the option the value was meant as, not that it is none of them.
+    const meant = meantOption(options, value, root);
+    if (meant.option !== undefined) {
+      return validate(meant.option, value, root, at);
+    }
+    if (meant.key !== undefined) {
+      return `${at}.${meant.key} must be one of ${meant.words.map(word => JSON.stringify(word)).join(', ')}.`;
+    }
+    return `${at} does not match any of the ${options.length} shapes it may take.`;
   }
   const type = schema.type;
   if (typeof type === 'string' && !hasType(value, type)) {
@@ -205,7 +213,8 @@ export function repairedArguments(schema: JsonSchema, value: unknown, root: Json
     return next.some((each, i) => each !== value[i]) ? next : value;
   }
   if (value !== null && typeof value === 'object') {
-    const properties = (optionWith(schema, root, 'object')?.properties as Record<string, JsonSchema> | undefined) ?? {};
+    const properties =
+      (optionWith(schema, root, 'object', value)?.properties as Record<string, JsonSchema> | undefined) ?? {};
     let changed = false;
     const out: Record<string, unknown> = {};
     for (const [key, each] of Object.entries(value as Record<string, unknown>)) {
@@ -250,14 +259,70 @@ function wordsOf(schema: JsonSchema, root: JsonSchema): Set<unknown> {
   return new Set([...(Array.isArray(schema.enum) ? schema.enum : []), ...('const' in schema ? [schema.const] : [])]);
 }
 
-/** The schema, or the option of its anyOf, that describes a value of this kind. */
-function optionWith(schema: JsonSchema, root: JsonSchema, kind: 'object' | 'array'): JsonSchema | undefined {
+/**
+ * Which option of an anyOf a value was meant as, when that can be told.
+ *
+ * Object options told apart by a property each fixes to one word (a
+ * shape's `kind: "circle"`, `kind: "rect"`) are a tagged union: the
+ * value's own word picks its option, and a word that is none of them is
+ * reported with the words there are (`key` and `words`). Otherwise the
+ * one option that takes the value's JSON type, if only one does.
+ */
+function meantOption(
+  options: readonly JsonSchema[],
+  value: unknown,
+  root: JsonSchema
+): { option?: JsonSchema; key?: string; words: unknown[] } {
+  const resolved = options.map(option => resolve(option, root));
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const objects = resolved.filter(option => kindsOf(option, root).has('object') && option.properties !== undefined);
+    const wordOf = (option: JsonSchema, key: string): unknown[] | undefined => {
+      const property = (option.properties as Record<string, JsonSchema>)[key];
+      if (property === undefined) return undefined;
+      const fixed = resolve(property, root);
+      if ('const' in fixed) return [fixed.const];
+      return Array.isArray(fixed.enum) ? (fixed.enum as unknown[]) : undefined;
+    };
+    const keys = objects.length < 2 ? [] : Object.keys(objects[0]!.properties as object);
+    const key = keys.find(k => objects.every(option => wordOf(option, k) !== undefined));
+    if (key !== undefined) {
+      const given = (value as Record<string, unknown>)[key];
+      // Left out, the word is the one option that does not require it (a cutout is the default of an add).
+      const optional = objects.filter(o => !((o.required as string[] | undefined) ?? []).includes(key));
+      const option =
+        given === undefined && optional.length === 1 ? optional[0] : objects.find(o => wordOf(o, key)!.includes(given));
+      return option !== undefined ? { option, words: [] } : { key, words: objects.flatMap(o => wordOf(o, key)!) };
+    }
+  }
+  const kind =
+    value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value === 'number' ? 'number' : typeof value;
+  const fits = resolved.filter(option => kindsOf(option, root).has(kind));
+  return fits.length === 1 ? { option: fits[0], words: [] } : { words: [] };
+}
+
+/** A schema with its $ref followed. */
+function resolve(schema: JsonSchema, root: JsonSchema): JsonSchema {
+  const ref = schema.$ref;
+  if (typeof ref !== 'string') return schema;
+  const target = (root.$defs as Record<string, JsonSchema> | undefined)?.[ref.replace(/^#\/\$defs\//, '')];
+  return target === undefined ? schema : resolve(target, root);
+}
+
+/** The schema, or the option of its anyOf, that describes a value of this kind (for an object, the option it was meant as). */
+function optionWith(
+  schema: JsonSchema,
+  root: JsonSchema,
+  kind: 'object' | 'array',
+  value?: unknown
+): JsonSchema | undefined {
   const ref = schema.$ref;
   if (typeof ref === 'string') {
     const target = (root.$defs as Record<string, JsonSchema> | undefined)?.[ref.replace(/^#\/\$defs\//, '')];
-    return target === undefined ? undefined : optionWith(target, root, kind);
+    return target === undefined ? undefined : optionWith(target, root, kind, value);
   }
   if (Array.isArray(schema.anyOf)) {
+    const meant = value === undefined ? undefined : meantOption(schema.anyOf as JsonSchema[], value, root).option;
+    if (meant !== undefined && kindsOf(meant, root).has(kind)) return optionWith(meant, root, kind, value);
     for (const option of schema.anyOf as JsonSchema[]) {
       const found = optionWith(option, root, kind);
       if (found !== undefined) return found;
