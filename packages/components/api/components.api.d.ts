@@ -650,6 +650,7 @@ interface SelectProps extends ControlLayoutProps {
   ref?: (node: UiNode | null) => void;
   compact?: boolean;
   labelHidden?: boolean;
+  onHighlight?: (value: string | null) => void;
 }
 declare function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiChild;
 interface DatePickerProps extends ControlLayoutProps {

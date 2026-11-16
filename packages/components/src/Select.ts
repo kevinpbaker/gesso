@@ -97,6 +97,14 @@ export interface SelectProps extends ControlLayoutProps {
    * what a screen reader announces.
    */
   labelHidden?: boolean;
+  /**
+   * The option the open list highlights, each time the arrows, a typed
+   * letter or the pointer move the highlight, and null when the list
+   * closes: for showing what choosing it would do before it is chosen,
+   * such as the edge of a drawing an option names. Disabled options are
+   * never highlighted.
+   */
+  onHighlight?: (value: string | null) => void;
 }
 
 export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiChild {
@@ -207,6 +215,13 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
   };
 
   const step = (delta: number): void => moveTo(seek(active.value + delta, delta));
+  /** The pointer on an option: the highlight goes to it, unless it is disabled. */
+  const pointAt = (index: number): void => {
+    if (optionAt(index) !== undefined && active.value !== index) {
+      active.next(index);
+      anchored = true;
+    }
+  };
 
   /** Whether a type-ahead search is still running: typed into, and not paused. */
   const searching = (): boolean => search !== '' && Date.now() - typedAt <= TYPE_AHEAD_PAUSE;
@@ -293,6 +308,13 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
     }
   };
   ctx.effect(active, reveal);
+  /** Tells `onHighlight` the highlighted option, while the list is open. */
+  const announceHighlight = (): void => {
+    if (overlay.isOpen()) {
+      inputs.onHighlight?.value?.(optionAt(active.value)?.value ?? null);
+    }
+  };
+  ctx.effect(active, announceHighlight);
   ctx.effect(scrollerBox, reveal);
 
   /** A row arriving or leaving; a leaving row takes out only its own entry. */
@@ -374,7 +396,7 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
               const rows = options
                 .slice(start, end)
                 .map((option, offset) =>
-                  row(option, start + offset, options.length, active, value.value, choose, track, compact)
+                  row(option, start + offset, options.length, active, value.value, choose, track, compact, pointAt)
                 );
               return group === undefined ? rows : heading(group, start, rows, compact);
             })
@@ -406,8 +428,11 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
       onClose: () => {
         search = '';
         release();
+        inputs.onHighlight?.value?.(null);
       }
     });
+    // The list is open now, with the highlight it opened on.
+    announceHighlight();
   };
 
   return Column(
@@ -549,7 +574,8 @@ function row(
   chosen: Observable<string>,
   choose: (value: string) => void,
   track: (index: number, node: UiNode, present: boolean) => void,
-  compact = false
+  compact = false,
+  pointAt: (index: number) => void = () => {}
 ): UiElement {
   const selected = chosen.pipe(map(current => current === option.value));
   const foreground = option.disabled === true ? 'controlForegroundDisabled' : 'controlForeground';
@@ -570,6 +596,8 @@ function row(
       // the column scrolls them rather than shrinking them to fit.
       flexShrink: 0,
       modifiers: [CONTROL_INTERACTION],
+      // The highlight follows the pointer, as `Menu`'s does, so Enter takes what is under it.
+      onPointerEnter: () => pointAt(index),
       ...(compact ? { paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4 } : { padding: 8 }),
       gap: 8,
       y: 'center',

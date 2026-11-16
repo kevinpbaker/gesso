@@ -34,18 +34,19 @@ is chosen.
 
 ## Props
 
-| Prop           | Type                      | Default     | What it does                                                                      |
-| -------------- | ------------------------- | ----------- | --------------------------------------------------------------------------------- |
-| `options`      | `readonly SelectOption[]` | required    | The options, in the order they are drawn. Declare the array once.                 |
-| `value`        | `string`                  | none        | The chosen value, when the application owns it. Supplying it makes it controlled. |
-| `defaultValue` | `string`                  | none        | The value to start on, when the select owns it. Supplying both throws.            |
-| `onChange`     | `(value: string) => void` | none        | Called with the value the select would take, on a click, a key and a jump.        |
-| `label`        | `string`                  | `''`        | Drawn above the trigger, and the accessible name of the trigger and the list.     |
-| `placeholder`  | `string`                  | `'Choose…'` | Drawn in the trigger while the value is the empty string.                         |
-| `disabled`     | `boolean`                 | `false`     | Refuses clicks and keys, greys the text, and marks the subtree unavailable.       |
-| `invalid`      | `boolean`                 | `false`     | Draws the trigger's border in `danger` and adds the `invalid` state.              |
-| `required`     | `boolean`                 | `false`     | Adds the `required` state. It enforces nothing: validity is the application's.    |
-| `ref`          | `UiNodeRef`               | none        | Receives the trigger node, for focusing it or anchoring something to it.          |
+| Prop           | Type                              | Default     | What it does                                                                      |
+| -------------- | --------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `options`      | `readonly SelectOption[]`         | required    | The options, in the order they are drawn. Declare the array once.                 |
+| `value`        | `string`                          | none        | The chosen value, when the application owns it. Supplying it makes it controlled. |
+| `defaultValue` | `string`                          | none        | The value to start on, when the select owns it. Supplying both throws.            |
+| `onChange`     | `(value: string) => void`         | none        | Called with the value the select would take, on a click, a key and a jump.        |
+| `label`        | `string`                          | `''`        | Drawn above the trigger, and the accessible name of the trigger and the list.     |
+| `placeholder`  | `string`                          | `'Choose…'` | Drawn in the trigger while the value is the empty string.                         |
+| `disabled`     | `boolean`                         | `false`     | Refuses clicks and keys, greys the text, and marks the subtree unavailable.       |
+| `invalid`      | `boolean`                         | `false`     | Draws the trigger's border in `danger` and adds the `invalid` state.              |
+| `required`     | `boolean`                         | `false`     | Adds the `required` state. It enforces nothing: validity is the application's.    |
+| `ref`          | `UiNodeRef`                       | none        | Receives the trigger node, for focusing it or anchoring something to it.          |
+| `onHighlight`  | `(value: string \| null) => void` | none        | The option the open list highlights, as it moves; null when the list closes.      |
 
 A `SelectOption` has these fields:
 
@@ -245,6 +246,17 @@ option still takes up a place: the first of four options announces as
 "1 of 4" whether or not the fourth can be picked. Which option is chosen
 is the `selected` state and not a number, so there is no `valueNow` on
 an option.
+
+## Showing what an option would do
+
+The highlight in the open list follows the arrows, a letter and the
+pointer, as a menu's does, so `Enter` takes the option under the
+pointer. `onHighlight` hears each move, with the option's value, and
+`null` once the list closes, whether by a choice, `Escape` or a press
+outside. A disabled option is never highlighted. It is for showing what
+choosing an option would do while the person is still deciding: Gesso
+Cut's "Flange on an edge…" list names edges of a drawing, and the edge
+an option names is lit on the canvas beside the list.
 
 ## The list is an overlay
 

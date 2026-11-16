@@ -457,3 +457,62 @@ describe('a select with grouped options', () => {
     }
   });
 });
+
+/**
+ * `onHighlight` tells the page which option the open list highlights:
+ * found in Gesso Cut, whose "Flange on an edge…" list names edges of a
+ * drawing, and lights up the one an option names before it is chosen.
+ */
+describe('a select’s highlight', () => {
+  function mountWith(seen: (string | null)[]) {
+    const ui = renderTest(
+      Column(
+        { width: 400, height: 300 },
+        createComponent(Select, {
+          label: 'Edge',
+          placeholder: 'Choose an edge',
+          options: [
+            { value: 'top', label: 'Top edge' },
+            { value: 'left', label: 'Left edge', disabled: true },
+            { value: 'right', label: 'Right edge' }
+          ],
+          onHighlight: (value: string | null) => seen.push(value)
+        })
+      ),
+      { width: 400, height: 300 }
+    );
+    ui.fireEvent.focus(ui.getByRole('combobox', { name: 'Edge' }));
+    ui.frame();
+    return ui;
+  }
+
+  it('says the option the list opens on, each the arrows move to, and null when it closes', () => {
+    const seen: (string | null)[] = [];
+    const ui = mountWith(seen);
+    ui.fireEvent.press('Enter');
+    ui.frame();
+    ui.fireEvent.press('ArrowDown');
+    ui.frame();
+    ui.fireEvent.press('Escape');
+    ui.frame();
+    // The disabled Left edge is passed over.
+    expect(seen).toEqual(['top', 'right', null]);
+  });
+
+  it('follows the pointer, as a menu’s does, so Enter takes the option under it', () => {
+    const seen: (string | null)[] = [];
+    const ui = mountWith(seen);
+    ui.fireEvent.press('Enter');
+    ui.frame();
+    const right = ui.getByRole('option', { name: 'Right edge' });
+    const box = ui.getVisibleBox(right);
+    ui.fireEvent.pointerMove(box.x + box.width / 2, box.y + box.height / 2);
+    ui.frame();
+    expect(seen.at(-1)).toBe('right');
+    // A disabled option does not take the highlight.
+    const left = ui.getVisibleBox(ui.getByRole('option', { name: 'Left edge' }));
+    ui.fireEvent.pointerMove(left.x + left.width / 2, left.y + left.height / 2);
+    ui.frame();
+    expect(seen.at(-1)).toBe('right');
+  });
+});
