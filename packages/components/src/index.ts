@@ -68,8 +68,15 @@ export { ColorPalette, normalizeHex, PALETTE, type ColorPaletteProps, type Palet
 export { ColorPicker, hexOfHsv, hsvOfHex, type ColorPickerProps, type Hsv } from './ColorPicker';
 export { Menu, type MenuProps, type MenuItem } from './Menu';
 export { MenuBar, type MenuBarProps } from './MenuBar';
-export { MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarStep } from './menuBarModel';
-export type { MenuBarContext, MenuBarEntry, MenuBarMenu, MenuBarState, MenuBarStep } from './menuBarModel';
+export { isMenuBarSubmenu, MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarLevels, menuBarStep } from './menuBarModel';
+export type {
+  MenuBarContext,
+  MenuBarEntry,
+  MenuBarMenu,
+  MenuBarState,
+  MenuBarStep,
+  MenuBarSubmenu
+} from './menuBarModel';
 export { Select, type SelectProps, type SelectOption } from './Select';
 export { DatePicker, type DatePickerProps } from './DatePicker';
 export { addDays, addMonths, formatDate, isoDate, monthGrid, parseIsoDate, todayIso } from './calendar';

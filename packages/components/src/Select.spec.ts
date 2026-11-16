@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
-import { renderTest } from 'gesso-testing';
+import { nodesUnder, renderTest } from 'gesso-testing';
 import { Column, Row, shortcut, shortcuts, UiShortcutRegistry } from 'gesso-core';
 import { Select } from './Select';
 
@@ -375,5 +375,85 @@ describe('type-ahead in a select', () => {
     expect(ui.value.value).toBe('blueberry');
     ui.type('b');
     expect(ui.value.value).toBe('banana');
+  });
+});
+
+/**
+ * Options under headings. Found in Gesso Cut, whose "Cut by" select
+ * lists the person's own machines and the cutting services apart.
+ */
+describe('a select with grouped options', () => {
+  const CUT_BY = [
+    { value: '', label: 'Not chosen' },
+    { value: 'glowforge', label: 'Glowforge Pro', group: 'Your machines' },
+    { value: 'xtool', label: 'xTool P2', group: 'Your machines' },
+    { value: 'ponoko', label: 'Ponoko', group: 'Cutting services' },
+    { value: 'sendcutsend', label: 'SendCutSend', group: 'Cutting services', disabled: true },
+    { value: 'big-blue-saw', label: 'Big Blue Saw', group: 'Cutting services' }
+  ];
+
+  function mountCutBy(start = '') {
+    const value = new BehaviorSubject(start);
+    const ui = renderTest(
+      createComponent(Select, {
+        label: 'Cut by',
+        value,
+        onChange: (next: string) => value.next(next),
+        options: CUT_BY
+      }),
+      { width: 400, height: 500 }
+    );
+    ui.fireEvent.focus(ui.getByRole('combobox', { name: 'Cut by' }));
+    ui.frame();
+    const type = (...keys: string[]) => {
+      for (const key of keys) {
+        ui.fireEvent.press(key);
+        ui.frame();
+      }
+    };
+    const chosenAfter = (...keys: string[]): string => {
+      type('Enter', ...keys, 'Enter');
+      return value.value;
+    };
+    return { ...ui, value, type, chosenAfter };
+  }
+
+  it('draws each group under its heading, and names the group by it', () => {
+    const ui = mountCutBy();
+    ui.type('Enter');
+
+    const groups = ui.getAllByRole('group');
+    expect(groups.map(group => ui.getSemantics(group).label)).toEqual(['Your machines', 'Cutting services']);
+    const options = ui.getAllByRole('option');
+    const optionsIn = (group: (typeof groups)[number]) =>
+      nodesUnder(group)
+        .filter(node => options.includes(node))
+        .map(node => ui.getSemantics(node).label);
+    expect(optionsIn(groups[0]!)).toEqual(['Glowforge Pro', 'xTool P2']);
+    expect(optionsIn(groups[1]!)).toEqual(['Ponoko', 'SendCutSend', 'Big Blue Saw']);
+    expect(nodesUnder(groups[0]!)).toContain(ui.getByText('Your machines'));
+    // The option without a group is in none, and every row is still an option of the one list.
+    expect(options).toHaveLength(6);
+  });
+
+  it('walks across a heading with the arrows, as if it were not there', () => {
+    const ui = mountCutBy('xtool');
+    expect(ui.chosenAfter('ArrowDown')).toBe('ponoko');
+    expect(ui.chosenAfter('ArrowUp')).toBe('xtool');
+    expect(ui.chosenAfter('End')).toBe('big-blue-saw');
+    expect(ui.chosenAfter('Home')).toBe('');
+  });
+
+  it('finds options by their own labels, never by a heading', () => {
+    vi.useFakeTimers();
+    try {
+      const ui = mountCutBy('glowforge');
+      // `c` starts "Cutting services" and no option: the highlight stays.
+      expect(ui.chosenAfter('c')).toBe('glowforge');
+      vi.advanceTimersByTime(600);
+      expect(ui.chosenAfter('p')).toBe('ponoko');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

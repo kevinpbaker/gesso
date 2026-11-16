@@ -30,8 +30,31 @@
 /** A rule between two groups of entries. */
 export const MENU_SEPARATOR = '-' as const;
 
-/** One row of a menu: a command, or a rule. */
-export type MenuBarEntry<T> = T | typeof MENU_SEPARATOR;
+/**
+ * A row that opens a menu of its own beside it: View → Precision ▸.
+ *
+ * Shaped as a bar's menu is, with `submenu` where a menu has `entries`,
+ * so a command type that is an object should not have a `submenu`
+ * array of its own. Its entries are chosen as the bar's are: one chosen
+ * is `onChoose`'s, and closes everything. It can nest.
+ */
+export interface MenuBarSubmenu<T> {
+  readonly label: string;
+  readonly submenu: readonly MenuBarEntry<T>[];
+}
+
+/** One row of a menu: a command, a rule, or a submenu. */
+export type MenuBarEntry<T> = T | typeof MENU_SEPARATOR | MenuBarSubmenu<T>;
+
+/** Whether a row opens a submenu rather than being a command. */
+export function isMenuBarSubmenu<T>(entry: MenuBarEntry<T> | undefined): entry is MenuBarSubmenu<T> {
+  return (
+    typeof entry === 'object' &&
+    entry !== null &&
+    Array.isArray((entry as { submenu?: unknown }).submenu) &&
+    typeof (entry as { label?: unknown }).label === 'string'
+  );
+}
 
 /** One menu on the bar. */
 export interface MenuBarMenu<T> {
@@ -69,6 +92,14 @@ export interface MenuBarState {
    * disabled item sits anywhere but the end.
    */
   readonly active: number;
+  /**
+   * The submenus open from the menu, outermost first: the highlighted
+   * entry in each, as `active` is in the menu, or -1 for one the
+   * pointer opened with nothing highlighted yet. Each is opened from
+   * the highlighted entry of the list before it. Absent or empty, none
+   * is open; the keys act on the innermost list open.
+   */
+  readonly trail?: readonly number[];
 }
 
 /** A bar with nothing open and the first menu focused. */
@@ -146,38 +177,60 @@ export function menuBarStep<T>(
     }
   }
 
-  const entries = menus[focused]!.entries;
+  const levels = menuBarLevels(state, menus);
+  const depth = levels.length - 1;
+  const { entries, active } = levels[depth]!;
+  /** This state with the innermost list's highlight moved to `index`. */
+  const at = (index: number): MenuBarState => withActive({ ...state, focused }, depth, index);
+  const highlighted = entries[active];
+  /** The highlighted submenu opened, its first choosable entry highlighted. */
+  const into = (submenu: MenuBarSubmenu<T>): MenuBarState => ({
+    focused,
+    open: true,
+    active: depth === 0 ? active : state.active,
+    trail: [...(state.trail ?? []).slice(0, depth), seek(submenu.submenu, 0, 1, context)]
+  });
+  /** The innermost submenu closed, back to the entry that opened it. */
+  const back = (): MenuBarState => ({ ...state, focused, trail: (state.trail ?? []).slice(0, depth - 1) });
   switch (key) {
     case 'ArrowDown':
-      return { state: { focused, open: true, active: seek(entries, state.active + 1, 1, context) } };
+      return { state: at(seek(entries, active + 1, 1, context)) };
     case 'ArrowUp':
-      return { state: { focused, open: true, active: seek(entries, state.active - 1, -1, context) } };
+      return { state: at(seek(entries, active - 1, -1, context)) };
     case 'Home':
-      return { state: { focused, open: true, active: seek(entries, 0, 1, context) } };
+      return { state: at(seek(entries, 0, 1, context)) };
     case 'End':
-      return { state: { focused, open: true, active: seek(entries, entries.length - 1, -1, context) } };
+      return { state: at(seek(entries, entries.length - 1, -1, context)) };
     /**
      * Left and right walk the *bar* while a menu is open, closing this
      * one and opening the next. This is the case a focus-trapped popup
-     * cannot serve, and the reason this model exists.
+     * cannot serve, and the reason this model exists. On a submenu's
+     * entry, Right opens it instead, and in a submenu Left goes back.
      */
     case 'ArrowLeft':
-      return { state: opened(wrap(focused - 1, menus.length), menus, context, 1) };
+      return { state: depth > 0 ? back() : opened(wrap(focused - 1, menus.length), menus, context, 1) };
     case 'ArrowRight':
-      return { state: opened(wrap(focused + 1, menus.length), menus, context, 1) };
+      return {
+        state:
+          isMenuBarSubmenu(highlighted) && choosable(highlighted, context)
+            ? into(highlighted)
+            : opened(wrap(focused + 1, menus.length), menus, context, 1)
+      };
     case 'Escape':
       // The first Escape closes the menu and leaves the bar focused,
       // the second gives the keyboard back. Closing straight through
       // loses the place of anybody who opened the wrong menu, which is
-      // most people, most of the time.
-      return { state: { focused, open: false, active: -1 } };
+      // most people, most of the time. In a submenu it closes only that.
+      return { state: depth > 0 ? back() : { focused, open: false, active: -1 } };
     case 'Enter':
     case ' ': {
-      const entry = entries[state.active];
-      if (entry === undefined || entry === MENU_SEPARATOR || !context.enabled(entry as T)) {
+      if (isMenuBarSubmenu(highlighted)) {
+        return { state: choosable(highlighted, context) ? into(highlighted) : state };
+      }
+      if (highlighted === undefined || highlighted === MENU_SEPARATOR || !context.enabled(highlighted as T)) {
         return { state };
       }
-      return { state: { focused, open: false, active: -1 }, choose: entry as T, dismiss: true };
+      return { state: { focused, open: false, active: -1 }, choose: highlighted as T, dismiss: true };
     }
     case 'Tab':
       // Tab out of an open menu closes it rather than moving inside it.
@@ -193,10 +246,59 @@ export function menuBarStep<T>(
       if (!isPrintable(key)) {
         return null;
       }
-      const found = typeAhead(entries, state.active, key, context);
-      return found === -1 ? { state } : { state: { focused, open: true, active: found } };
+      const found = typeAhead(entries, active, key, context);
+      return found === -1 ? { state } : { state: at(found) };
     }
   }
+}
+
+/**
+ * The lists open in a menu, the menu's own first and then each submenu
+ * open from it, with the highlight in each. A trail that no longer
+ * leads through a submenu (the menus changed under it) stops where it
+ * stops leading.
+ */
+export function menuBarLevels<T>(
+  state: MenuBarState,
+  menus: readonly MenuBarMenu<T>[]
+): Array<{ readonly entries: readonly MenuBarEntry<T>[]; readonly active: number }> {
+  const menu = menus[clampMenu(state.focused, menus)];
+  const levels = [{ entries: menu?.entries ?? [], active: state.active }];
+  for (const active of state.trail ?? []) {
+    const outer = levels[levels.length - 1]!;
+    const entry = outer.entries[outer.active];
+    if (!isMenuBarSubmenu(entry)) {
+      break;
+    }
+    levels.push({ entries: entry.submenu, active });
+  }
+  return levels;
+}
+
+/** A state with the highlight of the list `depth` deep (0 for the menu) moved. */
+function withActive(state: MenuBarState, depth: number, active: number): MenuBarState {
+  if (depth === 0) {
+    return { focused: state.focused, open: state.open, active };
+  }
+  const trail = (state.trail ?? []).slice(0, depth);
+  trail[depth - 1] = active;
+  return { ...state, trail };
+}
+
+/** Whether an entry can be highlighted: a command that is enabled, or a submenu with one in it. */
+function choosable<T>(entry: MenuBarEntry<T> | undefined, context: MenuBarContext<T>): boolean {
+  if (entry === undefined || entry === MENU_SEPARATOR) {
+    return false;
+  }
+  if (isMenuBarSubmenu(entry)) {
+    return entry.submenu.some(inner => choosable(inner, context));
+  }
+  return context.enabled(entry as T);
+}
+
+/** What type-ahead matches an entry by. */
+function labelOfEntry<T>(entry: T | MenuBarSubmenu<T>, context: MenuBarContext<T>): string {
+  return isMenuBarSubmenu(entry) ? entry.label : context.labelOf(entry as T);
 }
 
 /** Opening a menu with its first choosable entry highlighted. */
@@ -230,8 +332,7 @@ function seek<T>(
   }
   for (let moved = 0; moved < count; moved++) {
     const index = wrap(from + direction * moved, count);
-    const entry = entries[index];
-    if (entry !== MENU_SEPARATOR && entry !== undefined && context.enabled(entry as T)) {
+    if (choosable(entries[index], context)) {
       return index;
     }
   }
@@ -254,12 +355,11 @@ function typeAhead<T>(
   for (let moved = 1; moved <= entries.length; moved++) {
     const index = wrap(active + moved, entries.length);
     const entry = entries[index];
-    if (entry === MENU_SEPARATOR || entry === undefined || !context.enabled(entry as T)) {
+    if (!choosable(entry, context)) {
       continue;
     }
     if (
-      context
-        .labelOf(entry as T)
+      labelOfEntry(entry as T | MenuBarSubmenu<T>, context)
         .toLowerCase()
         .startsWith(wanted)
     ) {

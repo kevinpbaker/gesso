@@ -47,13 +47,35 @@ is chosen.
 | `required`     | `boolean`                 | `false`     | Adds the `required` state. It enforces nothing: validity is the application's.    |
 | `ref`          | `UiNodeRef`               | none        | Receives the trigger node, for focusing it or anchoring something to it.          |
 
-A `SelectOption` is three fields:
+A `SelectOption` has these fields:
 
 | Field      | Type      | Default  | What it does                                                                              |
 | ---------- | --------- | -------- | ----------------------------------------------------------------------------------------- |
 | `value`    | `string`  | required | What `onChange` reports and `value` is compared against. Also the row's key.              |
 | `label`    | `string`  | required | Drawn on the row, the row's accessible name, and what the trigger shows when chosen.      |
 | `disabled` | `boolean` | `false`  | Draws the label in the disabled foreground token, makes the row inert, and skips the keys |
+| `group`    | `string`  | none     | The heading of the group the option is in. See "Options in groups" below.                 |
+
+### Options in groups
+
+Options next to each other with the same `group` are one group. The
+list draws the group under a heading, and a screen reader announces the
+group by that name as the highlight enters it:
+
+```ts
+const cutBy: readonly SelectOption[] = [
+  { value: 'glowforge', label: 'Glowforge Pro', group: 'Your machines' },
+  { value: 'xtool', label: 'xTool P2', group: 'Your machines' },
+  { value: 'ponoko', label: 'Ponoko', group: 'Cutting services' },
+  { value: 'sendcutsend', label: 'SendCutSend', group: 'Cutting services' }
+];
+```
+
+A heading is not an option. The arrows, `Home`, `End` and type-ahead
+skip it, and a letter matches only option labels. An option without a
+`group` is in no group. Keep the options of one group together: the
+same `group` later in the list starts a second group with the same
+heading.
 
 Every prop takes a plain value or an Observable of one, and the shared
 layout props on [the library page](/components/) apply here: `Select`

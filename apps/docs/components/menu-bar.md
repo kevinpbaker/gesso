@@ -97,18 +97,20 @@ same place will see the second overwrite the first.
 
 ## The keys
 
-| Key             | With nothing open      | With a menu open                  |
-| --------------- | ---------------------- | --------------------------------- |
-| `←` `→`         | Move along the bar     | Close this menu and open the next |
-| `↓`             | Open, from the top     | Next entry, wrapping              |
-| `↑`             | Open, from the bottom  | Previous entry, wrapping          |
-| `Home` `End`    | First or last menu     | First or last entry               |
-| `Enter` `Space` | Open                   | Choose, and close                 |
-| `Escape`        | Give the keyboard back | Close to the bar                  |
-| `F10`           | Give the keyboard back | Close, and give it back           |
-| `Alt` alone     | Give the keyboard back | Close, and give it back           |
-| A letter        | Open the menu it names | Jump to the entry it starts       |
-| `Tab`           | Leave the bar          | Close, and leave                  |
+| Key             | With nothing open      | With a menu open                     |
+| --------------- | ---------------------- | ------------------------------------ |
+| `←` `→`         | Move along the bar     | Close this menu and open the next    |
+| `→`             |                        | On a submenu's entry: open it        |
+| `←`             |                        | In a submenu: close it               |
+| `↓`             | Open, from the top     | Next entry, wrapping                 |
+| `↑`             | Open, from the bottom  | Previous entry, wrapping             |
+| `Home` `End`    | First or last menu     | First or last entry                  |
+| `Enter` `Space` | Open                   | Choose and close, or open a submenu  |
+| `Escape`        | Give the keyboard back | Close a submenu, or close to the bar |
+| `F10`           | Give the keyboard back | Close, and give it back              |
+| `Alt` alone     | Give the keyboard back | Close, and give it back              |
+| A letter        | Open the menu it names | Jump to the entry it starts          |
+| `Tab`           | Leave the bar          | Close, and leave                     |
 
 Escape twice rather than once, and the order matters: the first closes
 the menu and leaves the bar focused, the second gives the keyboard
@@ -119,6 +121,32 @@ the wrong menu, which is most people, most of the time.
 A letter that names nothing is not claimed, and neither is Tab from the
 closed bar. A bar that swallowed every key would be a bar you cannot
 get out of.
+
+## Submenus
+
+An entry can be a submenu: `{ label, submenu: entries }`, the same
+shape as a menu with `submenu` in place of `entries`.
+
+```ts
+const view: MenuBarMenu<Command> = {
+  label: 'View',
+  mnemonic: 'v',
+  entries: ['zoomIn', 'zoomOut', MENU_SEPARATOR, { label: 'Appearance', submenu: ['light', 'dark', 'system'] }]
+};
+```
+
+The entry shows `›` at its end, and opens its submenu beside it, toward
+the end of the row. Right, Enter or Space opens it with its first
+command highlighted. The pointer resting on the entry opens it with
+nothing highlighted. Left or Escape closes it and goes back to the
+entry. Right on a command in a submenu goes on to the next menu on the
+bar, as it does in a menu. A command chosen in a submenu goes to
+`onChoose`, and closes the submenu and the menu. A submenu in which no
+command is enabled is skipped and does not open. A submenu can hold
+other submenus.
+
+The command type must not be an object with a `submenu` array of its
+own: such an object is read as a submenu.
 
 ## Reaching the bar from anywhere
 

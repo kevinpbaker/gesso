@@ -481,3 +481,79 @@ describe('MenuBar reached from elsewhere in the application', () => {
     expect(elsewhere).toHaveFocus();
   });
 });
+
+/**
+ * A submenu in a bar's menu. Found in Gesso Cut, whose View menu is long
+ * and flat where it wants View → Appearance ▸.
+ */
+describe('a MenuBar submenu', () => {
+  function mountNested() {
+    const chosen: Command[] = [];
+    const ui = renderTest(
+      Column(
+        createComponent(MenuBar<Command>, {
+          menus: [{ label: 'View', entries: ['zoomIn', { label: 'Appearance', submenu: ['light', 'dark'] }] }],
+          labelOf: (item: Command) => LABELS[item],
+          onChoose: (item: Command) => chosen.push(item)
+        })
+      ),
+      { width: 600, height: 400 }
+    );
+    const keys = (...pressed: string[]) => {
+      for (const key of pressed) {
+        ui.fireEvent.keyDown(key);
+        ui.frame();
+      }
+    };
+    const pointAt = (node: ReturnType<typeof ui.getByRole>) => {
+      const box = ui.getLayout(node);
+      ui.fireEvent.pointerMove(box.x + box.width / 2, box.y + box.height / 2);
+      ui.frame();
+    };
+    return { ui, chosen, keys, pointAt };
+  }
+
+  it('opens beside its entry from the keyboard, and its command is chosen and closes everything', () => {
+    const { ui, chosen, keys } = mountNested();
+    ui.fireEvent.focus(ui.getByLabel('Main menu'));
+    keys('ArrowDown', 'ArrowDown', 'ArrowRight');
+
+    const entry = ui.getByRole('menuitem', { name: 'Appearance', states: ['expanded'] });
+    const submenu = ui.getByRole('menu', { name: 'Appearance' });
+    // Toward the end of the row, as `Menu`'s submenu opens.
+    expect(ui.getLayout(submenu).x).toBeGreaterThanOrEqual(ui.getLayout(entry).x + ui.getLayout(entry).width);
+
+    keys('ArrowDown', 'Enter');
+    expect(chosen).toEqual(['dark']);
+    expect(ui.queryByRole('menu')).toBeNull();
+  });
+
+  it('goes back to its entry with Left or Escape, and the menu stays open', () => {
+    for (const back of ['ArrowLeft', 'Escape']) {
+      const { ui, keys } = mountNested();
+      ui.fireEvent.focus(ui.getByLabel('Main menu'));
+      keys('ArrowDown', 'ArrowDown', 'ArrowRight', back);
+      expect(ui.queryByRole('menu', { name: 'Appearance' })).toBeNull();
+      expect(ui.getByRole('menu', { name: 'View' })).toBeDefined();
+      expect(ui.queryByRole('menuitem', { name: 'Appearance', states: ['expanded'] })).toBeNull();
+    }
+  });
+
+  it('opens with the pointer resting on its entry, closes as the pointer moves to another, and takes a click', () => {
+    const { ui, chosen, pointAt } = mountNested();
+    ui.fireEvent.click(ui.getByRole('menuitem', { name: 'View' }));
+    ui.frame();
+
+    pointAt(ui.getByRole('menuitem', { name: 'Appearance' }));
+    expect(ui.getByRole('menu', { name: 'Appearance' })).toBeDefined();
+    pointAt(ui.getByRole('menuitem', { name: 'Zoom in' }));
+    expect(ui.queryByRole('menu', { name: 'Appearance' })).toBeNull();
+
+    pointAt(ui.getByRole('menuitem', { name: 'Appearance' }));
+    // A press in the submenu is not a press outside the menu.
+    ui.fireEvent.click(ui.getByRole('menuitem', { name: 'Light' }));
+    ui.frame();
+    expect(chosen).toEqual(['light']);
+    expect(ui.queryByRole('menu')).toBeNull();
+  });
+});

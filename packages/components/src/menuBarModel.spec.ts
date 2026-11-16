@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isMenuBarSubmenu,
   MENU_BAR_CLOSED,
   MENU_SEPARATOR,
+  menuBarLevels,
   menuBarStep,
   type MenuBarContext,
   type MenuBarMenu,
@@ -72,10 +74,18 @@ function press(from: MenuBarState, keys: readonly string[], context = everything
   return { state, choose, dismissed };
 }
 
-/** The command the highlight is on, or null when it is on nothing. */
-function highlighted(state: MenuBarState, menus: readonly MenuBarMenu<Command>[] = MENUS): Command | null {
-  const entry = menus[state.focused]!.entries[state.active];
-  return entry === undefined || entry === MENU_SEPARATOR ? null : entry;
+/**
+ * The command the highlight is on, in the innermost list open, or the
+ * label of the submenu it is on, or null when it is on nothing.
+ */
+function highlighted(state: MenuBarState, menus: readonly MenuBarMenu<Command>[] = MENUS): string | null {
+  const levels = menuBarLevels(state, menus);
+  const { entries, active } = levels[levels.length - 1]!;
+  const entry = entries[active];
+  if (entry === undefined || entry === MENU_SEPARATOR) {
+    return null;
+  }
+  return isMenuBarSubmenu(entry) ? entry.label : entry;
 }
 
 describe('the bar with nothing open', () => {
@@ -258,5 +268,83 @@ describe('leaving and coming back', () => {
       focused: 1,
       open: false
     });
+  });
+});
+
+/**
+ * A submenu in a bar's menu. Found in Gesso Cut, whose View menu is long
+ * and flat where it wants View → Precision ▸ and View → Appearance ▸.
+ */
+describe('a submenu', () => {
+  const NESTED: readonly MenuBarMenu<Command>[] = [
+    {
+      label: 'Edit',
+      mnemonic: 'e',
+      entries: ['undo', { label: 'Format', submenu: ['bold', MENU_SEPARATOR, 'italic'] }, 'paste']
+    },
+    { label: 'Data', mnemonic: 'd', entries: ['sortAscending', 'freeze'] }
+  ];
+  const run = (keys: readonly string[], context = everything) => press(MENU_BAR_CLOSED, keys, context, NESTED);
+  const open = (keys: readonly string[], context = everything) => {
+    const { state } = run(keys, context);
+    return { ...state, at: highlighted(state, NESTED), depth: menuBarLevels(state, NESTED).length - 1 };
+  };
+
+  it('is walked past like a command, and opened by Right, Enter or Space on its first command', () => {
+    expect(open(['ArrowDown', 'ArrowDown'])).toMatchObject({ at: 'Format', depth: 0 });
+    for (const key of ['ArrowRight', 'Enter', ' ']) {
+      expect(open(['ArrowDown', 'ArrowDown', key])).toMatchObject({ at: 'bold', depth: 1, focused: 0 });
+    }
+  });
+
+  it('walks its own commands with the arrows, wrapping, past a rule', () => {
+    expect(open(['ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowDown'])).toMatchObject({ at: 'italic', depth: 1 });
+    expect(open(['ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowDown', 'ArrowDown'])).toMatchObject({ at: 'bold' });
+    expect(open(['ArrowDown', 'ArrowDown', 'ArrowRight', 'End'])).toMatchObject({ at: 'italic' });
+  });
+
+  it('goes back to its entry with Left or Escape, leaving the menu open', () => {
+    for (const key of ['ArrowLeft', 'Escape']) {
+      expect(open(['ArrowDown', 'ArrowDown', 'ArrowRight', key])).toMatchObject({
+        open: true,
+        focused: 0,
+        at: 'Format',
+        depth: 0
+      });
+    }
+  });
+
+  it('chooses one of its commands, and closes everything', () => {
+    const { state, choose, dismissed } = run(['ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowDown', 'Enter']);
+    expect(choose).toBe('italic');
+    expect(dismissed).toBe(true);
+    expect(state).toEqual({ focused: 0, open: false, active: -1 });
+  });
+
+  it('lets Right on one of its commands walk on along the bar', () => {
+    expect(open(['ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowRight'])).toMatchObject({
+      focused: 1,
+      at: 'sortAscending',
+      depth: 0
+    });
+  });
+
+  it('is found by its label with type-ahead, and its commands by theirs inside it', () => {
+    expect(open(['ArrowDown', 'f'])).toMatchObject({ at: 'Format', depth: 0 });
+    expect(open(['ArrowDown', 'f', 'ArrowRight', 'i'])).toMatchObject({ at: 'italic', depth: 1 });
+  });
+
+  it('is passed by, and does not open, when nothing in it can be chosen', () => {
+    const none = without('bold', 'italic');
+    expect(open(['ArrowDown', 'ArrowDown'], none)).toMatchObject({ at: 'paste', depth: 0 });
+    expect(open(['ArrowDown', 'ArrowDown', 'ArrowUp'], none)).toMatchObject({ at: 'undo', depth: 0 });
+  });
+
+  it('closes with its menu on Tab or F10', () => {
+    for (const key of ['Tab', 'F10']) {
+      const { state, dismissed } = run(['ArrowDown', 'ArrowDown', 'ArrowRight', key]);
+      expect(state).toEqual({ focused: 0, open: false, active: -1 });
+      expect(dismissed).toBe(true);
+    }
   });
 });

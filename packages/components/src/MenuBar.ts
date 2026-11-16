@@ -1,6 +1,14 @@
 import { BehaviorSubject, combineLatest, distinctUntilChanged, map, Subject, type Observable } from 'rxjs';
 
-import { each, FocusService, input, ScrollService, type ComponentContext, type Inputs } from 'gesso-framework';
+import {
+  createComponent,
+  each,
+  FocusService,
+  input,
+  ScrollService,
+  type ComponentContext,
+  type Inputs
+} from 'gesso-framework';
 import {
   Box,
   Column,
@@ -21,9 +29,11 @@ import {
 } from 'gesso-core';
 
 import {
+  isMenuBarSubmenu,
   MENU_BAR_CLOSED,
   MENU_SEPARATOR,
   menuBarStep,
+  type MenuBarEntry,
   type MenuBarMenu,
   type MenuBarState,
   type MenuBarStep
@@ -118,6 +128,8 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
   /** Each title's node, by its menu's label: a title follows its menu when the menus change. */
   const titleNodes = new Map<string, UiNode>();
   const titleAt = (index: number): UiNode | null => titleNodes.get(menus()[index]?.label ?? '') ?? null;
+  /** The bar with nothing open, on the menu it is on. */
+  const closed = (): MenuBarState => ({ focused: state.value.focused, open: false, active: -1 });
 
   /**
    * The open panel's rows, by menu and index, so the row the keyboard
@@ -141,7 +153,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
    * not do. A fresh object each time, so pressing a key always reveals
    * the row again, even after the wheel has scrolled it away.
    */
-  const revealed = new BehaviorSubject<{ readonly menu: number; readonly at: number } | null>(null);
+  const revealed = new BehaviorSubject<{ readonly menu: number; readonly at: readonly number[] } | null>(null);
 
   /**
    * The title the pointer is over, or -1.
@@ -236,7 +248,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
       dismissOnOutsidePress: false,
       onClose: () => {
         if (!swapping && state.value.open) {
-          state.next({ ...state.value, open: false, active: -1 });
+          state.next(closed());
         }
       }
     });
@@ -254,12 +266,12 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
    */
   let entered = false;
   let returnTo: UiNode | null = null;
-  /** The open menu's panel, while one is up. */
-  let panelNode: UiNode | null = null;
-  /** Whether a node is the bar, one of its titles, or in the open panel. */
+  /** The open menu's panel and its submenus' panels, while they are up. */
+  const panelNodes = new Set<UiNode>();
+  /** Whether a node is the bar, one of its titles, or in an open panel. */
   const ours = (node: UiNode): boolean => {
     for (let at: UiNode | null = node; at !== null; at = at.parent) {
-      if (at === barNode || at === panelNode) return true;
+      if (at === barNode || panelNodes.has(at)) return true;
     }
     return false;
   };
@@ -271,7 +283,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     // Focus taken somewhere else while a menu is open (a dialog a shortcut opened, a field clicked into) leaves the
     // menu behind it: it closes, as a press outside does, rather than float over what took the focus.
     if (node !== null && state.value.open && !ours(node)) {
-      show({ ...state.value, open: false, active: -1 });
+      show(closed());
     }
   });
 
@@ -318,7 +330,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     if (!context.enabled(item)) {
       return;
     }
-    show({ ...state.value, open: false, active: -1 });
+    show(closed());
     giveBack();
     inputs.onChoose.value?.(item);
     // A choice closes the bar, whichever way it was made, and the docs
@@ -329,8 +341,9 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
   /** Draws what a key did, and reports what it chose and whether the bar is done. */
   const apply = (step: MenuBarStep<T>): void => {
     show(step.state);
-    if (step.state.open && step.state.active !== -1) {
-      revealed.next({ menu: step.state.focused, at: step.state.active });
+    const path = [step.state.active, ...(step.state.trail ?? [])];
+    if (step.state.open && path[path.length - 1] !== -1) {
+      revealed.next({ menu: step.state.focused, at: path });
     }
     if (step.dismiss === true) {
       giveBack();
@@ -420,7 +433,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     if (letter === null || !menus().some(menu => menu.mnemonic === letter)) {
       return;
     }
-    const step = menuBarStep({ ...state.value, open: false, active: -1 }, letter, menus(), context);
+    const step = menuBarStep(closed(), letter, menus(), context);
     if (step !== null && enter()) {
       key.preventDefault();
       key.stopPropagation();
@@ -437,7 +450,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
       return;
     }
     if (focus.focused.value === barNode) {
-      apply({ state: { ...state.value, open: false, active: -1 }, dismiss: true });
+      apply({ state: closed(), dismiss: true });
     } else if (!enter()) {
       return;
     }
@@ -461,10 +474,17 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
   const reveal = (): void => {
     const target = revealed.value;
     const current = state.value;
-    if (target === null || !current.open || current.focused !== target.menu || current.active !== target.at) {
+    const path = [current.active, ...(current.trail ?? [])];
+    if (
+      target === null ||
+      !current.open ||
+      current.focused !== target.menu ||
+      path.length !== target.at.length ||
+      path.some((at, depth) => at !== target.at[depth])
+    ) {
       return;
     }
-    const node = rows.get(`${target.menu}:${target.at}`);
+    const node = rows.get(rowKey(target.menu, target.at));
     if (node !== undefined) {
       scroll.scrollIntoView(node, 4);
     }
@@ -492,40 +512,115 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
    * own height rather than being shrunk to fit — a rule is a one-pixel
    * box with nothing in it, and would be the first to go.
    */
-  const panel = (index: number): UiChild =>
-    Column(
+  const panel = (index: number, path: readonly number[] = []): UiChild => {
+    const entries = listAt(index, path);
+    return Column(
       {
-        ref: (node: UiNode | null) => {
-          panelNode = node;
-        },
-        minWidth: 232,
+        ref: trackPanel(),
+        minWidth: path.length === 0 ? 232 : 180,
         padding: 4,
         backgroundColor: 'surface',
         borderColor: 'border',
         borderWidth: 1,
         borderRadius: 8,
         role: 'menu',
-        label: menus()[index]?.label ?? '',
-        modifiers: [
-          clickOutside({
-            onOutside: () => show({ ...state.value, open: false, active: -1 }),
-            except: () => [...titleNodes.values()]
-          })
-        ]
+        label: path.length === 0 ? (menus()[index]?.label ?? '') : labelAt(index, path),
+        // The menu's panel hears a press outside it; a submenu's panel
+        // is not outside, and closing on a press outside the menu closes
+        // the submenus with it.
+        modifiers:
+          path.length === 0
+            ? [
+                clickOutside({
+                  onOutside: () => show(closed()),
+                  except: () => [...titleNodes.values(), ...panelNodes]
+                })
+              ]
+            : []
       },
       Column(
         { overflow: 'auto', minHeight: 0, gap: 1, modifiers: [measureFlow(scrollerBox)] },
-        ...(menus()[index]?.entries ?? []).map((entry, at) => item(entry, at, index, ticked(index)))
-      )
+        ...entries.map((entry, at) => item(entry, at, index, path, ticked(entries)))
+      ),
+      // The submenu open from this list, if one is: a panel of its own
+      // beside its entry. Always here, empty until one opens.
+      createComponent(MenuBarSubmenuPanel, { open: submenuFrom(index, path) })
     );
+  };
+
+  /** Each panel in `panelNodes` while it is up. */
+  const trackPanel = (): ((node: UiNode | null) => void) => {
+    let mounted: UiNode | null = null;
+    return node => {
+      if (mounted !== null) panelNodes.delete(mounted);
+      mounted = node;
+      if (node !== null) panelNodes.add(node);
+    };
+  };
+
+  /** The entries of a menu, or of the submenu `path` leads to in it. */
+  const listAt = (menu: number, path: readonly number[]): readonly MenuBarEntry<T>[] => {
+    let entries: readonly MenuBarEntry<T>[] = menus()[menu]?.entries ?? [];
+    for (const at of path) {
+      const entry = entries[at];
+      entries = isMenuBarSubmenu(entry) ? entry.submenu : [];
+    }
+    return entries;
+  };
+
+  /** The label of the submenu `path` leads to. */
+  const labelAt = (menu: number, path: readonly number[]): string => {
+    const entry = listAt(menu, path.slice(0, -1))[path[path.length - 1]!];
+    return isMenuBarSubmenu(entry) ? entry.label : '';
+  };
+
+  /** The submenu open from the list at `path`, with its entry's row to open beside, or null. */
+  const submenuFrom = (menu: number, path: readonly number[]): Observable<SubmenuOpen | null> =>
+    state.pipe(
+      map(current => {
+        if (!listOpen(current, menu, path) || (current.trail?.length ?? 0) <= path.length) {
+          return null;
+        }
+        const at = [...path, activeAt(current, path.length)];
+        const anchor = rows.get(rowKey(menu, at));
+        if (!isMenuBarSubmenu(listAt(menu, path)[at[at.length - 1]!]) || anchor === undefined) {
+          return null;
+        }
+        return { key: rowKey(menu, at), anchor, render: () => panel(menu, at) };
+      })
+    );
+
+  /**
+   * The pointer on an entry: the highlight moves to it, a submenu open
+   * deeper than its list closes, and a submenu's entry opens its own,
+   * with nothing in it highlighted, as a desktop's menus do.
+   */
+  const point = (menu: number, path: readonly number[], at: number, opens: boolean): void => {
+    const current = state.value;
+    if (!listOpen(current, menu, path)) {
+      return;
+    }
+    const trail = path.length === 0 ? [] : [...(current.trail ?? []).slice(0, path.length - 1), at];
+    const next: MenuBarState = {
+      focused: current.focused,
+      open: true,
+      active: path.length === 0 ? at : current.active,
+      trail: opens ? [...trail, -1] : trail
+    };
+    const before = [current.active, ...(current.trail ?? [])];
+    const after = [next.active, ...next.trail!];
+    if (before.length !== after.length || before.some((value, depth) => value !== after[depth])) {
+      state.next(next);
+    }
+  };
 
   /**
    * Keeps `rows` to the open panel's, so the highlight can be scrolled
    * to. A row leaving takes out only its own entry, so a panel reopened
    * before the last one's rows have gone keeps the rows it mounted.
    */
-  const trackRow = (menu: number, at: number): ((node: UiNode | null) => void) => {
-    const key = `${menu}:${at}`;
+  const trackRow = (menu: number, at: readonly number[]): ((node: UiNode | null) => void) => {
+    const key = rowKey(menu, at);
     let mounted: UiNode | null = null;
     return node => {
       if (node !== null) {
@@ -541,19 +636,29 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
   };
 
   /**
-   * Whether a menu has a column for ticks: every row in it does when
+   * Whether a list has a column for ticks: every row in it does when
    * any of its commands is a setting, so the labels stay in one line
    * whether or not each one is on.
    */
-  const ticked = (menu: number): boolean => {
+  const ticked = (entries: readonly MenuBarEntry<T>[]): boolean => {
     const checkedOf = inputs.checkedOf.value;
     return (
       checkedOf !== undefined &&
-      (menus()[menu]?.entries ?? []).some(entry => entry !== MENU_SEPARATOR && checkedOf(entry as T) !== undefined)
+      entries.some(entry => entry !== MENU_SEPARATOR && !isMenuBarSubmenu(entry) && checkedOf(entry as T) !== undefined)
     );
   };
 
-  const item = (entry: T | typeof MENU_SEPARATOR, at: number, menu: number, tickColumn: boolean): UiChild => {
+  /** Whether a choice can be made in a submenu: one of its commands, however deep, is enabled. */
+  const reachable = (entry: MenuBarEntry<T>): boolean =>
+    entry !== MENU_SEPARATOR && (isMenuBarSubmenu(entry) ? entry.submenu.some(reachable) : context.enabled(entry as T));
+
+  const item = (
+    entry: MenuBarEntry<T>,
+    at: number,
+    menu: number,
+    path: readonly number[],
+    tickColumn: boolean
+  ): UiChild => {
     if (entry === MENU_SEPARATOR) {
       return Box({
         key: `rule-${at}`,
@@ -565,18 +670,23 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
         role: 'separator'
       });
     }
+    const submenu = isMenuBarSubmenu(entry) ? entry : null;
     const command = entry as T;
-    const text = context.labelOf(command);
-    const on = context.enabled(command);
-    const accelerator = inputs.acceleratorOf.value?.(command) ?? '';
-    const checked = inputs.checkedOf.value?.(command);
+    const text = submenu !== null ? submenu.label : context.labelOf(command);
+    const on = submenu !== null ? reachable(submenu) : context.enabled(command);
+    // A submenu's entry says so where a command says its keys, as `Menu`'s does.
+    const accelerator = submenu !== null ? '›' : (inputs.acceleratorOf.value?.(command) ?? '');
+    const checked = submenu !== null ? undefined : inputs.checkedOf.value?.(command);
     const highlighted: Observable<boolean> = state.pipe(
-      map(current => current.open && current.focused === menu && current.active === at)
+      map(current => listOpen(current, menu, path) && activeAt(current, path.length) === at)
+    );
+    const expanded = state.pipe(
+      map((current): UiSemanticState[] => (listOpen(current, menu, [...path, at]) ? ['expanded'] : []))
     );
     return Row(
       {
-        key: text,
-        ref: trackRow(menu, at),
+        key: submenu !== null ? `submenu ${text}` : text,
+        ref: trackRow(menu, [...path, at]),
         flexShrink: 0,
         gap: 24,
         paddingLeft: 10,
@@ -589,7 +699,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
         backgroundColor: highlighted.pipe(map(is => (is ? 'controlBackgroundHovered' : 'transparent'))),
         role: checked === undefined ? 'menuitem' : 'menuitemcheckbox',
         label: text,
-        states: checked === true ? ['checked'] : undefined,
+        states: submenu !== null ? expanded : checked === true ? ['checked'] : undefined,
         disabled: !on,
         /**
          * Hovering moves the *same* highlight the arrows move.
@@ -601,11 +711,12 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
          * only ever rests where Enter would work.
          */
         onPointerEnter: () => {
-          if (on && state.value.active !== at) {
-            state.next({ ...state.value, active: at });
+          if (on) {
+            point(menu, path, at, submenu !== null);
           }
         },
-        onClick: () => choose(command)
+        // A submenu's entry opens it rather than being chosen: it is a way to commands, not one.
+        onClick: () => (submenu !== null ? on && point(menu, path, at, true) : choose(command))
       },
       Row(
         { flex: 1, gap: 6, y: 'center' },
@@ -739,6 +850,58 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
       }
     )
   );
+}
+
+/** A row's key in `rows`: its menu, and its index in each list down to it. */
+function rowKey(menu: number, at: readonly number[]): string {
+  return `${menu}:${at.join('.')}`;
+}
+
+/** The highlight in the list `depth` deep: the menu's at 0, then each open submenu's. */
+function activeAt(state: MenuBarState, depth: number): number {
+  return depth === 0 ? state.active : (state.trail?.[depth - 1] ?? -1);
+}
+
+/** Whether the list `path` leads to in a menu is open: the menu, and each submenu on the way. */
+function listOpen(state: MenuBarState, menu: number, path: readonly number[]): boolean {
+  return (
+    state.open &&
+    state.focused === menu &&
+    (state.trail?.length ?? 0) >= path.length &&
+    path.every((at, depth) => activeAt(state, depth) === at)
+  );
+}
+
+interface SubmenuOpen {
+  /** Which submenu, so the panel is put up again only for another one. */
+  readonly key: string;
+  readonly anchor: UiNode;
+  readonly render: () => UiChild;
+}
+
+/**
+ * A submenu's panel, beside its entry, toward the end of the row, as
+ * `Menu` opens one. A component of its own so each list has its own
+ * overlay, at any depth, and the panel goes when the list it is in does.
+ * It takes no keys: the bar keeps them, as it does for the menu's panel.
+ */
+function MenuBarSubmenuPanel(inputs: Inputs<{ open: SubmenuOpen | null }>, ctx: ComponentContext): UiChild {
+  const overlay = useOverlay(ctx, 'menubar-submenu');
+  ctx.effect(inputs.open.pipe(distinctUntilChanged((a, b) => a?.key === b?.key)), open => {
+    if (overlay.isOpen()) {
+      overlay.hide();
+    }
+    if (open !== null) {
+      overlay.show(open.render(), {
+        anchor: open.anchor,
+        environment: open.anchor,
+        placement: 'end-start',
+        offset: 2,
+        dismissOnOutsidePress: false
+      });
+    }
+  });
+  return Box({ width: 0, height: 0 });
 }
 
 /**

@@ -584,7 +584,12 @@ interface MenuProps {
 }
 declare function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild;
 declare const MENU_SEPARATOR: '-';
-type MenuBarEntry<T> = T | typeof MENU_SEPARATOR;
+interface MenuBarSubmenu<T> {
+  readonly label: string;
+  readonly submenu: readonly MenuBarEntry<T>[];
+}
+type MenuBarEntry<T> = T | typeof MENU_SEPARATOR | MenuBarSubmenu<T>;
+declare function isMenuBarSubmenu<T>(entry: MenuBarEntry<T> | undefined): entry is MenuBarSubmenu<T>;
 interface MenuBarMenu<T> {
   readonly label: string;
   readonly mnemonic?: string;
@@ -594,6 +599,7 @@ interface MenuBarState {
   readonly focused: number;
   readonly open: boolean;
   readonly active: number;
+  readonly trail?: readonly number[];
 }
 declare const MENU_BAR_CLOSED: MenuBarState;
 interface MenuBarStep<T> {
@@ -606,6 +612,10 @@ interface MenuBarContext<T> {
   readonly labelOf: (item: T) => string;
 }
 declare function menuBarStep<T>(state: MenuBarState, key: string, menus: readonly MenuBarMenu<T>[], context: MenuBarContext<T>): MenuBarStep<T> | null;
+declare function menuBarLevels<T>(state: MenuBarState, menus: readonly MenuBarMenu<T>[]): Array<{
+  readonly entries: readonly MenuBarEntry<T>[];
+  readonly active: number;
+}>;
 interface MenuBarProps<T> {
   menus: readonly MenuBarMenu<T>[];
   enabled?: (item: T) => boolean;
@@ -624,6 +634,7 @@ interface SelectOption {
   readonly value: string;
   readonly label: string;
   readonly disabled?: boolean;
+  readonly group?: string;
 }
 interface SelectProps extends ControlLayoutProps {
   value?: string;
@@ -1395,6 +1406,7 @@ export {
   Icon,
   Image,
   isFormulaError,
+  isMenuBarSubmenu,
   isoDate,
   keymap,
   LazyList,
@@ -1406,6 +1418,7 @@ export {
   MENU_BAR_CLOSED,
   MENU_SEPARATOR,
   MenuBar,
+  menuBarLevels,
   menuBarStep,
   Meter,
   minLength,
@@ -1533,6 +1546,7 @@ export {
   type MenuBarProps,
   type MenuBarState,
   type MenuBarStep,
+  type MenuBarSubmenu,
   type MenuItem,
   type MenuProps,
   type MeterOptimum,

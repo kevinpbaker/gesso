@@ -41,6 +41,14 @@ export interface SelectOption {
   readonly value: string;
   readonly label: string;
   readonly disabled?: boolean;
+  /**
+   * The heading of the group this option is in: "Your machines",
+   * "Cutting services". Options next to each other with the same group
+   * are one group, drawn under one heading and announced as a group by
+   * name. The heading is not an option: the arrows, Home, End and
+   * type-ahead pass it by. Options without a group are not in one.
+   */
+  readonly group?: string;
 }
 
 /**
@@ -362,9 +370,14 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
         { overflow: 'auto', minHeight: 0, gap: 2, modifiers: [measureFlow(scrollerBox)] },
         inputs.options.pipe(
           map(options =>
-            options.map((option, index) =>
-              row(option, index, options.length, active, value.value, choose, track, compact)
-            )
+            groups(options).flatMap(({ group, start, end }) => {
+              const rows = options
+                .slice(start, end)
+                .map((option, offset) =>
+                  row(option, start + offset, options.length, active, value.value, choose, track, compact)
+                );
+              return group === undefined ? rows : heading(group, start, rows, compact);
+            })
           )
         )
       )
@@ -482,6 +495,49 @@ export function Select(inputs: Inputs<SelectProps>, ctx: ComponentContext): UiCh
       chevron(CHEVRON_DOWN, foregroundToken(disabled))
     ),
     controlMessage(error)
+  );
+}
+
+/**
+ * The list in runs: each run of neighbours with the same group, and each
+ * option with none on its own. `start` and `end` are indexes into the
+ * whole list, which is what the highlight and the keys count in.
+ */
+function groups(
+  options: readonly SelectOption[]
+): Array<{ readonly group: string | undefined; readonly start: number; readonly end: number }> {
+  const runs: Array<{ group: string | undefined; start: number; end: number }> = [];
+  options.forEach((option, index) => {
+    const group = option.group === '' ? undefined : option.group;
+    const previous = runs[runs.length - 1];
+    if (group !== undefined && previous !== undefined && previous.group === group) {
+      previous.end = index + 1;
+    } else {
+      runs.push({ group, start: index, end: index + 1 });
+    }
+  });
+  return runs;
+}
+
+/**
+ * A group of options under its heading. The group is named by the
+ * heading, so a screen reader says "Your machines, group" on entering
+ * it; the heading itself is drawn text, never highlighted or chosen.
+ */
+function heading(group: string, start: number, rows: readonly UiElement[], compact: boolean): UiElement {
+  return Column(
+    { key: `group ${start} ${group}`, role: 'group', label: group, gap: 2, flexShrink: 0 },
+    Row(
+      {
+        paddingLeft: 8,
+        paddingRight: 8,
+        // Room above it except at the top, so a group is set off from the one before.
+        paddingTop: start === 0 ? (compact ? 2 : 4) : compact ? 8 : 10,
+        paddingBottom: 2
+      },
+      Text({ text: group, color: 'textMuted', textStyle: 'bodySmall', fontWeight: 600, selectable: false })
+    ),
+    ...rows
   );
 }
 
