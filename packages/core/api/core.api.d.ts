@@ -5066,6 +5066,7 @@ declare class PaintTarget implements PaintSurface {
   private ctx;
   private readonly layers;
   private suppressed;
+  private readonly paths;
   constructor(ctx: PaintContext2D, resolver: PaintResolver, layerSource?: PaintLayers | undefined);
   save(): void;
   restore(): void;
@@ -5073,12 +5074,18 @@ declare class PaintTarget implements PaintSurface {
   scale(x: number, y: number): void;
   rotate(angle: number): void;
   transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  private get pathState();
+  private piece;
+  private toPieces;
+  private joined;
+  private reframed;
   beginPath(): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
   quadraticCurveTo(cx: number, cy: number, x: number, y: number): void;
   bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void;
   arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise?: boolean): void;
+  private arcTo;
   rect(x: number, y: number, width: number, height: number): void;
   roundRect(x: number, y: number, width: number, height: number, radius: number): void;
   closePath(): void;

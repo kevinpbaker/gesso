@@ -171,6 +171,66 @@ export interface PaintResolver {
  * change replaces the node's environment, which is part of the
  * picture's cache key.
  */
+/**
+ * How many subpaths one path may close on a context before it is built
+ * from `Path2D` pieces instead.
+ *
+ * Chrome's `closePath` costs as much as the path it closes is long:
+ * each copies the path drawn so far. A path of five thousand closed
+ * subpaths (a plate's holes, a map's parcels, a scatter of markers) took
+ * 62 ms to build there, and 139 ms of circles, before a pixel of it was
+ * filled; built as one small `Path2D` per subpath, each closed while it
+ * is short, and appended to the whole, the same path took 2.4 ms. The
+ * pieces are the same path: `addPath` keeps every subpath as it was
+ * drawn, closed or open, and fill, stroke and clip draw it the same way.
+ *
+ * A path that closes fewer than this stays on the context, so drawing
+ * that was quick is drawn as it always was. Found by Gesso Cut (its
+ * roadmap's 7.4), whose 5,000-hole plate panned at four frames a second.
+ */
+export const PATH_PIECES_AFTER = 64;
+
+/**
+ * How many closed subpaths one piece holds before the next subpath
+ * starts another. A piece per subpath was a `Path2D` and an `addPath`
+ * for each hole, a third of what was left of the frame; sixteen keeps
+ * each `closePath` as short as it needs to be and those to a sixteenth.
+ */
+const PIECE_CLOSES = 16;
+
+/** A path call, kept as numbers while the path may yet be built in pieces. */
+const enum PathOp {
+  MoveTo,
+  LineTo,
+  Quadratic,
+  Bezier,
+  Arc,
+  ArcTo,
+  Rect,
+  Close
+}
+
+/** The path a context is drawing, as `PaintTarget` keeps it. */
+interface PathState {
+  /** The calls since `beginPath`, while the path is on the context: an op and its numbers, one after another. */
+  readonly trail: number[];
+  /** Subpaths closed since `beginPath`. */
+  closes: number;
+  /** The transform changed since the path began: it stays on the context, where each call took the transform it was made under. */
+  moved: boolean;
+  /** The path in pieces, once it has closed `PATH_PIECES_AFTER` subpaths: those finished, and the one being drawn. */
+  pieces: { whole: Path2D; sub: Path2D; drawn: boolean; closes: number; joined: Path2D | null } | null;
+}
+
+const freshPath = (): PathState => ({ trail: [], closes: 0, moved: false, pieces: null });
+
+/** Whether this host can build a path in pieces: a browser's `Path2D` and `DOMMatrix`, and a context that reports its transform. */
+const piecesPossible = (ctx: PaintContext2D): boolean =>
+  typeof Path2D === 'function' &&
+  typeof DOMMatrix === 'function' &&
+  typeof Path2D.prototype.addPath === 'function' &&
+  ctx.getTransform !== undefined;
+
 export class PaintTarget implements PaintSurface {
   /**
    * The pending blur radius per save level.
@@ -191,6 +251,8 @@ export class PaintTarget implements PaintSurface {
    * text and images are dropped while it is above zero.
    */
   private suppressed = 0;
+  /** Each context's path, as drawn so far: see `PATH_PIECES_AFTER`. A layer's canvas has a path of its own. */
+  private readonly paths = new WeakMap<PaintContext2D, PathState>();
 
   constructor(
     ctx: PaintContext2D,
@@ -207,51 +269,233 @@ export class PaintTarget implements PaintSurface {
 
   restore(): void {
     this.blurRadius = this.blurStack.pop() ?? 0;
-    this.ctx.restore();
+    this.reframed(this.ctx, () => this.ctx.restore());
   }
 
   translate(x: number, y: number): void {
-    this.ctx.translate(x, y);
+    this.reframed(this.ctx, () => this.ctx.translate(x, y));
   }
 
   scale(x: number, y: number): void {
-    this.ctx.scale(x, y);
+    this.reframed(this.ctx, () => this.ctx.scale(x, y));
   }
 
   rotate(angle: number): void {
-    this.ctx.rotate(angle);
+    this.reframed(this.ctx, () => this.ctx.rotate(angle));
   }
 
   transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
-    this.ctx.transform(a, b, c, d, e, f);
+    this.reframed(this.ctx, () => this.ctx.transform(a, b, c, d, e, f));
+  }
+
+  // ------------------------------------------------------------- the path
+  //
+  // Each call goes to the context as it always did, and is kept as
+  // numbers too, until the path has closed `PATH_PIECES_AFTER` subpaths.
+  // Then the path is built again from those numbers as Path2D pieces,
+  // and the rest of it goes there (see `PATH_PIECES_AFTER`).
+
+  /** The path being drawn on the context drawn into now. */
+  private get pathState(): PathState {
+    let state = this.paths.get(this.ctx);
+    if (state === undefined) {
+      state = freshPath();
+      this.paths.set(this.ctx, state);
+    }
+    return state;
+  }
+
+  /**
+   * The piece being drawn, ready for one more call. A call that starts a
+   * subpath (`starts`) puts a piece that has closed `PIECE_CLOSES` with
+   * the rest first, and begins another.
+   */
+  private piece(state: PathState, starts: boolean): Path2D {
+    const pieces = state.pieces!;
+    pieces.joined = null;
+    if (starts && pieces.drawn && pieces.closes >= PIECE_CLOSES) {
+      pieces.whole.addPath(pieces.sub);
+      pieces.sub = new Path2D();
+      pieces.closes = 0;
+    }
+    pieces.drawn = true;
+    return pieces.sub;
+  }
+
+  /** Builds the path drawn so far as pieces, from the numbers kept of it. */
+  private toPieces(state: PathState): void {
+    const t = state.trail;
+    const whole = new Path2D();
+    let sub = new Path2D();
+    let drawn = false;
+    let closes = 0;
+    for (let i = 0; i < t.length;) {
+      const op = t[i++] as PathOp;
+      if ((op === PathOp.MoveTo || op === PathOp.Rect) && drawn && closes >= PIECE_CLOSES) {
+        whole.addPath(sub);
+        sub = new Path2D();
+        closes = 0;
+      }
+      drawn = true;
+      if (op === PathOp.Close) closes++;
+      switch (op) {
+        case PathOp.MoveTo:
+          sub.moveTo(t[i++]!, t[i++]!);
+          break;
+        case PathOp.LineTo:
+          sub.lineTo(t[i++]!, t[i++]!);
+          break;
+        case PathOp.Quadratic:
+          sub.quadraticCurveTo(t[i++]!, t[i++]!, t[i++]!, t[i++]!);
+          break;
+        case PathOp.Bezier:
+          sub.bezierCurveTo(t[i++]!, t[i++]!, t[i++]!, t[i++]!, t[i++]!, t[i++]!);
+          break;
+        case PathOp.Arc:
+          sub.arc(t[i++]!, t[i++]!, t[i++]!, t[i++]!, t[i++]!, t[i++]! === 1);
+          break;
+        case PathOp.ArcTo:
+          sub.arcTo(t[i++]!, t[i++]!, t[i++]!, t[i++]!, t[i++]!);
+          break;
+        case PathOp.Rect:
+          sub.rect(t[i++]!, t[i++]!, t[i++]!, t[i++]!);
+          break;
+        case PathOp.Close:
+          sub.closePath();
+          break;
+      }
+    }
+    t.length = 0;
+    state.pieces = { whole, sub, drawn, closes, joined: null };
+  }
+
+  /** The whole path in pieces, as one `Path2D` to fill, stroke or clip with; kept until the path changes. */
+  private joined(state: PathState): Path2D {
+    const pieces = state.pieces!;
+    if (pieces.joined === null) {
+      const all = new Path2D(pieces.whole);
+      if (pieces.drawn) all.addPath(pieces.sub);
+      pieces.joined = all;
+    }
+    return pieces.joined;
+  }
+
+  /**
+   * Runs something that may change a context's transform. A path on the
+   * context is marked, so it is never built in pieces (its calls took
+   * the transforms they were made under); a path in pieces is moved, so
+   * it lands where it was drawn under the transform it is filled under.
+   */
+  private reframed(ctx: PaintContext2D, change: () => void): void {
+    const state = this.paths.get(ctx);
+    if (state === undefined || (state.pieces === null && state.trail.length === 0)) {
+      change();
+      return;
+    }
+    if (state.pieces === null) {
+      change();
+      state.moved = true;
+      return;
+    }
+    const before = ctx.getTransform!();
+    change();
+    const after = ctx.getTransform!();
+    if (
+      before.a === after.a &&
+      before.b === after.b &&
+      before.c === after.c &&
+      before.d === after.d &&
+      before.e === after.e &&
+      before.f === after.f
+    )
+      return;
+    // Drawn under `before`, filled under `after`: each point moved by after⁻¹ · before.
+    const m = DOMMatrix.fromMatrix(after).inverse().multiply(DOMMatrix.fromMatrix(before));
+    const pieces = state.pieces;
+    const whole = new Path2D();
+    whole.addPath(pieces.whole, m);
+    const sub = new Path2D();
+    sub.addPath(pieces.sub, m);
+    state.pieces = { whole, sub, drawn: pieces.drawn, closes: pieces.closes, joined: null };
   }
 
   beginPath(): void {
     this.ctx.beginPath();
+    const state = this.pathState;
+    state.trail.length = 0;
+    state.closes = 0;
+    state.moved = false;
+    state.pieces = null;
   }
 
   moveTo(x: number, y: number): void {
+    const state = this.pathState;
+    if (state.pieces !== null) {
+      this.piece(state, true).moveTo(x, y);
+      return;
+    }
     this.ctx.moveTo(x, y);
+    state.trail.push(PathOp.MoveTo, x, y);
   }
 
   lineTo(x: number, y: number): void {
+    const state = this.pathState;
+    if (state.pieces !== null) {
+      this.piece(state, false).lineTo(x, y);
+      return;
+    }
     this.ctx.lineTo(x, y);
+    state.trail.push(PathOp.LineTo, x, y);
   }
 
   quadraticCurveTo(cx: number, cy: number, x: number, y: number): void {
+    const state = this.pathState;
+    if (state.pieces !== null) {
+      this.piece(state, false).quadraticCurveTo(cx, cy, x, y);
+      return;
+    }
     this.ctx.quadraticCurveTo(cx, cy, x, y);
+    state.trail.push(PathOp.Quadratic, cx, cy, x, y);
   }
 
   bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void {
+    const state = this.pathState;
+    if (state.pieces !== null) {
+      this.piece(state, false).bezierCurveTo(c1x, c1y, c2x, c2y, x, y);
+      return;
+    }
     this.ctx.bezierCurveTo(c1x, c1y, c2x, c2y, x, y);
+    state.trail.push(PathOp.Bezier, c1x, c1y, c2x, c2y, x, y);
   }
 
   arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, counterclockwise = false): void {
+    const state = this.pathState;
+    if (state.pieces !== null) {
+      this.piece(state, false).arc(x, y, radius, startAngle, endAngle, counterclockwise);
+      return;
+    }
     this.ctx.arc(x, y, radius, startAngle, endAngle, counterclockwise);
+    state.trail.push(PathOp.Arc, x, y, radius, startAngle, endAngle, counterclockwise ? 1 : 0);
+  }
+
+  private arcTo(x1: number, y1: number, x2: number, y2: number, radius: number): void {
+    const state = this.pathState;
+    if (state.pieces !== null) {
+      this.piece(state, false).arcTo(x1, y1, x2, y2, radius);
+      return;
+    }
+    this.ctx.arcTo(x1, y1, x2, y2, radius);
+    state.trail.push(PathOp.ArcTo, x1, y1, x2, y2, radius);
   }
 
   rect(x: number, y: number, width: number, height: number): void {
+    const state = this.pathState;
+    if (state.pieces !== null) {
+      this.piece(state, true).rect(x, y, width, height);
+      return;
+    }
     this.ctx.rect(x, y, width, height);
+    state.trail.push(PathOp.Rect, x, y, width, height);
   }
 
   /**
@@ -263,19 +507,28 @@ export class PaintTarget implements PaintSurface {
   roundRect(x: number, y: number, width: number, height: number, radius: number): void {
     const r = Math.min(radius, width / 2, height / 2);
     if (!(r > 0)) {
-      this.ctx.rect(x, y, width, height);
+      this.rect(x, y, width, height);
       return;
     }
-    this.ctx.moveTo(x + r, y);
-    this.ctx.arcTo(x + width, y, x + width, y + height, r);
-    this.ctx.arcTo(x + width, y + height, x, y + height, r);
-    this.ctx.arcTo(x, y + height, x, y, r);
-    this.ctx.arcTo(x, y, x + width, y, r);
-    this.ctx.closePath();
+    this.moveTo(x + r, y);
+    this.arcTo(x + width, y, x + width, y + height, r);
+    this.arcTo(x + width, y + height, x, y + height, r);
+    this.arcTo(x, y + height, x, y, r);
+    this.arcTo(x, y, x + width, y, r);
+    this.closePath();
   }
 
   closePath(): void {
+    const state = this.pathState;
+    if (state.pieces === null && ++state.closes >= PATH_PIECES_AFTER && !state.moved && piecesPossible(this.ctx))
+      this.toPieces(state);
+    if (state.pieces !== null) {
+      this.piece(state, false).closePath();
+      state.pieces.closes++;
+      return;
+    }
     this.ctx.closePath();
+    state.trail.push(PathOp.Close);
   }
 
   path(d: string): void {
@@ -506,18 +759,24 @@ export class PaintTarget implements PaintSurface {
     if (this.suppressed > 0) {
       return;
     }
-    this.ctx.fill(rule);
+    const state = this.pathState;
+    if (state.pieces !== null) (this.ctx as unknown as CanvasPath2DDrawing).fill(this.joined(state), rule);
+    else this.ctx.fill(rule);
   }
 
   stroke(): void {
     if (this.suppressed > 0) {
       return;
     }
-    this.ctx.stroke();
+    const state = this.pathState;
+    if (state.pieces !== null) (this.ctx as unknown as CanvasPath2DDrawing).stroke(this.joined(state));
+    else this.ctx.stroke();
   }
 
   clip(rule: PaintFillRule = 'nonzero'): void {
-    this.ctx.clip(rule);
+    const state = this.pathState;
+    if (state.pieces !== null) (this.ctx as unknown as CanvasPath2DDrawing).clip(this.joined(state), rule);
+    else this.ctx.clip(rule);
   }
 
   text(value: string, x: number, y: number, style?: PaintTextStyle): void {
@@ -541,6 +800,13 @@ export class PaintTarget implements PaintSurface {
     }
     this.ctx.drawImage(image, x, y, width, height);
   }
+}
+
+/** A browser context's calls that take a `Path2D`: only made where `piecesPossible` found one. */
+interface CanvasPath2DDrawing {
+  fill(path: Path2D, rule?: PaintFillRule): void;
+  stroke(path: Path2D): void;
+  clip(path: Path2D, rule?: PaintFillRule): void;
 }
 
 interface LayerRect {
