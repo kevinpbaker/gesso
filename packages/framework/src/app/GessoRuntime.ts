@@ -127,6 +127,7 @@ import {
   type UiFrameClockFactory,
   type UiContrast,
   type UiPointer,
+  type ScrollAnchor,
   writeOverrideProperty,
   clearOverrideProperty
 } from 'gesso-core';
@@ -3858,7 +3859,12 @@ export class GessoRuntime {
    * every node in a subtree a reload replaced has its first layout on
    * this frame.
    */
-  private settleLayout(frame: UiFrame, root: UiNode, laidOut: boolean): SettledLayout {
+  private settleLayout(
+    frame: UiFrame,
+    root: UiNode,
+    laidOut: boolean,
+    anchor: ScrollAnchor | null = null
+  ): SettledLayout {
     const stats = this.engine.stats;
     const settled: SettledLayout = {
       frame,
@@ -3894,6 +3900,26 @@ export class GessoRuntime {
         // Nothing listening means nothing walked.
         if (!this.layoutNotifier.isEmpty()) {
           this.layoutNotifier.notify(read, readFlow);
+        }
+        // The boxes have settled: the focused node's scroll container
+        // scrolls by however far the layout moved it, so what grew or
+        // shrank above it does not move it out from under the caret and
+        // the pointer. Once a frame, then the listeners hear the scroll.
+        if (anchor !== null && !this.layoutPending()) {
+          const held = this.engine.anchorAdjustment(anchor);
+          anchor = null;
+          if (held !== null) {
+            this.smoothScroller.stop(held.container);
+            held.container.setProperty('scrollY', held.scrollY);
+            this.graph.markDirty(held.container, DirtyFlags.Transform);
+            const scrolled = this.scheduler.recollect(frame);
+            settled.frame = settled.frame.merged(scrolled);
+            this.phaseTimings.layout += this.timePhase(
+              () => true,
+              () => this.engine.layoutForFrame(scrolled, this.constraints, root)
+            );
+            continue;
+          }
         }
         if (!this.layoutPending()) {
           this.finishSettling(settled.passes > 0);
@@ -4041,6 +4067,10 @@ export class GessoRuntime {
     this.focusManager.settleScope();
 
     const firstPass = frameNeedsLayout(collected);
+    // Where the focused node sits in its scroll container before this
+    // frame's layout, to hold it there after (see `settleLayout`).
+    const focused = firstPass ? this.focusManager.focusedNode : null;
+    const anchor = focused === null ? null : this.engine.scrollAnchor(focused);
     this.phaseTimings.layout = this.timePhase(
       () => firstPass,
       () => this.engine.layoutForFrame(collected, this.constraints, root)
@@ -4050,7 +4080,7 @@ export class GessoRuntime {
     // when what it does in answer moves boxes, they are laid out again
     // before anything paints. From here on `frame` is everything the
     // frame changed, the listeners' writes included.
-    const settled = this.settleLayout(collected, root, firstPass);
+    const settled = this.settleLayout(collected, root, firstPass, anchor);
     const frame = settled.frame;
     const laidOut = settled.passes > 0;
     if (laidOut) {

@@ -3776,6 +3776,11 @@ interface ScrollAdjustment {
   scrollX: number;
   scrollY: number;
 }
+interface ScrollAnchor {
+  readonly node: UiNode;
+  readonly container: UiNode;
+  readonly offsetY: number;
+}
 declare class LayoutEngine {
   private records;
   private readonly cornerScratch;
@@ -3835,6 +3840,8 @@ declare class LayoutEngine {
   visibleBox(node: UiNode): LayoutBox;
   screenBox(node: UiNode, part?: LayoutBox): LayoutBox;
   screenBounds(node: UiNode): LayoutBox | null;
+  scrollAnchor(node: UiNode): ScrollAnchor | null;
+  anchorAdjustment(anchor: ScrollAnchor): ScrollAdjustment | null;
   revealAdjustments(node: UiNode, padding?: number, inner?: LayoutBox): ScrollAdjustment[];
   private textScrollAdjustment;
   revealScrollbars(node: UiNode): void;
@@ -6289,6 +6296,7 @@ export {
   scaleSpacing,
   ScissorRect,
   ScrollAdjustment,
+  ScrollAnchor,
   SCROLLBAR_FADE_MS,
   SCROLLBAR_HOVER_ZONE,
   SCROLLBAR_INSET,
@@ -7263,6 +7271,7 @@ import {
   scaleSpacing,
   ScissorRect,
   ScrollAdjustment,
+  ScrollAnchor,
   SCROLLBAR_FADE_MS,
   SCROLLBAR_HOVER_ZONE,
   SCROLLBAR_INSET,
@@ -8317,6 +8326,7 @@ export {
   type RunMeasure,
   type ScissorRect,
   type ScrollAdjustment,
+  type ScrollAnchor,
   type ScrollbarAxis,
   type ScrollbarThumb,
   type ScrollBounds,

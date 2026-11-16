@@ -100,6 +100,17 @@ its right edge, and its `scrollX` runs from minus the overflow up to
   the container settled on is what layout keeps, and it is what
   `scrollPosition` reports.
 
+The focused node also holds its place. When a layout moves it within
+its scroll container (a list of problems above it grew, a section above
+it opened), the container scrolls by as much, vertically, before the
+frame paints, so the field being typed in stays under the caret and the
+pointer. This is CSS's `overflow-anchor`, kept on the focused node only,
+and only while it is in sight: a node scrolled out of view, or nothing
+focused, leaves the offset as it was. A container cannot scroll past its
+ends to do it, so content above that shrinks at the top of a list still
+moves what is below. The offset is written to `scrollY`, as a wheel
+writes it.
+
 ## Being told that it scrolled
 
 A wheel is not the only thing that moves a list. A scrollbar drag, a

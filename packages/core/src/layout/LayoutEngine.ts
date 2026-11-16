@@ -63,6 +63,14 @@ export interface ScrollAdjustment {
   scrollY: number;
 }
 
+/** A node's place in its scroll container, before a layout, for `LayoutEngine.anchorAdjustment`. */
+export interface ScrollAnchor {
+  readonly node: UiNode;
+  readonly container: UiNode;
+  /** The node's top below the container's, in layout (unscrolled) space. */
+  readonly offsetY: number;
+}
+
 /**
  * Whether a node names any of the four logical horizontal insets, and
  * so needs its writing direction resolved before its box is worked
@@ -1482,6 +1490,60 @@ export class LayoutEngine {
       rec.boundsMaxX - rec.boundsMinX,
       rec.boundsMaxY - rec.boundsMinY
     );
+  }
+
+  /**
+   * Where `node` sits in its nearest vertical scroll container, to hold
+   * it there across a layout: taken before the layout, and handed to
+   * `anchorAdjustment` after it. Null when the node has no box yet, or
+   * no scroll container above it (one that follows another's scroll,
+   * `scrollWith`, is passed over: its offset is not its own).
+   */
+  scrollAnchor(node: UiNode): ScrollAnchor | null {
+    const rec = this.records.get(node);
+    if (rec === undefined) {
+      return null;
+    }
+    for (let current = node.parent; current !== null; current = current.parent) {
+      const container = this.records.get(current);
+      if (container === undefined || !container.scrollable || scrollLeaderOf(current) !== null) {
+        continue;
+      }
+      // Scrolled out of sight, it is not what the person is looking at:
+      // what they are looking at is left where it is, as without.
+      const viewTop = container.y + container.scrollY;
+      if (rec.y + rec.height <= viewTop || rec.y >= viewTop + container.height) {
+        return null;
+      }
+      return { node, container: current, offsetY: rec.y - container.y };
+    }
+    return null;
+  }
+
+  /**
+   * The scroll that keeps an anchor where it was on screen after a
+   * layout moved it within its container: content above it that grew
+   * or shrank (a list of messages, a section opened) leaves it under
+   * the pointer and the caret, as CSS's `overflow-anchor` does. Null
+   * when it did not move, when it or its container has gone, or when
+   * the container cannot scroll far enough to make up any of it.
+   * Vertical only: content above is what pushes a column about.
+   */
+  anchorAdjustment(anchor: ScrollAnchor): ScrollAdjustment | null {
+    const rec = this.records.get(anchor.node);
+    const container = this.records.get(anchor.container);
+    if (rec === undefined || container === undefined || !container.scrollable) {
+      return null;
+    }
+    const moved = rec.y - container.y - anchor.offsetY;
+    if (Math.abs(moved) < 0.5) {
+      return null;
+    }
+    const scrollY = this.clampScroll(container, 'y', container.scrollY + moved);
+    if (scrollY === container.scrollY) {
+      return null;
+    }
+    return { container: anchor.container, scrollX: container.scrollX, scrollY };
   }
 
   /**
