@@ -31,7 +31,7 @@ import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, readClipboard, writeClipboard } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { performShellStorage } from '../shellStorage';
-import { observeColorScheme, type ColorSchemePreference } from '../colorScheme';
+import { observeColorScheme, type ColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeContrast } from '../contrast';
 import { observePointer } from '../pointer';
 import { observeWindowActive } from '../windowActive';
@@ -445,6 +445,8 @@ export class WorkerApp {
   private detachViewportInsets: (() => void) | null = null;
   /** The appearance this shell reports, remembered across a remount. */
   private colorSchemePreference: ColorSchemePreference = 'auto';
+  /** What `auto` follows in place of `prefers-color-scheme`, once a host has said. */
+  private platformColorScheme: ColorScheme | undefined;
   /**
    * Whether the render worker still owes an answer to a `resize`, and
    * the newest size that has gone unsent because it does.
@@ -811,32 +813,63 @@ export class WorkerApp {
   /**
    * Chooses what the application is told about the appearance.
    *
-   * `auto` watches `prefers-color-scheme` and reports what it says;
-   * `light` and `dark` stop watching and report themselves, for a host
-   * with its own control — the reader of a documentation site who has
-   * picked dark against a light system, or a desktop window with an
-   * appearance setting of its own.
+   * `auto` follows the platform: `prefers-color-scheme`, or what the
+   * host reports through `setPlatformColorScheme`. `light` and `dark`
+   * stop following and report themselves, for a host with its own
+   * control — the reader of a documentation site who has picked dark
+   * against a light system, or a desktop window with an appearance
+   * setting of its own.
    *
    * Safe to call before `mount`: the preference is remembered and sent
    * when the worker starts.
    */
   setColorScheme(preference: ColorSchemePreference): void {
-    this.detachColorScheme?.();
-    this.detachColorScheme = null;
     this.colorSchemePreference = preference;
     // Undefined until `mount`, which calls this again once it is there.
     this.appLogicWorker?.colorSchemePreference?.(preference);
+    this.reportColorScheme();
+  }
+
+  /**
+   * Tells the shell which appearance the platform is in, for a host
+   * that knows better than `prefers-color-scheme`.
+   *
+   * From the first call, `auto` follows these reports and no longer
+   * watches the media query. It does not change the preference: an
+   * application that asked for `light` or `dark` (`createApp({
+   * colorScheme })`, `ShellService.preferColorScheme`) keeps it, and
+   * this is what it goes back to when it asks for `auto` again. A
+   * desktop window's main thread passes `createRemoteBridge`'s
+   * `onColorScheme` here, because the webview's media query is wrong on
+   * WebKitGTK.
+   *
+   * Safe to call before `mount`.
+   */
+  setPlatformColorScheme(scheme: ColorScheme): void {
+    this.platformColorScheme = scheme;
+    if (this.colorSchemePreference === 'auto') {
+      this.reportColorScheme();
+    }
+  }
+
+  /** Tells the render worker the appearance the preference resolves to. */
+  private reportColorScheme(): void {
+    this.detachColorScheme?.();
+    this.detachColorScheme = null;
     if (this.renderWorker === undefined) {
       return;
     }
-    if (preference === 'auto') {
+    const preference = this.colorSchemePreference;
+    if (preference !== 'auto') {
+      this.post({ type: 'colorScheme', scheme: preference });
+    } else if (this.platformColorScheme !== undefined) {
+      this.post({ type: 'colorScheme', scheme: this.platformColorScheme });
+    } else {
       // Reports once immediately as well as on change, for the reason
       // reduced motion does: nobody fires a `change` event at an app
       // that started in the appearance it is already in.
       this.detachColorScheme = observeColorScheme(scheme => this.post({ type: 'colorScheme', scheme }));
-      return;
     }
-    this.post({ type: 'colorScheme', scheme: preference });
   }
 
   /**

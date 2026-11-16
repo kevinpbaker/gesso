@@ -152,9 +152,10 @@ export interface DesktopAppOptions {
    * (`createApp({ colorScheme })`, `ShellService.preferColorScheme`), and
    * says so to this process; the frame around it is AppKit's, and keeps
    * the system's unless it is told. Given this and each window's
-   * `nativeWindow`, the frame follows the page: Light, Dark, or the
-   * system's for `auto`. A window whose page has said nothing keeps the
-   * system's. See `showAppearance`.
+   * `nativeWindow`, the frame follows the page: Light or Dark, and for
+   * `auto` what `colorScheme` last said, which is what the page follows
+   * too (the system's without it). A window whose page has said nothing
+   * keeps the system's. See `showAppearance`.
    *
    *   import * as ffi from 'bun:ffi';
    *   createDesktopApp({ ffi, open: … ({ send, close, nativeWindow: window.ptr }) });
@@ -243,19 +244,24 @@ export function createDesktopApp(options: DesktopAppOptions): DesktopApp {
       let preferred: ColorSchemePreference | undefined;
       let drawn: ColorSchemePreference | undefined;
       let warned = false;
+      /** The appearance last pushed from `colorScheme`, which a page's `auto` follows. */
+      let latest: 'light' | 'dark' | undefined;
       const drawFrame = (): void => {
         const native = transport?.nativeWindow;
+        // A page asked for `auto` is in what this process tells it, so
+        // its frame is too. Only without `colorScheme` is it the system's.
+        const look = preferred === 'auto' ? (latest ?? 'auto') : preferred;
         if (
           options.ffi === undefined ||
-          preferred === undefined ||
-          preferred === drawn ||
+          look === undefined ||
+          look === drawn ||
           native === undefined ||
           native === null
         ) {
           return;
         }
-        drawn = preferred;
-        const why = showAppearance(native, preferred, options.ffi);
+        drawn = look;
+        const why = showAppearance(native, look, options.ffi);
         if (why !== null && !warned) {
           warned = true;
           console.warn(`A window's title bar keeps the system's appearance: ${why}`);
@@ -292,7 +298,6 @@ export function createDesktopApp(options: DesktopAppOptions): DesktopApp {
       // window found this; a spec with a transport that was live
       // immediately could not.
       let greeted = false;
-      let latest: 'light' | 'dark' | undefined;
       transport = options.open(frame => {
         if (!greeted) {
           greeted = true;
@@ -310,6 +315,7 @@ export function createDesktopApp(options: DesktopAppOptions): DesktopApp {
         if (greeted) {
           host.setColorScheme(scheme);
         }
+        drawFrame();
       });
       if (appearance !== undefined) {
         subscriptions.set(id, appearance);

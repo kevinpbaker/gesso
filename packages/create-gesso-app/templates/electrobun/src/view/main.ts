@@ -18,7 +18,9 @@ const bridge = createElectrobunBridge({
   send: frame => view.rpc?.send.gessoFrame(frame),
   // The main process is the only side that knows, so the shell is told
   // rather than left to ask `matchMedia`, which lies in this webview.
-  onColorScheme: scheme => shell.setColorScheme(scheme)
+  // It is what `auto` follows; a screen that asks for `light` or `dark`
+  // (`ShellService.preferColorScheme`) still gets it.
+  onColorScheme: scheme => shell.setPlatformColorScheme(scheme)
 });
 
 const rpc = Electroview.defineRPC<GessoWindowRPC>({

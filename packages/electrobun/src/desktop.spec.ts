@@ -9,7 +9,7 @@
  * disturbing the other, and the last one closing being something the
  * application hears about.
  */
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, type Observable } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { channel, ChannelReplica, portHandle, type ChannelPort, type ServedChannel } from 'gesso-framework';
@@ -463,11 +463,18 @@ describe("a window's title bar", () => {
   });
 
   /** An application whose windows are each a bridge, with the page's half handed back. */
-  function standWindows(options: { ffi?: BunFfi; nativeWindow?: (id: number) => number | bigint | null } = {}) {
+  function standWindows(
+    options: {
+      ffi?: BunFfi;
+      nativeWindow?: (id: number) => number | bigint | null;
+      colorScheme?: Observable<'light' | 'dark'>;
+    } = {}
+  ) {
     const pages: Array<ReturnType<typeof createElectrobunBridge>> = [];
     const app = createDesktopApp({
       channels: [],
       ffi: options.ffi,
+      colorScheme: options.colorScheme,
       open: (receive, handle) => {
         const bridge = createElectrobunBridge({ send: frame => receive(frame) });
         pages.push(bridge);
@@ -496,6 +503,27 @@ describe("a window's title bar", () => {
       [42n, 'light', ffi],
       [42n, 'dark', ffi],
       [42n, 'auto', ffi]
+    ]);
+  });
+
+  it('is drawn for auto in what the application tells its page, and follows it', () => {
+    // The page follows what `colorScheme` pushes when it is asked for
+    // auto (`setPlatformColorScheme`), so the frame does too. The
+    // system's would put a light title bar over the template's dark page.
+    const scheme = new BehaviorSubject<'light' | 'dark'>('dark');
+    const { app, ask } = standWindows({ ffi, nativeWindow: () => 42n, colorScheme: scheme });
+    app.openWindow();
+
+    ask(0, 'auto');
+    scheme.next('light');
+    ask(0, 'dark');
+    scheme.next('dark');
+    scheme.next('light');
+
+    expect(drawn.mock.calls).toEqual([
+      [42n, 'dark', ffi],
+      [42n, 'light', ffi],
+      [42n, 'dark', ffi]
     ]);
   });
 

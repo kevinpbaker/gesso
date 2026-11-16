@@ -92,7 +92,7 @@ export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
       {/*
         The appearance is the main process's, not this window's, so
         flipping it here changes every window that is open. That is the
-        desktop shape of `setColorScheme`: one setting, replicated.
+        desktop shape of `setPlatformColorScheme`: one setting, replicated.
       */}
       <Switch label="Dark" checked={counter.view.dark} onChange={next => counter.send.setDark(next)} />
     </column>

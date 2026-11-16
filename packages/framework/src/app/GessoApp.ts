@@ -23,7 +23,7 @@ import { redirectWith } from './shellRedirect';
 import { EditingProxy, readClipboard, writeClipboard } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
 import { performShellStorage, shellStorageDenied } from './shellStorage';
-import { observeColorScheme, type ColorSchemePreference } from './colorScheme';
+import { observeColorScheme, type ColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
 import { observeContrast } from './contrast';
 import { observeWindowActive } from './windowActive';
@@ -168,6 +168,8 @@ export class GessoApp {
   private detachViewportInsets: (() => void) | null = null;
   /** The appearance this shell reports; watched or overridden. */
   private colorSchemePreference: ColorSchemePreference = 'auto';
+  /** What `auto` follows in place of `prefers-color-scheme`, once a host has said. */
+  private platformColorScheme: ColorScheme | undefined;
 
   constructor(options: GessoAppOptions) {
     this.host = options.host;
@@ -349,21 +351,42 @@ export class GessoApp {
 
   /**
    * Chooses what the application is told about the appearance: `auto`
-   * follows `prefers-color-scheme`, `light` and `dark` override it.
+   * follows the platform (`prefers-color-scheme`, or
+   * `setPlatformColorScheme`), `light` and `dark` override it.
    *
    * The same method `WorkerApp` has, doing the same thing without the
    * protocol in the middle — which is the point of the two shells
    * having one surface.
    */
   setColorScheme(preference: ColorSchemePreference): void {
+    this.colorSchemePreference = preference;
+    this.reportColorScheme();
+  }
+
+  /**
+   * Tells the shell which appearance the platform is in, for a host
+   * that knows better than `prefers-color-scheme`. `auto` follows it
+   * from then on; a `light` or `dark` preference is kept. See
+   * `WorkerApp.setPlatformColorScheme`.
+   */
+  setPlatformColorScheme(scheme: ColorScheme): void {
+    this.platformColorScheme = scheme;
+    if (this.colorSchemePreference === 'auto') {
+      this.reportColorScheme();
+    }
+  }
+
+  private reportColorScheme(): void {
     this.detachColorScheme?.();
     this.detachColorScheme = null;
-    this.colorSchemePreference = preference;
-    if (preference === 'auto') {
+    const preference = this.colorSchemePreference;
+    if (preference !== 'auto') {
+      this.runtime.setColorScheme(preference);
+    } else if (this.platformColorScheme !== undefined) {
+      this.runtime.setColorScheme(this.platformColorScheme);
+    } else {
       this.detachColorScheme = observeColorScheme(scheme => this.runtime.setColorScheme(scheme));
-      return;
     }
-    this.runtime.setColorScheme(preference);
   }
 
   /** Receives a report on the hovered node while the inspector is on. */

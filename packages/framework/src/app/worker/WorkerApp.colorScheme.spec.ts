@@ -115,3 +115,35 @@ describe('WorkerApp telling its application endpoint the appearance it is asked 
     expect(schemes()).toEqual(['dark']);
   });
 });
+
+describe('WorkerApp and a platform appearance its host reports', () => {
+  // A desktop window's main thread passed the main process's appearance
+  // to `setColorScheme`, which is the application's preference: each
+  // report overwrote a `light` or `dark` a screen had asked for.
+  it('follows the reports for auto, in place of the media query', () => {
+    const platform = darkPlatform();
+    const { app, fromWorker, schemes } = shell();
+
+    fromWorker({ type: 'preferColorScheme', preference: 'auto' });
+    app.setPlatformColorScheme('light');
+    // The media query is no longer heard once the host has reported.
+    platform.set(false);
+    platform.set(true);
+    app.setPlatformColorScheme('dark');
+
+    expect(schemes()).toEqual(['dark', 'light', 'dark']);
+  });
+
+  it('keeps an appearance the app asked for, and goes back to the reports for auto', () => {
+    darkPlatform();
+    const { app, fromWorker, schemes } = shell();
+    app.setPlatformColorScheme('dark');
+
+    fromWorker({ type: 'preferColorScheme', preference: 'light' });
+    app.setPlatformColorScheme('dark');
+    app.setPlatformColorScheme('light');
+    fromWorker({ type: 'preferColorScheme', preference: 'auto' });
+
+    expect(schemes()).toEqual(['light', 'light']);
+  });
+});

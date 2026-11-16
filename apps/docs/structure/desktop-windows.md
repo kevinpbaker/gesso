@@ -211,7 +211,7 @@ import type { GessoWindowRPC } from '../shared/rpc';
 
 const bridge = createElectrobunBridge({
   send: frame => view.rpc?.send.gessoFrame(frame),
-  onColorScheme: scheme => shell.setColorScheme(scheme)
+  onColorScheme: scheme => shell.setPlatformColorScheme(scheme)
 });
 
 const rpc = Electroview.defineRPC<GessoWindowRPC>({
@@ -344,8 +344,11 @@ createDesktopApp({ colorScheme: appearance /* … */ });
 
 The value is pushed to every window as it changes, and to a new window
 as it opens. In the window it arrives as `onColorScheme`, and passing
-it to `shell.setColorScheme` stops the shell watching the media query
-and makes it report what it was told. Everything downstream of that,
+it to `shell.setPlatformColorScheme` stops the shell watching the media
+query and makes `auto` report what it was told. A screen that asks for
+`light` or `dark` (`ShellService.preferColorScheme`) still gets it.
+Passing it to `setColorScheme` instead would overwrite that request on
+every report. Everything downstream of that,
 the environment, the theme and [light and dark](/guide/appearance), is
 unchanged.
 

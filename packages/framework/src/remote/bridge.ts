@@ -35,7 +35,10 @@ export interface RemoteBridgeOptions {
   /**
    * The appearance the platform is in, as the other process reports it.
    *
-   * Wire it to `app.setColorScheme`. It exists because
+   * Wire it to `app.setPlatformColorScheme`, which `auto` then
+   * follows. Not to `setColorScheme`: that is the application's
+   * preference, and each report would overwrite one it asked for
+   * (`ShellService.preferColorScheme`). It exists because
    * `prefers-color-scheme` is not to be trusted in every webview: on
    * WebKitGTK it reported light on a desktop that was in dark mode,
    * and a shell that believes it is a browser gets the appearance

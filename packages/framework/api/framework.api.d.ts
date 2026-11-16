@@ -2362,6 +2362,7 @@ declare class WorkerApp {
   private detachColorScheme;
   private detachViewportInsets;
   private colorSchemePreference;
+  private platformColorScheme;
   private resizeInFlight;
   private heldResize;
   private canvasOrigin;
@@ -2382,6 +2383,8 @@ declare class WorkerApp {
   onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
   devtools(request: DevtoolsRequest): void;
   setColorScheme(preference: ColorSchemePreference): void;
+  setPlatformColorScheme(scheme: ColorScheme): void;
+  private reportColorScheme;
   private setFrameLoop;
   private measureDisplay;
   dispose(): void;
@@ -2501,6 +2504,7 @@ declare class GessoApp {
   private detachColorScheme;
   private detachViewportInsets;
   private colorSchemePreference;
+  private platformColorScheme;
   constructor(options: GessoAppOptions);
   private flushFrame;
   uiHost(): UiHost;
@@ -2514,6 +2518,8 @@ declare class GessoApp {
   reload(root: FrameworkChild, services?: readonly (new () => object)[]): void;
   setInspector(enabled: boolean): void;
   setColorScheme(preference: ColorSchemePreference): void;
+  setPlatformColorScheme(scheme: ColorScheme): void;
+  private reportColorScheme;
   onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
   onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
   devtools(request: DevtoolsRequest): void;
