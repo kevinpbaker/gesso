@@ -185,7 +185,7 @@ export interface PaintResolver {
  * drawn, closed or open, and fill, stroke and clip draw it the same way.
  *
  * A path that closes fewer than this stays on the context, so drawing
- * that was quick is drawn as it always was. Found by Gesso Cut (its
+ * that was quick is drawn as it always was. Found by Flatwright (its
  * roadmap's 7.4), whose 5,000-hole plate panned at four frames a second.
  */
 export const PATH_PIECES_AFTER = 64;
