@@ -47,10 +47,16 @@ export const UiEnvironmentKeys = {
    * theme's. A `UiTextStyle` holds a resolved `UiColor`, which would
    * have fixed the name to whichever theme was in scope where it was
    * written.
+   *
+   * With nothing set above it, the theme's `text`: the palette name,
+   * not the colour, so plain text under a dark theme is that theme's
+   * light text. It was the default style's near-black, the light
+   * theme's text resolved once, and a `<text>` with no `color` and no
+   * `textStyle` in a dark app or a dialog drew near-black on dark.
    */
   color: createEnvironmentKey<UiColorValue>({
     name: 'color',
-    defaultValue: defaultTextStyle.color,
+    defaultValue: 'text',
     compare: colorValuesEqual
   }),
 

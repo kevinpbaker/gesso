@@ -71,6 +71,19 @@ describe('theme color tokens', () => {
     expect(resolveColor(node, UiProperties.color)).toEqual({ r: 0.5, g: 0.5, b: 0.5, a: 1 });
   });
 
+  it("paints text that sets no colour in the theme's text", () => {
+    // No `color` and no `textStyle` on it or above it: a key's label in
+    // a dark dialog. It drew in the default style's near-black, the
+    // light theme's text, on the dark theme's surface.
+    const dark = themedNode(darkTheme);
+    dark.setProperty('text', 'Ctrl+S');
+    expect(resolvePaintState(dark, createPaintState()).textColor).toEqual(darkTheme.colors.text);
+
+    const light = themedNode(lightTheme);
+    light.setProperty('text', 'Ctrl+S');
+    expect(resolvePaintState(light, createPaintState()).textColor).toEqual(lightTheme.colors.text);
+  });
+
   it('reaches the paint state through resolvePaintState', () => {
     const node = themedNode(darkTheme);
     node.setProperty('text', 'hello');
