@@ -135,6 +135,62 @@ describe('Tour', () => {
     expect(free.pressed).toEqual([]);
   });
 
+  it('when not modal, gives the keyboard back to where the person was working if the next step points there', async () => {
+    const field = tourTarget();
+    const other = tourTarget();
+    const ui = renderTest(
+      Column(
+        { width: 400, height: 300, padding: 20, gap: 140 },
+        Button({ ref: field.ref, width: 100, height: 40, text: 'Compose' }),
+        Button({ ref: other.ref, width: 100, height: 40, text: 'Archive' }),
+        createComponent(Tour, {
+          modal: false,
+          steps: [
+            { target: field, title: 'Type one' },
+            { target: field, title: 'Type another' },
+            { target: field, title: 'And a third' },
+            { target: other, title: 'Somewhere else' },
+            { target: field, title: 'Back to typing' }
+          ]
+        })
+      ),
+      { width: 400, height: 300 }
+    );
+    // A frame to draw the step's card, and the turn after, when the keyboard is given.
+    const turn = async () => {
+      for (let i = 0; i < 2; i++) {
+        ui.frame();
+        await new Promise(done => setTimeout(done, 0));
+      }
+      ui.frame();
+    };
+    await turn();
+    const compose = ui.getByRole('button', { name: 'Compose' });
+    ui.fireEvent.focus(compose);
+    ui.frame();
+    // Next pressed with the pointer, which focuses it on the way.
+    const next = ui.getByRole('button', { name: 'Next' });
+    ui.fireEvent.pointerDown(ui.getLayout(next).x + 4, ui.getLayout(next).y + 4);
+    ui.fireEvent.pointerUp(ui.getLayout(next).x + 4, ui.getLayout(next).y + 4);
+    await turn();
+    expect(ui.getByRole('dialog', { name: 'Type another' })).toBeDefined();
+    expect(compose).toHaveFocus();
+    // Next pressed from the keyboard: Tab to it, then Enter.
+    ui.fireEvent.focus(ui.getByRole('button', { name: 'Next' }));
+    ui.fireEvent.keyDown('Enter');
+    await turn();
+    expect(ui.getByRole('dialog', { name: 'And a third' })).toBeDefined();
+    expect(compose).toHaveFocus();
+    // A step that points elsewhere: the card has it, so Next can be reached.
+    ui.fireEvent.click(ui.getByRole('button', { name: 'Next' }));
+    await turn();
+    expect(ui.getByRole('dialog', { name: 'Somewhere else' })).toHaveFocus();
+    // And the one after, back at the field, returns there.
+    ui.fireEvent.click(ui.getByRole('button', { name: 'Next' }));
+    await turn();
+    expect(compose).toHaveFocus();
+  });
+
   it('closes on Escape', () => {
     const { ui } = mount();
     // The card has the keyboard while it is open.

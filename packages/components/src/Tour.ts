@@ -86,6 +86,11 @@ export interface TourProps {
    * opens something by taking focus opens it. Presses outside the hole
    * are still taken by the dim. Escape and the arrow keys work while the
    * card has the keyboard.
+   *
+   * A step whose target holds the place the person last worked in, the
+   * field they typed in on the step before, gives the keyboard back to
+   * that place instead of the card, so they carry on typing after Next
+   * without a click.
    */
   modal?: boolean;
 }
@@ -134,8 +139,15 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
   let placeholder: UiNode | null = null;
   /** The card's node while focus is kept in it. */
   let trapped: UiNode | null = null;
-  /** The card's node a tour that is not modal last gave the keyboard to, so it is given it once a step. */
-  let given: UiNode | null = null;
+  /** The card's node, while it is drawn. The overlay keeps the same node from step to step. */
+  let cardNode: UiNode | null = null;
+  /** The step a tour that is not modal last gave the keyboard for, so it is given once a step. */
+  let given: object | null = null;
+  /** Where the keyboard last was outside the card, for a tour that is not modal: where the person works. */
+  let working: UiNode | null = null;
+  ctx.effect(focus.focused, node => {
+    if (node !== null && !modal.value && (cardNode === null || !within(node, cardNode))) working = node;
+  });
   const release = (): void => {
     if (trapped !== null) {
       const scope = trapped;
@@ -167,8 +179,15 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
     const all = steps();
     const current = all[at]!;
     const last = at === all.length - 1;
+    /** This step, as the card shows it: the card's node is the same from step to step. */
+    const opened = {};
     const mine = (node: UiNode | null): void => {
-      if (node === null || trapped === node || given === node) {
+      if (node === null) {
+        cardNode = null;
+        return;
+      }
+      cardNode = node;
+      if (trapped === node || given === opened) {
         return;
       }
       if (modal.value) {
@@ -176,11 +195,19 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
         trapped = node;
         focus.trap(node);
       } else {
-        // The keyboard to the card as the step opens, free to go to the target from there. On the next turn: a
-        // ref fires before the overlay holding the card is in the tree, where focus would be refused.
-        given = node;
+        // The keyboard to the card as the step opens, free to go to the target from there; or back to where the
+        // person was working, if that is in the step's target. On the next turn: a ref fires before the overlay
+        // holding the card is in the tree, where focus would be refused.
+        given = opened;
+        const target = current.target?.node.value ?? null;
         setTimeout(() => {
-          if (given === node) focus.focus(node, { preventScroll: true });
+          if (given !== opened || cardNode !== node) return;
+          const place = working;
+          if (place !== null && target !== null && within(place, target)) {
+            focus.focus(place, { preventScroll: true });
+            if (focus.focused.value === place) return;
+          }
+          focus.focus(node, { preventScroll: true });
         }, 0);
       }
     };
@@ -393,6 +420,14 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
   });
 
   return Box({ position: 'absolute', width: 0, height: 0, ref: node => (placeholder = node) });
+}
+
+/** Whether `node` is `ancestor` or under it, in the tree as it is now: false for a node taken out of it. */
+function within(node: UiNode, ancestor: UiNode): boolean {
+  for (let at: UiNode | null = node; at !== null; at = at.parent) {
+    if (at === ancestor) return true;
+  }
+  return false;
 }
 
 /** The rectangle a fraction `t` of the way from `a` to `b`. */
