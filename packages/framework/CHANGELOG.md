@@ -1,5 +1,28 @@
 # gesso-framework
 
+## 0.9.0
+
+### Minor Changes
+
+- 11f0ed8: A screen in a desktop window can ask for `light` or `dark`, and the main process's appearance no longer overrides it. The shells have `setPlatformColorScheme(scheme)`: what `auto` follows in place of `prefers-color-scheme`, once a host has reported it. It leaves the preference alone. The Electrobun template and the desktop guide now pass the bridge's `onColorScheme` to it. They passed it to `setColorScheme`, so each report from the main process replaced what the screen had asked for through `ShellService.preferColorScheme`. `createDesktopApp` draws the title bar of a page asked for `auto` in the appearance `colorScheme` last pushed, which is the page's appearance, and in the system's only when there is no `colorScheme`.
+- bf8cd45: A desktop window's title bar can be drawn in the appearance its page is asked for, on macOS. Give `createDesktopApp` the `bun:ffi` module (`ffi`) and each window's `nativeWindow` (Electrobun's `window.ptr`), and the frame follows the page: Light, Dark, or the system's for `auto`. The frame used to keep macOS's appearance, so a page asked for Light sat under a dark title bar whenever macOS was dark. The page's shell tells its application endpoint the appearance it is asked for (`AppLogicEndpoint.colorSchemePreference`), the remote bridge carries it, and `serveRemoteChannels` hands it to `onColorSchemePreference`. `showAppearance(window, preference, ffi)` from `gesso-electrobun/desktop` sets a window's frame directly, for an appearance that is not the page's. The Electrobun template passes both.
+
+### Patch Changes
+
+- 103f0fc: An optional tool argument sent as `""` where the schema needs one of an enum's words, or text matching a pattern that `""` does not match (an id such as `after: ""`), is left out, as if it had not been sent, as `null` already was. gpt-oss:20b fills every optional field this way and stops after the refusal. Free text keeps its `""`, and a required field is still refused.
+- c8b7e5f: An agent tool's arguments written in the wrong JSON type are put back in the type the schema asks for before they are checked, for application tools and channel commands alike: an object or array sent as JSON text (`{"profile": "{\"id\": \"sendcutsend\"}"}`), a number sent as a string (`"quantity": "8"`) and `"true"` or `"false"` where a boolean belongs, as smaller models often write them. They used to be refused, which cost the model a turn it might not recover from. Only where the schema does not take the string as it is (no free string type, and not one of an enum's words), and only when the text is that kind of value; anything else reaches the checks as it came. Text that looks like an object or array but would not parse is refused with how to send it.
+- 42f0507: Two more repairs to a tool call's arguments before they are checked, both seen from llama3.1 and qwen3 driving Mockz: an optional value sent as `null` (or as the text `"null"` where text is not taken) where the schema takes no null is left out, as if it had not been sent, rather than refused; and an object or array sent as JSON text with a line break or tab left raw inside a string (a file's contents, written out) is parsed, where it used to be refused as text.
+- 8959371: `render_frame`'s example call and its module help use placeholders instead of `src/mocks/Settings`. Claude Haiku copied that path as given into a project whose mocks live in `mocks/`.
+- c8226fc: `render_frame`, `tokens_view`, `library_search` and `library_get` end their descriptions with an example call, and the theme argument says it is a string as well as listing its words. Small local models copy an example's shape more reliably than they read a schema, and some clients drop a field that has no `type`.
+- 444ed7f: The focused node keeps its place on screen in its scroll container. When a layout moves it within the container, because something above it grew or shrank (a list of problems in an inspector, a section opened), the container scrolls by as much before the frame paints, as CSS's `overflow-anchor` does. Before, the field being typed in slid away under the caret, and the next click landed on whatever had slid under the pointer: in Flatwright, a section's header, and once a Delete button. Only the focused node, only while it is in sight, and only vertically; nothing focused, or a node scrolled out of view, leaves the offset as it was. The engine gains `scrollAnchor` and `anchorAdjustment` (and the `ScrollAnchor` type) for the runtime to do this with. Found by Flatwright's second UI review.
+- 97e544f: `render_frame` says under its picture that a model which cannot see pictures gets a note from its client in the picture's place, which says nothing about the frame, and should read the screen as text with the app's own tools. Small text-only models took that note for the tool's answer.
+- 0b97f2e: A tool call whose value fits none of a tagged union's shapes now says what is wrong with the shape it was meant as, picked by its `kind` (or other tag): "input.shape.d is required." instead of "does not match any of the 14 shapes". A missing or unknown tag lists the words it may be. Repairs (a number sent as text) reach inside the meant shape too.
+- Updated dependencies [d3833b9]
+- Updated dependencies [17fcd3a]
+- Updated dependencies [444ed7f]
+- Updated dependencies [13e00a8]
+  - gesso-core@0.9.0
+
 ## 0.8.4
 
 ### Patch Changes

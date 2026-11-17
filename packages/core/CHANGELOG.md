@@ -1,5 +1,17 @@
 # gesso-core
 
+## 0.9.0
+
+### Minor Changes
+
+- 444ed7f: The focused node keeps its place on screen in its scroll container. When a layout moves it within the container, because something above it grew or shrank (a list of problems in an inspector, a section opened), the container scrolls by as much before the frame paints, as CSS's `overflow-anchor` does. Before, the field being typed in slid away under the caret, and the next click landed on whatever had slid under the pointer: in Flatwright, a section's header, and once a Delete button. Only the focused node, only while it is in sight, and only vertically; nothing focused, or a node scrolled out of view, leaves the offset as it was. The engine gains `scrollAnchor` and `anchorAdjustment` (and the `ScrollAnchor` type) for the runtime to do this with. Found by Flatwright's second UI review.
+
+### Patch Changes
+
+- d3833b9: A painted path of many closed shapes draws in a few milliseconds on Canvas2D, where it took hundreds. Chrome's `closePath` costs as much as the path it closes is long, so a path of 5,000 holes (a perforated plate, a map's parcels, a scatter of markers) spent 60 to 140 ms in `closePath` alone, every frame it was drawn. Once a path has closed 64 shapes, the canvas target builds the rest of it in `Path2D` pieces of 16 closed shapes each and fills, strokes or clips the whole: the same path, drawn the same way. A path that closes fewer, a path drawn across a change of transform, and a host with no `Path2D` draw as before. Found by Flatwright, whose 5,000-hole plate panned at under five frames a second and now pans at sixty.
+- 17fcd3a: A node can declare its baseline with `baseline`, in pixels from its top, for content the layout cannot read one from: a painted figure, math set by a painter of its own. A row with `y: 'baseline'` lines it up with the text beside it.
+- 13e00a8: Text that sets no `color` and no `textStyle`, and has none above it, is drawn in the theme's `text`. It was the default style's near-black, which is the light theme's text resolved once, so a plain `<text>` in a dark app or a dark dialog drew near-black on dark. The inherited colour now starts as the palette name `text`, looked up against the theme in scope where it is painted, as a `color` an ancestor sets already was. Found by Calcwright, whose keyboard-shortcut sheet showed blank keys in dark mode.
+
 ## 0.8.4
 
 ## 0.8.3

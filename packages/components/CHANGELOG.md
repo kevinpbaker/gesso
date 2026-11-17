@@ -1,5 +1,36 @@
 # gesso-components
 
+## 0.9.0
+
+### Minor Changes
+
+- 927d1b4: A `MenuBar` menu can hold submenus, as a `Menu` can. An entry `{ label, submenu: entries }` shows `›` and opens its entries beside it: Right, Enter or Space opens it from the keyboard, the pointer resting on it opens it, and Left or Escape goes back to it. A command chosen in a submenu goes to `onChoose` and closes everything. `MenuBarState` has an optional `trail` for the submenus open, and `isMenuBarSubmenu`, `menuBarLevels` and `MenuBarSubmenu` are exported. `MenuBarEntry` now includes `MenuBarSubmenu`.
+- 927d1b4: A `Select` can put its options in groups under headings. Give options next to each other the same `group` ("Your machines", "Cutting services"), and the list draws them under that heading as a `group` named by it, which a screen reader announces. The heading is not an option: the arrows, `Home`, `End` and type-ahead pass it by.
+- ed789a5: `Select` says which option its open list highlights: `onHighlight` hears the option's value each time the arrows, a typed letter or the pointer move the highlight, and `null` when the list closes, for showing what choosing an option would do before it is chosen. The highlight now follows the pointer too, as `Menu`'s does, so Enter takes the option under the pointer; a disabled option still never takes it. Found by Flatwright, whose "Flange on an edge…" list lights up on the drawing the edge each option names.
+
+### Patch Changes
+
+- beff1b6: An open `MenuBar` menu closes when focus goes somewhere outside the bar and its menu, as when a shortcut opens a dialog or a field is clicked into, the way a press outside closes it. It used to stay open and draw over the dialog.
+- 393fae5: A `MenuBar`'s titles follow its `menus`: a menu added, taken away or renamed after the bar is built gets its title, and opens. The bar used to build its titles from the first value only, and warned that it had read `menus` with `.value`.
+- 288971f: A `NumberInput`'s step buttons are named for its field, `Increase Guests` and `Decrease Guests`, so two number fields in one form no longer offer two buttons both called Increase.
+- 422b2f4: A `Toast` kept up while its `message` changes shows the new notice whole: its action button, tone and screen-reader label follow their inputs, and the new message gets the whole `duration` from when it arrives. The toast used to build its body from the values it opened with, so a second notice before the first had gone showed the new words with the old button, tone and label, and closed on the first notice's timer.
+- 1184c81: A `Tour` that is not modal gives the keyboard to the card on every step, not only the first: the overlay keeps the card's node from step to step, so the card took it once and, after Next or Back, nothing had it. A step whose target holds the place the person last worked in gives the keyboard back there instead, so after typing on a step and pressing Next, by pointer or by key, the next keys go where they typed. Found by Calcwright, whose tutorials have the person type on the worksheet step after step.
+- Updated dependencies [103f0fc]
+- Updated dependencies [c8b7e5f]
+- Updated dependencies [42f0507]
+- Updated dependencies [8959371]
+- Updated dependencies [c8226fc]
+- Updated dependencies [d3833b9]
+- Updated dependencies [17fcd3a]
+- Updated dependencies [444ed7f]
+- Updated dependencies [13e00a8]
+- Updated dependencies [11f0ed8]
+- Updated dependencies [97e544f]
+- Updated dependencies [0b97f2e]
+- Updated dependencies [bf8cd45]
+  - gesso-framework@0.9.0
+  - gesso-core@0.9.0
+
 ## 0.8.4
 
 ### Patch Changes

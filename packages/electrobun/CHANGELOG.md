@@ -1,5 +1,27 @@
 # gesso-electrobun
 
+## 0.9.0
+
+### Minor Changes
+
+- beeb870: `keepRunningWhenCovered(window.webview.ptr, ffi)` from `gesso-electrobun/desktop` keeps a window's page running while other windows cover it, on macOS. WebKit took a covered window's page for a hidden one and stopped it after four minutes, so an agent working while the person was in their AI app got no answer from the window (its screen tools, or its own channels) until the window was brought forward, and the window was blank when it was. It turns WebKit's occlusion detection off for the web view, through `bun:ffi`, which the caller passes. A minimized window, or an app hidden with ⌘H, still stops.
+- bf8cd45: A desktop window's title bar can be drawn in the appearance its page is asked for, on macOS. Give `createDesktopApp` the `bun:ffi` module (`ffi`) and each window's `nativeWindow` (Electrobun's `window.ptr`), and the frame follows the page: Light, Dark, or the system's for `auto`. The frame used to keep macOS's appearance, so a page asked for Light sat under a dark title bar whenever macOS was dark. The page's shell tells its application endpoint the appearance it is asked for (`AppLogicEndpoint.colorSchemePreference`), the remote bridge carries it, and `serveRemoteChannels` hands it to `onColorSchemePreference`. `showAppearance(window, preference, ffi)` from `gesso-electrobun/desktop` sets a window's frame directly, for an appearance that is not the page's. The Electrobun template passes both.
+
+### Patch Changes
+
+- 11f0ed8: A screen in a desktop window can ask for `light` or `dark`, and the main process's appearance no longer overrides it. The shells have `setPlatformColorScheme(scheme)`: what `auto` follows in place of `prefers-color-scheme`, once a host has reported it. It leaves the preference alone. The Electrobun template and the desktop guide now pass the bridge's `onColorScheme` to it. They passed it to `setColorScheme`, so each report from the main process replaced what the screen had asked for through `ShellService.preferColorScheme`. `createDesktopApp` draws the title bar of a page asked for `auto` in the appearance `colorScheme` last pushed, which is the page's appearance, and in the system's only when there is no `colorScheme`.
+- Updated dependencies [103f0fc]
+- Updated dependencies [c8b7e5f]
+- Updated dependencies [42f0507]
+- Updated dependencies [8959371]
+- Updated dependencies [c8226fc]
+- Updated dependencies [444ed7f]
+- Updated dependencies [11f0ed8]
+- Updated dependencies [97e544f]
+- Updated dependencies [0b97f2e]
+- Updated dependencies [bf8cd45]
+  - gesso-framework@0.9.0
+
 ## 0.8.4
 
 ### Patch Changes

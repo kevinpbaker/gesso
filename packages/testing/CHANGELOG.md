@@ -1,5 +1,26 @@
 # gesso-testing
 
+## 0.9.0
+
+### Patch Changes
+
+- 58c1378: `GessoMatchers` is exported from `gesso-testing/matchers`, for a project that takes Gesso's packages from their source in another checkout and so has to declare the matchers on its own `vitest`.
+- Updated dependencies [103f0fc]
+- Updated dependencies [c8b7e5f]
+- Updated dependencies [42f0507]
+- Updated dependencies [8959371]
+- Updated dependencies [c8226fc]
+- Updated dependencies [d3833b9]
+- Updated dependencies [17fcd3a]
+- Updated dependencies [444ed7f]
+- Updated dependencies [13e00a8]
+- Updated dependencies [11f0ed8]
+- Updated dependencies [97e544f]
+- Updated dependencies [0b97f2e]
+- Updated dependencies [bf8cd45]
+  - gesso-framework@0.9.0
+  - gesso-core@0.9.0
+
 ## 0.8.4
 
 ### Patch Changes
