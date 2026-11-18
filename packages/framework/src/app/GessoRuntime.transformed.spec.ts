@@ -7,6 +7,7 @@ import {
   Button,
   Column,
   EditableText,
+  ScrollView,
   Text,
   breakpoint,
   defineModifier,
@@ -358,5 +359,69 @@ describe('a node under a panned, zoomed parent', () => {
     pointer.pointerUp(second.x + second.width + 40, second.y + second.height / 2, 0, none);
 
     expect(runtime.input.selection.selectedText()).toBe('One\nTwo');
+  });
+});
+
+/**
+ * A scroll container whose content is drawn zoomed: a page of paper
+ * laid out at full size and scaled by 2, inside a box as big as the
+ * zoomed page so there is that much to scroll. Records are where the
+ * page would be at zoom 1, and a scroll offset is in the zoomed space
+ * the container draws, so a reveal that compared the two sent the view
+ * to half the depth of what it was revealing: typing in a field low on
+ * the page threw the view up the page on the first key.
+ */
+describe('a node under a zoomed parent in a scroll container', () => {
+  const ZOOM = { scaleX: 2, scaleY: 2 };
+
+  function zoomedPage(scrolled: number) {
+    const offset = new BehaviorSubject(scrolled);
+    let desk: UiNode | null = null;
+    const mounted = mountRuntime(
+      ScrollView(
+        { width: 400, height: 300, scrollY: offset, ref: (n: UiNode | null) => (desk = n) },
+        Box(
+          { position: 'relative', width: 400, height: 2000 },
+          Box(
+            { position: 'absolute', top: 0, left: 0, width: 200, height: 1000, transform: ZOOM },
+            EditableText({ label: 'Low', value: 'V', position: 'absolute', left: 20, top: 700, width: 120 }),
+            Text({ label: 'Lower', text: 'Below', position: 'absolute', left: 20, top: 900, width: 120, height: 20 })
+          )
+        )
+      ),
+      { width: 400, height: 300 }
+    );
+    mounted.frame(0);
+    mounted.frame();
+    return { ...mounted, desk: () => desk! };
+  }
+
+  it('keeps the view where it is while a field it shows is typed in', () => {
+    // The field is laid out at 700 and drawn at 1400; scrolled to 1300 it
+    // is 100 down the view. Its record, at 700, is above the view.
+    const { runtime, frame, desk } = zoomedPage(1300);
+    expect(desk().getProperty('scrollY')).toBe(1300);
+    const field = byLabel(runtime, 'Low');
+    runtime.input.focus.focus(field);
+    frame();
+    editorFor(field).select(1);
+    frame();
+    runtime.input.editing.beforeInput('insertText', '(x)');
+    frame();
+    frame();
+
+    expect(desk().getProperty('scrollY')).toBe(1300);
+    // The caret is drawn on the field's line, 100 down the view.
+    const caret = runtime.input.editing.state()!.caret;
+    expect(caret.y).toBeGreaterThanOrEqual(100);
+    expect(caret.y + caret.height).toBeLessThanOrEqual(100 + 2 * 40);
+  });
+
+  it('scrolls a node below the view to where it is drawn, not where it is laid out', () => {
+    // Drawn from 1800 to 1840: the view, 300 tall, ends 8 below it.
+    const { runtime, frame, desk } = zoomedPage(0);
+    runtime.scrollIntoView(byLabel(runtime, 'Lower'));
+    frame();
+    expect(desk().getProperty('scrollY')).toBe(1840 - 300 + 8);
   });
 });

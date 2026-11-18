@@ -67,7 +67,7 @@ export interface ScrollAdjustment {
 export interface ScrollAnchor {
   readonly node: UiNode;
   readonly container: UiNode;
-  /** The node's top below the container's, in layout (unscrolled) space. */
+  /** The node's top below the container's, in the container's unscrolled content space: drawn, through any transform between them. */
   readonly offsetY: number;
 }
 
@@ -1512,10 +1512,11 @@ export class LayoutEngine {
       // Scrolled out of sight, it is not what the person is looking at:
       // what they are looking at is left where it is, as without.
       const viewTop = container.y + container.scrollY;
-      if (rec.y + rec.height <= viewTop || rec.y >= viewTop + container.height) {
+      const span = this.spanIn(node, rec, current);
+      if (span.bottom <= viewTop || span.top >= viewTop + container.height) {
         return null;
       }
-      return { node, container: current, offsetY: rec.y - container.y };
+      return { node, container: current, offsetY: span.top - container.y };
     }
     return null;
   }
@@ -1535,7 +1536,7 @@ export class LayoutEngine {
     if (rec === undefined || container === undefined || !container.scrollable) {
       return null;
     }
-    const moved = rec.y - container.y - anchor.offsetY;
+    const moved = this.spanIn(anchor.node, rec, anchor.container).top - container.y - anchor.offsetY;
     if (Math.abs(moved) < 0.5) {
       return null;
     }
@@ -1582,6 +1583,19 @@ export class LayoutEngine {
       innerScrollX = self.scrollX;
       innerScrollY = self.scrollY;
     }
+    if (hasTransformedChain(node.parent)) {
+      this.revealThroughTransforms(
+        node,
+        rec,
+        targetX - innerScrollX,
+        targetY - innerScrollY,
+        targetWidth,
+        targetHeight,
+        padding,
+        adjustments
+      );
+      return adjustments;
+    }
     for (let current = node.parent; current !== null; current = current.parent) {
       const container = this.records.get(current);
       if (container === undefined || !container.scrollable) {
@@ -1604,6 +1618,90 @@ export class LayoutEngine {
       innerScrollY += scrollY;
     }
     return adjustments;
+  }
+
+  /**
+   * `revealAdjustments` for a node with a `transform` above it: a page
+   * laid out at full size and drawn zoomed inside a scroll container.
+   * Records are where things would be with no transform, and a
+   * container's offset is in the space it draws, so the target is
+   * carried up through each ancestor's transform, as `projectBox`
+   * carries it, and compared with each container in that container's
+   * own content space. Compared as laid out, a caret low on a page
+   * zoomed to 200% was found above the view and the view went to it at
+   * half its depth.
+   */
+  private revealThroughTransforms(
+    node: UiNode,
+    rec: LayoutRecord,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    padding: number,
+    adjustments: ScrollAdjustment[]
+  ): void {
+    const corners = this.cornersOf(x, y, width, height);
+    // The node's own transform is how it is drawn where it is (see `screenBox`).
+    transformPointsOut(node, rec, corners, false);
+    for (let current = node.parent; current !== null; current = current.parent) {
+      const container = this.records.get(current);
+      if (container === undefined) {
+        continue;
+      }
+      if (container.scrollable) {
+        const box = this.boundsOfCorners(corners);
+        const shiftX = revealShift(
+          box.x - padding,
+          box.x + box.width + padding,
+          container.x + container.scrollX,
+          container.width
+        );
+        const shiftY = revealShift(
+          box.y - padding,
+          box.y + box.height + padding,
+          container.y + container.scrollY,
+          container.height
+        );
+        const scrollX = this.clampScroll(container, 'x', container.scrollX + shiftX);
+        const scrollY = this.clampScroll(container, 'y', container.scrollY + shiftY);
+        if (scrollX !== container.scrollX || scrollY !== container.scrollY) {
+          adjustments.push({ container: current, scrollX, scrollY });
+        }
+        for (let i = 0; i < corners.length; i += 2) {
+          corners[i] -= scrollX;
+          corners[i + 1] -= scrollY;
+        }
+      }
+      transformPointsOut(current, container, corners);
+    }
+  }
+
+  /**
+   * A node's top and bottom in `container`'s content space (unscrolled),
+   * through every transform between them: its record's, when there is
+   * none. What `scrollAnchor` and `anchorAdjustment` measure a move with.
+   */
+  private spanIn(node: UiNode, rec: LayoutRecord, container: UiNode): { top: number; bottom: number } {
+    if (!hasTransformedChain(node.parent)) {
+      return { top: rec.y, bottom: rec.y + rec.height };
+    }
+    const corners = this.cornersOf(rec.x, rec.y, rec.width, rec.height);
+    for (let current = node.parent; current !== null && current !== container; current = current.parent) {
+      const ancestor = this.records.get(current);
+      if (ancestor === undefined) {
+        continue;
+      }
+      if (ancestor.scrollable) {
+        for (let i = 0; i < corners.length; i += 2) {
+          corners[i] -= ancestor.scrollX;
+          corners[i + 1] -= ancestor.scrollY;
+        }
+      }
+      transformPointsOut(current, ancestor, corners);
+    }
+    const box = this.boundsOfCorners(corners);
+    return { top: box.y, bottom: box.y + box.height };
   }
 
   /**

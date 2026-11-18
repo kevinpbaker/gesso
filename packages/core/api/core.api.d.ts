@@ -3843,6 +3843,8 @@ declare class LayoutEngine {
   scrollAnchor(node: UiNode): ScrollAnchor | null;
   anchorAdjustment(anchor: ScrollAnchor): ScrollAdjustment | null;
   revealAdjustments(node: UiNode, padding?: number, inner?: LayoutBox): ScrollAdjustment[];
+  private revealThroughTransforms;
+  private spanIn;
   private textScrollAdjustment;
   revealScrollbars(node: UiNode): void;
   scrollContainers(): Iterable<UiNode>;

@@ -111,6 +111,14 @@ ends to do it, so content above that shrinks at the top of a list still
 moves what is below. The offset is written to `scrollY`, as a wheel
 writes it.
 
+Revealing and holding go by where a node is drawn, not where it is laid
+out. Content under a `transform` (a page laid out at full size and drawn
+zoomed, inside a box as big as the zoomed page) has its records where it
+would be at zoom 1, while the container scrolls in the space it draws.
+The caret, a focused field and an anchored node are carried through every
+transform between them and their container first, so a field low on a
+page zoomed to 200% is found where it is on screen.
+
 ## Being told that it scrolled
 
 A wheel is not the only thing that moves a list. A scrollbar drag, a

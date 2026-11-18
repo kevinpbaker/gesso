@@ -91,4 +91,38 @@ describe('scroll anchoring', () => {
     drain(mounted);
     expect(list().getProperty('scrollY')).toBe(400);
   });
+
+  it('holds a field drawn zoomed by as far as it moved where it is drawn', () => {
+    // The column is laid out at full size and drawn at 2x, as a page of
+    // paper zoomed in. The field is laid out at 160 and drawn at 320;
+    // scrolled to 250 it is in sight, though its record is above the view.
+    const summary = internalState(40);
+    const offset = internalState(250);
+    let field: UiNode | null = null;
+    let list: UiNode | null = null;
+    const mounted = mountRuntime(
+      ScrollView(
+        { width: 300, height: 200, scrollY: offset, ref: (n: UiNode | null) => (list = n) },
+        Box(
+          { position: 'relative', width: 600, height: 2400 },
+          Column(
+            { position: 'absolute', top: 0, left: 0, width: 300, transform: { scaleX: 2, scaleY: 2 } },
+            Box({ width: 300, height: summary }),
+            Box({ width: 300, height: 120 }),
+            Box({ width: 200, height: 30, focusable: true, ref: (n: UiNode | null) => (field = n) }),
+            Box({ width: 300, height: 800 })
+          )
+        )
+      )
+    );
+    drain(mounted);
+    mounted.runtime.input.focus.focus(field!);
+    drain(mounted);
+    expect(list!.getProperty('scrollY')).toBe(250);
+
+    // 30 more above it, which is 60 where it is drawn.
+    summary.value = 70;
+    drain(mounted);
+    expect(list!.getProperty('scrollY')).toBeCloseTo(310, 5);
+  });
 });
