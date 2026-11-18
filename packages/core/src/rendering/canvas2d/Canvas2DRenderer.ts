@@ -250,7 +250,9 @@ export class Canvas2DRenderer implements UiRenderer {
 
   /** When a frame is wanted though nothing changes: a zoom settling, whose kept pixels are then drawn sharp. */
   nextRepaint(): number | undefined {
-    return this.rasters?.nextRepaint;
+    const kept = this.rasters?.nextRepaint;
+    const pictures = paintPictures.nextRepaint;
+    return kept === undefined ? pictures : pictures === undefined ? kept : Math.min(kept, pictures);
   }
 
   /** Text kept as pixels; see `TextRasterCache.ts`. */
@@ -336,6 +338,7 @@ export class Canvas2DRenderer implements UiRenderer {
     this.boundsWidth = this.surface.physicalWidth;
     this.boundsHeight = this.surface.physicalHeight;
     this.rasters?.beginFrame(context.changes, this.surface.physicalWidth * this.surface.physicalHeight);
+    paintPictures.beginFrame(this.surface.physicalWidth * this.surface.physicalHeight);
     this.layers.beginFrame(
       this.options.scrollLayers === false ? undefined : context.changes,
       this.surface.dpr,
@@ -350,6 +353,7 @@ export class Canvas2DRenderer implements UiRenderer {
     this.layers.endFrame();
     this.textCache?.endFrame();
     this.rasters?.endFrame();
+    paintPictures.endFrame();
   }
 
   /**
@@ -477,7 +481,7 @@ export class Canvas2DRenderer implements UiRenderer {
     }
     this.paintImage(draw, rec, paint);
     if (node.type === UiNodeType.Paint) {
-      this.paintPicture(draw, node, rec);
+      this.paintPicture(draw, node, rec, context);
     }
     this.paintBorder(draw, rec, paint);
     // Decorations sit beside the border, outside the node's own clip:
@@ -923,21 +927,34 @@ export class Canvas2DRenderer implements UiRenderer {
    *
    * The picture is made by `PaintPicture.ts` when the painter's inputs
    * move and reused otherwise, so a still frame costs this one
-   * `drawImage` and nothing else. It is drawn at the device scale
-   * rather than at the node's full transform scale, which is what
-   * `PaintSurface` promises a painter: a node a morph is scaling is
-   * resampled for the length of the morph, exactly as a picture on it
-   * would be, instead of being redrawn sixty times.
+   * `drawImage` and nothing else. It is made at the scale it lands at,
+   * the device's times any zoom above it, so a zoomed picture is as
+   * sharp as one at 100%. While that scale moves (a zoom, a morph) the
+   * picture is stretched rather than made again on every frame, and it
+   * counts as volatile, so a scroll layer does not keep the soft
+   * pixels; once the scale holds it is made sharp, on a frame
+   * `nextRepaint` asks for. Inside a kept subtree being drawn again,
+   * the scale has settled already.
    *
    * The WebGPU backend draws the same bitmap in the same box, because
    * it asks the same cache for it. That is the whole of the parity
    * story for a painted node.
    */
-  private paintPicture(ctx: Canvas2DContext, node: UiNode, rec: LayoutRecord): void {
+  private paintPicture(ctx: Canvas2DContext, node: UiNode, rec: LayoutRecord, context: RenderContext): void {
     // `draw` rather than `pictureFor`: a picture that changed this frame
     // is replayed onto this context instead of rasterised into a bitmap
     // used once. See `PaintPictureCache.draw`.
-    paintPictures.draw(node, rec, this.surface.dpr, ctx as unknown as PaintContext2D);
+    const stretched = paintPictures.draw(
+      node,
+      rec,
+      this.surface.dpr,
+      ctx as unknown as PaintContext2D,
+      context.now ?? performance.now(),
+      this.rasterDepth > 0
+    );
+    if (stretched) {
+      this.volatileDraws++;
+    }
   }
 
   /**

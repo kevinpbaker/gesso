@@ -63,7 +63,7 @@ export type {
   PaintResolver
 } from './PaintTarget';
 export { PaintPictureCache, paintPictures } from './PaintPicture';
-export type { PaintCanvas, PaintCanvasFactory, PaintStats } from './PaintPicture';
+export type { PaintCanvas, PaintCanvasFactory, PaintStats, ZoomedPictureMemory } from './PaintPicture';
 export { parseTransform } from '../properties/UiTransform';
 export type { UiTransform } from '../properties/UiTransform';
 export type { LayoutReader, RenderChanges, RenderContext } from './RenderContext';

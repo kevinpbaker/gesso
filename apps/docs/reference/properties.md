@@ -152,7 +152,7 @@ Fills, borders, shadows and everything else that changes pixels without changing
 | `transform` | `unset` | no | Paint, Transform | Translation, scale and rotation applied at paint time. Layout does not see it. |
 | `rasterize` | `false` | no | Paint | Keeps the subtree as pixels and copies them while only what is above it moves or scales, as a camera does. Canvas2D only; drawn again when anything in it changes. |
 | `holdUnseen` | `unset` | no | Properties | Holds the subtree as it last was while it is out of view, or with `belowScale` drawn smaller than that share of its size: changes inside wait, and it catches up the frame it can be read again. For a board of many live screens. |
-| `paint` | `unset` | no | Paint, Layout | A painter given a drawing surface, the resolved box and the device scale, with the inputs it reads. Repainted when those change and not otherwise. |
+| `paint` | `unset` | no | Paint, Layout | A painter given a drawing surface, the resolved box and the scale it is drawn at (the device pixel ratio times any zoom above it), with the inputs it reads. Repainted when those change and not otherwise; under a zoom that is still moving, the last picture is stretched until the zoom holds. |
 | `path` | `unset` | no | Paint | A static vector shape, with its own fill rule, stroke, dash, caps and joins. |
 | `clipPath` | `unset` | no | Paint | Clips this node to a path, in the same vocabulary `path` takes. |
 | `blur` | `unset` | no | Paint | Blurs a painted node's own picture, in pixels. Not a backdrop blur. |

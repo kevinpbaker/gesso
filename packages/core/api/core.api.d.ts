@@ -5123,19 +5123,38 @@ interface PaintStats {
   rasterized: number;
   resolved: number;
   direct: number;
+  resharpened: number;
+  replayed: number;
+}
+interface ZoomedPictureMemory {
+  pictures: number;
+  pixels: number;
 }
 declare class PaintPictureCache {
   private readonly slots;
+  private readonly zoomed;
+  private zoomedPixels;
+  private frame;
+  private surfacePixels;
+  private spent;
+  private wanted;
   private createCanvas;
   readonly stats: PaintStats;
   constructor(createCanvas?: PaintCanvasFactory);
   setCanvasFactory(factory: PaintCanvasFactory): void;
   resetStats(): void;
+  beginFrame(surfacePixels?: number): void;
+  endFrame(): void;
+  get nextRepaint(): number | undefined;
+  get zoomedMemory(): ZoomedPictureMemory;
   pictureFor(node: UiNode, rec: LayoutRecord, scale: number): UiImage | undefined;
-  draw(node: UiNode, rec: LayoutRecord, scale: number, ctx: PaintContext2D): void;
+  draw(node: UiNode, rec: LayoutRecord, deviceScale: number, ctx: PaintContext2D, now?: number, settled?: boolean): boolean;
+  private scaleToDraw;
+  private want;
   private replay;
   private pictureOf;
   private remember;
+  private release;
   recordingFor(node: UiNode): PaintRecording;
   private record;
   private rasterize;
@@ -6713,6 +6732,7 @@ export {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty,
+  ZoomedPictureMemory,
   ZoomState
 };
 // ==== index.d.ts ====
@@ -7688,6 +7708,7 @@ import {
   wordRangeIn,
   writeDeclaredProperty,
   writeOverrideProperty,
+  ZoomedPictureMemory,
   ZoomState
 } from "./index.js";
 export {
@@ -8475,6 +8496,7 @@ export {
   type VttTrack,
   type WebGPUCanvasHost,
   type WebGPURendererOptions,
+  type ZoomedPictureMemory,
   type ZoomState,
   typographyEqual,
   UI_ROLES,

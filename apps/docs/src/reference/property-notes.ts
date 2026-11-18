@@ -300,7 +300,7 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
   },
   paint: {
     group: 'Paint',
-    note: 'A painter given a drawing surface, the resolved box and the device scale, with the inputs it reads. Repainted when those change and not otherwise.'
+    note: 'A painter given a drawing surface, the resolved box and the scale it is drawn at (the device pixel ratio times any zoom above it), with the inputs it reads. Repainted when those change and not otherwise; under a zoom that is still moving, the last picture is stretched until the zoom holds.'
   },
   path: { group: 'Paint', note: 'A static vector shape, with its own fill rule, stroke, dash, caps and joins.' },
   clipPath: { group: 'Paint', note: 'Clips this node to a path, in the same vocabulary `path` takes.' },

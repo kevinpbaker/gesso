@@ -11,6 +11,7 @@ import {
   type PaintCanvasFactory,
   type PaintContext2D,
   type PaintDeviceRect,
+  type PaintMatrix,
   type PaintResolver
 } from './PaintTarget';
 import { paintValuesEqual, pathValuesEqual, type PaintBox, type UiPaint, type UiPath } from './PaintSurface';
@@ -54,6 +55,50 @@ const MAX_PICTURE_SIDE = 8192;
  */
 const SETTLE_FRAMES = 4;
 
+/**
+ * How long, in milliseconds, the scale a picture is drawn at must hold
+ * before its bitmap is made again at that scale.
+ *
+ * A picture under a zoom is drawn at the whole transform's scale, so
+ * text and lines in it stay sharp at 300% on a 2x display. While the
+ * scale moves (a pinch, a zoom animation, a morph), the bitmap it has
+ * is stretched instead, which is soft for a moment and keeps every step
+ * of the zoom one `drawImage`. The same as `RasterCache`'s, so a kept
+ * subtree and the pictures in it go sharp on the same frame.
+ */
+export const PICTURE_SETTLE_MS = 120;
+
+/**
+ * The most device pixels one zoomed picture is kept in: 16 MB.
+ *
+ * Above the device scale a bitmap grows with the square of the zoom: a
+ * page-sized painter at 300% on a 2x display would be 31 million
+ * pixels, almost all of it off screen. A picture that would be larger
+ * than this, or than the surface, is replayed from its recording onto
+ * every frame instead, which is sharp at any zoom, holds no pixels, and
+ * costs what the painter's calls cost. At the device scale nothing
+ * changes: the picture is a bitmap as it always was.
+ */
+const MAX_ZOOMED_PICTURE_PIXELS = 4_194_304;
+
+/**
+ * The device pixels all zoomed bitmaps together may hold, as a multiple
+ * of the surface's. What is on screen fits in one surface, since
+ * pictures seldom overlap: 59 MB on a 5K display at 2x. Past it, the
+ * bitmaps drawn longest ago are let go, and made again if they are
+ * drawn again; none drawn on the frame is.
+ */
+const ZOOMED_SURFACES = 1;
+
+/** The least the zoomed bitmaps may hold, for a small surface: 32 MB. */
+const MIN_ZOOMED_PIXELS = 8_388_608;
+
+/** Frames a zoomed bitmap is kept without being drawn. */
+const ZOOMED_IDLE_FRAMES = 600;
+
+/** Pixels made sharp in one frame once a zoom settles; the rest the next frame. */
+const SETTLED_PIXELS = 8_000_000;
+
 interface PaintedSlot {
   picture: UiImage | null;
   /**
@@ -76,6 +121,23 @@ interface PaintedSlot {
   width: number;
   height: number;
   scale: number;
+  /**
+   * The scale the picture was last asked for, and when that started:
+   * what a zoom settling is judged by. See `PICTURE_SETTLE_MS`.
+   */
+  seenScale: number;
+  seenAt: number;
+  /**
+   * Replayed onto the frame rather than kept as a bitmap, because at
+   * this scale it would be too large. See `MAX_ZOOMED_PICTURE_PIXELS`.
+   */
+  direct: boolean;
+  /** The device scale it was drawn on: a bitmap above it counts against the zoomed budget. */
+  base: number;
+  /** The device pixels its bitmap holds, while it counts against that budget. */
+  pixels: number;
+  /** The frame it was last drawn in, for letting go of zoomed bitmaps. */
+  used: number;
 }
 
 /** What a painted frame did, for `PaintPicture.budget.spec.ts`. */
@@ -91,6 +153,19 @@ export interface PaintStats {
    * frame's context instead of into a bitmap. See `draw`.
    */
   direct: number;
+  /**
+   * How many bitmaps were made again at a new scale once a zoom
+   * settled, and how many zoomed pictures were replayed onto the frame
+   * because a bitmap of them would be too large.
+   */
+  resharpened: number;
+  replayed: number;
+}
+
+/** The device pixels the zoomed bitmaps hold, for specs and for measuring. */
+export interface ZoomedPictureMemory {
+  pictures: number;
+  pixels: number;
 }
 
 /**
@@ -130,8 +205,22 @@ export interface PaintStats {
  */
 export class PaintPictureCache {
   private readonly slots = new WeakMap<UiNode, PaintedSlot>();
+  /**
+   * The slots whose bitmap is above the device scale they were drawn
+   * at, by node, oldest drawn first: the only ones that count against
+   * the zoomed budget, and the only ones let go. A `Map` rather than
+   * the `WeakMap`, so it can be walked; a removed node leaves it when
+   * it has not been drawn for `ZOOMED_IDLE_FRAMES` or the budget is met.
+   */
+  private readonly zoomed = new Map<UiNode, PaintedSlot>();
+  private zoomedPixels = 0;
+  private frame = 0;
+  private surfacePixels = Infinity;
+  /** Pixels made sharp this frame; see `SETTLED_PIXELS`. */
+  private spent = 0;
+  private wanted: number | undefined = undefined;
   private createCanvas: PaintCanvasFactory;
-  readonly stats: PaintStats = { recorded: 0, rasterized: 0, resolved: 0, direct: 0 };
+  readonly stats: PaintStats = { recorded: 0, rasterized: 0, resolved: 0, direct: 0, resharpened: 0, replayed: 0 };
 
   constructor(createCanvas: PaintCanvasFactory = offscreenPaintCanvas) {
     this.createCanvas = createCanvas;
@@ -147,6 +236,60 @@ export class PaintPictureCache {
     this.stats.rasterized = 0;
     this.stats.resolved = 0;
     this.stats.direct = 0;
+    this.stats.resharpened = 0;
+    this.stats.replayed = 0;
+  }
+
+  /**
+   * Starts a Canvas2D frame: what the zoom budget is measured against,
+   * and when the next settled picture is due.
+   */
+  beginFrame(surfacePixels = Infinity): void {
+    this.frame++;
+    this.spent = 0;
+    this.wanted = undefined;
+    this.surfacePixels = surfacePixels;
+  }
+
+  /**
+   * Ends a Canvas2D frame: lets go of the zoomed bitmaps not drawn for
+   * a while, then of the ones drawn longest ago while they hold more
+   * than the budget. None drawn this frame is let go.
+   */
+  endFrame(): void {
+    if (this.zoomed.size === 0) {
+      return;
+    }
+    for (const [node, slot] of this.zoomed) {
+      if (this.frame - slot.used > ZOOMED_IDLE_FRAMES) {
+        this.release(node, slot);
+      }
+    }
+    const budget = Math.max(MIN_ZOOMED_PIXELS, ZOOMED_SURFACES * this.surfacePixels);
+    if (this.zoomedPixels <= budget) {
+      return;
+    }
+    const oldest = [...this.zoomed].filter(([, slot]) => slot.used < this.frame).sort((a, b) => a[1].used - b[1].used);
+    for (const [node, slot] of oldest) {
+      if (this.zoomedPixels <= budget) {
+        break;
+      }
+      this.release(node, slot);
+    }
+  }
+
+  /**
+   * When the frame just drawn would like another though nothing
+   * changes: a zoom settling, whose pictures are then made sharp at the
+   * scale it stopped at. Undefined when nothing waits.
+   */
+  get nextRepaint(): number | undefined {
+    return this.wanted;
+  }
+
+  /** What the zoomed bitmaps hold now. */
+  get zoomedMemory(): ZoomedPictureMemory {
+    return { pictures: this.zoomed.size, pixels: this.zoomedPixels };
   }
 
   /**
@@ -196,37 +339,68 @@ export class PaintPictureCache {
    * A picture seen for the first time, or at a new size, is rasterised
    * at once, because it most likely holds still.
    *
+   * **At the scale it lands at.** The bitmap is made at the whole
+   * transform's scale, not the device's alone, so a picture under a
+   * zoom is as sharp at 300% as at 100%. While that scale moves, the
+   * bitmap it has is stretched (see `PICTURE_SETTLE_MS`), and the answer
+   * is true: the frame is not one a scroll layer should keep. Once it
+   * has held, the bitmap is made again, a frame's worth at a time, and
+   * `nextRepaint` asks for the frame that does it. A picture that would
+   * be too large at that scale is replayed onto every frame instead
+   * (see `MAX_ZOOMED_PICTURE_PIXELS`), and the zoomed bitmaps together
+   * are held to a budget (`ZOOMED_SURFACES`).
+   *
+   * `now` is the frame's clock; `settled` says the scale is final
+   * already, as it is inside a subtree `RasterCache` is drawing again
+   * once its own zoom settled.
+   *
    * Canvas2D only. WebGPU has no path pipeline to replay onto, which is
    * the reason the cache exists (see the class comment), and asks
-   * `pictureFor`. The two backends then differ only in when the pixels
-   * of a changing picture are made, not in which: both come from the
+   * `pictureFor`, at the device scale. The two backends then differ
+   * only in when the pixels of a changing picture are made, and in how
+   * sharp a zoomed one is, not in what it shows: both come from the
    * same recording through the same `PaintTarget`.
    */
-  draw(node: UiNode, rec: LayoutRecord, scale: number, ctx: PaintContext2D): void {
+  draw(node: UiNode, rec: LayoutRecord, deviceScale: number, ctx: PaintContext2D, now = 0, settled = false): boolean {
     this.stats.resolved++;
+    const m = ctx.getTransform?.();
+    const target = m === undefined ? deviceScale : pictureScale(m, deviceScale);
+    const slot = this.slots.get(node);
+    const scale = settled ? target : this.scaleToDraw(node, slot, rec, target, now);
     const key = keyFor(node, rec, scale);
     if (key === null) {
-      return;
+      return false;
     }
-    const slot = this.slots.get(node);
+    const stretched = scale !== target;
     if (slot !== undefined && matches(slot, key)) {
+      slot.used = this.frame;
+      if (slot.direct) {
+        this.stats.replayed++;
+        this.replay(node, slot.recording, rec, ctx);
+        return stretched;
+      }
       if (!slot.rasterized && slot.settling > 0) {
         // Unchanged, but it was changing a moment ago; it has to hold
         // still a little longer before a bitmap is worth making.
         slot.settling--;
         this.replay(node, slot.recording, rec, ctx);
-        return;
+        return stretched;
       }
       const picture = this.pictureOf(node, slot, key.box);
       if (picture !== null) {
-        ctx.drawImage(picture, rec.x, rec.y, rec.width, rec.height);
+        place(ctx, picture, rec, m, stretched ? undefined : scale, deviceScale);
       }
-      return;
+      return stretched;
     }
     const recording = this.record(key.paint, key.path, key.clipPath, key.blur, key.box);
-    const next = this.remember(node, slot, key, recording);
+    const next = this.remember(node, slot, key, recording, deviceScale, target, now);
     if (recording.ops.length === 0) {
-      return;
+      return false;
+    }
+    if (next.direct) {
+      this.stats.replayed++;
+      this.replay(node, recording, rec, ctx);
+      return false;
     }
     // Only a change of what the painter draws is taken as a sign the
     // picture moves every frame. A node seen for the first time, or
@@ -237,12 +411,57 @@ export class PaintPictureCache {
     if (slot === undefined || !contentChanged(slot, key)) {
       const picture = this.pictureOf(node, next, key.box);
       if (picture !== null) {
-        ctx.drawImage(picture, rec.x, rec.y, rec.width, rec.height);
+        place(ctx, picture, rec, m, scale, deviceScale);
       }
-      return;
+      return false;
     }
     next.settling = SETTLE_FRAMES - 1;
     this.replay(node, recording, rec, ctx);
+    return false;
+  }
+
+  /**
+   * The scale to draw a picture at this frame: the one it lands at,
+   * unless the picture is unchanged but for that and the scale is still
+   * moving, when it is the one its bitmap was made at, to be stretched.
+   */
+  private scaleToDraw(
+    node: UiNode,
+    slot: PaintedSlot | undefined,
+    rec: LayoutRecord,
+    target: number,
+    now: number
+  ): number {
+    if (slot === undefined || slot.scale === target) {
+      return target;
+    }
+    const held = keyFor(node, rec, slot.scale);
+    if (held === null || !matches(slot, held)) {
+      // Made again anyway, so at the scale it lands at.
+      return target;
+    }
+    if (slot.seenScale !== target) {
+      slot.seenScale = target;
+      slot.seenAt = now;
+    }
+    if (now - slot.seenAt < PICTURE_SETTLE_MS) {
+      this.want(slot.seenAt + PICTURE_SETTLE_MS);
+      return slot.scale;
+    }
+    // Settled. A frame's worth at a time, so the frame the zoom stops on
+    // is not the one that makes every picture on screen again.
+    const pixels = Math.round(rec.width * target) * Math.round(rec.height * target);
+    if (this.spent === 0 || this.spent + pixels <= SETTLED_PIXELS) {
+      this.spent += pixels;
+      this.stats.resharpened++;
+      return target;
+    }
+    this.want(now + 1);
+    return slot.scale;
+  }
+
+  private want(at: number): void {
+    this.wanted = this.wanted === undefined ? at : Math.min(this.wanted, at);
   }
 
   /** A recording drawn straight onto the frame, clipped to the box its bitmap would fill. */
@@ -266,6 +485,11 @@ export class PaintPictureCache {
     if (!slot.rasterized) {
       slot.picture = this.rasterize(node, slot.recording, box);
       slot.rasterized = true;
+      if (slot.picture !== null && slot.scale > slot.base) {
+        slot.pixels = slot.picture.width * slot.picture.height;
+        this.zoomed.set(node, slot);
+        this.zoomedPixels += slot.pixels;
+      }
     }
     return slot.picture;
   }
@@ -274,12 +498,19 @@ export class PaintPictureCache {
     node: UiNode,
     previous: PaintedSlot | undefined,
     key: SlotKey,
-    recording: PaintRecording
+    recording: PaintRecording,
+    deviceScale: number = key.box.scale,
+    target: number = key.box.scale,
+    now: number = 0
   ): PaintedSlot {
     // The old bitmap is released now rather than when the collector
     // gets to it: a chart repainting on a stream would otherwise hold
     // every frame it has ever drawn until it did.
-    previous?.picture?.close?.();
+    if (previous !== undefined) {
+      this.release(node, previous);
+    }
+    const scale = key.box.scale;
+    const pixels = Math.round(key.box.width * scale) * Math.round(key.box.height * scale);
     const slot: PaintedSlot = {
       picture: null,
       rasterized: false,
@@ -292,10 +523,28 @@ export class PaintPictureCache {
       environment: node.environment,
       width: key.box.width,
       height: key.box.height,
-      scale: key.box.scale
+      scale,
+      seenScale: target,
+      seenAt: now,
+      direct: scale > deviceScale && pixels > Math.min(MAX_ZOOMED_PICTURE_PIXELS, this.surfacePixels),
+      base: deviceScale,
+      pixels: 0,
+      used: this.frame
     };
     this.slots.set(node, slot);
     return slot;
+  }
+
+  /** Lets go of a slot's bitmap, and of what it counted against the zoomed budget. */
+  private release(node: UiNode, slot: PaintedSlot): void {
+    slot.picture?.close?.();
+    slot.picture = null;
+    slot.rasterized = false;
+    if (this.zoomed.get(node) === slot) {
+      this.zoomed.delete(node);
+      this.zoomedPixels -= slot.pixels;
+    }
+    slot.pixels = 0;
   }
 
   /**
@@ -527,4 +776,53 @@ function offscreenPaintCanvas(width: number, height: number): PaintCanvas | null
     // asynchronously.
     take: () => canvas.transferToImageBitmap()
   };
+}
+
+/**
+ * Physical pixels per logical pixel under a transform: the device scale
+ * times any zoom or scale above the node. The device scale itself when
+ * that is all there is, so a picture at 100% is made exactly as it
+ * always was; otherwise to a 256th, so a zoom of 110% on a 2x display
+ * is one scale and not a rounding error a frame.
+ */
+export function pictureScale(m: { a: number; b: number; c: number; d: number }, deviceScale: number): number {
+  const scale = Math.max(Math.hypot(m.a, m.b), Math.hypot(m.c, m.d));
+  if (!(scale > 0) || !Number.isFinite(scale) || Math.abs(scale - deviceScale) < 1e-6) {
+    return deviceScale;
+  }
+  return Math.round(scale * 256) / 256;
+}
+
+/**
+ * Draws a picture in its box. A zoomed one made at the scale it lands
+ * at, under no rotation or skew, is copied one pixel to one onto whole
+ * device pixels, so it is as sharp as it was drawn; the box's corner
+ * moves by under half a device pixel. At the device scale, or
+ * stretched, it is drawn into its box as it always was.
+ */
+function place(
+  ctx: PaintContext2D,
+  picture: UiImage,
+  rec: LayoutRecord,
+  m: PaintMatrix | undefined,
+  scale: number | undefined,
+  deviceScale: number
+): void {
+  if (
+    scale === undefined ||
+    scale === deviceScale ||
+    m === undefined ||
+    ctx.setTransform === undefined ||
+    m.b !== 0 ||
+    m.c !== 0 ||
+    Math.abs(m.a - scale) > 1e-3 ||
+    Math.abs(m.d - scale) > 1e-3
+  ) {
+    ctx.drawImage(picture, rec.x, rec.y, rec.width, rec.height);
+    return;
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(picture, Math.round(m.a * rec.x + m.e), Math.round(m.d * rec.y + m.f), picture.width, picture.height);
+  ctx.restore();
 }

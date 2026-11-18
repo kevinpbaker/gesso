@@ -215,11 +215,14 @@ export interface PaintBox {
   readonly paddingBottom: number;
   readonly paddingLeft: number;
   /**
-   * Physical pixels per logical pixel the picture is being made at.
+   * Physical pixels per logical pixel the picture is being made at: the
+   * device pixel ratio times any zoom or scale above the node, once it
+   * holds still.
    *
    * The one thing a painter needs the device for: `1 / scale` is a
    * hairline, and a grid line drawn at `1` on a retina display is two
-   * physical pixels wide and looks it.
+   * physical pixels wide and looks it. Under a zoom, `1 / scale` stays
+   * one physical pixel.
    */
   readonly scale: number;
 }
