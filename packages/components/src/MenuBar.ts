@@ -38,6 +38,7 @@ import {
   type MenuBarState,
   type MenuBarStep
 } from './menuBarModel';
+import { menuBadge } from './internals';
 import { useOverlay } from './overlay';
 
 export interface MenuBarProps<T> {
@@ -67,6 +68,15 @@ export interface MenuBarProps<T> {
    * application's state rather than being kept in step with it.
    */
   checkedOf?: (item: T) => boolean | undefined;
+  /**
+   * A short tag drawn after a command's label, as `Pro` or `New`: small,
+   * in the primary colour, in a thin outline, and the row's description
+   * to a screen reader, so the command's name stays its label. A command
+   * it returns undefined (or '') for has none.
+   *
+   * Read when its menu opens, like `labelOf`.
+   */
+  badgeOf?: (item: T) => string | undefined;
   onChoose?: (item: T) => void;
   /** Called when the bar is done with the keyboard, so the page takes it back. */
   onDismiss?: () => void;
@@ -677,6 +687,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     // A submenu's entry says so where a command says its keys, as `Menu`'s does.
     const accelerator = submenu !== null ? '›' : (inputs.acceleratorOf.value?.(command) ?? '');
     const checked = submenu !== null ? undefined : inputs.checkedOf.value?.(command);
+    const badge = submenu !== null ? '' : (inputs.badgeOf.value?.(command) ?? '');
     const highlighted: Observable<boolean> = state.pipe(
       map(current => listOpen(current, menu, path) && activeAt(current, path.length) === at)
     );
@@ -699,6 +710,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
         backgroundColor: highlighted.pipe(map(is => (is ? 'controlBackgroundHovered' : 'transparent'))),
         role: checked === undefined ? 'menuitem' : 'menuitemcheckbox',
         label: text,
+        ...(badge === '' ? {} : { description: badge }),
         states: submenu !== null ? expanded : checked === true ? ['checked'] : undefined,
         disabled: !on,
         /**
@@ -734,11 +746,13 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
           : []),
         Text({
           text,
-          flex: 1,
+          // With a tag, the tag follows the label and the row's own flex keeps the keys at its end.
+          ...(badge === '' ? { flex: 1 } : {}),
           textStyle: 'bodySmall',
           color: on ? 'controlForeground' : 'controlForegroundDisabled',
           selectable: false
-        })
+        }),
+        ...(badge === '' ? [] : [menuBadge(badge, on)])
       ),
       Text({
         text: accelerator,

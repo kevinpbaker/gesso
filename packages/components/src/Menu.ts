@@ -20,7 +20,7 @@ import {
   type UiKeyboardEvent,
   type UiNode
 } from 'gesso-core';
-import { CONTROL_INTERACTION, keymap } from './internals';
+import { CONTROL_INTERACTION, keymap, menuBadge } from './internals';
 import { useOverlay, type OverlayPlacement } from './overlay';
 
 export interface MenuItem {
@@ -33,6 +33,12 @@ export interface MenuItem {
   readonly shortcut?: string;
   /** It cannot be undone: its label in the danger colour. */
   readonly danger?: boolean;
+  /**
+   * A short tag after the label, as `Pro` or `New`: small, in the primary
+   * colour, in a thin outline, and the row's description to a screen
+   * reader, so the item's name stays its label.
+   */
+  readonly badge?: string;
   /**
    * A setting, on or off: a check before its label while it is on, and
    * a checkbox to a screen reader, which hears whether it is. In a menu
@@ -429,13 +435,17 @@ function row(
   let mounted: UiNode | null = null;
   const nested = item.items !== undefined;
   const trailing = nested ? '›' : item.shortcut;
-  const label = Text({
+  const badge = item.badge ?? '';
+  const text = Text({
     text: item.label,
     color: item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground',
     selectable: false,
-    flex: 1,
+    ...(badge === '' ? { flex: 1 } : {}),
     ...(compact ? { textStyle: 'bodySmall' } : {})
   });
+  // The tag after the label, in the label's room, so the shortcut keeps the row's end.
+  const labelled =
+    badge === '' ? text : Row({ flex: 1, gap: 6, y: 'center' }, text, menuBadge(badge, item.disabled !== true));
   const command = Row(
     {
       key: item.value,
@@ -458,6 +468,7 @@ function row(
       backgroundColor: active.pipe(map(current => (current === index ? 'controlBackgroundHovered' : 'transparent'))),
       role: item.checked === undefined ? 'menuitem' : 'menuitemcheckbox',
       label: item.shortcut === undefined || nested ? item.label : `${item.label}, ${item.shortcut}`,
+      ...(badge === '' ? {} : { description: badge }),
       ...(nested
         ? { states: sub.pipe(map(open => (open?.index === index ? (['expanded'] as const) : []))) }
         : item.checked === true
@@ -482,10 +493,10 @@ function row(
               flexShrink: 0,
               ...(compact ? { textStyle: 'bodySmall' } : {})
             }),
-            label
+            labelled
           )
         ]
-      : [label]),
+      : [labelled]),
     ...(trailing === undefined
       ? []
       : [

@@ -557,3 +557,31 @@ describe('a MenuBar submenu', () => {
     expect(ui.queryByRole('menu')).toBeNull();
   });
 });
+
+describe('MenuBar badgeOf', () => {
+  it('draws a tag after the label, and gives it to a screen reader as the row’s description', () => {
+    const ui = renderTest(
+      Column(
+        createComponent(MenuBar<Command>, {
+          menus: [{ label: 'View', entries: ['light', 'dark', 'zoomIn'] }],
+          labelOf: (item: Command) => LABELS[item],
+          badgeOf: (item: Command) => (item === 'zoomIn' ? 'Pro' : undefined)
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    ui.fireEvent.focus(ui.getByLabel('Main menu'));
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    const record = (label: string) => [...ui.semanticsTree().values()].find(entry => entry.label === label);
+
+    expect(ui.getAllByText('Pro')).toHaveLength(1);
+    expect(record('Zoom in')).toMatchObject({ role: 'menuitem', description: 'Pro' });
+    expect(record('Dark')?.description ?? '').toBe('');
+    // After the label, not at the row's end.
+    const label = ui.getLayout(ui.getByText('Zoom in'));
+    const tag = ui.getLayout(ui.getByText('Pro'));
+    expect(tag.x).toBeGreaterThan(label.x + label.width);
+    expect(tag.x).toBeLessThan(label.x + label.width + 24);
+  });
+});

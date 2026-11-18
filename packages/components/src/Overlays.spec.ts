@@ -502,6 +502,34 @@ describe('Menu', () => {
     expect(chosen).toEqual(['reset']);
   });
 
+  it('draws a tag after an item’s label, as its description, and keeps the shortcut at the row’s end', () => {
+    const open = new BehaviorSubject(false);
+    const ui = mount(
+      createComponent(Menu, {
+        open,
+        at: { x: 20, y: 20 },
+        items: [
+          { value: 'size', label: 'Size this shape…', badge: 'Pro', shortcut: '⌘K' },
+          { value: 'vary', label: 'Vary this value…' }
+        ],
+        onOpenChange: (next: boolean) => open.next(next)
+      })
+    );
+    open.next(true);
+    ui.frame();
+
+    const row = ui.getByRole('menuitem', { name: 'Size this shape…, ⌘K' });
+    expect([...ui.semanticsTree().values()].find(entry => entry.label === 'Size this shape…, ⌘K')?.description).toBe(
+      'Pro'
+    );
+    const label = ui.getLayout(ui.getByText('Size this shape…'));
+    const tag = ui.getLayout(ui.getByText('Pro'));
+    const keys = ui.getLayout(ui.getByText('⌘K'));
+    expect(tag.x).toBeGreaterThan(label.x + label.width);
+    expect(keys.x).toBeGreaterThan(tag.x + tag.width);
+    expect(ui.getLayout(row).x).toBe(ui.getLayout(ui.getByRole('menuitem', { name: 'Vary this value…' })).x);
+  });
+
   /**
    * A menu of settings, as a view menu has: each on or off. The check was
    * a "✓ " written into the label, so a setting that was off started

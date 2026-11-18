@@ -564,6 +564,7 @@ interface MenuItem {
   readonly separator?: boolean;
   readonly shortcut?: string;
   readonly danger?: boolean;
+  readonly badge?: string;
   readonly checked?: boolean;
   readonly items?: readonly MenuItem[];
 }
@@ -622,6 +623,7 @@ interface MenuBarProps<T> {
   labelOf: (item: T) => string;
   acceleratorOf?: (item: T) => string | undefined;
   checkedOf?: (item: T) => boolean | undefined;
+  badgeOf?: (item: T) => string | undefined;
   onChoose?: (item: T) => void;
   onDismiss?: () => void;
   f10Key?: boolean;

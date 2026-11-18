@@ -8,6 +8,8 @@ import {
   type UiSelfAlignment,
   decorated,
   focusRing,
+  Row,
+  Text,
   interactive,
   type UiModifier,
   type UiChild
@@ -265,4 +267,25 @@ export function followedChildren(
   fallback: () => UiChild
 ): Observable<UiChild[]> {
   return children.pipe(map(child => [child ?? fallback()]));
+}
+
+/**
+ * A menu row's tag, as `Pro`: small text in the primary colour in a thin
+ * outline, after the label. Drawn by `Menu` and `MenuBar` alike; the row
+ * gives it to a screen reader as its description.
+ */
+export function menuBadge(text: string, enabled: boolean): UiChild {
+  const color = enabled ? 'primary' : 'controlForegroundDisabled';
+  return Row(
+    {
+      flexShrink: 0,
+      paddingLeft: 4,
+      paddingRight: 4,
+      borderRadius: 3,
+      borderWidth: 1,
+      borderColor: color,
+      y: 'center'
+    },
+    Text({ text, textStyle: 'label', fontSize: 10, lineHeight: 14, color, selectable: false })
+  );
 }
