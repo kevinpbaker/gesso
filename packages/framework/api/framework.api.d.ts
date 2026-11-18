@@ -646,7 +646,10 @@ declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private attach;
   private detach;
   private onSourceChanged;
+  catchUp(): void;
+  private follow;
 }
+declare function batch<T>(run: () => T): T;
 declare function computed<T>(compute: (read: ReadSource) => T, options?: ComputedOptions<T>): ComputedCell<T>;
 type FanKey = string | number;
 interface FanOutOptions<S, V, D> {
@@ -3088,6 +3091,7 @@ export {
   AudioSinkOutput,
   AudioState,
   AudioStatus,
+  batch,
   bind,
   BoundStream,
   buildPath,
@@ -3417,6 +3421,7 @@ import {
   AudioSinkOutput,
   AudioState,
   AudioStatus,
+  batch,
   bind,
   BoundStream,
   buildPath,
@@ -3657,6 +3662,7 @@ export {
   audioClock,
   AudioService,
   AudioSink,
+  batch,
   bind,
   bounds,
   BoundsCell,

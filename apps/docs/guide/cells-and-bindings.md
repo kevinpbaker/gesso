@@ -165,6 +165,24 @@ cell without the parent knowing how many lines there are.
 What is not free is ten thousand nodes each reading a _different_ slice
 of one upstream value, which is the next section.
 
+Nor is writing many cells that one `computed` follows. Each write works
+the computed out again, and everything that follows it. A document that
+moves every block down a page, one place at a time, works out its file,
+its history and its pages once for each block. `batch` holds the
+computeds back until the writes are done, then works each out once:
+
+```ts
+import { batch } from 'gesso-framework';
+
+batch(() => {
+  for (const block of below) block.y.value += shift;
+});
+```
+
+A cell written inside has its new value at once, and its own
+subscribers hear it at once. A computed read inside works out what is
+waiting first, so it is never stale.
+
 ## `fanOut`, when every node wants its own slice
 
 A grid, a timeline and a log viewer all arrive at the same shape: one

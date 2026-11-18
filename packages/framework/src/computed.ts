@@ -110,6 +110,10 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   /** The current result: kept by the sources while followed, computed now when not. */
   get value(): T {
     trackRead(this);
+    // Inside a `batch`, what is waiting is worked out first, so a read is never stale.
+    if (held.size > 0) {
+      release();
+    }
     if (this.upstream === null) {
       this.recompute();
     }
@@ -210,6 +214,23 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
     if (this.attaching) {
       return; // a cell replays its current value on subscribe; that is not a change
     }
+    if (batching > 0) {
+      held.add(this as ComputedCell<unknown>);
+      return;
+    }
+    held.delete(this as ComputedCell<unknown>);
+    this.follow();
+  }
+
+  /** Works out a change held by a `batch`; nothing for a cell nobody follows any more. Not for applications. */
+  catchUp(): void {
+    if (this.upstream !== null) {
+      this.follow();
+    }
+  }
+
+  /** Runs again after a source changed, follows the cells it read this time, and says so if the result changed. */
+  private follow(): void {
     const changed = this.recompute();
     if (this.sourcesChanged) {
       // The function read different cells this time: follow those.
@@ -223,6 +244,53 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
     }
     if (changed) {
       this.changes.next(this.cached);
+    }
+  }
+}
+
+/** How many `batch` calls are running, one inside another. */
+let batching = 0;
+/** Cells whose sources changed in a batch, to work out when it ends; read as it grows. */
+const held = new Set<ComputedCell<unknown>>();
+
+/**
+ * Works out every held cell, and any its changes reach, once each. Held
+ * while it runs, so a cell that follows held cells (a list of a hundred
+ * computeds, each over one place) waits behind them in the set and runs
+ * once, not once for each of them.
+ */
+function release(): void {
+  batching++;
+  try {
+    for (const cell of held) {
+      held.delete(cell);
+      cell.catchUp();
+    }
+  } finally {
+    batching--;
+  }
+}
+
+/**
+ * Runs `run`, holding back every computed whose sources it changes until
+ * it ends, then works each of those out once. Changing many cells that
+ * one computed follows (moving every block of a long document down a
+ * page) would otherwise work that computed out once per cell, and
+ * everything that follows it with it.
+ *
+ * Only computeds wait. A cell written in the batch has its new value at
+ * once, and anything subscribed to that cell itself hears it at once. A
+ * computed read inside the batch works out what is waiting first, so it
+ * is never stale. A batch inside a batch ends with the outer one.
+ */
+export function batch<T>(run: () => T): T {
+  batching++;
+  try {
+    return run();
+  } finally {
+    batching--;
+    if (batching === 0) {
+      release();
     }
   }
 }

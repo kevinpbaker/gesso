@@ -14,7 +14,7 @@ export {
   type ReadableCell
 } from './Input';
 export { derive, type DeriveOptions, type Equality } from './derive';
-export { computed, ComputedCell, type ComputedOptions, type ReadSource } from './computed';
+export { batch, computed, ComputedCell, type ComputedOptions, type ReadSource } from './computed';
 export { fanOut, FanCell, FanOut, type FanKey, type FanOutOptions } from './fanOut';
 export { select, type SelectOptions } from './select';
 export { resource, Resource, type ResourceOptions, type ResourceState, type ResourceStatus } from './resource';
