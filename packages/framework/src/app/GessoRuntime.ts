@@ -3899,7 +3899,7 @@ export class GessoRuntime {
       for (;;) {
         // Nothing listening means nothing walked.
         if (!this.layoutNotifier.isEmpty()) {
-          this.layoutNotifier.notify(read, readFlow);
+          this.services.get(FrameService).tellLayoutListeners(() => this.layoutNotifier.notify(read, readFlow));
         }
         // The boxes have settled: the focused node's scroll container
         // scrolls by however far the layout moved it, so what grew or

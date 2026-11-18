@@ -40,4 +40,47 @@ export class FrameService {
   flush(): void {
     this.flusher?.();
   }
+
+  /** Whether the layout listeners of a frame are being told their boxes. */
+  private telling = false;
+  /** What waits for them to finish, in the order it was asked for. */
+  private readonly waiting = new Set<() => void>();
+
+  /**
+   * Runs `run` once every layout listener of the frame being laid out
+   * has been told its box, before the frame is drawn. What it changes is
+   * laid out in the same frame, as a listener's own writes are. Asked
+   * for again before it runs, the same function runs once. Outside a
+   * frame's layout listeners it runs at once.
+   *
+   * For work that follows many boxes together. A document that pushes
+   * its blocks apart as each is measured hears every block of a page
+   * measured in one frame: done in each block's listener, the work runs
+   * once per block, and on a long document that is the whole frame.
+   */
+  afterLayoutListeners(run: () => void): void {
+    if (this.telling) {
+      this.waiting.add(run);
+    } else {
+      run();
+    }
+  }
+
+  /**
+   * Called by the runtime around telling the layout listeners; not for
+   * components. `tell` tells them, then what waited for them runs.
+   */
+  tellLayoutListeners(tell: () => void): void {
+    this.telling = true;
+    try {
+      tell();
+    } finally {
+      this.telling = false;
+    }
+    // One asked for by another runs too, after it: the set is read as it grows.
+    for (const run of this.waiting) {
+      this.waiting.delete(run);
+      run();
+    }
+  }
 }

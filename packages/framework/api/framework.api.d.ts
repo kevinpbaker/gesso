@@ -2729,6 +2729,10 @@ declare class FrameService {
   publish(metrics: FrameMetrics): void;
   setFlush(flush: (() => void) | null): void;
   flush(): void;
+  private telling;
+  private readonly waiting;
+  afterLayoutListeners(run: () => void): void;
+  tellLayoutListeners(tell: () => void): void;
 }
 declare class InspectionService {
   private host;
