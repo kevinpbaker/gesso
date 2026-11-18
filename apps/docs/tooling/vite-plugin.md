@@ -275,7 +275,11 @@ four tags annotate a command:
 `@hidden` on a view key is read too: the key stays in the schema, and
 `ChannelSchema.hidden` lists it, so an agent is given the view without
 it. On the exported token it marks the whole channel
-(`ChannelSchema.internal`), and an agent is offered nothing of it.
+(`ChannelSchema.internal`), and an agent is offered nothing of it. Its
+schema is then written as that mark alone, an empty view and no
+commands, so plumbing between an application's threads does not carry
+a description nobody reads in every bundle. Its contract is still read,
+and anything in it that cannot cross a thread is still reported.
 
 So write those comments for a reader who has never seen the code. A
 comment explaining why two keys are separate is useful to a maintainer

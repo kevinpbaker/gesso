@@ -108,6 +108,12 @@ export const Counter = channel<CounterView, CounterCommands>('counter', { count:
  * @hidden
  */
 export const Plumbing = channel<{ memory: number }, { poke(): void }>('plumbing', { memory: 0 });
+
+/**
+ * Kept from agents, with a value that cannot cross a thread.
+ * @hidden
+ */
+export const Stamps = channel<{ at: Date }, {}>('stamps', { at: new Date(0) });
 `;
 
 const CONTROLS = `
@@ -346,15 +352,20 @@ describe('a contract, read by the checker', () => {
     });
     expect(counter.hidden).toEqual(['layout']);
     expect(counter.internal).toBeUndefined();
-    expect(legacy.channels.get('Plumbing')).toMatchObject({
+    // Kept from agents whole: nothing reads its schema, so none is written.
+    expect(legacy.channels.get('Plumbing')).toEqual({
       internal: true,
-      description: "The barrier between the page's threads, for its own components."
+      description: "The barrier between the page's threads, for its own components.",
+      view: { type: 'object' },
+      commands: {}
     });
     expect(catalog.channels.get('Catalog')!.hidden).toBeUndefined();
     expect(counter.commands.increment.input.properties).toEqual({
       by: { type: 'number', description: 'How far to count.' }
     });
-    expect(legacy.warnings).toEqual([]);
+    // Its schema is not written, but its contract is still read for what cannot cross a thread.
+    expect(legacy.channels.get('Stamps')!.view).toEqual({ type: 'object' });
+    expect(legacy.warnings).toEqual(['Stamps.view.at is a Date, which is not plain data and cannot cross a channel.']);
   });
 
   it('sees an edit once it is told the file changed', () => {

@@ -31,7 +31,9 @@ import { blankLiterals, findCalls, importSources } from './source.ts';
  *     command are its annotations; `CommandSchema` says what each means.
  *   - `@hidden` on a view key keeps that key from an agent; see
  *     `ChannelSchema.hidden`. On the token, it keeps the whole channel
- *     from one; see `ChannelSchema.internal`.
+ *     from one; see `ChannelSchema.internal`. Such a channel is read and
+ *     its problems reported, but its schema is written as `internal`
+ *     alone, with an empty view and no commands.
  *
  * And what it will not describe: a value that is not plain data, which
  * cannot cross a channel anyway. A function, a `Date`, a `Map`, a class
@@ -691,6 +693,18 @@ class Describer {
           out.commands[command.name] = described;
         }
       }
+    }
+    // A channel kept from agents is read whole all the same, so what in it
+    // cannot cross a thread is still reported. But nothing reads its schema:
+    // an agent is offered nothing of it. Written out, the schema of one
+    // application's two plumbing channels was 950 kB of each worker.
+    if (out.internal === true) {
+      return {
+        ...(out.description === undefined ? {} : { description: out.description }),
+        internal: true,
+        view: { type: 'object' },
+        commands: {}
+      };
     }
     return out;
   }

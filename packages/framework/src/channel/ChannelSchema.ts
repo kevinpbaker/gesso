@@ -69,7 +69,9 @@ export interface ChannelSchema {
    * plumbing as a whole, the barrier between its threads, say, whose
    * commands are a screen's and whose view holds shared memory. An agent
    * is offered nothing of it: no view tool, no command, no resource. The
-   * application reaches it as before.
+   * application reaches it as before. `gesso-vite-plugin` writes such a
+   * channel's view as an empty object and its commands as none, since
+   * nothing reads them, rather than carry its whole schema in the bundle.
    */
   readonly internal?: true;
   readonly commands: { readonly [name: string]: CommandSchema };
