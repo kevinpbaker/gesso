@@ -60,7 +60,6 @@ export class InputCell<T> extends BehaviorSubject<T> {
   }
 
   override get value(): T {
-    trackRead(this);
     // A read a `computed` is collecting is not the body's snapshot: the
     // computed follows this cell from here on and carries the change,
     // and a body that read the computed itself is the computed's own
@@ -69,7 +68,7 @@ export class InputCell<T> extends BehaviorSubject<T> {
     if (bodyOf !== null && tracking === null && this.snapshotBy === null) {
       this.snapshotBy = bodyOf;
     }
-    return super.getValue();
+    return trackRead(this, super.getValue());
   }
 
   /**
@@ -93,6 +92,7 @@ export class InputCell<T> extends BehaviorSubject<T> {
       this.warnedStale = true;
       warnStaleRead(this.snapshotBy, this.label, super.getValue(), value);
     }
+    noteWrite();
     super.next(value);
   }
 }
@@ -109,6 +109,25 @@ export function forceInput<T>(cell: InputCell<T>, value: T): void {
   } else {
     cell.next(value);
   }
+}
+
+/**
+ * How many times a cell has been given a new value, counted across the
+ * whole thread. A followed `computed` that was last checked at the
+ * current count is fresh without asking its sources again; a write
+ * since means it asks. A cell that takes values from outside the
+ * framework counts each one here before it tells its followers.
+ */
+let writes = 0;
+
+/** Counts a write, before the cell written tells anybody. */
+export function noteWrite(): void {
+  writes++;
+}
+
+/** The writes so far; see `noteWrite`. */
+export function writeCount(): number {
+  return writes;
 }
 
 /** The component whose function body is running, while one is. */
@@ -128,16 +147,25 @@ export interface ReadableCell<T> extends Observable<T> {
   readonly value: T;
 }
 
-/** The set a running `computed` is collecting its reads into, while one is. */
-let tracking: Set<ReadableCell<unknown>> | null = null;
+/** What a running `computed` read, while one runs: each cell, and the value it gave. */
+export type Reads = Map<ReadableCell<unknown>, unknown>;
 
-/** Records a `.value` read for whatever `computed` is running, if one is. */
-export function trackRead(cell: ReadableCell<unknown>): void {
-  tracking?.add(cell);
+/** The reads a running `computed` is collecting, while one is. */
+let tracking: Reads | null = null;
+
+/**
+ * Records a `.value` read for whatever `computed` is running, if one
+ * is, with the value the read gave. The value is what lets a computed
+ * that is followed tell, when it is read, whether a source changed
+ * since it last ran and it has not heard yet.
+ */
+export function trackRead<T>(cell: ReadableCell<T>, value: T): T {
+  tracking?.set(cell, value);
+  return value;
 }
 
 /** Runs `run` with every `.value` read on the way recorded into `into`. */
-export function withTracking<T>(into: Set<ReadableCell<unknown>>, run: () => T): T {
+export function withTracking<T>(into: Reads, run: () => T): T {
   const previous = tracking;
   tracking = into;
   try {

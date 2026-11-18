@@ -121,6 +121,65 @@ describe('computed', () => {
     expect(label.value).toBe('8 items');
   });
 
+  it('is never read stale between two computeds over one cell, followed or not', () => {
+    // A list and an index over the same ids, and a document built from
+    // both. The cell tells the list first; the document runs then, and
+    // reads the index before the index has heard.
+    const ids = internalState<readonly string[]>(['a']);
+    const list = computed(() => ids.value.map(id => ({ id })));
+    const index = computed(() => new Map(ids.value.map(id => [id, id.toUpperCase()])));
+    const misses: string[] = [];
+    const doc = computed(() =>
+      list.value.map(({ id }) => {
+        const found = index.value.get(id);
+        if (found === undefined) misses.push(id);
+        return found;
+      })
+    );
+    const heard: (string | undefined)[][] = [];
+    const following = doc.subscribe(value => heard.push(value));
+    ids.value = ['a', 'b'];
+    ids.value = ['a', 'b', 'c'];
+    expect(misses).toEqual([]);
+    expect(heard.at(-1)).toEqual(['A', 'B', 'C']);
+    expect(doc.value).toEqual(['A', 'B', 'C']);
+    following.unsubscribe();
+  });
+
+  it('tells its own followers a change a read worked out before the change reached it', () => {
+    const count = internalState(1);
+    const first = computed(() => count.value + 1);
+    const ahead = computed(() => count.value * 10);
+    const reader = computed(() => first.value + ahead.value);
+    const fromAhead: number[] = [];
+    const a = reader.subscribe(() => {});
+    const b = ahead.subscribe(value => fromAhead.push(value));
+    count.value = 2;
+    // The reader read `ahead` before `ahead` heard; it is told all the same.
+    expect(fromAhead).toEqual([10, 20]);
+    expect(reader.value).toBe(23);
+    a.unsubscribe();
+    b.unsubscribe();
+  });
+
+  it('follows the cells a run on a read took up, once the change reaches it', () => {
+    const on = internalState(false);
+    const other = internalState(1);
+    const first = computed(() => on.value);
+    const branch = computed(() => (on.value ? other.value : 0));
+    const reader = computed(() => (first.value ? branch.value : -1));
+    const fromBranch: number[] = [];
+    const a = reader.subscribe(() => {});
+    const b = branch.subscribe(value => fromBranch.push(value));
+    on.value = true;
+    expect(reader.value).toBe(1);
+    other.value = 5;
+    expect(fromBranch).toEqual([0, 1, 5]);
+    expect(reader.value).toBe(5);
+    a.unsubscribe();
+    b.unsubscribe();
+  });
+
   it('can compare structurally, so a rebuilt equal object is not a change', () => {
     const items = internalState(['a', 'b']);
     const byReference: unknown[] = [];

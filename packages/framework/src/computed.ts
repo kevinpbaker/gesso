@@ -1,6 +1,6 @@
 import { Observable, Subject, Subscription } from 'rxjs';
 import { equalityOf, type Equality } from './derive';
-import { currentBody, trackRead, withTracking, type ReadableCell } from './Input';
+import { currentBody, noteWrite, trackRead, withTracking, writeCount, type ReadableCell, type Reads } from './Input';
 
 export interface ComputedOptions<T> {
   /** How a new result is judged unchanged; `reference` by default. */
@@ -48,7 +48,11 @@ export type ReadSource = <V>(source: Observable<V>) => V;
  *
  * Nothing runs until someone asks. With no subscriber the function runs
  * only when `.value` is read; with one, the cell follows its sources and
- * emits a result when it differs from the last by `equal`. When the last
+ * emits a result when it differs from the last by `equal`. A read is
+ * never stale either way. Two computeds over one cell hear it change one
+ * after the other, and a third reading both can run between the two; a
+ * followed cell read before it has heard runs again then, since the
+ * values it last read are no longer what its sources hold. When the last
  * subscriber leaves it lets go of its sources, so a computed made in a
  * component body dies with the component's bindings and needs no
  * disposal of its own.
@@ -61,15 +65,22 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   label: string | undefined;
   private readonly equal: (a: T, b: T) => boolean;
   private readonly changes = new Subject<T>();
-  private sources = new Set<ReadableCell<unknown>>();
+  /** The cells the last run read, each with the value it gave then. */
+  private sources: Reads = new Map();
   /**
-   * The set the next run collects its reads into. It trades places with
+   * The map the next run collects its reads into. It trades places with
    * `sources` after the run, so following a cell allocates nothing per
-   * change; the two sets are simply reused.
+   * change; the two maps are simply reused.
    */
-  private collecting = new Set<ReadableCell<unknown>>();
+  private collecting: Reads = new Map();
   /** Whether the last run read different cells from the run before it. */
   private sourcesChanged = false;
+  /** The write count (see `noteWrite`) at which the result was last known current. */
+  private checkedAt = -1;
+  /** A result worked out on a read, ahead of the change that caused it reaching this cell; told when it does. */
+  private unannounced = false;
+  /** A run on a read that read different cells; followed when the change reaches this cell. */
+  private resubscribeOwed = false;
   private recomputing = false;
   private cached!: T;
   private hasValue = false;
@@ -109,20 +120,63 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
 
   /** The current result: kept by the sources while followed, computed now when not. */
   get value(): T {
-    trackRead(this);
     // Inside a `batch`, what is waiting is worked out first, so a read is never stale.
     if (held.size > 0) {
       release();
     }
-    if (this.upstream === null) {
-      this.recompute();
-    }
+    this.settle();
     const body = currentBody();
     if (body !== null && this.snapshotBy === null) {
       this.snapshotBy = body;
       this.watchForStaleRead();
     }
-    return this.cached;
+    return trackRead(this, this.cached);
+  }
+
+  /**
+   * Makes the result current. Not followed, it runs. Followed, it is
+   * current unless a source now holds something other than what the
+   * last run read: a change on its way that has not reached this cell
+   * yet, because a cell tells its followers one at a time. Then it runs
+   * now, and tells its own followers when the change arrives.
+   */
+  private settle(): void {
+    if (this.upstream === null) {
+      this.recompute();
+      return;
+    }
+    const writes = writeCount();
+    if (this.checkedAt === writes) {
+      return;
+    }
+    if (!this.behind()) {
+      this.checkedAt = writes;
+      return;
+    }
+    if (this.recompute()) {
+      this.unannounced = true;
+    }
+    if (this.sourcesChanged) {
+      this.resubscribeOwed = true;
+    }
+  }
+
+  /** Whether a source holds something other than what the last run read from it. */
+  private behind(): boolean {
+    for (const [source, seen] of this.sources) {
+      let now: unknown;
+      if (source instanceof ComputedCell) {
+        source.settle();
+        now = source.cached;
+      } else {
+        now = withTracking(peeking, () => source.value);
+        peeking.clear();
+      }
+      if (!Object.is(now, seen)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -134,7 +188,7 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private watchForStaleRead(): void {
     this.staleWatch = new Subscription();
     let settling = true;
-    for (const source of this.sources) {
+    for (const source of this.sources.keys()) {
       this.staleWatch.add(
         source.subscribe(() => {
           if (settling || this.observed) {
@@ -174,8 +228,10 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
     // a source) gets a set of its own, so it cannot clear the one the
     // outer run is still filling.
     const nested = this.recomputing;
-    const touched = nested ? new Set<ReadableCell<unknown>>() : this.collecting;
+    const touched: Reads = nested ? new Map() : this.collecting;
     touched.clear();
+    // Taken before the run: a write during it leaves the result to be checked again.
+    const at = writeCount();
     this.recomputing = true;
     let next: T;
     try {
@@ -191,6 +247,7 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
     const changed = !this.hasValue || !this.equal(this.cached, next);
     this.hasValue = true;
     this.cached = next;
+    this.checkedAt = at;
     return changed;
   }
 
@@ -198,11 +255,17 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private attach(): void {
     this.attaching = true;
     this.recompute();
+    this.unannounced = false;
+    this.resubscribeOwed = false;
+    this.subscribeSources();
+    this.attaching = false;
+  }
+
+  private subscribeSources(): void {
     this.upstream = new Subscription();
-    for (const source of this.sources) {
+    for (const source of this.sources.keys()) {
       this.upstream.add(source.subscribe(() => this.onSourceChanged()));
     }
-    this.attaching = false;
   }
 
   private detach(): void {
@@ -231,15 +294,15 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
 
   /** Runs again after a source changed, follows the cells it read this time, and says so if the result changed. */
   private follow(): void {
-    const changed = this.recompute();
-    if (this.sourcesChanged) {
+    // A read may have worked the change out already; its followers still have to hear it.
+    const changed = this.recompute() || this.unannounced;
+    this.unannounced = false;
+    if (this.sourcesChanged || this.resubscribeOwed) {
       // The function read different cells this time: follow those.
+      this.resubscribeOwed = false;
       this.detach();
       this.attaching = true;
-      this.upstream = new Subscription();
-      for (const source of this.sources) {
-        this.upstream.add(source.subscribe(() => this.onSourceChanged()));
-      }
+      this.subscribeSources();
       this.attaching = false;
     }
     if (changed) {
@@ -247,6 +310,9 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
     }
   }
 }
+
+/** Where `behind` reads a source that is not a computed, so the read is not recorded anywhere else. */
+const peeking: Reads = new Map();
 
 /** How many `batch` calls are running, one inside another. */
 let batching = 0;
@@ -342,7 +408,7 @@ const tracksReads = new WeakMap<Observable<unknown>, boolean>();
 function announcesItsReads(source: ReadableCell<unknown>): boolean {
   let known = tracksReads.get(source);
   if (known === undefined) {
-    const seen = new Set<ReadableCell<unknown>>();
+    const seen: Reads = new Map();
     withTracking(seen, () => void source.value);
     known = seen.has(source);
     tracksReads.set(source, known);
@@ -407,29 +473,29 @@ class StreamCell<T> extends Observable<T> implements ReadableCell<T> {
   }
 
   get value(): T {
-    trackRead(this);
     if (this.upstream === null) {
       const asking = this.stream.subscribe(value => {
         this.last = value;
       });
       asking.unsubscribe();
     }
-    return this.last;
+    return trackRead(this, this.last);
   }
 
   private attach(): void {
     this.upstream = this.stream.subscribe(value => {
       this.last = value;
+      noteWrite();
       this.changes.next(value);
     });
   }
 }
 
-function sameSet<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
+function sameSet<T>(a: ReadonlyMap<T, unknown>, b: ReadonlyMap<T, unknown>): boolean {
   if (a.size !== b.size) {
     return false;
   }
-  for (const item of a) {
+  for (const item of a.keys()) {
     if (!b.has(item)) {
       return false;
     }

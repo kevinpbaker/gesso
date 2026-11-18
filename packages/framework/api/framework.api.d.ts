@@ -410,6 +410,7 @@ declare class InternalState<T> extends BehaviorSubject<T> {
   constructor(initialValue: T);
   get value(): T;
   set value(next: T);
+  next(value: T): void;
 }
 declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
 declare class BoundsCell extends InternalState<LayoutBox> {
@@ -628,6 +629,9 @@ declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private sources;
   private collecting;
   private sourcesChanged;
+  private checkedAt;
+  private unannounced;
+  private resubscribeOwed;
   private recomputing;
   private cached;
   private hasValue;
@@ -639,11 +643,14 @@ declare class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
   private staleWatch;
   constructor(compute: (read: ReadSource) => T, options?: ComputedOptions<T>);
   get value(): T;
+  private settle;
+  private behind;
   private watchForStaleRead;
   private warnStale;
   get observed(): boolean;
   private recompute;
   private attach;
+  private subscribeSources;
   private detach;
   private onSourceChanged;
   catchUp(): void;

@@ -8,7 +8,7 @@ import {
   type MonoTypeOperatorFunction
 } from 'rxjs';
 
-import { trackRead, type ReadableCell } from './Input';
+import { noteWrite, trackRead, type ReadableCell } from './Input';
 
 /**
  * A cell that lets its source through on a timer.
@@ -64,7 +64,6 @@ class TimedCell<T> extends Observable<T> implements ReadableCell<T> {
   }
 
   get value(): T {
-    trackRead(this);
     if (this.upstream === null) {
       const asking = this.stream.subscribe(value => {
         this.current = value;
@@ -72,7 +71,7 @@ class TimedCell<T> extends Observable<T> implements ReadableCell<T> {
       });
       asking.unsubscribe();
     }
-    return this.current;
+    return trackRead(this, this.current);
   }
 
   private attach(): void {
@@ -98,6 +97,7 @@ class TimedCell<T> extends Observable<T> implements ReadableCell<T> {
         }
         this.current = value;
         this.hasCurrent = true;
+        noteWrite();
         this.changes.next(value);
       });
     this.seeding = false;

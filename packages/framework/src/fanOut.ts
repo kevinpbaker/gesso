@@ -1,7 +1,7 @@
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 
 import { equalityOf, type Equality } from './derive';
-import { trackRead, type ReadableCell } from './Input';
+import { noteWrite, trackRead, type ReadableCell } from './Input';
 
 /**
  * How many live keys with nothing ever released counts as a mistake.
@@ -119,8 +119,7 @@ export class FanCell<V, D = unknown> extends Observable<V> implements ReadableCe
   }
 
   get value(): V {
-    trackRead(this);
-    return this.subject.value;
+    return trackRead(this, this.subject.value);
   }
 }
 
@@ -265,6 +264,7 @@ export class FanOut<S, V, D = undefined> {
     cell.held = datum;
     const next = this.hasSnapshot ? this.read(this.snapshot as S, key, datum) : this.initial(key, datum);
     if (!this.equal(cell.subject.value, next)) {
+      noteWrite();
       cell.subject.next(next);
     }
     return cell;
@@ -327,6 +327,7 @@ export class FanOut<S, V, D = undefined> {
       }
       const next = this.read(snapshot, key, cell.held);
       if (!this.equal(cell.subject.value, next)) {
+        noteWrite();
         cell.subject.next(next);
       }
     }

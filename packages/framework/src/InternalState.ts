@@ -1,5 +1,5 @@
 import { BehaviorSubject } from 'rxjs';
-import { trackRead } from './Input';
+import { noteWrite, trackRead } from './Input';
 
 /**
  * A component's own state: originated here, and never crossing the
@@ -43,12 +43,16 @@ export class InternalState<T> extends BehaviorSubject<T> {
   }
 
   override get value(): T {
-    trackRead(this);
-    return super.getValue();
+    return trackRead(this, super.getValue());
   }
 
   override set value(next: T) {
     this.next(next);
+  }
+
+  override next(value: T): void {
+    noteWrite();
+    super.next(value);
   }
 }
 
