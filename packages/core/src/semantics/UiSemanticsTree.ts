@@ -397,9 +397,33 @@ function walk(
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
       if (claimedByName(node, child)) {
         warnIfFocusableInside(node, child);
+        // Text gathered into a list item's or a cell's name is spoken
+        // for, but a button beside that text is not: a row of a list
+        // with its own Delete stays a row with a button in it.
+        if (!presentational(node)) {
+          visitWithin(child, record.id, disabled);
+        }
         continue;
       }
       visit(child, record.id, disabled);
+    }
+  };
+  /**
+   * The nodes under a child whose text named its parent that are
+   * records of their own (a button, a link, a field), each as a child
+   * of that parent. The text itself is the parent's name already.
+   */
+  const visitWithin = (node: UiNode, parent: string, inert: boolean): void => {
+    if (node.properties.get('visible') === false) {
+      return;
+    }
+    const disabled = inert || node.properties.get('disabled') === true;
+    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+      if (namesItsParent(child)) {
+        visitWithin(child, parent, disabled);
+      } else {
+        visit(child, parent, disabled);
+      }
     }
   };
 
@@ -563,8 +587,7 @@ function namesItsParent(child: UiNode): boolean {
  * that only repeats the label, which is the label drawn.
  */
 function claimedByName(parent: UiNode, child: UiNode): boolean {
-  const role = (parent.properties.get('role') as UiRole | undefined) ?? IMPLICIT_ROLES[parent.type as UiNodeType];
-  if (role !== undefined && PRESENTATIONAL_CHILDREN.has(role)) {
+  if (presentational(parent)) {
     return true;
   }
   if (textInputOf(parent) !== undefined) {
@@ -582,6 +605,12 @@ function claimedByName(parent: UiNode, child: UiNode): boolean {
     return child.type === UiNodeType.Text && accessibleText(child) === label;
   }
   return namesItsParent(child) && accessibleText(child) !== undefined;
+}
+
+/** Whether a node's role makes its whole subtree presentational: a button, a tab, a menu item. */
+function presentational(node: UiNode): boolean {
+  const role = (node.properties.get('role') as UiRole | undefined) ?? IMPLICIT_ROLES[node.type as UiNodeType];
+  return role !== undefined && PRESENTATIONAL_CHILDREN.has(role);
 }
 
 /** The parents already warned about, so a tree built every frame says it once. */

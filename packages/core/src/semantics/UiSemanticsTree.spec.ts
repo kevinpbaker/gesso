@@ -208,6 +208,28 @@ describe('buildSemanticsTree', () => {
     );
   });
 
+  it('keeps a button beside the text that names its list item', () => {
+    // A row of a list: its words in a column, and a button beside them,
+    // both inside a row that only lays them out.
+    const t = new Tree();
+    const item = t.node(UiNodeType.Column, { role: 'listitem' });
+    const layout = t.node(UiNodeType.Row, {});
+    const words = t.node(UiNodeType.Column, {});
+    t.add(words, t.node(UiNodeType.Text, { text: 'Rev. B' }), t.node(UiNodeType.Text, { text: 'Not checked' }));
+    const button = t.node(UiNodeType.Button, { label: 'Compare with rev. B' });
+    t.add(button, t.node(UiNodeType.Text, { text: 'Compare' }));
+    t.add(layout, words, button);
+    t.add(item, layout);
+    t.add(t.root, item);
+
+    const records = t.build();
+
+    expect(records.map(r => [r.role, r.label, r.parent])).toEqual([
+      ['listitem', 'Rev. B Not checked', null],
+      ['button', 'Compare with rev. B', item.id]
+    ]);
+  });
+
   it("places a virtualized grid's rows and cells in the whole data, not in what is mounted", () => {
     // Scrolled down and to the right, the grid mounts rows 41 and 42
     // and columns 7 and 8 of a 1000 by 20 table. Without the indices a
