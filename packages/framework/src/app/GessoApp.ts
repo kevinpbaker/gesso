@@ -20,7 +20,7 @@ import { attachFileDrop } from './fileDrop';
 import { browserFilesHost, ShellFiles } from './shellFiles';
 import { setLeaveWarning } from './shellLeaveWarning';
 import { redirectWith } from './shellRedirect';
-import { EditingProxy, readClipboard, writeClipboard } from './EditingProxy';
+import { EditingProxy, readClipboard, writeClipboard, writeClipboardImage } from './EditingProxy';
 import { SemanticsMirror } from './SemanticsMirror';
 import { performShellStorage, shellStorageDenied } from './shellStorage';
 import { observeColorScheme, type ColorScheme, type ColorSchemePreference } from './colorScheme';
@@ -672,9 +672,11 @@ export class GessoApp {
       return;
     }
     if (request.type === 'clipboard') {
-      void writeClipboard(request.text, this.canvas.ownerDocument).then(copied =>
-        this.runtime.settleClipboard(request.id, copied)
-      );
+      const written =
+        request.image === undefined
+          ? writeClipboard(request.text, this.canvas.ownerDocument)
+          : writeClipboardImage(request.image, request.text);
+      void written.then(copied => this.runtime.settleClipboard(request.id, copied));
       return;
     }
     if (request.type === 'fullscreen') {

@@ -226,7 +226,7 @@ export { TextService } from './app/TextService';
 export { EditingService } from './app/EditingService';
 export { ScrollService } from './app/ScrollService';
 export { FocusService } from './app/FocusService';
-export { EditingProxy, writeClipboard, type EditingProxySink } from './app/EditingProxy';
+export { EditingProxy, writeClipboard, writeClipboardImage, type EditingProxySink } from './app/EditingProxy';
 export { SemanticsMirror, type EditingMirrorTarget, type SemanticsMirrorSink } from './app/SemanticsMirror';
 export type { EditingState, UiSemanticsMap, UiSemanticsPatch, UiSemanticsRecord } from 'gesso-core';
 export { UI_ROLES, UI_SEMANTIC_STATES, type UiRole, type UiSemanticState } from 'gesso-core';

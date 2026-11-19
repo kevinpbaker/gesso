@@ -17,7 +17,7 @@ import type { ReadableCell } from '../Input';
  * have exactly one place that answers them.
  */
 export type ShellRequest =
-  | { type: 'clipboard'; id: number; text: string }
+  | { type: 'clipboard'; id: number; text: string; image?: Uint8Array }
   | { type: 'clipboardRead'; id: number }
   | { type: 'openUrl'; url: string }
   | { type: 'openRoute'; url: string }
@@ -377,6 +377,31 @@ export class ShellService {
       this.copies.set(id, resolve);
     });
     handler({ type: 'clipboard', id, text });
+    return settled;
+  }
+
+  /**
+   * Puts a picture on the system clipboard, a PNG's bytes, with `text`
+   * beside it for a place that takes no pictures; answers whether it got
+   * there. For a Copy as picture command: the picture pastes into email,
+   * slides and documents.
+   *
+   * Refused more often than text is: a browser without `ClipboardItem`,
+   * or one that wants the write inside the gesture itself (Safari, and so
+   * a macOS webview), answers false, and nothing falls back for a picture
+   * as `execCommand` does for text. An application should say so, or
+   * offer the picture as a file instead. False with no shell installed.
+   */
+  copyImage(png: Uint8Array, text = ''): Promise<boolean> {
+    const handler = this.handler;
+    if (handler === undefined || handler === null) {
+      return Promise.resolve(false);
+    }
+    const id = this.nextCopyId++;
+    const settled = new Promise<boolean>(resolve => {
+      this.copies.set(id, resolve);
+    });
+    handler({ type: 'clipboard', id, text, image: png });
     return settled;
   }
 

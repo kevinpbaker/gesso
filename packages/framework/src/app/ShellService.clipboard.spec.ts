@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { readClipboard, writeClipboard } from './EditingProxy';
+import { readClipboard, writeClipboard, writeClipboardImage } from './EditingProxy';
 import { ShellService, type ShellRequest } from './ShellService';
 
 /**
@@ -118,5 +118,52 @@ describe('ShellService.readText', () => {
     await expect(readClipboard()).resolves.toBeNull();
     vi.stubGlobal('navigator', {});
     await expect(readClipboard()).resolves.toBeNull();
+  });
+});
+
+/**
+ * `copyImage` puts a picture on the clipboard, for an application's Copy
+ * as picture: a PNG, with text beside it. Asked for by a worksheet app
+ * whose people paste regions into email and slides.
+ */
+describe('ShellService.copyImage', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('asks the shell with the picture and its text, and resolves with what the shell reports', async () => {
+    const service = new ShellService();
+    const requests: ShellRequest[] = [];
+    service.setHandler(request => requests.push(request));
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const copied = service.copyImage(png, 'F = 12 kN');
+    expect(requests).toEqual([{ type: 'clipboard', id: 1, text: 'F = 12 kN', image: png }]);
+    service.settleClipboard(1, true);
+    await expect(copied).resolves.toBe(true);
+  });
+
+  it('resolves false at once when no shell is listening', async () => {
+    await expect(new ShellService().copyImage(new Uint8Array([1]))).resolves.toBe(false);
+  });
+
+  it('writes a PNG and its text as one clipboard item, where the browser has ClipboardItem', async () => {
+    const written: Record<string, Blob>[] = [];
+    class Item {
+      constructor(readonly parts: Record<string, Blob>) {
+        written.push(parts);
+      }
+    }
+    vi.stubGlobal('ClipboardItem', Item);
+    vi.stubGlobal('navigator', { clipboard: { write: async () => {} } });
+    await expect(writeClipboardImage(new Uint8Array([1, 2, 3]), 'a picture')).resolves.toBe(true);
+    expect(Object.keys(written[0]!)).toEqual(['image/png', 'text/plain']);
+    expect(written[0]!['image/png']!.type).toBe('image/png');
+  });
+
+  it('answers false, never throwing, where the browser has no ClipboardItem or refuses', async () => {
+    vi.stubGlobal('ClipboardItem', undefined);
+    vi.stubGlobal('navigator', { clipboard: { write: async () => {} } });
+    await expect(writeClipboardImage(new Uint8Array([1]))).resolves.toBe(false);
+    vi.stubGlobal('ClipboardItem', class {});
+    vi.stubGlobal('navigator', { clipboard: { write: async () => Promise.reject(new Error('NotAllowedError')) } });
+    await expect(writeClipboardImage(new Uint8Array([1]))).resolves.toBe(false);
   });
 });

@@ -788,7 +788,11 @@ export class RenderWorkerApp {
     });
     this.runtime.onShellRequest(request => {
       if (request.type === 'clipboard') {
-        this.host.postMessage({ type: 'clipboard', id: request.id, text: request.text });
+        this.host.postMessage(
+          request.image === undefined
+            ? { type: 'clipboard', id: request.id, text: request.text }
+            : { type: 'clipboard', id: request.id, text: request.text, image: request.image }
+        );
       } else if (request.type === 'clipboardRead') {
         this.host.postMessage({ type: 'clipboardRead', id: request.id });
       } else if (request.type === 'openUrl') {

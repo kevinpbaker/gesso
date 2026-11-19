@@ -639,6 +639,35 @@ export function readClipboard(): Promise<string | null> {
 }
 
 /**
+ * Writes a PNG to the system clipboard from the main thread, with text
+ * beside it for a place that takes no pictures, and answers whether it
+ * got there. Needs `ClipboardItem` and a secure context, and in some
+ * browsers a gesture still in hand; false when any is missing. Unlike
+ * text there is no fallback. It never rejects.
+ */
+export function writeClipboardImage(png: Uint8Array, text = ''): Promise<boolean> {
+  const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
+  const Item = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+  if (clipboard === undefined || typeof clipboard.write !== 'function' || Item === undefined) {
+    return Promise.resolve(false);
+  }
+  try {
+    const parts: Record<string, Blob> = {
+      'image/png': new Blob([png as Uint8Array<ArrayBuffer>], { type: 'image/png' })
+    };
+    if (text !== '') {
+      parts['text/plain'] = new Blob([text], { type: 'text/plain' });
+    }
+    return clipboard.write([new Item(parts)]).then(
+      () => true,
+      () => false
+    );
+  } catch {
+    return Promise.resolve(false);
+  }
+}
+
+/**
  * Writes text to the system clipboard from the main thread, and answers
  * whether it got there. The async API needs a secure context and, in
  * some browsers, a recent user gesture; the `execCommand` fallback

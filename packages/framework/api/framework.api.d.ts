@@ -1054,6 +1054,7 @@ type ShellRequest = {
   type: 'clipboard';
   id: number;
   text: string;
+  image?: Uint8Array;
 } | {
   type: 'clipboardRead';
   id: number;
@@ -1207,6 +1208,7 @@ declare class ShellService {
   applyContrast(contrast: UiContrast): void;
   applyViewportInsets(insets: UiInsets): void;
   copyText(text: string): Promise<boolean>;
+  copyImage(png: Uint8Array, text?: string): Promise<boolean>;
   settleClipboard(id: number, copied: boolean): void;
   readText(): Promise<string | null>;
   settleClipboardRead(id: number, text: string | null): void;
@@ -2097,6 +2099,7 @@ type RuntimeToShellMessage = {
   type: 'clipboard';
   id: number;
   text: string;
+  image?: Uint8Array;
 } |
 {
   type: 'clipboardRead';
@@ -2974,6 +2977,7 @@ declare class EditingProxy {
   private readonly onPaste;
   private listenWindow;
 }
+declare function writeClipboardImage(png: Uint8Array, text?: string): Promise<boolean>;
 declare function writeClipboard(text: string, doc?: Document): Promise<boolean>;
 interface SemanticsMirrorSink {
   action(action: UiSemanticsAction): void;
@@ -3329,7 +3333,8 @@ export {
   WebMcpChoice,
   WorkerApp,
   WorkerAppOptions,
-  writeClipboard
+  writeClipboard,
+  writeClipboardImage
 };
 // ==== index.d.ts ====
 import {
@@ -3659,7 +3664,8 @@ import {
   WebMcpChoice,
   WorkerApp,
   WorkerAppOptions,
-  writeClipboard
+  writeClipboard,
+  writeClipboardImage
 } from "./index.js";
 export {
   AnimationService,
@@ -3984,7 +3990,8 @@ export {
   viewKeys,
   WorkerApp,
   workerHandle,
-  writeClipboard
+  writeClipboard,
+  writeClipboardImage
 };
 // ==== jsx/jsx-dev-runtime.d.ts ====
 import {

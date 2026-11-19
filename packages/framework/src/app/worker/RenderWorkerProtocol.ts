@@ -398,10 +398,11 @@ export type RuntimeToShellMessage =
    */
   | { type: 'editing'; state: EditingState | null }
   /**
-   * Put text on the clipboard (ShellService.copyText). `id` pairs it
-   * with the `clipboardResult` that comes back, once.
+   * Put text on the clipboard (ShellService.copyText), or a PNG with
+   * text beside it (ShellService.copyImage). `id` pairs it with the
+   * `clipboardResult` that comes back, once.
    */
-  | { type: 'clipboard'; id: number; text: string }
+  | { type: 'clipboard'; id: number; text: string; image?: Uint8Array }
   /** Read the clipboard's text (ShellService.readText). `id` pairs it with the `clipboardReadResult` that comes back. */
   | { type: 'clipboardRead'; id: number }
   /** Open a URL in a new tab (ShellService.openUrl). */

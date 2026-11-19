@@ -28,7 +28,7 @@ import { browserFilesHost, fileResultTransfer, ShellFiles } from '../shellFiles'
 import { setLeaveWarning } from '../shellLeaveWarning';
 import { redirectWith } from '../shellRedirect';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
-import { EditingProxy, readClipboard, writeClipboard } from '../EditingProxy';
+import { EditingProxy, readClipboard, writeClipboard, writeClipboardImage } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
 import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorScheme, type ColorSchemePreference } from '../colorScheme';
@@ -1072,7 +1072,9 @@ export class WorkerApp {
     }
     if (message.type === 'clipboard') {
       // Answered on every path: `writeClipboard` never rejects.
-      void writeClipboard(message.text).then(copied => this.post({ type: 'clipboardResult', id: message.id, copied }));
+      const written =
+        message.image === undefined ? writeClipboard(message.text) : writeClipboardImage(message.image, message.text);
+      void written.then(copied => this.post({ type: 'clipboardResult', id: message.id, copied }));
       return;
     }
     if (message.type === 'clipboardRead') {
