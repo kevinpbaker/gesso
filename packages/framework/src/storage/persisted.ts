@@ -43,6 +43,13 @@ export interface PersistedOptions<T> {
    * `persisted.budget.spec.ts`, which asserts exactly that.
    */
   readonly settle?: number;
+  /**
+   * The value as it is written, when that is not the value itself: a
+   * smaller form that `revive` reads back, with references in place of
+   * copies, say. What it answers goes to `JSON.stringify`. Without one
+   * the value is written as it is.
+   */
+  readonly serialize?: (value: T) => unknown;
   /** What to call this in a devtools reading; optional. */
   readonly label?: string;
 }
@@ -121,6 +128,8 @@ export class PersistedState<T> {
   private stored: string | null = null;
   /** What `forget` goes back to. */
   private readonly initial: T;
+  /** The value as it is written: `PersistedOptions.serialize`. */
+  private readonly serialize: ((value: T) => unknown) | undefined;
 
   /** Where the first read got to; the same five words `resource` uses. */
   readonly status: ReadableCell<ResourceStatus>;
@@ -142,6 +151,7 @@ export class PersistedState<T> {
   ) {
     const label = options.label;
     this.initial = options.initial;
+    this.serialize = options.serialize;
     this.held = internalState<T>(options.initial, label);
     this.saves = internalState(0, label === undefined ? undefined : `${label}.saving`);
     this.failure = internalState<string | null>(null, label === undefined ? undefined : `${label}.saveError`);
@@ -248,7 +258,7 @@ export class PersistedState<T> {
     }
     let text: string;
     try {
-      text = JSON.stringify(value);
+      text = JSON.stringify(this.serialize === undefined ? value : this.serialize(value));
     } catch (error) {
       this.failure.value = error instanceof Error ? error.message : String(error);
       return;

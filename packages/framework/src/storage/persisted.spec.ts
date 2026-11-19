@@ -133,6 +133,27 @@ describe('persisted', () => {
     expect(store.writes).toEqual(['{"theme":"dark","density":1}']);
   });
 
+  it('writes the form serialize gives, and keeps the value itself', async () => {
+    const store = new ScriptedStorage(stored('{"t":"light","d":1}'));
+    const state = persisted(store, 'settings', {
+      initial: DEFAULTS,
+      settle: 200,
+      serialize: value => ({ t: value.theme, d: value.density }),
+      revive: raw => {
+        const r = raw as { t: string; d: number };
+        return { theme: r.t, density: r.d };
+      }
+    });
+    await state.hydrated;
+    expect(state.current).toEqual({ theme: 'light', density: 1 });
+
+    state.set({ theme: 'dark', density: 2 });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(store.writes).toEqual(['{"t":"dark","d":2}']);
+    expect(state.current).toEqual({ theme: 'dark', density: 2 });
+  });
+
   it('does not write back what it just read', async () => {
     const store = new ScriptedStorage(stored('{"theme":"dark","density":2}'));
     const state = persisted(store, 'settings', { initial: DEFAULTS, settle: 200 });

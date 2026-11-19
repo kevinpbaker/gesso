@@ -2704,6 +2704,7 @@ interface PersistedOptions<T> {
   readonly initial: T;
   readonly revive?: (raw: unknown) => T | null;
   readonly settle?: number;
+  readonly serialize?: (value: T) => unknown;
   readonly label?: string;
 }
 declare class PersistedState<T> {
@@ -2718,6 +2719,7 @@ declare class PersistedState<T> {
   private refused;
   private stored;
   private readonly initial;
+  private readonly serialize;
   readonly status: ReadableCell<ResourceStatus>;
   readonly error: ReadableCell<string | null>;
   readonly value: ReadableCell<T>;
