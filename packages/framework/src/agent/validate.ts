@@ -88,9 +88,16 @@ function validateObject(
   at: string
 ): string | null {
   const properties = (schema.properties as Record<string, JsonSchema> | undefined) ?? {};
+  const known = Object.keys(properties);
+  // Keys the schema does not take, when it takes no others: one may be the required key misnamed (region for regions).
+  const strangers =
+    schema.additionalProperties === false ? Object.keys(value).filter(key => properties[key] === undefined) : [];
   for (const key of (schema.required as string[] | undefined) ?? []) {
     if (value[key] === undefined) {
-      return `${at}.${key} is required.`;
+      const misnamed = strangers.find(stranger => nearName(stranger, [key]) !== undefined);
+      return misnamed === undefined
+        ? `${at}.${key} is required.`
+        : `${at}.${key} is required. Send it as ${key}, not ${misnamed}.`;
     }
   }
   for (const [key, property] of Object.entries(value)) {
@@ -104,8 +111,7 @@ function validateObject(
     }
     const extra = schema.additionalProperties;
     if (extra === false) {
-      const known = Object.keys(properties);
-      return `${at}.${key} is not expected${known.length > 0 ? `; the fields are ${known.join(', ')}` : ''}.`;
+      return `${at}.${key} is not expected${known.length > 0 ? `; the fields are ${known.join(', ')}` : ''}.${unexpectedHint(key, properties, root)}`;
     }
     if (extra !== undefined && extra !== true) {
       const problem = validate(extra as JsonSchema, property, root, `${at}.${key}`);
@@ -115,6 +121,83 @@ function validateObject(
     }
   }
   return null;
+}
+
+/**
+ * What a key the schema does not take was likely meant as, said so the
+ * agent can resend at once: a field of the same object it nearly names
+ * (expr for expression, colour for color, Units for units), or the
+ * object inside this one it belongs in (a beam's length sent beside the
+ * beam: "length belongs inside beam: {beam: {length: …}}"). Empty when
+ * neither is found.
+ */
+function unexpectedHint(key: string, properties: Readonly<Record<string, JsonSchema>>, root: JsonSchema): string {
+  const near = nearName(key, Object.keys(properties));
+  if (near !== undefined) return ` Did you mean ${near}?`;
+  const path = belongsIn(properties, key, root, 0);
+  if (path === null) return '';
+  const where = path.map(step => (step.list ? `${step.name}[…]` : step.name)).join('.');
+  const example = path.reduceRight(
+    (inner, step) => `{${step.name}: ${step.list ? `[${inner}]` : inner}}`,
+    `{${key}: …}`
+  );
+  return ` ${key} belongs inside ${where}: ${example}.`;
+}
+
+/** The objects inside these properties (and the items of their lists), down to the one that takes this key: the names to it, each marked when it is a list; null when none does. */
+function belongsIn(
+  properties: Readonly<Record<string, JsonSchema>>,
+  key: string,
+  root: JsonSchema,
+  depth: number
+): { readonly name: string; readonly list: boolean }[] | null {
+  if (depth > 2) return null;
+  for (const [name, declared] of Object.entries(properties)) {
+    const inner = resolve(declared, root);
+    const list = inner.type === 'array';
+    const item = list ? (inner.items as JsonSchema | undefined) : inner;
+    if (item === undefined || typeof item !== 'object') continue;
+    const shape = resolve(item, root);
+    const own = shape.properties as Record<string, JsonSchema> | undefined;
+    if (own === undefined) continue;
+    if (own[key] !== undefined) return [{ name, list }];
+    const deeper = belongsIn(own, key, root, depth + 1);
+    if (deeper !== null) return [{ name, list }, ...deeper];
+  }
+  return null;
+}
+
+/**
+ * The one of these names a key nearly is, as a model misnames a field:
+ * the same but for case, a plural or singular (region, regions), the
+ * start of it (expr, expression; units, unitSystem), or a letter or two
+ * off in a longer name (colour, color). Short names are only matched
+ * whole, so x is never taken for y.
+ */
+function nearName(key: string, names: readonly string[]): string | undefined {
+  const a = key.toLowerCase();
+  const near = (name: string): boolean => {
+    const b = name.toLowerCase();
+    if (a === b) return true;
+    if (a === `${b}s` || b === `${a}s` || a === `${b}es` || b === `${a}es`) return true;
+    if (Math.min(a.length, b.length) >= 3 && (a.startsWith(b) || b.startsWith(a))) return true;
+    return Math.min(a.length, b.length) >= 5 && editDistance(a, b) <= 2;
+  };
+  const found = names.filter(near);
+  return found.length === 1 ? found[0] : undefined;
+}
+
+/** How many letters to add, remove or change to turn one word into the other. */
+function editDistance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    row = next;
+  }
+  return row[b.length]!;
 }
 
 function hasType(value: unknown, type: string): boolean {

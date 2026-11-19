@@ -316,4 +316,45 @@ describe("an application's own agent tools", () => {
     expect(await said({ kind: 'rect', w: '4', h: 2 })).toContain('added');
     expect(seen.at(-1)).toEqual({ shape: { kind: 'rect', w: 4, h: 2 } });
   });
+
+  it('says what a key it does not take was likely meant as: a field it nearly names, or the object it belongs in', async () => {
+    const surface = toolSurface(() => [
+      {
+        name: 'sheet_add',
+        description: 'Adds regions.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            regions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  text: { type: 'string' },
+                  beam: { type: 'object', properties: { length: { type: 'string' } }, additionalProperties: false }
+                },
+                additionalProperties: false
+              }
+            },
+            expression: { type: 'string' },
+            unitSystem: { type: 'string' }
+          },
+          required: ['regions'],
+          additionalProperties: false
+        },
+        run: () => agentText('added')
+      }
+    ]);
+    const said = async (args: Record<string, unknown>) => JSON.stringify(await surface.call('sheet_add', args));
+    expect(await said({ region: [] })).toContain('input.regions is required. Send it as regions, not region.');
+    expect(await said({ regions: [], expr: 'x' })).toContain(
+      'input.expr is not expected; the fields are regions, expression, unitSystem. Did you mean expression?'
+    );
+    expect(await said({ regions: [], units: 'SI' })).toContain('Did you mean unitSystem?');
+    expect(await said({ regions: [{ length: '6m' }] })).toContain(
+      'input.regions[0].length is not expected; the fields are text, beam. length belongs inside beam: {beam: {length: …}}.'
+    );
+    // A short name is never taken for another: x is not y.
+    expect(await said({ regions: [], q: 1 })).toContain('the fields are regions, expression, unitSystem.\"');
+  });
 });
