@@ -21,12 +21,13 @@ before the refs of what it draws are called: the step learns where its
 element is once it is drawn, and a step whose element is not drawn yet
 waits for it rather than pointing at nothing.
 
-| Step field | What it does                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------ |
-| `target`   | The element it shows. Without one, the card is centred over a plain dim                    |
-| `title`    | The card's heading, and its name for a screen reader                                       |
-| `body`     | A sentence or two under the title                                                          |
-| `side`     | `'bottom'` (default), `'top'`, `'start'` or `'end'`: the side of the target the card is on |
+| Step field | What it does                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------- |
+| `target`   | The element it shows. Without one, the card is centred over a plain dim                              |
+| `title`    | The card's heading, and its name for a screen reader                                                 |
+| `body`     | A sentence or two under the title                                                                    |
+| `side`     | `'bottom'` (default), `'top'`, `'start'` or `'end'`: the side of the target the card is on           |
+| `padding`  | Room around this step's target, in place of the tour's `padding`: `0` for a bar at the window's edge |
 
 ## Props
 
@@ -62,7 +63,7 @@ target after grows out of one. On a settled clock, a design tool's
 board, it is there at once. Around the hole, boxes reaching past the screen take every
 press and wheel, so the page under the dim stays as the tour left it;
 the target itself, in the hole, can still be pressed. The card has the
-keyboard while it is open: Escape ends the tour, and the arrow keys
+keyboard while it is open: Escape ends the tour, as its ✕ (End tour) does for the pointer, and the arrow keys
 step through it.
 
 ## Inside an OverlayScope

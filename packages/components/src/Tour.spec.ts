@@ -50,6 +50,20 @@ describe('Tour', () => {
     expect(ui.getByText('1 of 3')).toBeDefined();
   });
 
+  it('takes a step’s own room around its target in place of the tour’s', () => {
+    const first = tourTarget();
+    const ui = renderTest(
+      Column(
+        { width: 400, height: 300, padding: 20 },
+        Button({ ref: first.ref, width: 100, height: 40, text: 'Compose' }),
+        createComponent(Tour, { steps: [{ target: first, title: 'The bar', padding: 0 }] })
+      ),
+      { width: 400, height: 300 }
+    );
+    ui.frame();
+    expect(ui.getLayout(holeOf(ui.allNodes()))).toEqual({ x: 20, y: 20, width: 100, height: 40 });
+  });
+
   it('takes a press on the dim and passes one in the hole to the target', () => {
     const { ui, pressed } = mount();
     const press = (x: number, y: number) => {
@@ -195,6 +209,14 @@ describe('Tour', () => {
     const { ui } = mount();
     // The card has the keyboard while it is open.
     ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(ui.queryByRole('dialog')).toBeNull();
+    expect(holeOf(ui.allNodes())).toBeUndefined();
+  });
+
+  it('closes on its End tour button at any step', () => {
+    const { ui } = mount();
+    ui.fireEvent.click(ui.getByRole('button', { name: 'End tour' }));
     ui.frame();
     expect(ui.queryByRole('dialog')).toBeNull();
     expect(holeOf(ui.allNodes())).toBeUndefined();

@@ -58,6 +58,8 @@ export interface TourStep {
   readonly body?: string;
   /** The side of the target the card opens on. Default `bottom`; `start` and `end` follow the reading direction. */
   readonly side?: 'bottom' | 'top' | 'start' | 'end';
+  /** Room around this step's target, in place of the tour's `padding`: 0 for a bar at a window's edge, whose room would light what is beside it. */
+  readonly padding?: number;
 }
 
 export interface TourProps {
@@ -101,8 +103,8 @@ const BEYOND = 10000;
 /**
  * A guided walk through a screen, one element at a time: everything
  * but the element dims, and a card beside it says what it is, with
- * Back, Next and a count. Escape closes it, as does Done on the last
- * step; the arrow keys step through it.
+ * Back, Next and a count. Escape closes it, as do its ✕ (End tour) and
+ * Done on the last step; the arrow keys step through it.
  *
  * The dim is a hole cut around the target, its corners rounded, that
  * follows the target through scrolling and layout as any anchored
@@ -237,7 +239,18 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
         }),
         modifiers: [motion({ initial: fade, duration: 'fast', easing: 'decelerate' })]
       },
-      Text({ text: current.title, textStyle: 'title', color: 'text' }),
+      Row(
+        { y: 'start', gap: 8 },
+        Text({ text: current.title, textStyle: 'title', color: 'text', flex: 1, minWidth: 0 }),
+        // The pointer's way out at any step, beside Escape for the keyboard.
+        createComponent(Button, {
+          label: 'End tour',
+          variant: 'plain',
+          size: 'small',
+          onClick: () => go(null),
+          children: Text({ text: '✕', color: 'textMuted', fontSize: 14 })
+        })
+      ),
       ...(current.body === undefined ? [] : [Text({ text: current.body, textStyle: 'body', color: 'textMuted' })]),
       Row(
         { y: 'center', gap: 8, paddingTop: 4 },
@@ -300,9 +313,11 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
   let holeIs: { readonly over: UiNode } | { readonly point: OverlayRect | null } | null = null;
   let glide: { readonly from: OverlayRect; readonly to: OverlayRect; readonly progress: InternalState<number> } | null =
     null;
+  /** The room around the hole for the step shown: its own, or the tour's. */
+  let gapNow = padding.value;
   const grownBox = (node: UiNode): OverlayRect => {
     const box = inspection.box(node);
-    const gap = padding.value;
+    const gap = gapNow;
     return { x: box.x - gap, y: box.y - gap, width: box.width + 2 * gap, height: box.height + 2 * gap };
   };
   const pointAt = (rect: OverlayRect): OverlayRect => ({
@@ -337,7 +352,7 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
     to: OverlayRect,
     whole: boolean
   ): Observable<OverlayRect | undefined> => {
-    const gap = padding.value;
+    const gap = gapNow;
     const base = inspection.box(anchor);
     const part = (hole: OverlayRect): OverlayRect => ({
       x: hole.x + gap - base.x,
@@ -373,7 +388,8 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
     const was = shownDim === null ? null : holeNow();
     shownDim ??= dim();
     const current = steps()[next.at]!;
-    const gap = padding.value;
+    gapNow = current.padding ?? padding.value;
+    const gap = gapNow;
     if (next.node === undefined) {
       // No target: the same dim, its hole shrunk to a point in the middle
       // of where it was, and the card in the middle.
@@ -403,7 +419,7 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
     card.show(cardFor(next.at), {
       anchor: next.node,
       placement: (current.side ?? 'bottom') as OverlayPlacement,
-      offset: padding.value + 8,
+      offset: gap + 8,
       environment: placeholder
     });
   };

@@ -1170,6 +1170,7 @@ interface TourStep {
   readonly title: string;
   readonly body?: string;
   readonly side?: 'bottom' | 'top' | 'start' | 'end';
+  readonly padding?: number;
 }
 interface TourProps {
   readonly steps?: readonly TourStep[];
