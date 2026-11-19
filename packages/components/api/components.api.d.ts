@@ -588,6 +588,7 @@ declare const MENU_SEPARATOR: '-';
 interface MenuBarSubmenu<T> {
   readonly label: string;
   readonly submenu: readonly MenuBarEntry<T>[];
+  readonly badge?: string;
 }
 type MenuBarEntry<T> = T | typeof MENU_SEPARATOR | MenuBarSubmenu<T>;
 declare function isMenuBarSubmenu<T>(entry: MenuBarEntry<T> | undefined): entry is MenuBarSubmenu<T>;

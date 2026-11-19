@@ -584,4 +584,22 @@ describe('MenuBar badgeOf', () => {
     expect(tag.x).toBeGreaterThan(label.x + label.width);
     expect(tag.x).toBeLessThan(label.x + label.width + 24);
   });
+
+  it('tags a submenu’s row with its own badge', () => {
+    const ui = renderTest(
+      Column(
+        createComponent(MenuBar<Command>, {
+          menus: [{ label: 'View', entries: ['light', { label: 'Zoom', badge: 'Pro', submenu: ['zoomIn'] }] }],
+          labelOf: (item: Command) => LABELS[item]
+        })
+      ),
+      { width: 400, height: 400 }
+    );
+    ui.fireEvent.focus(ui.getByLabel('Main menu'));
+    ui.fireEvent.keyDown('ArrowDown');
+    ui.frame();
+    const record = (label: string) => [...ui.semanticsTree().values()].find(entry => entry.label === label);
+    expect(record('Zoom')).toMatchObject({ role: 'menuitem', description: 'Pro' });
+    expect(ui.getAllByText('Pro')).toHaveLength(1);
+  });
 });

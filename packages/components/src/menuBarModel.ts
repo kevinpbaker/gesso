@@ -41,6 +41,8 @@ export const MENU_SEPARATOR = '-' as const;
 export interface MenuBarSubmenu<T> {
   readonly label: string;
   readonly submenu: readonly MenuBarEntry<T>[];
+  /** A small tag after its label, as a command's `badgeOf` gives one: Export ▸ marked Pro when every command in it is. */
+  readonly badge?: string;
 }
 
 /** One row of a menu: a command, a rule, or a submenu. */

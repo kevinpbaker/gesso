@@ -143,7 +143,9 @@ entry. Right on a command in a submenu goes on to the next menu on the
 bar, as it does in a menu. A command chosen in a submenu goes to
 `onChoose`, and closes the submenu and the menu. A submenu in which no
 command is enabled is skipped and does not open. A submenu can hold
-other submenus.
+other submenus. Give it `badge` for a tag after its label, as
+`badgeOf` gives a command one: `{ label: 'Export', badge: 'Pro',
+submenu: [...] }`.
 
 The command type must not be an object with a `submenu` array of its
 own: such an object is read as a submenu.

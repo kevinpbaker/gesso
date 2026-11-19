@@ -687,7 +687,7 @@ export function MenuBar<T>(inputs: Inputs<MenuBarProps<T>>, ctx: ComponentContex
     // A submenu's entry says so where a command says its keys, as `Menu`'s does.
     const accelerator = submenu !== null ? '›' : (inputs.acceleratorOf.value?.(command) ?? '');
     const checked = submenu !== null ? undefined : inputs.checkedOf.value?.(command);
-    const badge = submenu !== null ? '' : (inputs.badgeOf.value?.(command) ?? '');
+    const badge = submenu !== null ? (submenu.badge ?? '') : (inputs.badgeOf.value?.(command) ?? '');
     const highlighted: Observable<boolean> = state.pipe(
       map(current => listOpen(current, menu, path) && activeAt(current, path.length) === at)
     );
