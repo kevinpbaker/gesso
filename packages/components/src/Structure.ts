@@ -137,6 +137,13 @@ export interface ToolbarProps extends ControlLayoutProps {
    * The keyboard still reaches every button.
    */
   keepFocus?: boolean;
+  /**
+   * Focus came into the toolbar, its ⋯ menu included, or left it: for a
+   * panel that stays open while its own controls have focus. Told once
+   * focus has moved, after the focus and blur events of the controls it
+   * moved between, so keep it apart from what those report.
+   */
+  onFocusChange?: (focused: boolean) => void;
 }
 
 /**
@@ -168,7 +175,8 @@ export function Toolbar(inputs: Inputs<ToolbarProps>, ctx: ComponentContext): Ui
         onSelect: value => inputs.onSelect.emit(value),
         moreLabel: input(inputs.moreLabel, 'More'),
         shortcutBadges: inputs.shortcutBadges.value === true,
-        keepFocus: inputs.keepFocus.value === true
+        keepFocus: inputs.keepFocus.value === true,
+        onFocusChange: focused => inputs.onFocusChange.emit(focused)
       }),
       followedChildren(inputs.children, () => Row())
     );

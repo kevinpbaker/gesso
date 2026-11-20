@@ -78,19 +78,29 @@ the keyboard leaves focus on the button pressed.
 
 `keepFocus` makes a pointer press leave keyboard focus where it was.
 A canvas that answers to tool keys (V, L, R) keeps them after a tool is
-chosen with the mouse; the keyboard still reaches every button.
+chosen with the mouse; the keyboard still reaches every button. A press
+whose default is prevented is followed by no click, so with `keepFocus`
+the press itself chooses the tool (and opens ⋯); a screen reader's or
+an agent's activation is still a click.
+
+`onFocusChange` says when focus comes into the toolbar, its ⋯ menu
+included, and when it leaves: for a panel that stays open while its own
+controls have focus. It is told once focus has moved, after the focus
+and blur events of the controls it moved between, so keep what it says
+apart from what those report rather than letting the last word win.
 
 ## Props
 
-| Prop             | Type                      | Default      | What it does                                                                     |
-| ---------------- | ------------------------- | ------------ | -------------------------------------------------------------------------------- |
-| `label`          | `string`                  | `'Toolbar'`  | The group's accessible name. It is not drawn, so say what these controls act on. |
-| `children`       | `UiChild`                 | an empty row | The controls. With `items`, drawn after the tools and never folded.              |
-| `items`          | `ToolbarItem[]`           | none         | Tools the toolbar draws, folds and keys itself. See above.                       |
-| `onSelect`       | `(value: string) => void` | none         | A tool pressed, on the bar or in the ⋯ menu.                                     |
-| `moreLabel`      | `string`                  | `'More'`     | The ⋯ button's name and tooltip.                                                 |
-| `shortcutBadges` | `boolean`                 | `false`      | Draws a short shortcut in its button's corner.                                   |
-| `keepFocus`      | `boolean`                 | `false`      | A pointer press leaves keyboard focus where it was.                              |
+| Prop             | Type                         | Default      | What it does                                                                     |
+| ---------------- | ---------------------------- | ------------ | -------------------------------------------------------------------------------- |
+| `label`          | `string`                     | `'Toolbar'`  | The group's accessible name. It is not drawn, so say what these controls act on. |
+| `children`       | `UiChild`                    | an empty row | The controls. With `items`, drawn after the tools and never folded.              |
+| `items`          | `ToolbarItem[]`              | none         | Tools the toolbar draws, folds and keys itself. See above.                       |
+| `onSelect`       | `(value: string) => void`    | none         | A tool pressed, on the bar or in the ⋯ menu.                                     |
+| `moreLabel`      | `string`                     | `'More'`     | The ⋯ button's name and tooltip.                                                 |
+| `shortcutBadges` | `boolean`                    | `false`      | Draws a short shortcut in its button's corner.                                   |
+| `keepFocus`      | `boolean`                    | `false`      | A pointer press leaves keyboard focus where it was.                              |
+| `onFocusChange`  | `(focused: boolean) => void` | none         | Focus came into the toolbar or its ⋯ menu, or left them.                         |
 
 The default name is the word `Toolbar`, which is true and unhelpful on a
 screen with two of them. Name it after what it acts on.

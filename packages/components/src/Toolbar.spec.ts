@@ -133,6 +133,65 @@ describe('Toolbar items', () => {
     expect(mark.y + mark.height).toBeLessThanOrEqual(box.y + box.height + 0.5);
   });
 
+  it('says when focus comes into it or its ⋯ menu, and when it leaves', () => {
+    const seen: boolean[] = [];
+    const ui = renderTest(
+      Row(
+        { width: 600 },
+        createComponent(Toolbar, {
+          label: 'Tools',
+          items: TOOLS.map(tool => ({ ...tool, icon })),
+          maxWidth: 140,
+          keepFocus: true,
+          onFocusChange: (on: boolean) => seen.push(on)
+        }),
+        Box({ focusable: true, label: 'Canvas', width: 50, height: 50 })
+      ),
+      { width: 600, height: 300 }
+    );
+    const canvas = ui.getByLabel('Canvas');
+    ui.fireEvent.focus(canvas);
+    // ⋯ pressed with the pointer: focus stays on the canvas until the menu takes it.
+    const more = ui.getByLabel('More');
+    const at = ui.getVisibleBox(more);
+    ui.fireEvent.pointerDown(at.x + 4, at.y + 4);
+    ui.fireEvent.pointerUp(at.x + 4, at.y + 4);
+    ui.frame();
+    expect(ui.getAllByRole('menuitem').length).toBeGreaterThan(0);
+    expect(seen).toEqual([true]);
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(seen).toEqual([true, false]);
+    expect(ui.runtime.input.focus.focusedNode).toBe(canvas);
+    ui.fireEvent.focus(ui.getAllByRole('button')[0]!);
+    ui.fireEvent.focus(canvas);
+    expect(seen).toEqual([true, false, true, false]);
+  });
+
+  it('chooses a tool on a mouse press that leaves focus where it was', () => {
+    const chosen: string[] = [];
+    const ui = renderTest(
+      Row(
+        { width: 600 },
+        createComponent(Toolbar, {
+          label: 'Tools',
+          items: TOOLS.map(tool => ({ ...tool, icon })),
+          keepFocus: true,
+          onSelect: (value: string) => chosen.push(value)
+        }),
+        Box({ focusable: true, label: 'Canvas', width: 50, height: 50 })
+      ),
+      { width: 600, height: 300 }
+    );
+    const canvas = ui.getByLabel('Canvas');
+    ui.fireEvent.focus(canvas);
+    const rect = ui.getVisibleBox(ui.getByLabel('Rectangle'));
+    ui.fireEvent.pointerDown(rect.x + 10, rect.y + 10);
+    ui.fireEvent.pointerUp(rect.x + 10, rect.y + 10);
+    expect(chosen).toEqual(['rect']);
+    expect(ui.runtime.input.focus.focusedNode).toBe(canvas);
+  });
+
   it('a toolbar with children and no items is the plain row it was', () => {
     const ui = renderTest(createComponent(Toolbar, { label: 'Plain', children: Box({ width: 20, height: 20 }) }), {
       width: 300,

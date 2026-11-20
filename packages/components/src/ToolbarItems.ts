@@ -60,6 +60,7 @@ export interface ToolbarItemsOptions {
   readonly moreLabel: Observable<string>;
   readonly shortcutBadges: boolean;
   readonly keepFocus: boolean;
+  readonly onFocusChange?: (focused: boolean) => void;
 }
 
 /**
@@ -146,6 +147,27 @@ export function toolbarItems(ctx: ComponentContext, options: ToolbarItemsOptions
     }),
     distinctUntilChanged()
   );
+
+  // Whether focus is in the toolbar or in its ⋯ menu, for a panel that
+  // stays open while its own controls have focus. The menu's rows are
+  // not this component's nodes, but while it is open it holds focus.
+  let within = false;
+  let frame: UiNode | null = null;
+  const inside = (node: UiNode | null): boolean => {
+    for (let at = node; at !== null; at = at.parent) {
+      if (at === frame) {
+        return true;
+      }
+    }
+    return false;
+  };
+  ctx.effect(combineLatest([focus.focused, menuOpen]), ([node, open]) => {
+    const now = node !== null && (open || inside(node));
+    if (now !== within) {
+      within = now;
+      options.onFocusChange?.(now);
+    }
+  });
 
   ctx.effect(focus.focused, node => {
     if (node === null) {
@@ -299,6 +321,14 @@ export function toolbarItems(ctx: ComponentContext, options: ToolbarItemsOptions
       role: 'button',
       label: options.moreLabel,
       states: menuOpen.pipe(map(open => [open ? 'expanded' : 'collapsed'] as UiSemanticState[])),
+      // A press that keeps focus where it was has no click after it
+      // (see `ToolbarButton`), so it opens the menu itself.
+      onPointerDown: (event: UiPointerEvent) => {
+        if (options.keepFocus) {
+          event.preventDefault();
+          menuOpen.next(!menuOpen.value);
+        }
+      },
       onClick: () => menuOpen.next(!menuOpen.value),
       onKeyDown: keymap({
         ' ': () => menuOpen.next(true),
@@ -322,7 +352,21 @@ export function toolbarItems(ctx: ComponentContext, options: ToolbarItemsOptions
     }
   });
 
-  return [Row({ gap: GAP, y: 'center', flexShrink: 1, minWidth: 0, onKeyDown: keys }, bar, moreButton), menu];
+  return [
+    Row(
+      {
+        ref: (node: UiNode | null) => (frame = node),
+        gap: GAP,
+        y: 'center',
+        flexShrink: 1,
+        minWidth: 0,
+        onKeyDown: keys
+      },
+      bar,
+      moreButton
+    ),
+    menu
+  ];
 }
 
 const MORE = '\u0000more';
@@ -388,9 +432,13 @@ function ToolbarButton(inputs: Inputs<ToolbarButtonProps>, ctx: ComponentContext
       states: item.pipe(map(now => (now.pressed === true ? (['pressed'] as UiSemanticState[]) : []))),
       // A press that keeps focus where it was: a canvas that takes the
       // tool keys keeps them after a tool is chosen with the pointer.
+      // A press whose default is prevented is followed by no click, so
+      // the press itself is what chooses; a screen reader's or an
+      // agent's activation is still a click.
       onPointerDown: (event: UiPointerEvent) => {
         if (inputs.keepFocus.value) {
           event.preventDefault();
+          press();
         }
       },
       onClick: press,
