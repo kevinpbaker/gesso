@@ -82,13 +82,13 @@ describe('decoration shapes on a node', () => {
   it('places a shape against the node box, with the outset on all four sides', () => {
     const rect = decorationRect(RING[0], record({ x: 20, y: 10, width: 100, height: 40 }), 6);
 
-    expect(rect).toEqual({ x: 17, y: 7, width: 106, height: 46, radius: 9 });
+    expect(rect).toMatchObject({ x: 17, y: 7, width: 106, height: 46, radius: 9 });
   });
 
   it('a shape with its own box takes the node radius grown by the outset unless it says otherwise', () => {
     const rec = record({ x: 0, y: 0, width: 100, height: 100 });
 
-    expect(decorationRect({ kind: 'fill', color: '#000', x: 4, y: 4, width: 8, height: 8 }, rec, 5)).toEqual({
+    expect(decorationRect({ kind: 'fill', color: '#000', x: 4, y: 4, width: 8, height: 8 }, rec, 5)).toMatchObject({
       x: 4,
       y: 4,
       width: 8,
@@ -204,7 +204,7 @@ describe('focusRing', () => {
     expect(shape.outset).toBe(4);
     expect(shape).toMatchObject({ lineWidth: 2, color: 'focusRing' });
     const rect = decorationRect(shape, record({ x: 0, y: 0, width: 60, height: 20 }), 0);
-    expect(rect).toEqual({ x: -4, y: -4, width: 68, height: 28, radius: 4 });
+    expect(rect).toMatchObject({ x: -4, y: -4, width: 68, height: 28, radius: 4 });
   });
 
   it('appears on a node that already held focus when the ring attached', () => {

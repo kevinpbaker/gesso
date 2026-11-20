@@ -6,7 +6,10 @@ import {
   borderRadiusEqual,
   borderRadiusIsZero,
   normalizeBorderRadius,
-  uniformBorderRadius
+  uniformBorderRadius,
+  fitBorderRadius,
+  offsetBorderRadius,
+  borderRadiusIsUniform
 } from './UiBorderRadius';
 
 describe('UiBorderRadius', () => {
@@ -44,5 +47,27 @@ describe('UiBorderRadius', () => {
 
   it('returns a uniform scalar radius', () => {
     expect(uniformBorderRadius(borderRadiusCorners(2, 4, 6, 8))).toBe(8);
+  });
+});
+
+describe('fitting and offsetting corners', () => {
+  it('leaves corners that fit as they are', () => {
+    const radius = borderRadiusCorners(8, 8, 0, 0);
+    expect(fitBorderRadius(radius, 100, 40)).toBe(radius);
+  });
+
+  it('scales every corner by one factor when a side cannot hold its two, as CSS does', () => {
+    // The top side wants 30 + 30 of 40: everything scales by 2/3.
+    expect(fitBorderRadius(borderRadiusCorners(30, 30, 6, 0), 40, 100)).toEqual(borderRadiusCorners(20, 20, 4, 0));
+  });
+
+  it('moves rounded corners and keeps square ones square', () => {
+    expect(offsetBorderRadius(borderRadiusCorners(8, 4, 0, 2), -3)).toEqual(borderRadiusCorners(5, 1, 0, 0));
+    expect(offsetBorderRadius(borderRadiusCorners(8, 0, 0, 0), 4)).toEqual(borderRadiusCorners(12, 0, 0, 0));
+  });
+
+  it('says when one radius describes all four', () => {
+    expect(borderRadiusIsUniform(borderRadiusCorners(3, 3, 3, 3))).toBe(true);
+    expect(borderRadiusIsUniform(borderRadiusCorners(3, 3, 3, 0))).toBe(false);
   });
 });

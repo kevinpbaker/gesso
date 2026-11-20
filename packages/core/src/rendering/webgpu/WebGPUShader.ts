@@ -44,7 +44,7 @@ const SHARED = /* wgsl */ `
 // x: logical width, y: logical height, z: device pixel ratio.
 @group(0) @binding(0) var<uniform> uView: vec4f;
 
-// The frame's clip chain, four vec4s per node; see CLIP_STRIDE_FLOATS.
+// The frame's clip chain, five vec4s per node; see CLIP_STRIDE_FLOATS.
 @group(1) @binding(0) var<storage, read> uClips: array<vec4f>;
 
 // The frame's gradients, twelve vec4s each; see GRADIENT_STRIDE_FLOATS.
@@ -52,12 +52,49 @@ const SHARED = /* wgsl */ `
 // the primitive pipeline samples it.
 @group(1) @binding(1) var<storage, read> uGradients: array<vec4f>;
 
+// The radius of the corner nearest a point relative to a box's centre.
+// radii holds top left, top right, bottom right, bottom left. Used where
+// one radius has to stand for the shape, as the blurred shadow's
+// integral does.
+fn cornerRadius(fromCentre: vec2f, radii: vec4f) -> f32 {
+  if (fromCentre.x < 0.0) {
+    return select(radii.w, radii.x, fromCentre.y < 0.0);
+  }
+  return select(radii.z, radii.y, fromCentre.y < 0.0);
+}
+
 // Signed distance from a point to a rounded rectangle, negative inside.
-fn roundedRectDistance(point: vec2f, origin: vec2f, size: vec2f, radius: f32) -> f32 {
+//
+// The box's own distance, except in the square each rounded corner
+// occupies, where it is the distance to that corner's arc. The corners
+// arrive fitted, so no two squares overlap, and a corner may be wider
+// than half the box when its neighbour on that side is smaller, as CSS
+// allows: a 14-wide box can have an 11 and a 0 along its bottom, which
+// a split at the centre line would have clamped to 7.
+fn roundedRectDistance(point: vec2f, origin: vec2f, size: vec2f, radii: vec4f) -> f32 {
   let half = size * 0.5;
-  let r = min(radius, min(half.x, half.y));
-  let q = abs(point - (origin + half)) - (half - vec2f(r, r));
-  return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
+  let p = point - (origin + half);
+  let q = abs(p) - half;
+  var d = length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0);
+  let limit = min(size.x, size.y);
+  let tl = min(radii.x, limit);
+  let tr = min(radii.y, limit);
+  let br = min(radii.z, limit);
+  let bl = min(radii.w, limit);
+  let cTL = vec2f(-half.x + tl, -half.y + tl);
+  let cTR = vec2f(half.x - tr, -half.y + tr);
+  let cBR = vec2f(half.x - br, half.y - br);
+  let cBL = vec2f(-half.x + bl, half.y - bl);
+  if (tl > 0.0 && p.x < cTL.x && p.y < cTL.y) {
+    d = length(p - cTL) - tl;
+  } else if (tr > 0.0 && p.x > cTR.x && p.y < cTR.y) {
+    d = length(p - cTR) - tr;
+  } else if (br > 0.0 && p.x > cBR.x && p.y > cBR.y) {
+    d = length(p - cBR) - br;
+  } else if (bl > 0.0 && p.x < cBL.x && p.y > cBL.y) {
+    d = length(p - cBL) - bl;
+  }
+  return d;
 }
 
 // How much of a pixel lies inside a shape, from the signed distance of
@@ -77,16 +114,17 @@ fn clipCoverage(fragPx: vec2f, dpr: f32, clipIndex: f32) -> f32 {
     if (index < 0 || depth >= ${MAX_CLIP_DEPTH}) {
       break;
     }
-    let base = u32(index) * 4u;
+    let base = u32(index) * 5u;
     let rect = uClips[base];
     let header = uClips[base + 1u];
     let inverse = uClips[base + 2u];
     let translation = uClips[base + 3u];
+    let radii = uClips[base + 4u];
     let local = vec2f(
       screen.x * inverse.x + screen.y * inverse.z + translation.x,
       screen.x * inverse.y + screen.y * inverse.w + translation.y
     );
-    result = min(result, coverage(roundedRectDistance(local, rect.xy, rect.zw, header.x), dpr));
+    result = min(result, coverage(roundedRectDistance(local, rect.xy, rect.zw, radii), dpr));
     index = i32(header.y);
     depth = depth + 1;
   }
@@ -216,17 +254,21 @@ fn shadowRow(x: f32, y: f32, sigma: f32, corner: f32, halfSize: vec2f) -> f32 {
 // Coverage at a point of a rounded rectangle blurred by a Gaussian of
 // the given standard deviation. The row integral is weighted by the
 // Gaussian over the three deviations either side that it reaches.
-fn blurredRoundedRect(point: vec2f, origin: vec2f, size: vec2f, radius: f32, sigma: f32, dpr: f32) -> f32 {
+fn blurredRoundedRect(point: vec2f, origin: vec2f, size: vec2f, radii: vec4f, sigma: f32, dpr: f32) -> f32 {
   if (size.x <= 0.0 || size.y <= 0.0) {
     return 0.0;
   }
   if (sigma * dpr < 0.25) {
     // Under a quarter of a device pixel: the sharp shape, anti-aliased.
-    return coverage(roundedRectDistance(point, origin, size, radius), dpr);
+    return coverage(roundedRectDistance(point, origin, size, radii), dpr);
   }
   let halfSize = size * 0.5;
-  let corner = min(radius, min(halfSize.x, halfSize.y));
   let p = point - (origin + halfSize);
+  // The integral below is for one radius at all four corners. With
+  // corners that differ, the one nearest the point is taken: exact away
+  // from where two corners' blurs meet, and a blur's width from wrong
+  // where they do, which a soft shadow does not show.
+  let corner = min(cornerRadius(p, radii), min(halfSize.x, halfSize.y));
   let low = p.y - halfSize.y;
   let high = p.y + halfSize.y;
   let first = clamp(-3.0 * sigma, low, high);
@@ -243,7 +285,7 @@ fn blurredRoundedRect(point: vec2f, origin: vec2f, size: vec2f, radius: f32, sig
 
 // A shadow's alpha at a point of its quad; see the instance layout in
 // WebGPURenderData.ts for what each field holds.
-fn shadowAlpha(kind: u32, local: vec2f, size: vec2f, radius: f32, blur: f32, shadow: vec4f, dpr: f32) -> f32 {
+fn shadowAlpha(kind: u32, local: vec2f, size: vec2f, radii: vec4f, blur: f32, shadow: vec4f, other: vec4f, dpr: f32) -> f32 {
   let sigma = blur * 0.5;
   let offset = shadow.xy;
   let spread = shadow.z;
@@ -255,14 +297,14 @@ fn shadowAlpha(kind: u32, local: vec2f, size: vec2f, radius: f32, blur: f32, sha
     let shapeSize = size - vec2f(reach, reach) * 2.0;
     let boxOrigin = shapeOrigin - offset + vec2f(spread, spread);
     let boxSize = shapeSize - vec2f(spread, spread) * 2.0;
-    let blurred = blurredRoundedRect(local, shapeOrigin, shapeSize, radius, sigma, dpr);
-    return blurred * (1.0 - coverage(roundedRectDistance(local, boxOrigin, boxSize, shadow.w), dpr));
+    let blurred = blurredRoundedRect(local, shapeOrigin, shapeSize, radii, sigma, dpr);
+    return blurred * (1.0 - coverage(roundedRectDistance(local, boxOrigin, boxSize, other), dpr));
   }
   // Inset: the quad is the box; everything but the blurred hole is shadow.
   let holeOrigin = offset + vec2f(spread, spread);
   let holeSize = size - vec2f(spread, spread) * 2.0;
-  let inside = coverage(roundedRectDistance(local, vec2f(0.0, 0.0), size, radius), dpr);
-  return inside * (1.0 - blurredRoundedRect(local, holeOrigin, holeSize, shadow.w, sigma, dpr));
+  let inside = coverage(roundedRectDistance(local, vec2f(0.0, 0.0), size, radii), dpr);
+  return inside * (1.0 - blurredRoundedRect(local, holeOrigin, holeSize, other, sigma, dpr));
 }
 
 struct VertexOutput {
@@ -275,6 +317,8 @@ struct VertexOutput {
   @location(5) @interpolate(flat) clipIndex: f32,
   @location(6) @interpolate(flat) gradientIndex: f32,
   @location(7) @interpolate(flat) shadow: vec4f,
+  @location(8) @interpolate(flat) radii: vec4f,
+  @location(9) @interpolate(flat) otherRadii: vec4f,
 };
 
 @vertex
@@ -291,6 +335,8 @@ fn vs(
   @location(9) clipIndex: f32,
   @location(10) gradientIndex: f32,
   @location(11) shadow: vec4f,
+  @location(12) radii: vec4f,
+  @location(13) otherRadii: vec4f,
 ) -> VertexOutput {
   var out: VertexOutput;
   // The quad is inflated by one physical pixel on every side so the
@@ -313,13 +359,15 @@ fn vs(
   out.clipIndex = clipIndex;
   out.gradientIndex = gradientIndex;
   out.shadow = shadow;
+  out.radii = radii;
+  out.otherRadii = otherRadii;
   return out;
 }
 
 @fragment
 fn fs(in: VertexOutput) -> @location(0) vec4f {
   let dpr = uView.z;
-  let dist = roundedRectDistance(in.localPos, vec2f(0.0, 0.0), in.size, in.radiusOpacityBorder.x);
+  let dist = roundedRectDistance(in.localPos, vec2f(0.0, 0.0), in.size, in.radii);
 
   var shape = coverage(dist, dpr);
   if (in.kind >= KIND_SHADOW) {
@@ -327,9 +375,10 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
       in.kind,
       in.localPos,
       in.size,
-      in.radiusOpacityBorder.x,
+      in.radii,
       in.radiusOpacityBorder.z,
       in.shadow,
+      in.otherRadii,
       dpr
     );
   } else if (in.kind == KIND_BORDER) {

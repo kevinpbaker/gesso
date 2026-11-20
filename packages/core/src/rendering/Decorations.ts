@@ -1,4 +1,5 @@
 import type { LayoutRecord } from '../layout/LayoutRecord';
+import { borderRadius, fitBorderRadius, uniformBorderRadius, type UiBorderRadius } from '../properties/UiBorderRadius';
 import type { UiNode } from '../graph/UiNode';
 import type { UiColor } from '../properties/UiColor';
 import type { UiColorValue } from '../properties/UiPropertyValues';
@@ -107,7 +108,10 @@ export interface DecorationRect {
   y: number;
   width: number;
   height: number;
+  /** The largest corner; zero when every corner is square. */
   radius: number;
+  /** Each corner: the node's own, moved out by the outset, unless the shape names one radius for all four. */
+  corners: UiBorderRadius;
 }
 
 /**
@@ -117,17 +121,45 @@ export interface DecorationRect {
  * outset and the inherited radius are exactly the arithmetic the two
  * renderers would otherwise drift on.
  */
-export function decorationRect(shape: DecorationShape, rec: LayoutRecord, nodeRadius: number): DecorationRect {
+export function decorationRect(
+  shape: DecorationShape,
+  rec: LayoutRecord,
+  nodeRadius: number | UiBorderRadius
+): DecorationRect {
   const outset = shape.outset ?? 0;
   const horizontal = axis(rec.x, rec.width, shape.x, shape.width, shape.right, outset);
   const vertical = axis(rec.y, rec.height, shape.y, shape.height, shape.bottom, outset);
-  const radius = Math.max(0, shape.radius ?? nodeRadius + outset);
+  // A focus ring round a card with only its top corners rounded has
+  // only its top corners rounded too: it follows each corner, fitted to
+  // the node's box first, as an outline follows a box in CSS.
+  const corners =
+    shape.radius !== undefined
+      ? borderRadius(Math.max(0, shape.radius))
+      : typeof nodeRadius === 'number'
+        ? borderRadius(Math.max(0, nodeRadius + outset))
+        : grownCorners(fitBorderRadius(nodeRadius, rec.width, rec.height), outset);
   return {
     x: horizontal.start,
     y: vertical.start,
     width: horizontal.size,
     height: vertical.size,
-    radius
+    radius: uniformBorderRadius(corners),
+    corners
+  };
+}
+
+/**
+ * Every corner grown by the outset, a square one included: a ring set
+ * off a square box is rounded by its offset, which is how the rings
+ * were drawn when they took one radius and what keeps them soft.
+ */
+function grownCorners(radius: UiBorderRadius, outset: number): UiBorderRadius {
+  const grow = (corner: number): number => Math.max(0, corner + outset);
+  return {
+    topLeft: grow(radius.topLeft),
+    topRight: grow(radius.topRight),
+    bottomRight: grow(radius.bottomRight),
+    bottomLeft: grow(radius.bottomLeft)
   };
 }
 

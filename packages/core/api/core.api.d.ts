@@ -3779,6 +3779,8 @@ interface Canvas2DRendererOptions {
 }
 declare class Canvas2DRenderer implements UiRenderer {
   private readonly options;
+  private readonly snapped;
+  private snapScale;
   readonly backend: RendererBackend;
   private disposed;
   private readonly contentBox;
@@ -3824,6 +3826,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private renderChildren;
   private renderLifted;
   private applyAncestors;
+  private snappedBox;
   private paintBackground;
   private paintShadows;
   private fillBox;
@@ -3846,7 +3849,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private pushMappedCull;
   private popCull;
 }
-declare function traceRoundedRect(ctx: Canvas2DContext, x: number, y: number, width: number, height: number, radius: number): void;
+declare function traceRoundedRect(ctx: Canvas2DContext, x: number, y: number, width: number, height: number, radius: number | UiBorderRadius): void;
 declare class CanvasTextMeasurer extends ParagraphTextMeasurer {
   private readonly context;
   private readonly widths;
@@ -4389,11 +4392,11 @@ declare class GlyphShaper {
   private shapeClusters;
   clear(): void;
 }
-declare const INSTANCE_STRIDE_FLOATS = 24;
+declare const INSTANCE_STRIDE_FLOATS = 32;
 declare const INSTANCE_STRIDE_BYTES: number;
 declare const TEXTURED_STRIDE_FLOATS = 16;
 declare const TEXTURED_STRIDE_BYTES: number;
-declare const CLIP_STRIDE_FLOATS = 16;
+declare const CLIP_STRIDE_FLOATS = 20;
 declare const CLIP_STRIDE_BYTES: number;
 declare const NO_CLIP_INDEX = -1;
 declare const enum PrimitiveKind {
@@ -5573,6 +5576,7 @@ import {
   borderRadius,
   borderRadiusCorners,
   borderRadiusEqual,
+  borderRadiusIsUniform,
   borderRadiusIsZero,
   borderRadiusValuesEqual,
   Canvas2DContext,
@@ -5608,6 +5612,7 @@ import {
   easingIn,
   easings,
   findEnvironmentKey,
+  fitBorderRadius,
   FixedMetricsOptions,
   FontMetrics,
   hasDecorationPhase,
@@ -5630,6 +5635,7 @@ import {
   normalizeBorderRadius,
   normalizeColor,
   normalizeTransition,
+  offsetBorderRadius,
   OverlayShape,
   paintsAfterChildren,
   ParagraphLayout,
@@ -6567,6 +6573,7 @@ export {
   borderRadius,
   borderRadiusCorners,
   borderRadiusEqual,
+  borderRadiusIsUniform,
   borderRadiusIsZero,
   borderRadiusValuesEqual,
   borders,
@@ -6705,6 +6712,7 @@ export {
   findEnvironmentKey,
   findMatchesIn,
   findPropertyDefinition,
+  fitBorderRadius,
   fittedShadowRadius,
   flattenTextSpans,
   FlexDirection,
@@ -6848,6 +6856,7 @@ export {
   offsetAtPoint,
   offsetAtPointIn,
   offsetAtX,
+  offsetBorderRadius,
   offsetForVerticalMove,
   overrideSources,
   Paint,
@@ -8552,6 +8561,30 @@ declare class LayoutRecord {
   propsFromNodeAlone: boolean;
   reset(): void;
 }
+interface UiBorderRadius {
+  readonly topLeft: number;
+  readonly topRight: number;
+  readonly bottomRight: number;
+  readonly bottomLeft: number;
+}
+declare const UiBorderRadiuses: {
+  readonly none: {
+    readonly topLeft: 0;
+    readonly topRight: 0;
+    readonly bottomRight: 0;
+    readonly bottomLeft: 0;
+  };
+};
+declare function borderRadius(radius: number): UiBorderRadius;
+declare function borderRadiusCorners(topLeft: number, topRight: number, bottomRight: number, bottomLeft: number): UiBorderRadius;
+declare function borderRadiusEqual(a: UiBorderRadius, b: UiBorderRadius): boolean;
+declare function borderRadiusIsZero(radius: UiBorderRadius): boolean;
+declare function uniformBorderRadius(radius: UiBorderRadius): number;
+declare function borderRadiusIsUniform(radius: UiBorderRadius): boolean;
+declare function fitBorderRadius(radius: UiBorderRadius, width: number, height: number): UiBorderRadius;
+declare function offsetBorderRadius(radius: UiBorderRadius, by: number): UiBorderRadius;
+declare function normalizeBorderRadius(value: unknown): UiBorderRadius;
+declare function borderRadiusValuesEqual(a: unknown, b: unknown): boolean;
 interface UiColors {
   readonly background: UiColor;
   readonly surface: UiColor;
@@ -8594,27 +8627,6 @@ declare function shapesEqual(a: UiShapes, b: UiShapes): boolean;
 interface UiShapeExtensions {}
 type UiShapeName = keyof UiShapes | (keyof UiShapeExtensions & string);
 declare function isShapeName(value: unknown, scale: UiShapes): value is UiShapeName;
-interface UiBorderRadius {
-  readonly topLeft: number;
-  readonly topRight: number;
-  readonly bottomRight: number;
-  readonly bottomLeft: number;
-}
-declare const UiBorderRadiuses: {
-  readonly none: {
-    readonly topLeft: 0;
-    readonly topRight: 0;
-    readonly bottomRight: 0;
-    readonly bottomLeft: 0;
-  };
-};
-declare function borderRadius(radius: number): UiBorderRadius;
-declare function borderRadiusCorners(topLeft: number, topRight: number, bottomRight: number, bottomLeft: number): UiBorderRadius;
-declare function borderRadiusEqual(a: UiBorderRadius, b: UiBorderRadius): boolean;
-declare function borderRadiusIsZero(radius: UiBorderRadius): boolean;
-declare function uniformBorderRadius(radius: UiBorderRadius): number;
-declare function normalizeBorderRadius(value: unknown): UiBorderRadius;
-declare function borderRadiusValuesEqual(a: unknown, b: unknown): boolean;
 type UiAlignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline' | 'space-between' | 'space-around' | 'space-evenly';
 type UiSelfAlignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline';
 type UiContentDistribution = 'stretch' | 'start' | 'center' | 'end' | 'space-between' | 'space-around' | 'space-evenly';
@@ -8666,8 +8678,9 @@ interface DecorationRect {
   width: number;
   height: number;
   radius: number;
+  corners: UiBorderRadius;
 }
-declare function decorationRect(shape: DecorationShape, rec: LayoutRecord, nodeRadius: number): DecorationRect;
+declare function decorationRect(shape: DecorationShape, rec: LayoutRecord, nodeRadius: number | UiBorderRadius): DecorationRect;
 declare function decorationColor(node: UiNode, shape: DecorationShape): UiColor | undefined;
 declare function paintsAfterChildren(shape: DecorationShape): boolean;
 declare function hasDecorationPhase(shapes: readonly DecorationShape[], after: boolean): boolean;
@@ -9059,6 +9072,7 @@ export {
   borderRadius,
   borderRadiusCorners,
   borderRadiusEqual,
+  borderRadiusIsUniform,
   borderRadiusIsZero,
   borderRadiusValuesEqual,
   Canvas2DContext,
@@ -9095,6 +9109,7 @@ export {
   easingIn,
   easings,
   findEnvironmentKey,
+  fitBorderRadius,
   FixedMetricsOptions,
   FontMetrics,
   hasDecorationPhase,
@@ -9117,6 +9132,7 @@ export {
   normalizeBorderRadius,
   normalizeColor,
   normalizeTransition,
+  offsetBorderRadius,
   OverlayShape,
   paintsAfterChildren,
   ParagraphLayout,

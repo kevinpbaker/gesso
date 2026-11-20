@@ -155,7 +155,10 @@ function paritySection(state: PlaygroundState): UiElement {
         width: 120,
         height: 80,
         overflow: 'hidden',
-        borderRadius: 14,
+        // Corners that differ, on the gradient fill and on the clip the
+        // children are cut by: the shape both backends once drew with
+        // the largest corner at all four.
+        borderRadius: { topLeft: 14, topRight: 4, bottomRight: 14, bottomLeft: 0 },
         backgroundColor: '#1e293b',
         // A gradient on a box that already has a
         // radius and a clip, so the pixel gate sees a gradient follow a

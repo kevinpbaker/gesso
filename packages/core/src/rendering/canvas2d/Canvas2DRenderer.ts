@@ -1,4 +1,5 @@
 import { UiNodeType } from '../../graph/UiNodeType';
+import { snapBorderWidth, snapBox, snapsUnder, type SnapBox } from '../PixelSnap';
 import { snapScroll } from '../ScrollSnap';
 import type { UiNode } from '../../graph/UiNode';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
@@ -9,8 +10,13 @@ import type { ResolvedGradient } from '../../properties/UiGradient';
 import { gradientPaint } from '../../properties/UiGradient';
 import { colorToCss, computeObjectFitRect, createPaintState, isPaintVisible, resolvePaintState } from '../PaintState';
 import type { PaintBoxShadow, PaintState } from '../PaintState';
-import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
-import { boxShadowRadius, fittedShadowRadius } from '../../properties/UiBoxShadow';
+import {
+  borderRadiusIsUniform,
+  borderRadiusIsZero,
+  fitBorderRadius,
+  offsetBorderRadius,
+  type UiBorderRadius
+} from '../../properties/UiBorderRadius';
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { RenderContext } from '../RenderContext';
 import {
@@ -145,6 +151,9 @@ interface GroupLayer {
  * has only the strip that came into view drawn (`ScrollLayers.ts`).
  */
 export class Canvas2DRenderer implements UiRenderer {
+  /** The box `snappedBox` last wrote, and the device scale it was snapped at. */
+  private readonly snapped: SnapBox = { x: 0, y: 0, width: 0, height: 0 };
+  private snapScale = 1;
   readonly backend: RendererBackend = 'canvas2d';
   private disposed = false;
 
@@ -475,7 +484,7 @@ export class Canvas2DRenderer implements UiRenderer {
     if (paint.boxShadows.length > 0) {
       this.paintShadows(draw, rec, paint, false);
     }
-    this.paintBackground(draw, rec, paint);
+    this.paintBackground(draw, rec, this.snappedBox(draw, rec), paint);
     if (paint.boxShadows.length > 0) {
       this.paintShadows(draw, rec, paint, true);
     }
@@ -483,7 +492,7 @@ export class Canvas2DRenderer implements UiRenderer {
     if (node.type === UiNodeType.Paint) {
       this.paintPicture(draw, node, rec, context);
     }
-    this.paintBorder(draw, rec, paint);
+    this.paintBorder(draw, this.snappedBox(draw, rec), paint);
     // Decorations sit beside the border, outside the node's own clip:
     // a focus ring's every pixel lies outside the box that would clip
     // it. Ancestors' clips and the node's transform do apply, which is
@@ -506,11 +515,15 @@ export class Canvas2DRenderer implements UiRenderer {
       // radius); for a scroll container the children are also
       // translated by the scroll offset.
       draw.save();
+      // The same pixels the background and border were snapped to, so
+      // a child flush with its parent's edge is cut where the parent's
+      // own edge is drawn.
+      const box = this.snappedBox(draw, rec);
       if (!borderRadiusIsZero(paint.borderRadius)) {
-        traceRoundedRect(draw, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
+        traceRoundedRect(draw, box.x, box.y, box.width, box.height, paint.borderRadius);
       } else {
         draw.beginPath();
-        draw.rect(rec.x, rec.y, rec.width, rec.height);
+        draw.rect(box.x, box.y, box.width, box.height);
       }
       draw.clip();
       this.pushCull(rec);
@@ -760,10 +773,28 @@ export class Canvas2DRenderer implements UiRenderer {
   // Painting
   // -------------------------------------------------------------------------
 
-  private paintBackground(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState): void {
+  /**
+   * The node's box with its edges on device pixels, under the current
+   * transform; the record itself when the transform scales or turns,
+   * or the context cannot say what it is. See `PixelSnap.ts`.
+   *
+   * Written into one scratch box, read before the walk goes on to the
+   * children, so the per-node cost is one `getTransform` and no
+   * allocation beyond the matrix it returns.
+   */
+  private snappedBox(ctx: Canvas2DContext, rec: LayoutRecord): SnapBox {
+    const m = ctx.getTransform?.();
+    if (m === undefined || !snapsUnder(m.a, m.b, m.c, m.d, this.surface.dpr)) {
+      return rec;
+    }
+    this.snapScale = m.a;
+    return snapBox(rec, m.a, m.e, m.f, this.snapped);
+  }
+
+  private paintBackground(ctx: Canvas2DContext, rec: LayoutRecord, box: SnapBox, paint: PaintState): void {
     if (paint.backgroundColor !== undefined) {
       ctx.fillStyle = colorToCss(paint.backgroundColor);
-      this.fillBox(ctx, rec, paint);
+      this.fillBox(ctx, box, paint);
     }
     // The gradient goes over the colour and under the image, which is
     // where CSS puts a `background-image`. Both are the node's own box,
@@ -772,7 +803,7 @@ export class Canvas2DRenderer implements UiRenderer {
       const style = canvasGradient(ctx, paint.backgroundGradient, rec);
       if (style !== undefined) {
         ctx.fillStyle = style;
-        this.fillBox(ctx, rec, paint);
+        this.fillBox(ctx, box, paint);
       }
     }
   }
@@ -797,9 +828,9 @@ export class Canvas2DRenderer implements UiRenderer {
    */
   private paintShadows(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState, inset: boolean): void {
     const shadows = paint.boxShadows;
-    const radius = borderRadiusIsZero(paint.borderRadius)
-      ? 0
-      : fittedShadowRadius(uniformBorderRadius(paint.borderRadius), rec.width, rec.height);
+    // Fitted to the box first, as CSS fits a box's corners before a
+    // shadow is spread from them.
+    const radius = fitBorderRadius(paint.borderRadius, rec.width, rec.height);
     const dpr = this.surface.dpr;
     const m = ctx.getTransform?.() ?? { a: dpr, b: 0, c: 0, d: dpr };
     const scale = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c));
@@ -832,7 +863,7 @@ export class Canvas2DRenderer implements UiRenderer {
           rec.y + shadow.offsetY - spread,
           width,
           height,
-          boxShadowRadius(radius, spread, false)
+          offsetBorderRadius(radius, spread)
         );
         ctx.fill();
         ctx.restore();
@@ -853,7 +884,7 @@ export class Canvas2DRenderer implements UiRenderer {
           rec.y + shadow.offsetY + spread,
           width,
           height,
-          boxShadowRadius(radius, spread, true)
+          offsetBorderRadius(radius, -spread)
         );
       }
       ctx.fill();
@@ -862,9 +893,9 @@ export class Canvas2DRenderer implements UiRenderer {
   }
 
   /** The node's box, following its corner radius. */
-  private fillBox(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState): void {
+  private fillBox(ctx: Canvas2DContext, rec: SnapBox, paint: PaintState): void {
     if (!borderRadiusIsZero(paint.borderRadius)) {
-      traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, uniformBorderRadius(paint.borderRadius));
+      traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, paint.borderRadius);
       ctx.fill();
     } else {
       ctx.fillRect(rec.x, rec.y, rec.width, rec.height);
@@ -915,7 +946,7 @@ export class Canvas2DRenderer implements UiRenderer {
       return;
     }
     ctx.save();
-    traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, rounded ? uniformBorderRadius(paint.borderRadius) : 0);
+    traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, rounded ? paint.borderRadius : 0);
     ctx.clip();
     ctx.drawImage(drawn, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
@@ -980,20 +1011,26 @@ export class Canvas2DRenderer implements UiRenderer {
    * backend's border band does: the stroke is centred on a path inset
    * by half its width, so its outer edge is the box edge.
    */
-  private paintBorder(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState): void {
+  private paintBorder(ctx: Canvas2DContext, rec: SnapBox, paint: PaintState): void {
     if (paint.borderWidth <= 0) {
       return;
     }
-    const inset = paint.borderWidth / 2;
+    // Whole device pixels when the box was snapped, as Chrome rounds a
+    // border's width; as given otherwise.
+    const borderWidth = rec === this.snapped ? snapBorderWidth(paint.borderWidth, this.snapScale) : paint.borderWidth;
+    const inset = borderWidth / 2;
     const x = rec.x + inset;
     const y = rec.y + inset;
-    const width = Math.max(0, rec.width - paint.borderWidth);
-    const height = Math.max(0, rec.height - paint.borderWidth);
+    const width = Math.max(0, rec.width - borderWidth);
+    const height = Math.max(0, rec.height - borderWidth);
     ctx.strokeStyle = paint.borderColor !== undefined ? colorToCss(paint.borderColor) : '#000';
-    ctx.lineWidth = paint.borderWidth;
+    ctx.lineWidth = borderWidth;
     ctx.lineJoin = 'round';
     if (!borderRadiusIsZero(paint.borderRadius)) {
-      traceRoundedRect(ctx, x, y, width, height, Math.max(0, uniformBorderRadius(paint.borderRadius) - inset));
+      // The stroke's centre line: every corner pulled in by half the
+      // width, after fitting to the box the border's outer edge is.
+      const outer = fitBorderRadius(paint.borderRadius, rec.width, rec.height);
+      traceRoundedRect(ctx, x, y, width, height, offsetBorderRadius(outer, -inset));
       ctx.stroke();
     } else {
       ctx.strokeRect(x, y, width, height);
@@ -1015,7 +1052,7 @@ export class Canvas2DRenderer implements UiRenderer {
     shapes: readonly DecorationShape[],
     after: boolean
   ): void {
-    const nodeRadius = uniformBorderRadius(paint.borderRadius);
+    const nodeRadius = paint.borderRadius;
     for (const shape of shapes) {
       if ((shape.after === 'children') !== after) {
         continue;
@@ -1031,7 +1068,7 @@ export class Canvas2DRenderer implements UiRenderer {
       if (shape.kind === 'fill') {
         ctx.fillStyle = colorToCss(color);
         if (box.radius > 0) {
-          traceRoundedRect(ctx, box.x, box.y, box.width, box.height, box.radius);
+          traceRoundedRect(ctx, box.x, box.y, box.width, box.height, box.corners);
           ctx.fill();
         } else {
           ctx.fillRect(box.x, box.y, box.width, box.height);
@@ -1052,7 +1089,14 @@ export class Canvas2DRenderer implements UiRenderer {
       const width = Math.max(0, box.width - shape.lineWidth);
       const height = Math.max(0, box.height - shape.lineWidth);
       if (box.radius > 0) {
-        traceRoundedRect(ctx, x, y, width, height, Math.max(0, box.radius - inset));
+        traceRoundedRect(
+          ctx,
+          x,
+          y,
+          width,
+          height,
+          offsetBorderRadius(fitBorderRadius(box.corners, box.width, box.height), -inset)
+        );
         ctx.stroke();
       } else {
         ctx.strokeRect(x, y, width, height);
@@ -1689,7 +1733,7 @@ export function traceRoundedRect(
   y: number,
   width: number,
   height: number,
-  radius: number
+  radius: number | UiBorderRadius
 ): void {
   ctx.beginPath();
   appendRoundedRect(ctx, x, y, width, height, radius);
@@ -1702,8 +1746,15 @@ function appendRoundedRect(
   y: number,
   width: number,
   height: number,
-  radius: number
+  radius: number | UiBorderRadius
 ): void {
+  if (typeof radius !== 'number') {
+    if (!borderRadiusIsUniform(radius)) {
+      appendCorneredRect(ctx, x, y, width, height, fitBorderRadius(radius, width, height));
+      return;
+    }
+    radius = radius.topLeft;
+  }
   const r = Math.min(radius, width / 2, height / 2);
   if (r <= 0) {
     ctx.rect(x, y, width, height);
@@ -1714,5 +1765,26 @@ function appendRoundedRect(
   ctx.arcTo(x + width, y + height, x, y + height, r);
   ctx.arcTo(x, y + height, x, y, r);
   ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+/**
+ * A rectangle whose corners differ, each already fitted to the box.
+ * `arcTo` with a radius of zero runs straight to the corner, so a
+ * square corner needs no case of its own.
+ */
+function appendCorneredRect(
+  ctx: Canvas2DContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  r: UiBorderRadius
+): void {
+  ctx.moveTo(x + r.topLeft, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r.topRight);
+  ctx.arcTo(x + width, y + height, x, y + height, r.bottomRight);
+  ctx.arcTo(x, y + height, x, y, r.bottomLeft);
+  ctx.arcTo(x, y, x + width, y, r.topLeft);
   ctx.closePath();
 }

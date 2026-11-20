@@ -22,7 +22,14 @@ function rect(shape: Partial<DecorationShape>) {
 
 describe('decorationRect', () => {
   it('fills the node when nothing is said', () => {
-    expect(rect({})).toEqual({ x: 100, y: 200, width: 40, height: 20, radius: 0 });
+    expect(rect({})).toEqual({
+      x: 100,
+      y: 200,
+      width: 40,
+      height: 20,
+      radius: 0,
+      corners: { topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 }
+    });
   });
 
   it('places from the near edge with a size', () => {
@@ -71,5 +78,24 @@ describe('decorationRect', () => {
   it('takes an explicit radius over the inherited one', () => {
     const shape = { kind: 'fill', color: 'border', outset: 3, radius: 1 } as DecorationShape;
     expect(decorationRect(shape, RECORD, 6).radius).toBe(1);
+  });
+});
+
+describe('decorationRect corners', () => {
+  const card = { topLeft: 8, topRight: 8, bottomRight: 0, bottomLeft: 0 };
+
+  it('follows each corner of the node, grown by the outset', () => {
+    const ring = decorationRect(
+      { kind: 'stroke', color: 'focus', lineWidth: 2, outset: 3 } as DecorationShape,
+      RECORD,
+      card
+    );
+    expect(ring.corners).toEqual({ topLeft: 11, topRight: 11, bottomRight: 3, bottomLeft: 3 });
+    expect(ring.radius).toBe(11);
+  });
+
+  it('takes one radius for all four when the shape names one', () => {
+    const ring = decorationRect({ kind: 'fill', color: 'focus', radius: 4 } as DecorationShape, RECORD, card);
+    expect(ring.corners).toEqual({ topLeft: 4, topRight: 4, bottomRight: 4, bottomLeft: 4 });
   });
 });

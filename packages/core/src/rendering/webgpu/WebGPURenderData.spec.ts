@@ -146,6 +146,27 @@ describe('buildRenderList geometry', () => {
     expect(inst.kind).toBe(PrimitiveKind.Fill);
   });
 
+  it('carries each corner, fitted to the box, on the instance and on the clip it makes', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    // The top side wants 30 + 30 of 40, so all four scale by 2/3.
+    const radius = { topLeft: 30, topRight: 30, bottomRight: 6, bottomLeft: 0 };
+    const node = box(h, 'box', {
+      width: 40,
+      height: 100,
+      backgroundColor: '#f00',
+      borderRadius: radius,
+      overflow: 'hidden'
+    });
+    h.graph.appendChild(root, node);
+    const list = layoutAndBuild(h, root);
+    const o = 0 * INSTANCE_STRIDE_FLOATS;
+    expect(Array.from(list.instanceData.slice(o + 24, o + 28))).toEqual([20, 20, 4, 0]);
+    expect(readInstance(list, 0).radius).toBe(20);
+    const clip = 0 * CLIP_STRIDE_FLOATS;
+    expect(Array.from(list.clipData.slice(clip + 16, clip + 20))).toEqual([20, 20, 4, 0]);
+  });
+
   it('emits background then border for a bordered box', () => {
     const h = new RenderHarness();
     const root = h.graph.root;

@@ -45,6 +45,7 @@ import {
 } from '../shellHistory';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from '../fullscreen';
 import { watchPixelRatio } from '../pixelRatio';
+import { fitToDevicePixels, observeDevicePixels, type DevicePixelSize } from '../devicePixels';
 
 /**
  * What the shell needs to spawn and drive a render worker.
@@ -414,6 +415,9 @@ export class WorkerApp {
   /** The host's last size, for a pixel ratio that changes on its own; see `watchPixelRatio`. */
   private hostSize: { width: number; height: number } | null = null;
   private stopPixelRatio: (() => void) | null = null;
+  /** The canvas's device-pixel content box, when the browser reports one; see `devicePixels.ts`. */
+  private devicePixels: DevicePixelSize | null = null;
+  private stopDevicePixels: (() => void) | null = null;
   private detachInput: (() => void) | null = null;
   /** Pickers and remembered handles, made on the first file request. */
   private files: ShellFiles | null = null;
@@ -964,6 +968,9 @@ export class WorkerApp {
     this.resizeObserver = null;
     this.stopPixelRatio?.();
     this.stopPixelRatio = null;
+    this.stopDevicePixels?.();
+    this.stopDevicePixels = null;
+    this.devicePixels = null;
     // A remount starts from nothing in flight. The new worker is told
     // its size in `init`, and an acknowledgement from the old one
     // would be about a canvas that no longer exists.
@@ -1278,6 +1285,16 @@ export class WorkerApp {
         this.requestResize({ ...this.hostSize, dpr });
       }
     });
+    // The canvas's own box in device pixels, which can change while
+    // the host's size does not: the host moved to a fractional place.
+    if (this.canvas !== undefined) {
+      this.stopDevicePixels = observeDevicePixels(this.canvas, pixels => {
+        this.devicePixels = pixels;
+        if (this.hostSize !== null && !this.fullscreen) {
+          this.requestResize({ ...this.hostSize, dpr: window.devicePixelRatio || 1 });
+        }
+      });
+    }
   }
 
   /**
@@ -1292,7 +1309,8 @@ export class WorkerApp {
    * per refresh, and the size that eventually arrives is the size the
    * window ended at.
    */
-  private requestResize(size: { width: number; height: number; dpr: number }): void {
+  private requestResize(requested: { width: number; height: number; dpr: number }): void {
+    const size = { ...fitToDevicePixels(requested, requested.dpr, this.devicePixels), dpr: requested.dpr };
     if (this.resizeInFlight) {
       this.heldResize = size;
       return;

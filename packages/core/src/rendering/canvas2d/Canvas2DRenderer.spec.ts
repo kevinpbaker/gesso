@@ -129,6 +129,59 @@ describe('Canvas2DRenderer colors and borders', () => {
     expect(callArgs(h.context, 'moveTo')).toEqual([[8, 0]]);
   });
 
+  it('draws each corner at its own radius, so only the corners asked for are rounded', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const radius = { topLeft: 8, topRight: 8, bottomRight: 0, bottomLeft: 0 };
+    const node = box(h, 'box', { width: 40, height: 20, backgroundColor: '#f00', borderRadius: radius });
+    h.append(root, node);
+    h.layout(root);
+    h.render(root);
+    expect(callArgs(h.context, 'moveTo')).toEqual([[8, 0]]);
+    // Top right, bottom right, bottom left, top left: the radius is each call's last argument.
+    expect(callArgs(h.context, 'arcTo').map(args => args.at(-1))).toEqual([8, 0, 0, 8]);
+  });
+
+  it('puts a background and a border on device pixels, as Chrome paints them', () => {
+    // 1.5x: a box at 10.4 would cover device 15.6 to 46.05, two soft
+    // edges; a 1px border would be one and a half device pixels.
+    const h = new RenderHarness(800, 600, 1.5, { groups: true });
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 10.4);
+    const node = box(h, 'box', {
+      width: 20.3,
+      height: 20,
+      backgroundColor: '#f00',
+      borderWidth: 1,
+      borderColor: '#00f'
+    });
+    h.append(root, node);
+    h.layout(root);
+    h.render(root);
+    const [x, y, width, height] = callArgs(h.context, 'fillRect').at(-1)! as number[];
+    expect(x * 1.5).toBeCloseTo(16);
+    expect((x + width) * 1.5).toBeCloseTo(46);
+    expect(y * 1.5).toBeCloseTo(16);
+    expect((y + height) * 1.5).toBeCloseTo(46);
+    expect(Number(callArgs(h.context, 'set:lineWidth').at(-1)) * 1.5).toBeCloseTo(1);
+  });
+
+  it('leaves a box under its own scale where layout put it', () => {
+    const h = new RenderHarness(800, 600, 1.5, { groups: true });
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 10.4);
+    const node = box(h, 'box', {
+      width: 20.3,
+      height: 20,
+      backgroundColor: '#f00',
+      transform: { scaleX: 1.1, scaleY: 1.1 }
+    });
+    h.append(root, node);
+    h.layout(root);
+    h.render(root);
+    expect(callArgs(h.context, 'fillRect').at(-1)).toEqual([10.4, 10.4, 20.3, 20]);
+  });
+
   it('clamps border radius to half the smaller dimension', () => {
     const h = new RenderHarness();
     const root = h.createNode('app', UiNodeType.Column);

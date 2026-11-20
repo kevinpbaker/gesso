@@ -2382,6 +2382,8 @@ declare class WorkerApp {
   private resizeObserver;
   private hostSize;
   private stopPixelRatio;
+  private devicePixels;
+  private stopDevicePixels;
   private detachInput;
   private files;
   private proxy;
@@ -2521,6 +2523,8 @@ declare class GessoApp {
   private resizeObserver;
   private hostSize;
   private stopPixelRatio;
+  private devicePixels;
+  private stopDevicePixels;
   private proxy;
   private audio;
   private mirror;

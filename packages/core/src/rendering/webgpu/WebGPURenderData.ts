@@ -1,4 +1,5 @@
 import type { UiNode } from '../../graph/UiNode';
+import { snapBorderWidth, snapBox, snapsUnder, type SnapBox } from '../PixelSnap';
 import { snapScroll } from '../ScrollSnap';
 import { UiNodeType } from '../../graph/UiNodeType';
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
@@ -28,9 +29,15 @@ import { GlyphShaper } from './WebGPUGlyphShaper';
 import type { MeasureRun } from './WebGPUGlyphShaper';
 import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
-import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
+import {
+  borderRadiusIsZero,
+  fitBorderRadius,
+  offsetBorderRadius,
+  uniformBorderRadius,
+  type UiBorderRadius
+} from '../../properties/UiBorderRadius';
 import { gradientPaint, MAX_GRADIENT_STOPS, type ResolvedGradient } from '../../properties/UiGradient';
-import { BOX_SHADOW_BLUR_REACH, boxShadowRadius, fittedShadowRadius } from '../../properties/UiBoxShadow';
+import { BOX_SHADOW_BLUR_REACH } from '../../properties/UiBoxShadow';
 import type { PaintState } from '../PaintState';
 import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
@@ -49,13 +56,15 @@ import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSel
  *   0  pos.xy            absolute layout coordinates of the rectangle
  *   2  size.xy
  *   4  color.rgba
- *   8  radius, opacity, borderWidth
+ *   8  radius, opacity, borderWidth   radius: the largest corner, for reading a dump
  *   11 kind               (PrimitiveKind, as a float)
  *   12 transform          3x2 affine, absolute layout → logical screen
  *   18 clipIndex          index into the clip chain, -1 for none
  *   19 gradientIndex      index into the frame's gradients, -1 for none
- *   20 shadow             offsetX, offsetY, spread, the other shape's radius
- *   24 (end)
+ *   20 shadow             offsetX, offsetY, spread, the other shape's largest corner
+ *   24 radii              top left, top right, bottom right, bottom left
+ *   28 other radii        the other shape's corners, in the same order
+ *   32 (end)
  *
  * A shadow is two rounded rectangles, the blurred one and the box it
  * is cut by, and an instance describes the first. For an outer shadow
@@ -67,7 +76,7 @@ import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSel
  * by the offset and shrunk by the spread, with the hole's radius last.
  * Every other instance writes zeros there.
  */
-export const INSTANCE_STRIDE_FLOATS = 24;
+export const INSTANCE_STRIDE_FLOATS = 32;
 export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE_FLOATS * 4;
 
 /**
@@ -89,18 +98,19 @@ export const TEXTURED_STRIDE_FLOATS = 16;
 export const TEXTURED_STRIDE_BYTES = TEXTURED_STRIDE_FLOATS * 4;
 
 /**
- * Clip chain node layout, in floats (four vec4s):
+ * Clip chain node layout, in floats (five vec4s):
  *
  *   0  rect.xywh          the clipping box in its own layout space
- *   4  radius, parentIndex (-1 at the root), pad, pad
+ *   4  radius, parentIndex (-1 at the root), pad, pad   radius: the largest corner
  *   8  inverse a, b, c, d 3x2 affine, logical screen → clip space
  *   12 inverse tx, ty, pad, pad
- *   16 (end)
+ *   16 radii              top left, top right, bottom right, bottom left, fitted to rect
+ *   20 (end)
  *
  * An instance names its innermost rounded clip; the fragment shader
  * walks parent links to the root, so every rounded ancestor applies.
  */
-export const CLIP_STRIDE_FLOATS = 16;
+export const CLIP_STRIDE_FLOATS = 20;
 export const CLIP_STRIDE_BYTES = CLIP_STRIDE_FLOATS * 4;
 export const NO_CLIP_INDEX = -1;
 
@@ -701,6 +711,11 @@ export function buildRenderList(
     // container's edge; the record keeps the flow position.
     const baseCtm = sticky ? translateTransform(state.ctm, rec.stickyOffsetX, rec.stickyOffsetY) : state.ctm;
     const nodeCtm = paint.hasTransform ? multiplyTransform(baseCtm, buildOwnTransform(rec, paint.transform)) : baseCtm;
+    // The node's box on device pixels, as Canvas2D snaps it; see
+    // `PixelSnap.ts`. Read by the clip, background and border below,
+    // all before the walk reaches the children that reuse the scratch.
+    const snapped = snapsUnder(nodeCtm[0] * dpr, nodeCtm[1], nodeCtm[2], nodeCtm[3] * dpr, dpr);
+    const box: SnapBox = snapped ? snapBox(rec, dpr, nodeCtm[4] * dpr, nodeCtm[5] * dpr, snapScratch) : rec;
     // The region is the one Canvas2D sizes its layer to. The texture
     // here is the surface's size, which costs a GPU nothing to clear,
     // so only the blend is cut to it.
@@ -758,10 +773,7 @@ export function buildRenderList(
           // A new node in the chain whose parent is the enclosing rounded
           // clip, so descendants are tested against both.
           nextRounded = clipData.length / CLIP_STRIDE_FLOATS;
-          clipData.push4(rec.x, rec.y, rec.width, rec.height);
-          clipData.push4(uniformBorderRadius(paint.borderRadius), state.rounded, 0, 0);
-          clipData.push4(inverse[0], inverse[1], inverse[2], inverse[3]);
-          clipData.push4(inverse[4], inverse[5], 0, 0);
+          pushClip(clipData, box, paint.borderRadius, state.rounded, inverse);
         }
       }
     }
@@ -783,12 +795,12 @@ export function buildRenderList(
         beginPrimitives(ownScissor);
         pushInstance(
           instanceData,
-          rec.x,
-          rec.y,
-          rec.width,
-          rec.height,
+          box.x,
+          box.y,
+          box.width,
+          box.height,
           color,
-          uniformBorderRadius(paint.borderRadius),
+          fitBorderRadius(paint.borderRadius, box.width, box.height),
           effectiveOpacity,
           0,
           PrimitiveKind.Fill,
@@ -813,12 +825,12 @@ export function buildRenderList(
         const first = paint.backgroundGradient.stops[0].color;
         pushInstance(
           instanceData,
-          rec.x,
-          rec.y,
-          rec.width,
-          rec.height,
+          box.x,
+          box.y,
+          box.width,
+          box.height,
           first,
-          uniformBorderRadius(paint.borderRadius),
+          fitBorderRadius(paint.borderRadius, box.width, box.height),
           effectiveOpacity,
           0,
           PrimitiveKind.Fill,
@@ -870,10 +882,7 @@ export function buildRenderList(
           const inverse = invertTransform(nodeCtm);
           if (inverse !== null) {
             imageRounded = clipData.length / CLIP_STRIDE_FLOATS;
-            clipData.push4(rec.x, rec.y, rec.width, rec.height);
-            clipData.push4(uniformBorderRadius(paint.borderRadius), ownRounded, 0, 0);
-            clipData.push4(inverse[0], inverse[1], inverse[2], inverse[3]);
-            clipData.push4(inverse[4], inverse[5], 0, 0);
+            pushClip(clipData, box, paint.borderRadius, ownRounded, inverse);
           }
         }
         closePrimitives();
@@ -949,14 +958,14 @@ export function buildRenderList(
         beginPrimitives(ownScissor);
         pushInstance(
           instanceData,
-          rec.x,
-          rec.y,
-          rec.width,
-          rec.height,
+          box.x,
+          box.y,
+          box.width,
+          box.height,
           color,
-          uniformBorderRadius(paint.borderRadius),
+          fitBorderRadius(paint.borderRadius, box.width, box.height),
           effectiveOpacity,
-          paint.borderWidth,
+          snapped ? snapBorderWidth(paint.borderWidth, dpr) : paint.borderWidth,
           PrimitiveKind.Border,
           nodeCtm,
           ownRounded
@@ -975,7 +984,7 @@ export function buildRenderList(
      * `Decorations.ts`, which is the same arithmetic Canvas2D uses.
      */
     const pushDecorations = (shapes: readonly DecorationShape[], after: boolean): void => {
-      const nodeRadius = uniformBorderRadius(paint.borderRadius);
+      const nodeRadius = paint.borderRadius;
       for (const shape of shapes) {
         if ((shape.after === 'children') !== after) {
           continue;
@@ -1000,7 +1009,7 @@ export function buildRenderList(
           rect.width,
           rect.height,
           color,
-          rect.radius,
+          fitBorderRadius(rect.corners, rect.width, rect.height),
           effectiveOpacity,
           shape.kind === 'stroke' ? shape.lineWidth : 0,
           shape.kind === 'stroke' ? PrimitiveKind.Border : PrimitiveKind.Fill,
@@ -1474,7 +1483,7 @@ function pushInstance(
   width: number,
   height: number,
   color: RgbaColor,
-  radius: number,
+  radius: number | UiBorderRadius,
   opacity: number,
   borderWidth: number,
   kind: PrimitiveKind,
@@ -1484,7 +1493,7 @@ function pushInstance(
   shadowX = 0,
   shadowY = 0,
   shadowSpread = 0,
-  shadowRadius = 0
+  shadowRadius: number | UiBorderRadius = 0
 ): void {
   out.ensure(INSTANCE_STRIDE_FLOATS);
   const data = out.data;
@@ -1497,7 +1506,7 @@ function pushInstance(
   data[at + 5] = color.g;
   data[at + 6] = color.b;
   data[at + 7] = color.a;
-  data[at + 8] = radius;
+  data[at + 8] = typeof radius === 'number' ? radius : uniformBorderRadius(radius);
   data[at + 9] = opacity;
   data[at + 10] = borderWidth;
   data[at + 11] = kind;
@@ -1512,8 +1521,43 @@ function pushInstance(
   data[at + 20] = shadowX;
   data[at + 21] = shadowY;
   data[at + 22] = shadowSpread;
-  data[at + 23] = shadowRadius;
+  data[at + 23] = typeof shadowRadius === 'number' ? shadowRadius : uniformBorderRadius(shadowRadius);
+  // One radius is clamped to half the shorter side, as Canvas2D clamps
+  // it; four arrive fitted by the caller, against the shape they round.
+  writeCorners(data, at + 24, typeof radius === 'number' ? Math.min(radius, width / 2, height / 2) : radius);
+  writeCorners(data, at + 28, shadowRadius);
   out.length = at + INSTANCE_STRIDE_FLOATS;
+}
+
+/** Four corners at `at`, top left first and clockwise; one radius is four of it. */
+function writeCorners(data: Float32Array, at: number, radius: number | UiBorderRadius): void {
+  if (typeof radius === 'number') {
+    data[at] = radius;
+    data[at + 1] = radius;
+    data[at + 2] = radius;
+    data[at + 3] = radius;
+    return;
+  }
+  data[at] = radius.topLeft;
+  data[at + 1] = radius.topRight;
+  data[at + 2] = radius.bottomRight;
+  data[at + 3] = radius.bottomLeft;
+}
+
+/** Where each node's snapped box is written; see the walk. */
+const snapScratch: SnapBox = { x: 0, y: 0, width: 0, height: 0 };
+
+/**
+ * One rounded clip in the chain: the node's box, its corners fitted to
+ * it, the parent it nests in, and the way back from the screen.
+ */
+function pushClip(clipData: FloatBuffer, rec: SnapBox, radius: UiBorderRadius, parent: number, inverse: Affine): void {
+  const corners = fitBorderRadius(radius, rec.width, rec.height);
+  clipData.push4(rec.x, rec.y, rec.width, rec.height);
+  clipData.push4(uniformBorderRadius(corners), parent, 0, 0);
+  clipData.push4(inverse[0], inverse[1], inverse[2], inverse[3]);
+  clipData.push4(inverse[4], inverse[5], 0, 0);
+  clipData.push4(corners.topLeft, corners.topRight, corners.bottomRight, corners.bottomLeft);
 }
 
 /**
@@ -1532,9 +1576,9 @@ function pushShadows(
   inset: boolean
 ): void {
   const shadows = paint.boxShadows;
-  const radius = borderRadiusIsZero(paint.borderRadius)
-    ? 0
-    : fittedShadowRadius(uniformBorderRadius(paint.borderRadius), rec.width, rec.height);
+  // Fitted to the box first, as CSS fits a box's corners before a
+  // shadow is spread from them.
+  const radius = fitBorderRadius(paint.borderRadius, rec.width, rec.height);
   for (let i = shadows.length - 1; i >= 0; i--) {
     const shadow = shadows[i]!;
     if ((shadow.inset === true) !== inset || shadow.color.a <= 0) {
@@ -1564,7 +1608,7 @@ function pushShadows(
         shadow.offsetX,
         shadow.offsetY,
         spread,
-        boxShadowRadius(radius, spread, true)
+        offsetBorderRadius(radius, -spread)
       );
       continue;
     }
@@ -1581,7 +1625,7 @@ function pushShadows(
       width + reach * 2,
       height + reach * 2,
       color,
-      boxShadowRadius(radius, spread, false),
+      offsetBorderRadius(radius, spread),
       opacity,
       blur,
       PrimitiveKind.Shadow,
