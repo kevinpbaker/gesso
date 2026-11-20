@@ -310,4 +310,31 @@ describe('CanvasEditor', () => {
     // The glued shape moved with it, and was never snapped to.
     expect(live.every(edit => edit.snap?.kind !== 'point')).toBe(true);
   });
+
+  it('does not snap to a shape that moves with what is dragged', () => {
+    const edits: CanvasEdit[] = [];
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 400,
+        height: 200,
+        snap: {},
+        shapes: [
+          { id: 'a', bounds: { x: 20, y: 20, width: 100, height: 60 }, label: 'A' },
+          // A dimension glued to a's right side, just beyond it.
+          { id: 'dim', bounds: { x: 126, y: 120, width: 4, height: 60 }, label: 'Dimension', movesWith: ['a'] }
+        ],
+        onEdit: (edit: CanvasEdit) => edits.push(edit)
+      }),
+      { width: 400, height: 200 }
+    );
+    ui.frame();
+    ui.fireEvent.pointerDown(50, 50);
+    ui.fireEvent.pointerMove(60, 50, { buttons: 1 });
+    ui.fireEvent.pointerMove(55, 50, { buttons: 1 });
+    ui.fireEvent.pointerUp(55, 50);
+    // Its right side at 125 was within reach of the dimension's left at 126: no guide.
+    const last = edits.filter(edit => edit.phase === 'live').at(-1)!;
+    expect(last.kind === 'move' && last.dx).toBe(5);
+    expect(last.snap?.guides ?? []).toEqual([]);
+  });
 });

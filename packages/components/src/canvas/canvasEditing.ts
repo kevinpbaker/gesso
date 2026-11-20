@@ -80,6 +80,12 @@ export interface CanvasShape {
    * its numbers stay round. Its box's top left when left out.
    */
   readonly anchor?: CanvasPoint;
+  /**
+   * The shapes this one follows, by id: a dimension glued to a rectangle's
+   * corner moves when the rectangle does. While any of them is moved or
+   * reshaped it is not snapped to, where it was or where it goes.
+   */
+  readonly movesWith?: readonly string[];
 }
 
 /** A handle of a shape's own. */
@@ -434,7 +440,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     const boxes: CanvasRect[] = [];
     const points: SnapTarget[] = [];
     for (const shape of shapes.value) {
-      if (moving.has(shape.id)) continue;
+      if (moving.has(shape.id) || shape.movesWith?.some(id => moving.has(id)) === true) continue;
       boxes.push(shape.bounds);
       points.push(...(shape.snapPoints ?? boxPoints(shape.bounds)));
     }

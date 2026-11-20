@@ -608,6 +608,7 @@ interface CanvasShape {
   readonly hit?: (point: CanvasPoint, slack: number) => boolean;
   readonly snapPoints?: readonly SnapTarget[];
   readonly anchor?: CanvasPoint;
+  readonly movesWith?: readonly string[];
 }
 interface CanvasHandle {
   readonly id: string;

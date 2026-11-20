@@ -130,6 +130,7 @@ snap mark and readout through `show`, and the pure functions under both
 | `hit`         | `(point, slack) => boolean`         | Whether a point is on it. Its box when left out; a line wants its own.                                                        |
 | `snapPoints`  | `SnapTarget[]`                      | What others snap to. Its corners, side middles and centre when left out.                                                      |
 | `anchor`      | `CanvasPoint`                       | The point a move of it snaps to the grid by: a corner or an end, so its numbers stay round. Its box's top left when left out. |
+| `movesWith`   | `string[]`                          | The shapes it follows (a dimension glued to a corner). While any is moved or reshaped, it is not snapped to.                  |
 
 A `CanvasHandle` is an `id`, a point `at`, and optionally an `anchor`,
 the point Shift holds the drag at 45° round (a line end's other end),
