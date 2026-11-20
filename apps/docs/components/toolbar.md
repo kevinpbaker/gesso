@@ -1,5 +1,5 @@
 ---
-description: 'Toolbar: a bordered row of controls that belong together, announced once as a group; given items, it draws its own tool buttons with shortcut tooltips, one tab stop, and folds what does not fit into a ⋯ menu.'
+description: 'Toolbar: a bordered row of controls that belong together, announced once as a group; given items, it draws its own tool buttons with shortcut tooltips, one tab stop, and folds what does not fit into a ⋯ menu, or wraps it onto more rows.'
 ---
 
 # Toolbar
@@ -89,6 +89,27 @@ controls have focus. It is told once focus has moved, after the focus
 and blur events of the controls it moved between, so keep what it says
 apart from what those report rather than letting the last word win.
 
+## Tools that wrap
+
+With `wrap`, the tools that do not fit go onto more rows instead of
+into ⋯. Nothing folds and there is no ⋯ button: every tool is on the
+bar, and the toolbar is as tall as its rows. Use it where the toolbar
+has a fixed width and room below, such as the top of a side panel.
+
+```tsx
+<Toolbar label="Drawing tools" items={tools} wrap keepFocus shortcutBadges onSelect={choose} />
+```
+
+It is still one tab stop. Left and Right walk every tool in order,
+across the rows, and Home and End go to the first and the last. Up and
+Down go to the tool in the row above or below whose middle is nearest
+the focused one's. In the first row Up, and in the last row Down, does
+nothing and leaves the key to what is round the toolbar.
+
+A rule (`separator`) stays before its tool, so a tool that starts a row
+can have a rule at the start of that row. `wrap` is read once, as
+`items` is.
+
 ## Props
 
 | Prop             | Type                         | Default      | What it does                                                                     |
@@ -100,6 +121,7 @@ apart from what those report rather than letting the last word win.
 | `moreLabel`      | `string`                     | `'More'`     | The ⋯ button's name and tooltip.                                                 |
 | `shortcutBadges` | `boolean`                    | `false`      | Draws a short shortcut in its button's corner.                                   |
 | `keepFocus`      | `boolean`                    | `false`      | A pointer press leaves keyboard focus where it was.                              |
+| `wrap`           | `boolean`                    | `false`      | With `items`, the tools wrap onto more rows instead of folding into ⋯.           |
 | `onFocusChange`  | `(focused: boolean) => void` | none         | Focus came into the toolbar or its ⋯ menu, or left them.                         |
 
 The default name is the word `Toolbar`, which is true and unhelpful on a
@@ -145,7 +167,8 @@ box around the toolbar until that changes.
 With `items`: one tab stop, on the last button used. Left and Right
 walk the buttons on the bar and then ⋯, wrapping; Home and End go to
 the first and the last; Enter and Space press the focused button, and
-on ⋯ open the menu, as Down does. The menu then owns the keys.
+on ⋯ open the menu, as Down does. The menu then owns the keys. With
+`wrap`, there is no ⋯, and Up and Down move between the rows.
 
 With children: none. `Toolbar` binds no keys and is not a tab stop, so Tab and
 Shift+Tab walk the controls inside it one at a time, and each control

@@ -60,6 +60,8 @@ export interface ToolbarItemsOptions {
   readonly moreLabel: Observable<string>;
   readonly shortcutBadges: boolean;
   readonly keepFocus: boolean;
+  /** The items wrap onto more rows instead of folding: no ⋯ menu, and Up and Down move between rows. */
+  readonly wrap?: boolean;
   readonly onFocusChange?: (focused: boolean) => void;
 }
 
@@ -75,10 +77,17 @@ export interface ToolbarItemsOptions {
  * The toolbar is as wide as all of them where it can be and as wide as
  * it is let be otherwise (a `maxWidth`, a row that shrinks it), and the
  * row of items is what gives way.
+ *
+ * With `wrap`, the row wraps instead (`flexWrap`), and nothing folds:
+ * `shown` stays at every item and the ⋯ button never shows. It is
+ * still one tab stop. Left and Right walk every item in order, across
+ * the rows, and Up and Down go to the nearest item in the row above or
+ * below, measured from the boxes the last layout gave, as a grid does.
  */
 export function toolbarItems(ctx: ComponentContext, options: ToolbarItemsOptions): readonly UiChild[] {
   const focus = ctx.inject(FocusService);
   const items = options.items;
+  const wrap = options.wrap === true;
   /** How many items, from the start, are on the bar; the rest are in the ⋯ menu. */
   const shown = new BehaviorSubject<number>(Number.POSITIVE_INFINITY);
   /** The item that is the tab stop, by value: the last one focused. */
@@ -99,7 +108,7 @@ export function toolbarItems(ctx: ComponentContext, options: ToolbarItemsOptions
   // the first, so it settles in one more pass.
   const refold = (): void => {
     const all = list();
-    if (row === null || row.width <= 0) {
+    if (wrap || row === null || row.width <= 0) {
       return;
     }
     const start = row.x;
@@ -202,12 +211,58 @@ export function toolbarItems(ctx: ComponentContext, options: ToolbarItemsOptions
     focus.focus(all[next].node);
   };
 
-  const keys = keymap({
+  /**
+   * With `wrap`: focus to the item in the next row up or down whose
+   * middle is nearest the focused one's. False when there is no row
+   * that way, so the key is left for what is round the toolbar.
+   */
+  const stepRow = (direction: 1 | -1): boolean => {
+    const all = stops();
+    const from = all.find(entry => entry.node === focus.focused.value);
+    const at = from === undefined ? undefined : boxes.get(from.value);
+    if (at === undefined) {
+      return false;
+    }
+    const middle = (box: LayoutBox): number => box.x + box.width / 2;
+    // Rows by their top: an item whose top is past this one's by half
+    // its height is in another row. Items in one row are centred on it,
+    // so their tops differ by less than that.
+    const placed = all.flatMap(entry => {
+      const box = boxes.get(entry.value);
+      return box === undefined ? [] : [{ node: entry.node, box }];
+    });
+    const ahead = placed.filter(entry => (entry.box.y - at.y) * direction > at.height / 2);
+    if (ahead.length === 0) {
+      return false;
+    }
+    const nearest = Math.min(...ahead.map(entry => Math.abs(entry.box.y - at.y)));
+    const next = ahead.filter(entry => Math.abs(entry.box.y - at.y) - nearest < at.height / 2);
+    let best = next[0];
+    for (const entry of next) {
+      if (Math.abs(middle(entry.box) - middle(at)) < Math.abs(middle(best.box) - middle(at))) {
+        best = entry;
+      }
+    }
+    focus.focus(best.node);
+    return true;
+  };
+
+  const arrows = keymap({
     ArrowRight: () => step(1),
     ArrowLeft: () => step(-1),
     Home: () => step('first'),
     End: () => step('last')
   });
+  const keys = (event: UiKeyboardEvent): void => {
+    if (wrap && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      if (stepRow(event.key === 'ArrowDown' ? 1 : -1)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
+    arrows(event);
+  };
 
   const rowBox = new BehaviorSubject<LayoutBox>({ x: 0, y: 0, width: 0, height: 0 });
   ctx.effect(rowBox, box => {
@@ -230,7 +285,9 @@ export function toolbarItems(ctx: ComponentContext, options: ToolbarItemsOptions
       y: 'center',
       flexShrink: 1,
       minWidth: 0,
-      overflow: 'hidden',
+      // Wrapped, nothing runs past the end to clip, and a clip would
+      // cut off the focus rings of the rows.
+      ...(wrap ? { flexWrap: 'wrap' as const, rowGap: GAP } : { overflow: 'hidden' as const }),
       modifiers: [measureFlow(rowBox)]
     },
     structure.pipe(

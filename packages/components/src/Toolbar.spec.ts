@@ -28,7 +28,11 @@ function icon() {
 }
 
 function mount(
-  options: { width?: number | BehaviorSubject<number>; items?: ToolbarItem[] | BehaviorSubject<ToolbarItem[]> } = {}
+  options: {
+    width?: number | BehaviorSubject<number>;
+    items?: ToolbarItem[] | BehaviorSubject<ToolbarItem[]>;
+    wrap?: boolean;
+  } = {}
 ) {
   const chosen: string[] = [];
   const items = options.items ?? TOOLS.map(tool => ({ ...tool, icon }));
@@ -40,6 +44,7 @@ function mount(
         items,
         maxWidth: options.width,
         shortcutBadges: true,
+        wrap: options.wrap,
         onSelect: (value: string) => chosen.push(value)
       })
     ),
@@ -199,5 +204,94 @@ describe('Toolbar items', () => {
     });
     expect(ui.queryByRole('button')).toBeNull();
     expect(ui.getSemantics(ui.getByRole('toolbar')).label).toBe('Plain');
+  });
+});
+
+/**
+ * `wrap`: the tools go onto more rows instead of into the ⋯ menu.
+ * Calcwright docked its drawing tools in a 456 px inspector as three
+ * toolbars, because one folded its tools away; that was three tab
+ * stops, and the arrows stopped at each one's end.
+ */
+describe('Toolbar wrap', () => {
+  /** The buttons' rows, by their tops, top first. */
+  function rows(ui: ReturnType<typeof mount>['ui'], all: ReturnType<ReturnType<typeof mount>['buttons']>) {
+    const tops = [...new Set(all.map(node => Math.round(ui.getLayout(node).y)))].sort((a, b) => a - b);
+    return tops.map(top => all.filter(node => Math.round(ui.getLayout(node).y) === top));
+  }
+
+  it('wraps the tools onto more rows within its width, and folds none', () => {
+    const { ui, names, buttons } = mount({ width: 140, wrap: true });
+    expect(names()).toEqual(TOOLS.map(tool => tool.label));
+    expect(ui.queryByLabel('More')).toBeNull();
+    const toolbar = ui.getLayout(ui.getByRole('toolbar'));
+    expect(toolbar.width).toBeLessThanOrEqual(140);
+    const lines = rows(ui, buttons());
+    expect(lines.length).toBeGreaterThan(1);
+    for (const node of buttons()) {
+      const box = ui.getLayout(node);
+      expect(box.x + box.width).toBeLessThanOrEqual(toolbar.x + toolbar.width + 0.5);
+      expect(box.y + box.height).toBeLessThanOrEqual(toolbar.y + toolbar.height + 0.5);
+    }
+  });
+
+  it('is one row when there is room', () => {
+    const { ui, buttons } = mount({ wrap: true });
+    expect(rows(ui, buttons())).toHaveLength(1);
+  });
+
+  it('rewraps when its width changes, still with no ⋯', () => {
+    const width = new BehaviorSubject(400);
+    const { ui, buttons, names } = mount({ width, wrap: true });
+    expect(rows(ui, buttons())).toHaveLength(1);
+    width.next(100);
+    ui.frame();
+    ui.frame();
+    expect(rows(ui, buttons()).length).toBeGreaterThan(1);
+    expect(names()).toEqual(TOOLS.map(tool => tool.label));
+  });
+
+  it('is one tab stop whose Left and Right walk every tool across the rows', () => {
+    const { ui, buttons } = mount({ width: 140, wrap: true });
+    const all = buttons();
+    const [first, second] = rows(ui, all);
+    ui.fireEvent.focus(first.at(-1)!);
+    ui.fireEvent.keyDown('ArrowRight');
+    expect(ui.runtime.input.focus.focusedNode).toBe(second[0]);
+    ui.fireEvent.keyDown('ArrowLeft');
+    expect(ui.runtime.input.focus.focusedNode).toBe(first.at(-1));
+    ui.fireEvent.keyDown('End');
+    expect(ui.runtime.input.focus.focusedNode).toBe(all.at(-1));
+    ui.fireEvent.keyDown('ArrowRight');
+    expect(ui.runtime.input.focus.focusedNode).toBe(all[0]);
+    expect(all.filter(node => node.getProperty('tabStop') !== false)).toEqual([all[0]]);
+  });
+
+  it('moves between rows with Up and Down, to the nearest tool', () => {
+    const { ui, buttons } = mount({ width: 140, wrap: true });
+    const [first, second] = rows(ui, buttons());
+    const middle = (node: (typeof first)[number]) => {
+      const box = ui.getLayout(node);
+      return box.x + box.width / 2;
+    };
+    const nearest = (from: (typeof first)[number], row: typeof first) =>
+      row.reduce((best, node) =>
+        Math.abs(middle(node) - middle(from)) < Math.abs(middle(best) - middle(from)) ? node : best
+      );
+    ui.fireEvent.focus(first[0]);
+    ui.fireEvent.keyDown('ArrowDown');
+    expect(ui.runtime.input.focus.focusedNode).toBe(nearest(first[0], second));
+    ui.fireEvent.focus(second.at(-1)!);
+    ui.fireEvent.keyDown('ArrowUp');
+    expect(ui.runtime.input.focus.focusedNode).toBe(nearest(second.at(-1)!, first));
+    // No row above the first: the key is left alone.
+    ui.fireEvent.focus(first[0]);
+    ui.fireEvent.keyDown('ArrowUp');
+    expect(ui.runtime.input.focus.focusedNode).toBe(first[0]);
+  });
+
+  it('without wrap, the same width still folds into ⋯', () => {
+    const { names } = mount({ width: 140 });
+    expect(names().at(-1)).toBe('More');
   });
 });

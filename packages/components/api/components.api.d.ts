@@ -433,6 +433,7 @@ interface ToolbarProps extends ControlLayoutProps {
   label?: string;
   children?: UiChild;
   items?: readonly ToolbarItem[];
+  wrap?: boolean;
   onSelect?: (value: string) => void;
   moreLabel?: string;
   shortcutBadges?: boolean;
