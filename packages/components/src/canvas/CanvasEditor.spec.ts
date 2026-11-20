@@ -110,7 +110,7 @@ describe('CanvasEditor', () => {
   it('chooses what a marquee touches', () => {
     const { drag, selected } = mount();
     drag([20, 20], [120, 220]);
-    expect(selected().map(label => label.split(',')[0])).toEqual(['Rectangle a', 'Rectangle c']);
+    expect(selected().map(label => label?.split(',')[0])).toEqual(['Rectangle a', 'Rectangle c']);
   });
 
   it('moves the chosen shapes as one edit: start, live, end, totals from the start', () => {
