@@ -117,6 +117,7 @@ interface ButtonProps extends ControlLayoutProps {
   expanded?: boolean;
   controls?: UiNode | null;
   onClick?: () => void;
+  onFocusChange?: (focused: boolean) => void;
   children?: UiChild;
 }
 declare function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiChild;
@@ -833,6 +834,7 @@ declare function useOverlay(ctx: ComponentContext, name: string): OverlayHandle;
 interface PaletteColor {
   readonly value: string;
   readonly name: string;
+  readonly swatch?: string;
 }
 declare const PALETTE: readonly (readonly PaletteColor[])[];
 interface ColorPaletteProps {
@@ -847,6 +849,7 @@ interface ColorPaletteProps {
   colors?: readonly (readonly PaletteColor[])[];
   label?: string;
   onCustom?: () => void;
+  customLabel?: string;
 }
 declare function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentContext): UiChild;
 declare function normalizeHex(text: string): string | null;

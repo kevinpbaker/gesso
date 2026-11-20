@@ -19,6 +19,13 @@ import { useOverlay, type OverlayPlacement } from './overlay';
 export interface PaletteColor {
   readonly value: string;
   readonly name: string;
+  /**
+   * What the swatch is painted, when `value` is not itself a colour: a
+   * colour an application names its own way (`blue` in a drawing, which
+   * the drawing draws as its own blue), shown as the colour it stands
+   * for. A theme colour's name or `#rrggbb`. Left out, `value` is painted.
+   */
+  readonly swatch?: string;
 }
 
 const HUES = ['red berry', 'red', 'orange', 'yellow', 'green', 'cyan', 'cornflower blue', 'blue', 'purple', 'magenta'];
@@ -91,7 +98,10 @@ export interface ColorPaletteProps {
   onSelect?: (color: string) => void;
   /** What the choice of no colour is called: "Automatic", "No fill". */
   automaticLabel?: string;
-  /** Colours used lately, most recent first; at most a row of them is shown. */
+  /**
+   * Colours used lately, most recent first; at most a row of them is
+   * shown. One the grid has is named and painted as the grid does it.
+   */
   recent?: readonly string[];
   /** The rows of swatches; `PALETTE` when not given. */
   colors?: readonly (readonly PaletteColor[])[];
@@ -103,6 +113,8 @@ export interface ColorPaletteProps {
    * the caller opens whatever picks one — a `ColorPicker`, usually.
    */
   onCustom?: () => void;
+  /** What the "Custom colour…" row is called: "Custom color…" where the page is in US English. */
+  customLabel?: string;
 }
 
 /** The value of the "Custom colour…" row, which is no colour. */
@@ -118,6 +130,7 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
   const label = input(inputs.label, 'Colour');
   const placement = input(inputs.placement, 'bottom-start');
   const automatic = input(inputs.automaticLabel, 'Automatic');
+  const customLabel = input(inputs.customLabel, 'Custom colour…');
   const focus = ctx.inject(FocusService);
   const overlay = useOverlay(ctx, 'color-palette');
   const active = new BehaviorSubject<At>({ row: 0, column: 0 });
@@ -126,14 +139,16 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
 
   /** Every row the keyboard walks: the automatic choice, the recent colours, then the grid. */
   const rows = (): readonly (readonly PaletteColor[])[] => {
-    const recent = (inputs.recent.value ?? []).slice(0, 10).map(value => ({ value, name: `recent ${value}` }));
-    const custom = inputs.onCustom.value === undefined ? [] : [[{ value: CUSTOM, name: 'Custom colour…' }]];
-    return [
-      [{ value: '', name: automatic.value }],
-      ...(recent.length === 0 ? [] : [recent]),
-      ...(inputs.colors.value ?? PALETTE),
-      ...custom
-    ];
+    const grid = inputs.colors.value ?? PALETTE;
+    const recent = (inputs.recent.value ?? []).slice(0, 10).map((value): PaletteColor => {
+      // Named as the grid names it, so a screen reader hears "recent blue", not a hex code.
+      const known = grid.flat().find(color => sameColor(color.value, value));
+      return known === undefined
+        ? { value, name: `recent ${value}` }
+        : { ...known, value, name: `recent ${known.name}` };
+    });
+    const custom = inputs.onCustom.value === undefined ? [] : [[{ value: CUSTOM, name: customLabel.value }]];
+    return [[{ value: '', name: automatic.value }], ...(recent.length === 0 ? [] : [recent]), ...grid, ...custom];
   };
 
   const release = (): void => {
@@ -201,7 +216,7 @@ export function ColorPalette(inputs: Inputs<ColorPaletteProps>, ctx: ComponentCo
       width: 18,
       height: 18,
       borderRadius: 3,
-      backgroundColor: color.value,
+      backgroundColor: color.swatch ?? color.value,
       borderColor: combineLatest([lit, chosen]).pipe(
         map(([on, picked]) => (on ? 'focusRing' : picked ? 'text' : 'border'))
       ),

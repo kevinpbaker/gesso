@@ -80,21 +80,22 @@ change variant should change its `key`, which builds a new one.
 
 ## Props
 
-| Prop          | Type             | Default     | What it does                                                           |
-| ------------- | ---------------- | ----------- | ---------------------------------------------------------------------- |
-| `label`       | `string`         | `''`        | The words on it, and the accessible name                               |
-| `description` | `string`         | `''`        | Longer help, for a label that cannot say everything                    |
-| `variant`     | `ButtonVariant`  | `'filled'`  | How much of the surface it claims                                      |
-| `tone`        | `ButtonTone`     | `'neutral'` | What the action means                                                  |
-| `size`        | `ButtonSize`     | `'medium'`  | How big it is                                                          |
-| `disabled`    | `boolean`        | `false`     | Refuses presses and draws in the disabled foreground token             |
-| `busy`        | `boolean`        | `false`     | Refuses presses and announces `busy`, without looking disabled         |
-| `tabStop`     | `boolean`        | `true`      | Whether Tab stops on it; false leaves it pressable and focusable       |
-| `expanded`    | `boolean`        | none        | Whether the popup it opens is open; announced as expanded or collapsed |
-| `controls`    | `UiNode \| null` | none        | The node it shows or changes, usually that popup while it is open      |
-| `onClick`     | `() => void`     | none        | Fired on a press and on Enter or Space, which the element handles      |
-| `children`    | `UiChild`        | the label   | Content instead of the words; `label` stays the name                   |
-| `ref`         | `UiNodeRef`      | none        | Receives the node that _is_ the button, for focus and for anchoring    |
+| Prop            | Type                         | Default     | What it does                                                           |
+| --------------- | ---------------------------- | ----------- | ---------------------------------------------------------------------- |
+| `label`         | `string`                     | `''`        | The words on it, and the accessible name                               |
+| `description`   | `string`                     | `''`        | Longer help, for a label that cannot say everything                    |
+| `variant`       | `ButtonVariant`              | `'filled'`  | How much of the surface it claims                                      |
+| `tone`          | `ButtonTone`                 | `'neutral'` | What the action means                                                  |
+| `size`          | `ButtonSize`                 | `'medium'`  | How big it is                                                          |
+| `disabled`      | `boolean`                    | `false`     | Refuses presses and draws in the disabled foreground token             |
+| `busy`          | `boolean`                    | `false`     | Refuses presses and announces `busy`, without looking disabled         |
+| `tabStop`       | `boolean`                    | `true`      | Whether Tab stops on it; false leaves it pressable and focusable       |
+| `expanded`      | `boolean`                    | none        | Whether the popup it opens is open; announced as expanded or collapsed |
+| `controls`      | `UiNode \| null`             | none        | The node it shows or changes, usually that popup while it is open      |
+| `onClick`       | `() => void`                 | none        | Fired on a press and on Enter or Space, which the element handles      |
+| `onFocusChange` | `(focused: boolean) => void` | none        | Told from its own focus and blur; a box round it cannot hear them      |
+| `children`      | `UiChild`                    | the label   | Content instead of the words; `label` stays the name                   |
+| `ref`           | `UiNodeRef`                  | none        | Receives the node that _is_ the button, for focus and for anchoring    |
 
 Layout props pass through, as they do for every control in the library:
 `width`, `flex`, `margin` and the rest go on the button itself, so a

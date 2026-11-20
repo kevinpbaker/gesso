@@ -183,6 +183,19 @@ describe('Button', () => {
     expect(button().controls).toBeUndefined();
   });
 
+  it('says when it takes focus and loses it, from its own events', () => {
+    const seen: string[] = [];
+    const ui = mount(
+      Row(
+        createComponent(Button, { label: 'Line color', onFocusChange: (on: boolean) => seen.push(`button ${on}`) }),
+        Box({ focusable: true, label: 'Canvas', onFocus: () => seen.push('canvas true') })
+      )
+    );
+    ui.fireEvent.focus(ui.getByRole('button'));
+    ui.fireEvent.focus(ui.getByLabel('Canvas'));
+    expect(seen).toEqual(['button true', 'button false', 'canvas true']);
+  });
+
   it('says busy and expanded together', () => {
     const ui = mount(createComponent(Button, { label: 'Filters', busy: true, expanded: true }));
     // The record keeps states in its own order, so the order here is not the claim.

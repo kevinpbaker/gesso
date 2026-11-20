@@ -111,6 +111,50 @@ describe('ColorPalette', () => {
     expect(chosen).toEqual(['#123456']);
   });
 
+  it('names a recent colour the grid has as the grid does', () => {
+    const { ui, open, chosen } = mount('', ['#FF0000']);
+    open.next(true);
+    ui.frame();
+    ui.fireEvent.click(ui.getByRole('option', { name: 'recent red' }));
+    ui.frame();
+    expect(chosen).toEqual(['#FF0000']);
+  });
+
+  /** A drawing's "blue" is its own blue: the value is the name it writes, the swatch the colour it draws. */
+  it('paints a colour named its own way as the colour it stands for', () => {
+    const open = new BehaviorSubject(true);
+    const chosen: string[] = [];
+    const colors = [
+      [
+        { value: 'blue', name: 'drawing blue', swatch: '#1f5fbf' },
+        { value: '#ff0000', name: 'red' }
+      ]
+    ];
+    const ui = renderTest(
+      createComponent(ColorPalette, {
+        open,
+        onOpenChange: (next: boolean) => open.next(next),
+        value: 'blue',
+        recent: ['blue'],
+        colors,
+        onSelect: (color: string) => chosen.push(color),
+        onCustom: () => undefined,
+        customLabel: 'Custom color…'
+      }),
+      { width: 400, height: 300 }
+    );
+    ui.frame();
+    const blue = ui.getByRole('option', { name: 'drawing blue' });
+    expect(blue.properties.get('backgroundColor')).toBe('#1f5fbf');
+    expect(ui.getSemantics(blue).states).toContain('selected');
+    expect(ui.getByRole('option', { name: 'recent drawing blue' }).properties.get('backgroundColor')).toBe('#1f5fbf');
+    expect(ui.getByRole('option', { name: 'Custom color…' })).toBeDefined();
+    // It opens on the colour now: Enter keeps it.
+    ui.fireEvent.keyDown('Enter');
+    ui.frame();
+    expect(chosen).toEqual(['blue']);
+  });
+
   it('reads a colour written by hand', () => {
     expect(normalizeHex('#ABC')).toBe('#aabbcc');
     expect(normalizeHex('12ab9F')).toBe('#12ab9f');

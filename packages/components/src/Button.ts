@@ -105,6 +105,12 @@ export interface ButtonProps extends ControlLayoutProps {
    */
   controls?: UiNode | null;
   onClick?: () => void;
+  /**
+   * The button took focus or lost it, told from its own focus and blur,
+   * as `InspectorSection`'s is: a focus event does not bubble, so a box
+   * round the button cannot hear it.
+   */
+  onFocusChange?: (focused: boolean) => void;
   /** Content instead of the label's text; `label` stays the name. */
   children?: UiChild;
 }
@@ -173,7 +179,9 @@ export function Button(inputs: Inputs<ButtonProps>, ctx: ComponentContext): UiCh
       role: 'button',
       states: states(busy, expanded),
       controls,
-      onClick: press
+      onClick: press,
+      onFocus: () => inputs.onFocusChange.emit(true),
+      onBlur: () => inputs.onFocusChange.emit(false)
     },
     followedChildren(inputs.children, () =>
       Text({
