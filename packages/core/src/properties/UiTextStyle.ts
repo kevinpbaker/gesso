@@ -1,4 +1,5 @@
 import type { UiColor } from './UiColor';
+import { textScaleOf } from '../environment/UiTextScale';
 import { rgb8 } from './UiColor';
 import type { UiColorValue, UiFontWeight, UiTextAlign, UiTextDirection } from './UiPropertyValues';
 import type { UiNode } from '../graph/UiNode';
@@ -261,7 +262,41 @@ export function textContentOf(node: UiNode): string {
 
 /** The runs of a node's paragraph; empty when it has none. */
 export function resolvedSpansOf(node: UiNode): readonly UiResolvedTextSpan[] {
-  return spannedTextOf(node)?.spans ?? EMPTY_SPANS;
+  const spans = spannedTextOf(node)?.spans;
+  return spans === undefined ? EMPTY_SPANS : scaledSpans(spans, textScaleOf(node));
+}
+
+const scaledRuns = new WeakMap<
+  readonly UiResolvedTextSpan[],
+  { scale: number; spans: readonly UiResolvedTextSpan[] }
+>();
+
+/**
+ * A paragraph's runs at its text scale: a run's own font size and
+ * letter spacing are written sizes, like a node's, and are drawn as
+ * many times larger (see `UiEnvironmentKeys.textScale`). Remembered per
+ * runs and scale, so a frame allocates nothing; the same runs at 1 are
+ * returned as they are.
+ */
+function scaledSpans(spans: readonly UiResolvedTextSpan[], scale: number): readonly UiResolvedTextSpan[] {
+  if (scale === 1 || !spans.some(span => span.fontSize !== undefined || span.letterSpacing !== undefined)) {
+    return spans;
+  }
+  const kept = scaledRuns.get(spans);
+  if (kept !== undefined && kept.scale === scale) {
+    return kept.spans;
+  }
+  const scaled = spans.map(span =>
+    span.fontSize === undefined && span.letterSpacing === undefined
+      ? span
+      : {
+          ...span,
+          fontSize: span.fontSize === undefined ? undefined : span.fontSize * scale,
+          letterSpacing: span.letterSpacing === undefined ? undefined : span.letterSpacing * scale
+        }
+  );
+  scaledRuns.set(spans, { scale, spans: scaled });
+  return scaled;
 }
 
 /**
@@ -297,10 +332,11 @@ export function editableSpansOf(
     return EMPTY_SPANS;
   }
   if (spanned.text === text) {
-    return spanned.spans;
+    return scaledSpans(spanned.spans, textScaleOf(node));
   }
   if (composition !== undefined && composition !== null) {
-    return composedSpans(spanned, text, composition) ?? EMPTY_SPANS;
+    const composed = composedSpans(spanned, text, composition);
+    return composed === undefined ? EMPTY_SPANS : scaledSpans(composed, textScaleOf(node));
   }
   return EMPTY_SPANS;
 }

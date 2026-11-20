@@ -104,6 +104,24 @@ Text you can _edit_, with a caret, a selection and composition from an
 IME, is a different subject from text you lay out, and lives in
 `EditableText` and the `TextInput` component rather than in these props.
 
+## The browser's text size
+
+A person who has set their browser's text size larger than the usual 16
+gets every size in the application drawn that much larger: at 20, a
+`fontSize={14}` label is drawn at 17.5, its line height and letter
+spacing with it, and so is every run of a paragraph. The shell reads
+the setting when the application starts and again whenever the window
+comes back to the front, and the tree is laid out at the new size, as a
+page written in `rem` reflows. Boxes keep the sizes they were given, so
+text in a fixed-height row can outgrow it; `ShellService.textScale`
+says what the scale is, for a layout that wants to make room.
+
+Text that has to fit a shape it does not control, a label inside a
+drawn gauge, can keep its written size: `textScale={1}` on any element
+holds its subtree at 1. An application that wants none of it passes
+`textSize: 'fixed'` to `createApp`, or calls `.textSize('fixed')` on
+`createSyncApp`.
+
 ## Next
 
 [Light and dark](/guide/appearance) is where the type scale and the

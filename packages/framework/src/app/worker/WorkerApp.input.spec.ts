@@ -393,6 +393,19 @@ describe('pointer coordinates', () => {
  * Hover moves coalesced to one a frame, and never left behind the
  * event that superseded them.
  */
+describe('text size', () => {
+  it("reports the browser's text scale, unless the application keeps its sizes fixed", () => {
+    const following = setup();
+    following.internals.attachInput(following.canvas as unknown as HTMLCanvasElement);
+    expect(following.posts.filter(message => message.type === 'textScale')).toHaveLength(1);
+    following.restore();
+
+    const fixed = setup({ textSize: 'fixed' });
+    fixed.internals.attachInput(fixed.canvas as unknown as HTMLCanvasElement);
+    expect(fixed.posts.filter(message => message.type === 'textScale')).toEqual([]);
+  });
+});
+
 describe('hover coalescing', () => {
   it('posts the newest hover once a frame and nothing before it', () => {
     const shell = setup();

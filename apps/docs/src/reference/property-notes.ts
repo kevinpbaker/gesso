@@ -477,6 +477,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Environment',
     note: 'Says this subtree is used with a finger (coarse) or a mouse (fine), over the device; a coarse theme grows its controls.'
   },
+  textScale: {
+    group: 'Environment',
+    note: "Draws this subtree's text that many times larger. The runtime sets it on the root from the browser's text size; 1 keeps written sizes."
+  },
   textStyle: { group: 'Environment', note: 'Provides one step of the type scale as the inherited text style.' },
   contentColor: { group: 'Environment', note: 'Provides the colour that content on this surface should use.' },
   containerSize: {

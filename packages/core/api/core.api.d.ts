@@ -1512,6 +1512,7 @@ declare const UiProperties: {
   readonly virtualSheet: UiPropertyDefinition<UiVirtualSheet | undefined>;
   readonly theme: UiPropertyDefinition<UiTheme | undefined>;
   readonly pointer: UiPropertyDefinition<UiPointer | undefined>;
+  readonly textScale: UiPropertyDefinition<number | undefined>;
   readonly textStyle: UiPropertyDefinition<UiTextStyle | UiTypographyRole | undefined>;
   readonly contentColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly provide: UiPropertyDefinition<readonly UiProvision<unknown>[] | undefined>;
@@ -1574,7 +1575,7 @@ type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColo
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'touchEmulation' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
-type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets' | 'provide'>;
+type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textScale' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets' | 'provide'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];
 };
@@ -2040,6 +2041,7 @@ declare const UiEnvironmentKeys: {
   readonly textDirection: UiEnvironmentKey<UiTextDirection | undefined>;
   readonly contentColor: UiEnvironmentKey<UiColor>;
   readonly pointer: UiEnvironmentKey<UiPointer>;
+  readonly textScale: UiEnvironmentKey<number>;
   readonly containerSize: UiEnvironmentKey<UiContainerSize>;
   readonly insets: UiEnvironmentKey<UiInsetSource>;
   readonly motion: UiEnvironmentKey<UiMotion>;

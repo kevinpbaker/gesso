@@ -54,6 +54,7 @@ export class GessoAppBuilder {
   private webmcpChoice: boolean | WebMcpChoice = false;
   private disconnectWebMcp: (() => void) | null = null;
   private colorSchemePreference: ColorSchemePreference = 'auto';
+  private textSizeMode: 'browser' | 'fixed' = 'browser';
 
   constructor(private root: FrameworkChild | ComponentType) {}
 
@@ -238,6 +239,16 @@ export class GessoAppBuilder {
   }
 
   /**
+   * Whether the text follows the browser's text-size setting, as
+   * `createApp`'s `textSize` does: `'browser'` (the default) or
+   * `'fixed'`. Read when `mountSync` runs.
+   */
+  textSize(mode: 'browser' | 'fixed'): this {
+    this.textSizeMode = mode;
+    return this;
+  }
+
+  /**
    * Mounts the app on the calling thread.
    *
    * Named for what it costs: everything — components, layout and
@@ -264,7 +275,8 @@ export class GessoAppBuilder {
       fonts: this.fontDeclarations,
       history: this.historyOptions,
       renderer: this.rendererChoice,
-      colorScheme: this.colorSchemePreference
+      colorScheme: this.colorSchemePreference,
+      textSize: this.textSizeMode
     });
     app.deferPatchesFrom(channels.registry.all());
     if (this.frameListener !== undefined) {

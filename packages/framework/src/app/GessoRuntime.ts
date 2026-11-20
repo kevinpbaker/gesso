@@ -1856,6 +1856,24 @@ export class GessoRuntime {
   }
 
   /**
+   * How much larger than written the application's text is drawn: the
+   * browser's text-size setting, as the shell reads it (see
+   * `textSize.ts`). Written on the root as `textScale`, which every
+   * font, line height and letter spacing below it is multiplied by, so
+   * the tree is laid out again at the new size. A subtree that sets
+   * `textScale={1}` keeps its written sizes.
+   */
+  setTextScale(scale: number): void {
+    if (!(scale > 0) || !Number.isFinite(scale)) {
+      return;
+    }
+    this.services.get(ShellService).applyTextScale(scale);
+    if (this.graph.updateNodePropertyNow(this.graph.root, 'textScale', scale, DirtyFlags.Environment)) {
+      this.requestRepaint();
+    }
+  }
+
+  /**
    * The platform's own insets, as the shell reports them: the safe area
    * under a notch or a home indicator and the strip a soft keyboard
    * covers, once at start-up and again whenever they change.

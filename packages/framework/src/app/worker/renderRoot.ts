@@ -616,6 +616,9 @@ export class RenderWorkerApp {
       case 'contrast':
         runtime.setContrast(message.contrast);
         break;
+      case 'textScale':
+        runtime.setTextScale(message.scale);
+        break;
       case 'windowActive':
         runtime.setWindowActive(message.active);
         break;

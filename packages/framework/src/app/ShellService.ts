@@ -186,6 +186,7 @@ export class ShellService {
   private preferred: ColorSchemePreference | null = null;
   private readonly scheme = internalState<ColorScheme>('light');
   private readonly contrastState = internalState<UiContrast>('standard');
+  private readonly textScaleState = internalState(1);
   private readonly pointerState = internalState<UiPointer>('fine');
   private readonly activeState = internalState(true);
   private readonly insets = internalState<UiInsets>(noInsets);
@@ -345,6 +346,22 @@ export class ShellService {
       this.pointerState.value = pointer;
     }
   }
+
+  /** Called by the runtime when the shell reports the browser's text size; not for applications. */
+  applyTextScale(scale: number): void {
+    if (this.textScaleState.value !== scale) {
+      this.textScaleState.value = scale;
+    }
+  }
+
+  /**
+   * The browser's text-size setting over 16: 1 at the default, 1.25 for
+   * someone who set 20. Every text size in the app is drawn this many
+   * times larger already (see `GessoRuntime.setTextScale`); this is for
+   * a layout that wants to make room for it, a sidebar that widens with
+   * its labels.
+   */
+  readonly textScale: ReadableCell<number> = this.textScaleState;
 
   applyContrast(contrast: UiContrast): void {
     if (this.contrastState.value !== contrast) {

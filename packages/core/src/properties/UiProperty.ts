@@ -1855,6 +1855,20 @@ export const UiProperties = {
   }),
 
   /**
+   * Provides `UiEnvironmentKeys.textScale` to this element's subtree:
+   * every font size, line height and letter spacing in it is drawn this
+   * many times larger. The runtime sets it on the root from the
+   * browser's text-size setting; `textScale={1}` on an element keeps
+   * the text inside it at its written size.
+   */
+  textScale: defineProperty<number | undefined>({
+    name: 'textScale',
+    defaultValue: undefined,
+    inherited: false,
+    affects: E
+  }),
+
+  /**
    * The type this element and its subtree are written in: a role in
    * the theme's scale (`textStyle="title"`), or a style of its own.
    *

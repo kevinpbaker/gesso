@@ -1,4 +1,5 @@
 import type { UiPointer } from './UiPointer';
+import { textScaleKey } from './UiTextScale';
 import { createEnvironmentKey } from './UiEnvironmentKey';
 import type { UiTheme } from './UiTheme';
 import type { UiTextStyle } from '../properties/UiTextStyle';
@@ -98,6 +99,9 @@ export const UiEnvironmentKeys = {
     name: 'pointer',
     defaultValue: 'fine'
   }),
+
+  /** How much larger than written text is drawn; see `UiTextScale.ts`. */
+  textScale: textScaleKey,
 
   containerSize: createEnvironmentKey<UiContainerSize>({
     name: 'containerSize',

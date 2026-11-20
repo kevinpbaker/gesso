@@ -245,7 +245,7 @@ export type SemanticsProps = PropsOf<
 
 /** Environment values an element provides to its subtree. */
 export type EnvironmentProps = PropsOf<
-  'theme' | 'pointer' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets' | 'provide'
+  'theme' | 'pointer' | 'textScale' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets' | 'provide'
 >;
 
 /**

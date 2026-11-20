@@ -188,6 +188,8 @@ export type ShellToRuntimeMessage =
    */
   | { type: 'colorScheme'; scheme: ColorScheme }
   | { type: 'contrast'; contrast: UiContrast }
+  /** The browser's text-size setting over 16; see `textSize.ts` and `GessoRuntime.setTextScale`. */
+  | { type: 'textScale'; scale: number }
   | { type: 'pointer'; pointer: UiPointer }
   /** Whether the window is shown and holds the focus; once at start-up and on every change. See `ShellService.windowActive`. */
   | { type: 'windowActive'; active: boolean }

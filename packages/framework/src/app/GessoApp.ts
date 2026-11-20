@@ -26,6 +26,7 @@ import { performShellStorage, shellStorageDenied } from './shellStorage';
 import { observeColorScheme, type ColorScheme, type ColorSchemePreference } from './colorScheme';
 import { observeReducedMotion } from './reducedMotion';
 import { observeContrast } from './contrast';
+import { observeTextScale } from './textSize';
 import { observeWindowActive } from './windowActive';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from './fullscreen';
 import {
@@ -91,6 +92,12 @@ export interface GessoAppOptions {
    * and for measuring what the mirror costs.
    */
   accessibility?: boolean;
+  /**
+   * Whether the application's text follows the browser's text-size
+   * setting: `'browser'` (the default) or `'fixed'`. See the same option
+   * on `createApp`.
+   */
+  textSize?: 'browser' | 'fixed';
   /**
    * The appearance the application is told about: `auto` (the default)
    * follows `prefers-color-scheme`, `light` and `dark` override it.
@@ -165,6 +172,9 @@ export class GessoApp {
   private fullscreen = false;
   private detachReducedMotion: (() => void) | null = null;
   private detachContrast: (() => void) | null = null;
+  private detachTextScale: (() => void) | null = null;
+  /** Whether the text follows the browser's text-size setting; see `GessoAppOptions.textSize`. */
+  private readonly textSize: 'browser' | 'fixed';
   private detachWindowActive: (() => void) | null = null;
   /** Stops watching `prefers-color-scheme`; null while overridden. */
   private detachColorScheme: (() => void) | null = null;
@@ -180,6 +190,7 @@ export class GessoApp {
     this.canvas = options.canvas ?? createCanvasElement();
     this.inputEnabled = options.input ?? true;
     this.accessibilityEnabled = options.accessibility ?? true;
+    this.textSize = options.textSize ?? 'browser';
     this.onOpenRoute = options.onOpenRoute;
     this.colorSchemePreference = options.colorScheme ?? 'auto';
     // Here rather than at `mount`, because the runtime below builds its
@@ -461,6 +472,8 @@ export class GessoApp {
     this.detachReducedMotion = null;
     this.detachContrast?.();
     this.detachContrast = null;
+    this.detachTextScale?.();
+    this.detachTextScale = null;
     this.detachWindowActive?.();
     this.detachWindowActive = null;
     this.detachColorScheme?.();
@@ -553,6 +566,9 @@ export class GessoApp {
     }
     this.detachReducedMotion = observeReducedMotion(reduced => this.runtime.setReducedMotion(reduced));
     this.detachContrast = observeContrast(contrast => this.runtime.setContrast(contrast));
+    if (this.textSize !== 'fixed') {
+      this.detachTextScale = observeTextScale(scale => this.runtime.setTextScale(scale));
+    }
     this.detachWindowActive = observeWindowActive(active => this.runtime.setWindowActive(active));
     this.setColorScheme(this.colorSchemePreference);
   }

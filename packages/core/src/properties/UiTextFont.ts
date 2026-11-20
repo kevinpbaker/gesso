@@ -1,6 +1,7 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiProperties } from './UiProperty';
 import { resolveProperty } from './UiPropertyResolver';
+import { textScaleOf } from '../environment/UiTextScale';
 import type { UiFontWeight } from './UiPropertyValues';
 import type { UiFontKerning, UiFontStretch, UiFontStyle, UiFontVariant } from './UiTextStyle';
 
@@ -81,20 +82,23 @@ export interface UiFontFields {
 
 /** `resolveFont`, writing into a target the caller owns. */
 export function resolveFontInto(node: UiNode, out: UiFontFields): void {
-  const fontSize = positive(resolveProperty(node, UiProperties.fontSize)) ?? UiProperties.fontSize.defaultValue;
+  const scale = textScaleOf(node);
+  const fontSize =
+    (positive(resolveProperty(node, UiProperties.fontSize)) ?? UiProperties.fontSize.defaultValue) * scale;
   const ownFontSize = node.properties.get('fontSize');
   const ownLineHeight = positive(node.properties.get('lineHeight'));
   if (ownLineHeight !== undefined) {
-    out.lineHeight = ownLineHeight;
+    out.lineHeight = ownLineHeight * scale;
   } else if (ownFontSize !== undefined) {
     out.lineHeight = fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
   } else {
-    out.lineHeight = positive(resolveProperty(node, UiProperties.lineHeight)) ?? fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
+    const inherited = positive(resolveProperty(node, UiProperties.lineHeight));
+    out.lineHeight = inherited !== undefined ? inherited * scale : fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
   }
   out.fontSize = fontSize;
   out.fontFamily = nonEmpty(resolveProperty(node, UiProperties.fontFamily)) ?? UiProperties.fontFamily.defaultValue;
   out.fontWeight = weight(resolveProperty(node, UiProperties.fontWeight)) ?? UiProperties.fontWeight.defaultValue;
-  out.letterSpacing = finite(resolveProperty(node, UiProperties.letterSpacing)) ?? 0;
+  out.letterSpacing = (finite(resolveProperty(node, UiProperties.letterSpacing)) ?? 0) * scale;
   out.fontStyle = nonEmpty(resolveProperty(node, UiProperties.fontStyle)) ?? 'normal';
   out.fontStretch = nonEmpty(resolveProperty(node, UiProperties.fontStretch)) ?? 'normal';
   out.fontVariant = nonEmpty(resolveProperty(node, UiProperties.fontVariant)) ?? 'normal';

@@ -33,6 +33,7 @@ import { SemanticsMirror } from '../SemanticsMirror';
 import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeContrast } from '../contrast';
+import { observeTextScale } from '../textSize';
 import { observePointer } from '../pointer';
 import { observeWindowActive } from '../windowActive';
 import { observeReducedMotion } from '../reducedMotion';
@@ -281,6 +282,15 @@ export interface WorkerAppOptions {
    * a measurement.
    */
   accessibility?: boolean;
+  /**
+   * Whether the application's text follows the browser's text-size
+   * setting: `'browser'` (the default) draws every size that many times
+   * larger, as a page written in `rem` grows; `'fixed'` keeps the sizes
+   * as written, for an application whose text has to fit shapes it
+   * draws. A subtree can keep its own sizes either way with
+   * `textScale={1}`.
+   */
+  textSize?: 'browser' | 'fixed';
   /**
    * How the app's url is kept, for an app with routes: `path`
    * (pushState, the default), `hash`, or `memory`. See `shellHistory`.
@@ -1553,6 +1563,8 @@ export class WorkerApp {
       this.post({ type: 'reducedMotion', reduced });
     });
     const detachContrast = observeContrast(contrast => this.post({ type: 'contrast', contrast }));
+    const detachTextScale =
+      this.options.textSize === 'fixed' ? () => {} : observeTextScale(scale => this.post({ type: 'textScale', scale }));
     const detachPointer = observePointer(pointer => this.post({ type: 'pointer', pointer }));
     const detachWindowActive = observeWindowActive(active => this.post({ type: 'windowActive', active }));
     const onPointerMove = (event: PointerEvent): void => {
@@ -1743,6 +1755,7 @@ export class WorkerApp {
     return () => {
       detachReducedMotion();
       detachContrast();
+      detachTextScale();
       detachPointer();
       detachWindowActive();
       detachFullscreen();

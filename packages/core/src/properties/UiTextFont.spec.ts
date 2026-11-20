@@ -9,6 +9,7 @@ import { Constraints } from '../layout/LayoutTypes';
 import { CharacterCountTextMeasurer } from '../layout/TextMeasurer';
 import { createPaintState, resolvePaintState } from '../rendering/PaintState';
 import { resolveFont, resolveFontInto } from './UiTextFont';
+import { resolvedSpansOf } from './UiTextStyle';
 
 /**
  * Layout and paint must agree on the font, or text is measured in one
@@ -95,5 +96,64 @@ describe('resolveFont', () => {
     };
     resolveFontInto(text, target);
     expect(target).toEqual({ ...resolveFont(text) });
+  });
+});
+
+describe('text scale', () => {
+  function tree(parentProps: Record<string, unknown>, textProps: Record<string, unknown>) {
+    const graph = new UiGraph();
+    const parent = graph.createNode('parent', UiNodeType.Column);
+    for (const [name, value] of Object.entries(parentProps)) {
+      parent.setProperty(name, value);
+    }
+    graph.appendChild(graph.root, parent);
+    const text = graph.createNode('text', UiNodeType.Text);
+    text.setProperty('text', 'Hello');
+    for (const [name, value] of Object.entries(textProps)) {
+      text.setProperty(name, value);
+    }
+    graph.appendChild(parent, text);
+    parent.environment = graph.buildNodeEnvironment(parent);
+    text.environment = graph.buildNodeEnvironment(text);
+    return text;
+  }
+
+  it('draws every size, line height and letter spacing that many times larger', () => {
+    const font = resolveFont(tree({ textScale: 1.25 }, { fontSize: 16, lineHeight: 20, letterSpacing: 2 }));
+    expect(font.fontSize).toBe(20);
+    expect(font.lineHeight).toBe(25);
+    expect(font.letterSpacing).toBe(2.5);
+  });
+
+  it('scales a size inherited from a text style, and the line height that comes with it', () => {
+    const plain = resolveFont(tree({ textStyle: defaultTypography.headline }, {}));
+    const scaled = resolveFont(tree({ textStyle: defaultTypography.headline, textScale: 1.5 }, {}));
+    expect(scaled.fontSize).toBeCloseTo(plain.fontSize * 1.5);
+    expect(scaled.lineHeight).toBeCloseTo(plain.lineHeight * 1.5);
+  });
+
+  it('keeps written sizes under a subtree that provides 1', () => {
+    const graph = new UiGraph();
+    const outer = graph.createNode('outer', UiNodeType.Column);
+    outer.setProperty('textScale', 2);
+    graph.appendChild(graph.root, outer);
+    const inner = graph.createNode('inner', UiNodeType.Column);
+    inner.setProperty('textScale', 1);
+    graph.appendChild(outer, inner);
+    const text = graph.createNode('text', UiNodeType.Text);
+    text.setProperty('fontSize', 12);
+    graph.appendChild(inner, text);
+    outer.environment = graph.buildNodeEnvironment(outer);
+    inner.environment = graph.buildNodeEnvironment(inner);
+    text.environment = graph.buildNodeEnvironment(text);
+    expect(resolveFont(text).fontSize).toBe(12);
+  });
+
+  it("scales a paragraph's runs with it", () => {
+    const text = tree({ textScale: 2 }, {});
+    text.setProperty('spans', [{ text: 'big ', fontSize: 20 }, { text: 'plain' }]);
+    const runs = resolvedSpansOf(text);
+    expect(runs[0]!.fontSize).toBe(40);
+    expect(runs[1]!.fontSize).toBeUndefined();
   });
 });

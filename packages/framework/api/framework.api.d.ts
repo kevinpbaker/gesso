@@ -1188,6 +1188,7 @@ declare class ShellService {
   private preferred;
   private readonly scheme;
   private readonly contrastState;
+  private readonly textScaleState;
   private readonly pointerState;
   private readonly activeState;
   private readonly insets;
@@ -1213,6 +1214,8 @@ declare class ShellService {
   applyColorScheme(scheme: ColorScheme): void;
   applyWindowActive(active: boolean): void;
   applyPointer(pointer: UiPointer): void;
+  applyTextScale(scale: number): void;
+  readonly textScale: ReadableCell<number>;
   applyContrast(contrast: UiContrast): void;
   applyViewportInsets(insets: UiInsets): void;
   copyText(text: string): Promise<boolean>;
@@ -1753,6 +1756,7 @@ declare class GessoRuntime {
   setWindowActive(active: boolean): void;
   setPointer(pointer: UiPointer): void;
   setContrast(contrast: UiContrast): void;
+  setTextScale(scale: number): void;
   setViewportInsets(insets: UiInsets): void;
   private publishViewportInsets;
   settlePopup(id: number, opened: boolean): void;
@@ -2001,6 +2005,10 @@ type ShellToRuntimeMessage = {
 } | {
   type: 'contrast';
   contrast: UiContrast;
+} |
+{
+  type: 'textScale';
+  scale: number;
 } | {
   type: 'pointer';
   pointer: UiPointer;
@@ -2379,6 +2387,7 @@ interface WorkerAppOptions {
   interceptKey?: (event: KeyboardEvent) => boolean;
   colorScheme?: ColorSchemePreference;
   accessibility?: boolean;
+  textSize?: 'browser' | 'fixed';
   history?: ShellHistoryOptions | ShellHistory;
 }
 declare class WorkerApp {
@@ -2477,6 +2486,7 @@ declare class GessoAppBuilder {
   private webmcpChoice;
   private disconnectWebMcp;
   private colorSchemePreference;
+  private textSizeMode;
   constructor(root: FrameworkChild | ComponentType);
   useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options: {
     worker?: WorkerHandle | (() => Worker);
@@ -2497,6 +2507,7 @@ declare class GessoAppBuilder {
   devtools(request: DevtoolsRequest): void;
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): this;
   setColorScheme(preference: ColorSchemePreference): this;
+  textSize(mode: 'browser' | 'fixed'): this;
   mountSync(host: HTMLElement | string): () => void;
   useWebMcp(choice?: boolean | WebMcpChoice): this;
   openRenderPort(key: string): MessagePort | undefined;
@@ -2516,6 +2527,7 @@ interface GessoAppOptions {
   clock?: UiFrameClockFactory;
   input?: boolean;
   accessibility?: boolean;
+  textSize?: 'browser' | 'fixed';
   colorScheme?: ColorSchemePreference;
   media?: MediaOptions;
   fonts?: readonly FontFamilyDeclaration[];
@@ -2549,6 +2561,8 @@ declare class GessoApp {
   private fullscreen;
   private detachReducedMotion;
   private detachContrast;
+  private detachTextScale;
+  private readonly textSize;
   private detachWindowActive;
   private detachColorScheme;
   private detachViewportInsets;

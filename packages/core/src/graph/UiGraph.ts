@@ -899,6 +899,10 @@ export class UiGraph {
     if (pointer === 'fine' || pointer === 'coarse') {
       env = env.set(UiEnvironmentKeys.pointer as UiEnvironmentKey<unknown>, pointer);
     }
+    const textScale = node.getProperty<unknown>('textScale');
+    if (typeof textScale === 'number' && textScale > 0 && Number.isFinite(textScale)) {
+      env = env.set(UiEnvironmentKeys.textScale as UiEnvironmentKey<unknown>, textScale);
+    }
     const theme = node.getProperty<unknown>('theme');
     if (theme !== undefined) {
       env = env.set(UiEnvironmentKeys.theme as UiEnvironmentKey<unknown>, theme);
