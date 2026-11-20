@@ -37,3 +37,33 @@ describe('ShellService.warnOnLeave', () => {
     expect(requests).toEqual([]);
   });
 });
+
+describe('ShellService.setTitle', () => {
+  it('tells the shell of each change once, and a shell that arrives later the latest', () => {
+    const service = new ShellService();
+    service.setTitle('Inbox');
+    const requests: ShellRequest[] = [];
+    service.setHandler(request => requests.push(request));
+    service.setTitle('Inbox');
+    service.setTitle('Message 7');
+    expect(requests).toEqual([
+      { type: 'title', title: 'Inbox' },
+      { type: 'title', title: 'Message 7' }
+    ]);
+  });
+});
+
+describe('ShellService.claimFindShortcut', () => {
+  it('tells the shell of each change once, and a shell that arrives later that it is claimed', () => {
+    const service = new ShellService();
+    service.claimFindShortcut(true);
+    const requests: ShellRequest[] = [];
+    service.setHandler(request => requests.push(request));
+    service.claimFindShortcut(true);
+    service.claimFindShortcut(false);
+    expect(requests).toEqual([
+      { type: 'findShortcut', on: true },
+      { type: 'findShortcut', on: false }
+    ]);
+  });
+});

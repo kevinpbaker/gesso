@@ -85,9 +85,10 @@ const MAX_ENTRIES = 48;
 export interface ScaledImageSurface {
   width: number;
   height: number;
-  getContext(
-    contextId: '2d'
-  ): { drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void } | null;
+  getContext(contextId: '2d'): {
+    imageSmoothingQuality?: ImageSmoothingQuality;
+    drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void;
+  } | null;
   transferToImageBitmap(): ImageBitmap;
 }
 
@@ -251,6 +252,13 @@ export class ScaledImageCache {
       if (context === null) {
         return null;
       }
+      // The default is 'low', a bilinear tap that skips source pixels
+      // once the ratio passes 2:1, so a photo shrunk to a thumbnail
+      // shimmers and its edges stair-step. 'high' filters every
+      // source pixel. That is dearer, but this draw runs once per size
+      // and is then reused for every frame, which is the trade the
+      // cache exists to make.
+      context.imageSmoothingQuality = 'high';
       context.drawImage(source, 0, 0, width, height);
       return surface.transferToImageBitmap();
     } catch {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createComponent } from 'gesso-framework';
-import { Column, type UiKeyboardEvent } from 'gesso-core';
+import { Column, type UiKeyboardEvent, type UiNode } from 'gesso-core';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
 
@@ -89,5 +89,25 @@ describe('TextArea, submitting', () => {
     ui.fireEvent.keyDown('Enter');
     ui.fireEvent.keyDown('Enter', { meta: true });
     expect(submits).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('TextInput keyboard hints', () => {
+  it('spellchecks a TextArea and not a TextInput unless asked, and passes the keyboard through', () => {
+    const nodes: Record<string, UiNode | null> = {};
+    const ref = (name: string) => (node: UiNode | null) => (nodes[name] = node);
+    renderTest(
+      Column(
+        {},
+        createComponent(TextArea, { label: 'Notes', ref: ref('area') }),
+        createComponent(TextInput, { label: 'Email', inputMode: 'email', ref: ref('field') }),
+        createComponent(TextInput, { label: 'Title', spellCheck: true, ref: ref('prose') })
+      )
+    );
+
+    expect(nodes.area!.properties.get('spellCheck')).toBe(true);
+    expect(nodes.field!.properties.get('spellCheck')).toBe(false);
+    expect(nodes.field!.properties.get('inputMode')).toBe('email');
+    expect(nodes.prose!.properties.get('spellCheck')).toBe(true);
   });
 });

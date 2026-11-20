@@ -157,6 +157,18 @@ describe('RenderWorkerApp', () => {
     expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0);
   });
 
+  it('posts no frame metrics when the shell says nothing listens for them', async () => {
+    const { host, sent, send } = createFakeWorkerGlobal();
+    const canvas = createMockCanvas();
+    new RenderWorkerApp(createComponent(WorkerRoot), host);
+
+    send({ ...initMessage(canvas), frameMetrics: false } as ShellToRuntimeMessage);
+
+    const ctx = canvas.getContext('2d') as unknown as { fillText: ReturnType<typeof vi.fn> };
+    await vi.waitFor(() => expect(ctx.fillText.mock.calls.length).toBeGreaterThan(0));
+    expect(sent.some(m => m.type === 'frame')).toBe(false);
+  });
+
   it('sizes the backing store from the shell-supplied dpr', () => {
     const { host, send } = createFakeWorkerGlobal();
     const canvas = createMockCanvas();

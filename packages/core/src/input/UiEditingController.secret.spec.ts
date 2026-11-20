@@ -87,4 +87,37 @@ describe('UiEditingController with a secret field', () => {
     expect(model.text).toBe('a');
     expect(editing.state()!.multiline).toBe(false);
   });
+
+  it('never asks the platform to spellcheck, whatever `spellCheck` says, but keeps its keyboard', () => {
+    const { editing } = field('1234', { spellCheck: true, inputMode: 'numeric' });
+    const state = editing.state()!;
+    expect(state.spellCheck).toBeUndefined();
+    expect(state.inputMode).toBe('numeric');
+  });
+});
+
+describe('UiEditingController keyboard hints', () => {
+  it("hands the shell a field's keyboard and spellchecking, and nothing for a field that set neither", () => {
+    const h = new InputTestHarness();
+    const plain = h.node('plain', UiNodeType.EditableText, { value: '', focusable: true });
+    const prose = h.node('prose', UiNodeType.EditableText, {
+      value: '',
+      focusable: true,
+      inputMode: 'email',
+      spellCheck: true
+    });
+    h.add(h.root, plain);
+    h.add(h.root, prose);
+    h.layoutTree();
+    const focus = h.createFocusManager();
+    const editing = h.createEditingController(focus);
+
+    focus.focus(plain);
+    expect(editing.state()!.inputMode).toBeUndefined();
+    expect(editing.state()!.spellCheck).toBeUndefined();
+
+    focus.focus(prose);
+    expect(editing.state()!.inputMode).toBe('email');
+    expect(editing.state()!.spellCheck).toBe(true);
+  });
 });

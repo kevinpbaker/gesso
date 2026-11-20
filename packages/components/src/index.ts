@@ -81,6 +81,7 @@ export { Drawer, type DrawerProps, type DrawerSide } from './Drawer';
 export { ColorPalette, normalizeHex, PALETTE, type ColorPaletteProps, type PaletteColor } from './ColorPalette';
 export { ColorPicker, hexOfHsv, hsvOfHex, type ColorPickerProps, type Hsv } from './ColorPicker';
 export { Menu, type MenuProps, type MenuItem } from './Menu';
+export { ContextMenus, type ContextMenusProps } from './ContextMenus';
 export { MenuBar, type MenuBarProps } from './MenuBar';
 export { isMenuBarSubmenu, MENU_BAR_CLOSED, MENU_SEPARATOR, menuBarLevels, menuBarStep } from './menuBarModel';
 export type {

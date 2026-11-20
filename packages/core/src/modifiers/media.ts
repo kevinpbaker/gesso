@@ -280,7 +280,8 @@ export const iconSource = defineModifier<IconSourceArgs>({
         color,
         style: seen.style,
         strokeWidth: seen.strokeWidth,
-        fillRule: seen.fillRule
+        fillRule: seen.fillRule,
+        scale: args.rasterizer.pixelScale
       };
       if (current !== null && sameSpec(current, spec)) {
         return;
@@ -318,8 +319,12 @@ export const iconSource = defineModifier<IconSourceArgs>({
       render();
     });
     host.onEnvironment(render);
+    // A raster is baked at a pixel ratio, as it is in a colour, so a
+    // window moved to a screen with another ratio asks again.
+    const stopScale = args.rasterizer.onScaleChange(render);
     host.own(() => {
       subscription.unsubscribe();
+      stopScale();
       generation++;
       if (current !== null) {
         args.rasterizer.release(current);
@@ -336,6 +341,7 @@ function sameSpec(a: IconSpec, b: IconSpec): boolean {
     a.size === b.size &&
     a.style === b.style &&
     a.strokeWidth === b.strokeWidth &&
+    a.scale === b.scale &&
     (a.fillRule ?? 'nonzero') === (b.fillRule ?? 'nonzero') &&
     a.color.r === b.color.r &&
     a.color.g === b.color.g &&

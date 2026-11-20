@@ -1735,6 +1735,8 @@ function BlockView(
     flexGrow: 1,
     multiline: true,
     textWrap: 'word',
+    // Prose, so the platform's spellchecker is wanted; not in code.
+    spellCheck: !(type === 'code' || raw),
     value: current.pipe(map(b => b.text)),
     spans,
     fontSize,

@@ -300,17 +300,7 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
       }
     }
     out.placeholder = undefined;
-    // Only a selected paragraph pays for the colour: the scratch is
-    // reused across nodes, so an unselected one must not resolve it and
-    // must not read the last node's either.
-    out.textSelection = out.text === undefined ? undefined : selectionRangeOf(node);
-    if (out.textSelection !== undefined) {
-      out.selectionColor = resolveColor(node, UiProperties.selectionColor) ?? defaultSelectionColor(node);
-    }
-    out.textMatches = out.text === undefined ? undefined : matchRangesOf(node);
-    if (out.textMatches !== undefined) {
-      out.matchColor = resolveColor(node, UiProperties.matchColor) ?? defaultMatchColor(node);
-    }
+    readTextRanges(node, out);
   }
 
   if (out.text === undefined) {
@@ -341,6 +331,71 @@ export function resolvePaintState(node: UiNode, out: PaintState): PaintState {
   out.textOverflow = normalizeTextOverflow(resolveString(node, 'textOverflow'));
 
   return out;
+}
+
+/**
+ * The selection and find matches over a paragraph's text, read into a
+ * state already resolved for it. Only a selected paragraph pays for the
+ * colour: a reused scratch must not resolve it for an unselected one,
+ * and must not keep the last node's either.
+ */
+function readTextRanges(node: UiNode, out: PaintState): void {
+  out.textSelection = out.text === undefined ? undefined : selectionRangeOf(node);
+  if (out.textSelection !== undefined) {
+    out.selectionColor = resolveColor(node, UiProperties.selectionColor) ?? defaultSelectionColor(node);
+  }
+  out.textMatches = out.text === undefined ? undefined : matchRangesOf(node);
+  if (out.textMatches !== undefined) {
+    out.matchColor = resolveColor(node, UiProperties.matchColor) ?? defaultMatchColor(node);
+  }
+}
+
+/** A node's resolved state and what it was resolved from. */
+interface CachedPaint {
+  readonly state: PaintState;
+  version: number;
+  environment: unknown;
+}
+
+const cachedPaint = new WeakMap<UiNode, CachedPaint>();
+
+/**
+ * A node's paint state, resolved once and kept until something it was
+ * resolved from changes.
+ *
+ * Resolving is forty-odd property lookups, and the frame benchmark
+ * measured it at a quarter of the Canvas2D walk's own time, paid for
+ * every visible node on every frame although almost none of them had
+ * changed. What a state is resolved from is the node's own properties,
+ * which `propertyVersion` counts (modifier overrides included, since
+ * they write through `setProperty`), and its environment, which holds
+ * every inherited value and the theme and is replaced rather than
+ * changed. Those two are the key. The rest is read again on every call:
+ * an editable's text lives in its model, so a field is resolved in
+ * full each time, and a paragraph's selection and find matches are
+ * re-read, which costs two property reads when there are none.
+ *
+ * The returned object is the node's own and stays valid across other
+ * nodes' calls, so unlike `resolvePaintState` with a shared scratch it
+ * needs no owner bookkeeping. Callers must not write to it.
+ */
+export function paintStateOf(node: UiNode): PaintState {
+  let entry = cachedPaint.get(node);
+  if (entry === undefined) {
+    entry = { state: createPaintState(), version: -1, environment: undefined };
+    cachedPaint.set(node, entry);
+  } else if (
+    entry.version === node.propertyVersion &&
+    entry.environment === node.environment &&
+    entry.state.editor === undefined
+  ) {
+    readTextRanges(node, entry.state);
+    return entry.state;
+  }
+  resolvePaintState(node, entry.state);
+  entry.version = node.propertyVersion;
+  entry.environment = node.environment;
+  return entry.state;
 }
 
 /**

@@ -215,6 +215,40 @@ describe('IconRasterizer', () => {
     expect(fills).toEqual(['#f00', '#00f']);
     expect(rasterizer.size).toBe(2);
   });
+
+  it('draws at the scale it is set to, so a 1.5x screen gets a 1.5x raster', async () => {
+    const sides: number[] = [];
+    const rasterizer = new IconRasterizer({
+      createCanvas: (width: number) => {
+        sides.push(width);
+        const ctx: IconContext = {
+          scale: () => {},
+          fillStyle: '',
+          strokeStyle: '',
+          lineWidth: 0,
+          lineCap: 'butt',
+          lineJoin: 'miter',
+          fill: () => {},
+          stroke: () => {}
+        };
+        return { getContext2D: () => ctx, toBitmap: () => Promise.resolve(fakeBitmap()) };
+      }
+    });
+    const spec = {
+      path: 'M0 0h24v24H0z',
+      viewBox: 24,
+      size: 16,
+      style: 'fill' as const,
+      strokeWidth: 2,
+      color: { r: 0, g: 0, b: 0, a: 1 }
+    };
+
+    await rasterizer.raster(spec);
+    rasterizer.setScale(1.5);
+    await rasterizer.raster({ ...spec, scale: rasterizer.pixelScale });
+
+    expect(sides).toEqual([32, 24]);
+  });
 });
 
 /**
@@ -1608,6 +1642,33 @@ describe('Icon', () => {
     // resolve a palette name at paint.
     expect(fills).toHaveLength(2);
     expect(fills[0]).not.toBe(fills[1]);
+  });
+
+  it('redraws when the pixel ratio changes, and lets the old raster go', async () => {
+    const { rasterizer, fills } = recordingRasterizer();
+    let node: UiNode | null = null;
+    const mounted = renderTest(
+      Column(
+        {},
+        createComponent(Icon, {
+          path: 'M0 0h24v24H0z',
+          color: '#ff0000',
+          size: 16,
+          ref: (n: UiNode | null) => (node = n)
+        })
+      ),
+      { media: { rasterizer } }
+    );
+    mounted.frame();
+    await mounted.settle();
+    const before = node!.properties.get('image');
+
+    rasterizer.setScale(3);
+    mounted.frame();
+    await mounted.settle();
+
+    expect(fills).toHaveLength(2);
+    expect(node!.properties.get('image')).not.toBe(before);
   });
 });
 

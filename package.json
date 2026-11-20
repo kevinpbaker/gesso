@@ -49,7 +49,9 @@
     "screenshots": "node scripts/check-route-screenshots.ts",
     "screenshots:update": "node scripts/check-route-screenshots.ts --update",
     "docs:screenshots": "node scripts/check-docs-screenshots.ts",
-    "docs:screenshots:update": "node scripts/check-docs-screenshots.ts --update"
+    "docs:screenshots:update": "node scripts/check-docs-screenshots.ts --update",
+    "screenshots:docker": "node scripts/screenshots-docker.ts",
+    "screenshots:docker:update": "node scripts/screenshots-docker.ts --update"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",

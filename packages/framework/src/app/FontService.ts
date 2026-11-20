@@ -73,6 +73,8 @@ export class FontService {
   private readonly failed = new Set<string>();
   private readonly batches: Promise<void>[] = [];
   private listener: ((family: string) => void) | null = null;
+  /** A family with faces still out, waiting at most `FACE_WAIT_MS` for them before it is told anyway. */
+  private readonly waiting = new Map<string, ReturnType<typeof setTimeout>>();
   private disposed = false;
 
   /**
@@ -113,7 +115,11 @@ export class FontService {
     return [...this.statuses.keys()];
   }
 
-  /** Called with a family each time one of its faces finishes loading or failing. */
+  /**
+   * Called with a family once its faces have all finished loading or
+   * failing, or `FACE_WAIT_MS` after the first of them did, whichever
+   * is sooner. See `FACE_WAIT_MS` for why not once per face.
+   */
   setListener(listener: ((family: string) => void) | null): void {
     this.listener = listener;
   }
@@ -122,6 +128,10 @@ export class FontService {
   dispose(): void {
     this.disposed = true;
     this.listener = null;
+    for (const timer of this.waiting.values()) {
+      clearTimeout(timer);
+    }
+    this.waiting.clear();
   }
 
   private async loadFace(family: string, declaration: FontFaceDeclaration, host: FontHost): Promise<void> {
@@ -144,11 +154,45 @@ export class FontService {
     if (left <= 0) {
       this.statuses.set(family, this.failed.has(family) ? 'error' : 'loaded');
     }
-    if (!this.disposed) {
+    if (this.disposed) {
+      return;
+    }
+    if (left <= 0) {
+      const timer = this.waiting.get(family);
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        this.waiting.delete(family);
+      }
       this.listener?.(family);
+      return;
+    }
+    if (!this.waiting.has(family)) {
+      this.waiting.set(
+        family,
+        setTimeout(() => {
+          this.waiting.delete(family);
+          if (!this.disposed) {
+            this.listener?.(family);
+          }
+        }, FACE_WAIT_MS)
+      );
     }
   }
 }
+
+/**
+ * How long a family's first settled face waits for the rest before
+ * the runtime is told.
+ *
+ * Each notice drops every measured width and lays the whole tree out
+ * again, about 17ms for a 5,000-node page. A family is usually four
+ * or so weights fetched together that land a frame or two apart, and
+ * telling the runtime per face paid that cold layout per face. Waiting
+ * for the family costs nothing when its faces arrive together. The
+ * ceiling is for the one that does not, an italic on a slow link, so
+ * it cannot hold the regular weight's text in the fallback for long.
+ */
+const FACE_WAIT_MS = 100;
 
 /**
  * Faces already created on this thread, by family and URL, so two

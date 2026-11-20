@@ -44,6 +44,7 @@ import type { FontFamilyDeclaration } from './FontService';
 import { renderModule } from '../agent/render';
 import type { UiHost } from '../agent/ui';
 import { watchPixelRatio } from './pixelRatio';
+import { fitToDevicePixels, observeDevicePixels, type DevicePixelSize } from './devicePixels';
 
 export interface GessoAppOptions {
   host: HTMLElement;
@@ -146,6 +147,9 @@ export class GessoApp {
   /** The host's last size, for a pixel ratio that changes on its own; see `watchPixelRatio`. */
   private hostSize: { width: number; height: number } | null = null;
   private stopPixelRatio: (() => void) | null = null;
+  /** The canvas's device-pixel content box, when the browser reports one; see `devicePixels.ts`. */
+  private devicePixels: DevicePixelSize | null = null;
+  private stopDevicePixels: (() => void) | null = null;
   private proxy: EditingProxy | null = null;
   /** The one audio element, behind `AudioService`; see `AudioSink`. */
   private audio: AudioSink | null = null;
@@ -333,7 +337,9 @@ export class GessoApp {
 
   /** Resizes the drawing surface and schedules a repaint. */
   resize(width: number, height: number): void {
-    this.runtime.resize(width, height, devicePixelRatio());
+    const dpr = devicePixelRatio();
+    const fitted = fitToDevicePixels({ width, height }, dpr, this.devicePixels);
+    this.runtime.resize(fitted.width, fitted.height, dpr);
   }
 
   /** Turns the layout inspector on or off; see GessoRuntime.setInspectorEnabled. */
@@ -471,6 +477,9 @@ export class GessoApp {
     this.resizeObserver = null;
     this.stopPixelRatio?.();
     this.stopPixelRatio = null;
+    this.stopDevicePixels?.();
+    this.stopDevicePixels = null;
+    this.devicePixels = null;
     if (isCanvasElement(this.canvas) && this.canvas.parentElement === this.host) {
       this.host.removeChild(this.canvas);
     }
@@ -679,6 +688,15 @@ export class GessoApp {
       void written.then(copied => this.runtime.settleClipboard(request.id, copied));
       return;
     }
+    if (request.type === 'findShortcut') {
+      // Nothing to do on one thread: the platform adapter cancels the
+      // browser's default for any key the find controller claimed.
+      return;
+    }
+    if (request.type === 'title') {
+      this.canvas.ownerDocument.title = request.title;
+      return;
+    }
     if (request.type === 'fullscreen') {
       // The canvas rather than the document body: what the application
       // draws on is what should fill the screen, and a host page with
@@ -766,6 +784,15 @@ export class GessoApp {
         this.resize(this.hostSize.width, this.hostSize.height);
       }
     });
+    // The canvas's own box in device pixels; see `devicePixels.ts`.
+    if (isCanvasElement(this.canvas)) {
+      this.stopDevicePixels = observeDevicePixels(this.canvas, pixels => {
+        this.devicePixels = pixels;
+        if (this.hostSize !== null && !this.fullscreen) {
+          this.resize(this.hostSize.width, this.hostSize.height);
+        }
+      });
+    }
   }
 }
 

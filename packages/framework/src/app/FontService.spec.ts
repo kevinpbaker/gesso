@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearFontStacks, fontStackFor } from 'gesso-core';
 
 import { FontService, type FontFaceLike, type FontHost } from './FontService';
@@ -66,7 +66,41 @@ describe('FontService', () => {
     host.settle('Inter');
     await service.ready;
     expect(service.statusOf('Inter')).toBe('loaded');
-    expect(changes).toEqual(['Inter', 'Inter']);
+    // Once for the family, not once per face: each notice is a cold
+    // layout of the whole tree.
+    expect(changes).toEqual(['Inter']);
+  });
+
+  it('does not let a slow face hold the family back for longer than the wait', async () => {
+    vi.useFakeTimers();
+    try {
+      const service = new FontService();
+      const changes: string[] = [];
+      service.setListener(family => changes.push(family));
+      const fast = fakeHost();
+      const slow = fakeHost();
+      service.declare(
+        [{ family: 'Inter', faces: [{ source: `https://x/fast-${Math.random()}.woff2`, weight: 400 }] }],
+        fast
+      );
+      service.declare(
+        [{ family: 'Inter', faces: [{ source: `https://x/slow-${Math.random()}.woff2`, style: 'italic' }] }],
+        slow
+      );
+
+      fast.settle('Inter');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(changes).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(changes).toEqual(['Inter']);
+
+      slow.settle('Inter');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(changes).toEqual(['Inter', 'Inter']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reports error when a face fails and still settles', async () => {

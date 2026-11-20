@@ -104,12 +104,13 @@ describe('inline links', () => {
       expect(linkHoverOf(s.para)).toBe(-1);
     });
 
-    it('shows a pointer cursor over the run and none beside it', () => {
+    it('shows a pointer cursor over the run and the text I-beam beside it', () => {
       const s = scene();
       s.controller.pointerHover(s.para, 100, 6);
       expect(resolveCursor(s.para)).toBe('pointer');
       s.controller.pointerHover(s.para, 20, 6);
-      expect(resolveCursor(s.para)).toBe(null);
+      // The paragraph's own words can be selected, so they say so.
+      expect(resolveCursor(s.para)).toBe('text');
     });
   });
 

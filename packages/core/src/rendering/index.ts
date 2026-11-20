@@ -23,6 +23,7 @@ export { IconRasterizer, iconKey } from './IconRasterizer';
 export type { IconSpec, IconRasterizerOptions, IconCanvas, IconContext } from './IconRasterizer';
 export {
   createPaintState,
+  paintStateOf,
   resolvePaintState,
   isPaintVisible,
   normalizeTextAlign,

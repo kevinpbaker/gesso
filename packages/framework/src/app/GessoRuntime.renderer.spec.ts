@@ -219,6 +219,27 @@ describe('GessoRuntime renderer option', () => {
     runtime.dispose();
   });
 
+  it('touches neither context when disposed before the WebGPU module arrives', async () => {
+    withMockWebGPU(createMockDevice());
+    const canvas = mockCanvas(mockGPUContext());
+    const runtime = new GessoRuntime({
+      root,
+      canvas,
+      renderer: 'webgpu',
+      measureCanvas: mockCanvas(),
+      clock: manualClock().factory,
+      width: 200,
+      height: 100
+    });
+    // Fetched, not imported: nothing has asked the canvas for anything yet.
+    expect(runtime.rendererBackend).toBe('pending');
+    expect(canvas.contexts).toEqual([]);
+    runtime.dispose();
+
+    await runtime.rendererReady;
+    expect(canvas.contexts).toEqual([]);
+  });
+
   it('never asks for an adapter when Canvas2D is named', () => {
     withMockWebGPU(createMockDevice());
     const requestAdapter = navigator.gpu.requestAdapter as unknown as ReturnType<typeof vi.fn>;

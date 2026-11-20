@@ -501,6 +501,25 @@ describe('EditingProxy', () => {
     expect(textarea.attributes.get('enterkeyhint')).toBe('enter');
   });
 
+  it('asks the phone for the keyboard the field wants, and spellchecks only a field that asked', () => {
+    const { proxy, textarea, state } = setup();
+
+    proxy.update(state());
+    expect(textarea.attributes.has('inputmode')).toBe(false);
+    expect(textarea.attributes.get('spellcheck')).toBe('false');
+
+    proxy.update(state({ inputMode: 'email', spellCheck: true }));
+    expect(textarea.attributes.get('inputmode')).toBe('email');
+    expect(textarea.attributes.get('spellcheck')).toBe('true');
+    expect(textarea.attributes.get('autocorrect')).toBe('on');
+
+    // The next field to take focus asks for neither.
+    proxy.update(state());
+    expect(textarea.attributes.has('inputmode')).toBe(false);
+    expect(textarea.attributes.get('spellcheck')).toBe('false');
+    expect(textarea.attributes.get('autocorrect')).toBe('off');
+  });
+
   describe('raiseKeyboard', () => {
     it('retakes focus it already holds, without reporting a blur', () => {
       const { doc, proxy, textarea, state, sink } = setup();

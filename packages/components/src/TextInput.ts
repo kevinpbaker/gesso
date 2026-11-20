@@ -7,6 +7,7 @@ import {
   type UiChild,
   type UiKeyboardEvent,
   type UiTextChangeEvent,
+  type UiInputMode,
   type UiSemanticState
 } from 'gesso-core';
 
@@ -64,6 +65,18 @@ export interface TextInputProps extends ControlLayoutProps {
    * line, whatever `multiline` says.
    */
   secret?: boolean;
+  /**
+   * Which keyboard a phone shows: `'email'`, `'tel'`, `'url'`,
+   * `'numeric'`, `'decimal'`, `'search'`; the full one when left out.
+   */
+  inputMode?: UiInputMode;
+  /**
+   * Whether the platform checks spelling and offers corrections. On by
+   * default in a `TextArea`, which is for prose, and off in a
+   * `TextInput`, which is more often a name or a code. Never on for a
+   * secret field.
+   */
+  spellCheck?: boolean;
   /**
    * Enter in a single-line field. In a multiline one Enter is a new
    * line, so it is Command-Enter or Control-Enter there, either on every
@@ -135,6 +148,8 @@ function textField(inputs: Inputs<TextInputProps>, ctx: ComponentContext, forceM
       readOnly,
       multiline,
       secret,
+      inputMode: inputs.inputMode,
+      spellCheck: input(inputs.spellCheck, forceMultiline),
       // A single-line field scrolls its text rather than wrapping it.
       textWrap: multiline.pipe(map(on => (on ? 'word' : 'none'))),
       backgroundColor: 'controlBackground',

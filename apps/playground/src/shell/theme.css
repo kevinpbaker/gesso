@@ -791,6 +791,11 @@ canvas.pg-canvas:focus-visible {
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-4);
+  /* One line held open before the first frame's numbers arrive, so the
+     footer, and the preview above it, is the same height either way. It
+     grew by this line when they came, which the screenshot gate saw as
+     a route changing size whenever its capture raced the first report. */
+  min-height: 18px;
 }
 
 .pg-metric {

@@ -59,12 +59,70 @@ export function borderRadiusIsZero(radius: UiBorderRadius): boolean {
 }
 
 /**
- * Returns a single scalar radius for renderers that do not yet
- * support per-corner radii. This is a temporary bridge; per-corner
- * support belongs in each renderer.
+ * The largest of the four corners. Both renderers draw every corner at
+ * its own radius; this is for the questions that only need a bound,
+ * such as how far a rounded edge can pull in from the box.
  */
 export function uniformBorderRadius(radius: UiBorderRadius): number {
   return Math.max(radius.topLeft, radius.topRight, radius.bottomRight, radius.bottomLeft);
+}
+
+/** Whether all four corners are the same, so a single radius describes them. */
+export function borderRadiusIsUniform(radius: UiBorderRadius): boolean {
+  return (
+    radius.topLeft === radius.topRight && radius.topLeft === radius.bottomRight && radius.topLeft === radius.bottomLeft
+  );
+}
+
+/**
+ * The corners as CSS draws them in a `width` x `height` box: when two
+ * corners on one side want more than the side has, every corner is
+ * scaled by the same factor until they fit (CSS Backgrounds 3, "Corner
+ * Overlap"). Scaling only the offending pair would change the shape's
+ * proportions, which is why the rule scales all four.
+ */
+export function fitBorderRadius(radius: UiBorderRadius, width: number, height: number): UiBorderRadius {
+  const w = Math.max(0, width);
+  const h = Math.max(0, height);
+  const tl = Math.max(0, radius.topLeft);
+  const tr = Math.max(0, radius.topRight);
+  const br = Math.max(0, radius.bottomRight);
+  const bl = Math.max(0, radius.bottomLeft);
+  let factor = 1;
+  factor = Math.min(factor, ratio(w, tl + tr), ratio(w, bl + br), ratio(h, tl + bl), ratio(h, tr + br));
+  if (
+    factor >= 1 &&
+    tl === radius.topLeft &&
+    tr === radius.topRight &&
+    br === radius.bottomRight &&
+    bl === radius.bottomLeft
+  ) {
+    return radius;
+  }
+  return { topLeft: tl * factor, topRight: tr * factor, bottomRight: br * factor, bottomLeft: bl * factor };
+}
+
+function ratio(side: number, wanted: number): number {
+  return wanted > 0 ? side / wanted : 1;
+}
+
+/**
+ * Every corner moved out by `by` (in, when negative), as a shape grown
+ * or shrunk from the box follows it: an outset ring, a spread shadow,
+ * the inside edge of a border. A square corner stays square, as CSS
+ * keeps it, and none goes below zero.
+ */
+export function offsetBorderRadius(radius: UiBorderRadius, by: number): UiBorderRadius {
+  if (by === 0) {
+    return radius;
+  }
+  const move = (corner: number): number => (corner <= 0 ? 0 : Math.max(0, corner + by));
+  return {
+    topLeft: move(radius.topLeft),
+    topRight: move(radius.topRight),
+    bottomRight: move(radius.bottomRight),
+    bottomLeft: move(radius.bottomLeft)
+  };
 }
 
 /**

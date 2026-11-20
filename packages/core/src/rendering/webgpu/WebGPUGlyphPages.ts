@@ -19,6 +19,7 @@ import { createTexture, createTexturedBindGroup } from './WebGPUTextureCache';
 export class WebGPUGlyphPages {
   private readonly textures: (GPUTexture | null)[] = [];
   private readonly bindGroups: (GPUBindGroup | null)[] = [];
+  private readonly smoothBindGroups: (GPUBindGroup | null)[] = [];
   private scratch: OffscreenCanvas | HTMLCanvasElement | null = null;
   private scratchContext: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null = null;
   /** Cells uploaded since the renderer was created; for tests and metrics. */
@@ -40,6 +41,7 @@ export class WebGPUGlyphPages {
       this.textures[page]?.destroy();
       this.textures[page] = null;
       this.bindGroups[page] = null;
+      this.smoothBindGroups[page] = null;
     }
     const pending = this.atlas.takePending();
     for (const upload of pending) {
@@ -47,9 +49,13 @@ export class WebGPUGlyphPages {
     }
   }
 
-  /** The bind group for a page, creating its texture on first use. */
-  bindGroup(page: number): GPUBindGroup | null {
-    const existing = this.bindGroups[page];
+  /**
+   * The bind group for a page, creating its texture on first use;
+   * `smooth` samples it with filtering, for glyphs drawn under a scale.
+   */
+  bindGroup(page: number, smooth = false): GPUBindGroup | null {
+    const groups = smooth ? this.smoothBindGroups : this.bindGroups;
+    const existing = groups[page];
     if (existing !== undefined && existing !== null) {
       return existing;
     }
@@ -57,8 +63,9 @@ export class WebGPUGlyphPages {
     if (texture === null) {
       return null;
     }
-    const bindGroup = createTexturedBindGroup(this.device, this.pipeline, texture, this.pipeline.textSampler);
-    this.bindGroups[page] = bindGroup;
+    const sampler = smooth ? this.pipeline.imageSampler : this.pipeline.textSampler;
+    const bindGroup = createTexturedBindGroup(this.device, this.pipeline, texture, sampler);
+    groups[page] = bindGroup;
     return bindGroup;
   }
 
@@ -68,6 +75,7 @@ export class WebGPUGlyphPages {
     }
     this.textures.length = 0;
     this.bindGroups.length = 0;
+    this.smoothBindGroups.length = 0;
     this.scratch = null;
     this.scratchContext = null;
   }

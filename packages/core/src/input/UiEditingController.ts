@@ -1,5 +1,6 @@
 import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiNode } from '../graph/UiNode';
+import type { UiInputMode } from '../properties/UiProperty';
 import type { LayoutBox } from '../layout/LayoutTypes';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import type { TextMeasurer } from '../layout/TextMeasurer';
@@ -105,6 +106,10 @@ export interface EditingState {
    * learn, correct or read out what is typed.
    */
   readonly secret?: true;
+  /** The keyboard a phone should show (`UiProperties.inputMode`); the full one when absent. */
+  readonly inputMode?: UiInputMode;
+  /** The field asked for spellchecking (`UiProperties.spellCheck`). Never set on a secret field. */
+  readonly spellCheck?: true;
 }
 
 export interface EditingControllerOptions {
@@ -877,7 +882,8 @@ export class UiEditingController {
         multiline: false,
         composing: model.composing,
         clipboard: '',
-        secret: true
+        secret: true,
+        ...inputHints(node, false)
       };
     }
     const html = model.collapsed || model.composing ? undefined : this.fieldHtml(node, model.start, model.end);
@@ -888,6 +894,7 @@ export class UiEditingController {
       caret,
       multiline: isMultiline(node),
       composing: model.composing,
+      ...inputHints(node, true),
       ...(html === undefined ? {} : { html })
     };
   }
@@ -1447,4 +1454,11 @@ function deleteInputType(unit: EditUnit, direction: -1 | 1): string {
     default:
       return `deleteContent${side}`;
   }
+}
+
+/** What a field asks of the platform's keyboard, for `EditingState`. */
+function inputHints(node: UiNode, spellingAllowed: boolean): { inputMode?: UiInputMode; spellCheck?: true } {
+  const mode = node.properties.get('inputMode') as UiInputMode | undefined;
+  const spell = spellingAllowed && node.properties.get('spellCheck') === true;
+  return { ...(mode === undefined ? {} : { inputMode: mode }), ...(spell ? { spellCheck: true as const } : {}) };
 }

@@ -227,7 +227,9 @@ function primitiveInstanceLayout(): GPUVertexBufferLayout {
       { shaderLocation: 8, offset: 64, format: 'float32x2' }, // transform c
       { shaderLocation: 9, offset: 72, format: 'float32' }, // clip index
       { shaderLocation: 10, offset: 76, format: 'float32' }, // gradient index
-      { shaderLocation: 11, offset: 80, format: 'float32x4' } // shadow: offset, spread, other radius
+      { shaderLocation: 11, offset: 80, format: 'float32x4' }, // shadow: offset, spread, other radius
+      { shaderLocation: 12, offset: 96, format: 'float32x4' }, // corner radii
+      { shaderLocation: 13, offset: 112, format: 'float32x4' } // the other shape's corner radii
     ]
   };
 }

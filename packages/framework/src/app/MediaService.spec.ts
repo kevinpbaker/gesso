@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DefaultImageResolver, IconRasterizer, type ImageResolver, type VideoResolver } from 'gesso-core';
 
-import { MediaService } from './MediaService';
+import { LazyVideoResolver, MediaService } from './MediaService';
 
 /**
  * Who disposes what.
@@ -36,6 +36,22 @@ function fakeVideoResolver(): VideoResolver & { disposed: boolean } {
     }
   };
 }
+
+describe('MediaService pixel ratio', () => {
+  it('sets the ratio on the icon rasteriser it built', () => {
+    const service = new MediaService();
+    service.setPixelRatio(1.25);
+    expect(service.icons.pixelScale).toBe(1.25);
+  });
+
+  it('leaves the scale of a rasteriser it was given alone', () => {
+    const service = new MediaService();
+    const supplied = new IconRasterizer({ scale: 2 });
+    service.setRasterizer(supplied);
+    service.setPixelRatio(3);
+    expect(supplied.pixelScale).toBe(2);
+  });
+});
 
 describe('MediaService ownership', () => {
   it('disposes the image resolver it built, and not one it was given', () => {
@@ -98,5 +114,45 @@ describe('MediaService ownership', () => {
     service.setResolver(supplied);
 
     expect(service.images).toBe(supplied);
+  });
+});
+
+describe('LazyVideoResolver', () => {
+  it('loads nothing until a video is asked for, and loads once', async () => {
+    const real = { ...fakeVideoResolver(), resolve: vi.fn(() => Promise.resolve({} as never)) };
+    const load = vi.fn(() => Promise.resolve(real));
+    const lazy = new LazyVideoResolver(load);
+    expect(load).not.toHaveBeenCalled();
+
+    await Promise.all([lazy.resolve('a.mp4'), lazy.resolve('b.mp4')]);
+
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(real.resolve.mock.calls).toEqual([['a.mp4'], ['b.mp4']]);
+  });
+
+  it('keeps a release that arrives during the load after the resolve it follows', async () => {
+    const calls: string[] = [];
+    const real: VideoResolver = {
+      resolve: source => (calls.push(`resolve ${source}`), Promise.resolve({} as never)),
+      release: source => calls.push(`release ${source}`),
+      dispose: () => calls.push('dispose')
+    };
+    const lazy = new LazyVideoResolver(() => Promise.resolve(real));
+
+    const resolved = lazy.resolve('a.mp4');
+    lazy.release('a.mp4');
+    lazy.dispose();
+    await resolved;
+    await Promise.resolve();
+
+    expect(calls).toEqual(['resolve a.mp4', 'release a.mp4', 'dispose']);
+  });
+
+  it('never loads the decoder for a service that is disposed without playing a video', () => {
+    const load = vi.fn(() => Promise.resolve(fakeVideoResolver()));
+    const lazy = new LazyVideoResolver(load);
+    lazy.release('a.mp4');
+    lazy.dispose();
+    expect(load).not.toHaveBeenCalled();
   });
 });

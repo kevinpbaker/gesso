@@ -45,6 +45,7 @@ import {
 } from '../shellHistory';
 import { afterLayout, isDocumentFullscreen, observeFullscreen, setElementFullscreen, surfaceBox } from '../fullscreen';
 import { watchPixelRatio } from '../pixelRatio';
+import { fitToDevicePixels, observeDevicePixels, type DevicePixelSize } from '../devicePixels';
 
 /**
  * What the shell needs to spawn and drive a render worker.
@@ -231,9 +232,11 @@ export interface WorkerAppOptions {
   onInspect?: (report: UiNodeReport | null) => void;
   /**
    * Cancel the browser's Ctrl/Cmd+F on the canvas, so the app's own
-   * find bar takes it. Off by default: the browser's find bar cannot
-   * see a canvas, but taking the shortcut from an app that has no find
-   * of its own would leave the user with neither.
+   * find bar takes it. Left out, the shell takes it exactly while a
+   * `FindBar` is mounted, which the runtime reports: the browser's find
+   * bar cannot see a canvas, but taking the shortcut from an app with no
+   * find of its own would leave the user with neither. `true` takes it
+   * always, for an app with a find of its own making; `false` never.
    *
    * A flag rather than something the runtime decides, because the
    * worker's answer cannot come back in time to cancel a default —
@@ -410,10 +413,15 @@ export class WorkerApp {
   private ownsAppLogicWorker = false;
   private canvas: HTMLCanvasElement | undefined;
   private host: HTMLElement | undefined;
+  /** Whether the app has a find bar mounted; see `interceptFind`. */
+  private findClaimed = false;
   private resizeObserver: ResizeObserver | null = null;
   /** The host's last size, for a pixel ratio that changes on its own; see `watchPixelRatio`. */
   private hostSize: { width: number; height: number } | null = null;
   private stopPixelRatio: (() => void) | null = null;
+  /** The canvas's device-pixel content box, when the browser reports one; see `devicePixels.ts`. */
+  private devicePixels: DevicePixelSize | null = null;
+  private stopDevicePixels: (() => void) | null = null;
   private detachInput: (() => void) | null = null;
   /** Pickers and remembered handles, made on the first file request. */
   private files: ShellFiles | null = null;
@@ -591,6 +599,7 @@ export class WorkerApp {
         // Text comes through the editing proxy below, IME and all.
         textInput: 'proxy',
         accessibility: this.options.accessibility !== false,
+        frameMetrics: this.options.onFrame !== undefined,
         appPort,
         url
       } as ShellToRuntimeMessage,
@@ -741,7 +750,8 @@ export class WorkerApp {
     // reach here from the canvas, the editing proxy and the semantics
     // mirror, so the flush belongs here rather than in one listener.
     this.flushPendingMove();
-    if ((this.options.interceptFind === true && isFind(event)) || this.options.interceptKey?.(event) === true) {
+    const takeFind = this.options.interceptFind ?? this.findClaimed;
+    if ((takeFind && isFind(event)) || this.options.interceptKey?.(event) === true) {
       event.preventDefault();
     }
     if (event.key === 'Tab' || isSelectAll(event)) {
@@ -963,6 +973,9 @@ export class WorkerApp {
     this.resizeObserver = null;
     this.stopPixelRatio?.();
     this.stopPixelRatio = null;
+    this.stopDevicePixels?.();
+    this.stopDevicePixels = null;
+    this.devicePixels = null;
     // A remount starts from nothing in flight. The new worker is told
     // its size in `init`, and an acknowledgement from the old one
     // would be about a canvas that no longer exists.
@@ -1111,6 +1124,14 @@ export class WorkerApp {
     }
     if (message.type === 'leaveWarning') {
       setLeaveWarning(window, message.on);
+      return;
+    }
+    if (message.type === 'title') {
+      document.title = message.title;
+      return;
+    }
+    if (message.type === 'findShortcut') {
+      this.findClaimed = message.on;
       return;
     }
     if (message.type === 'preferColorScheme') {
@@ -1273,6 +1294,16 @@ export class WorkerApp {
         this.requestResize({ ...this.hostSize, dpr });
       }
     });
+    // The canvas's own box in device pixels, which can change while
+    // the host's size does not: the host moved to a fractional place.
+    if (this.canvas !== undefined) {
+      this.stopDevicePixels = observeDevicePixels(this.canvas, pixels => {
+        this.devicePixels = pixels;
+        if (this.hostSize !== null && !this.fullscreen) {
+          this.requestResize({ ...this.hostSize, dpr: window.devicePixelRatio || 1 });
+        }
+      });
+    }
   }
 
   /**
@@ -1287,7 +1318,8 @@ export class WorkerApp {
    * per refresh, and the size that eventually arrives is the size the
    * window ended at.
    */
-  private requestResize(size: { width: number; height: number; dpr: number }): void {
+  private requestResize(requested: { width: number; height: number; dpr: number }): void {
+    const size = { ...fitToDevicePixels(requested, requested.dpr, this.devicePixels), dpr: requested.dpr };
     if (this.resizeInFlight) {
       this.heldResize = size;
       return;

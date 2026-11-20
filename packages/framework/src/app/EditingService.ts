@@ -1,4 +1,19 @@
-import type { CaretRect, UiEditingController, UiNode, UiTextPosition } from 'gesso-core';
+import {
+  editorFor,
+  isEditableNode,
+  isReadOnly,
+  type CaretRect,
+  type UiEditingController,
+  type UiNode,
+  type UiSelectionController,
+  type UiTextPosition
+} from 'gesso-core';
+
+/** The clipboard, as the shell offers it; see `ShellService.copyText` and `readText`. */
+export interface EditingClipboard {
+  copyText(text: string): Promise<boolean>;
+  readText(): Promise<string | null>;
+}
 
 /**
  * The part of a text field an application has to ask about.
@@ -23,10 +38,94 @@ import type { CaretRect, UiEditingController, UiNode, UiTextPosition } from 'ges
  */
 export class EditingService {
   private controller: UiEditingController | null = null;
+  private selection: UiSelectionController | null = null;
+  private clipboard: EditingClipboard | null = null;
 
   /** Installed by the runtime; without one there is nothing to ask. */
   setController(controller: UiEditingController | null): void {
     this.controller = controller;
+  }
+
+  /** Installed by the runtime, with the canvas's text selection and the shell's clipboard. */
+  setSelection(selection: UiSelectionController | null, clipboard: EditingClipboard | null): void {
+    this.selection = selection;
+    this.clipboard = clipboard;
+  }
+
+  /** The editable that holds focus, or null; what `cut`, `paste` and `selectAll` act on. */
+  get focusedField(): UiNode | null {
+    return this.controller?.focused ?? null;
+  }
+
+  /**
+   * What a copy would take: the focused field's selection, or the text
+   * selected on the canvas when no field has focus. Empty for a secret
+   * field, whose text never leaves the runtime.
+   */
+  selectedText(): string {
+    const field = this.focusedField;
+    if (field !== null && isEditableNode(field)) {
+      if (field.properties.get('secret') === true) {
+        return '';
+      }
+      const state = this.controller?.state();
+      if (state?.clipboard !== undefined) {
+        return state.clipboard;
+      }
+      const model = editorFor(field);
+      return model.text.slice(Math.min(model.start, model.end), Math.max(model.start, model.end));
+    }
+    return this.selection?.selectedText() ?? '';
+  }
+
+  /** Puts `text` on the clipboard, for a copy of something that is not a selection: a link's address. */
+  copyText(text: string): Promise<boolean> {
+    return this.clipboard === null || text.length === 0 ? Promise.resolve(false) : this.clipboard.copyText(text);
+  }
+
+  /** Puts the selection on the clipboard. Resolves to whether anything was copied. */
+  async copy(): Promise<boolean> {
+    const text = this.selectedText();
+    if (text.length === 0 || this.clipboard === null) {
+      return false;
+    }
+    return this.clipboard.copyText(text);
+  }
+
+  /**
+   * Copies the focused field's selection and deletes it, as Ctrl/Cmd+X
+   * does. Deletes nothing if the copy failed, so the text is never on
+   * no clipboard at all.
+   */
+  async cut(): Promise<boolean> {
+    const field = this.focusedField;
+    if (field === null || isReadOnly(field) || !(await this.copy())) {
+      return false;
+    }
+    return this.controller?.beforeInput('deleteByCut', null) ?? false;
+  }
+
+  /** Inserts the clipboard's text at the focused field's caret, as Ctrl/Cmd+V does. */
+  async paste(): Promise<boolean> {
+    const field = this.focusedField;
+    if (field === null || isReadOnly(field) || this.clipboard === null) {
+      return false;
+    }
+    const text = await this.clipboard.readText();
+    if (text === null || text.length === 0 || this.controller === null || this.controller.focused !== field) {
+      return false;
+    }
+    return this.controller.beforeInput('insertFromPaste', text);
+  }
+
+  /** Selects all of the focused field's text. */
+  selectAll(): boolean {
+    const field = this.focusedField;
+    if (field === null || !isEditableNode(field)) {
+      return false;
+    }
+    const length = editorFor(field).text.length;
+    return this.select({ node: field, offset: 0 }, { node: field, offset: length });
   }
 
   /**

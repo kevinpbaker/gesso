@@ -146,6 +146,10 @@ export function NumberInput(inputs: Inputs<NumberInputProps>, ctx: ComponentCont
         modifiers: modifiersOf(inputs, tokens.modifier, CONTROL_FOCUS_RING),
         value: text,
         disabled,
+        // The number pad, when it can type every value: iOS's has no
+        // minus sign, so a field that takes negatives keeps the full
+        // keyboard.
+        inputMode: min.pipe(map(low => (low >= 0 ? 'decimal' : 'text'))),
         textWrap: 'none',
         backgroundColor: 'controlBackground',
         color: 'controlForeground',

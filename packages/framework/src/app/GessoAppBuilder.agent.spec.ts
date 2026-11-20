@@ -25,7 +25,12 @@ import type { ModelContextLike } from '../agent/webmcp';
 
 function mockCanvas(): CanvasHost {
   const ctx = new Proxy(
-    { measureText: (text: string) => ({ width: String(text).length * 7 }) } as Record<string, unknown>,
+    {
+      measureText: (text: string) => ({ width: String(text).length * 7 }),
+      // A matrix, as a real context always returns: the renderer reads
+      // it to put box edges on device pixels.
+      getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 })
+    } as Record<string, unknown>,
     {
       get: (target, key) => target[key as string] ?? vi.fn()
     }

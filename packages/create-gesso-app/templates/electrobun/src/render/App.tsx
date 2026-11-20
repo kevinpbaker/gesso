@@ -1,6 +1,6 @@
 import { map } from 'rxjs/operators';
 
-import { Switch } from 'gesso-components';
+import { ContextMenus, FindBar, Switch } from 'gesso-components';
 import { darkTheme, lightTheme, percent } from 'gesso-core';
 import { DesktopWindows } from 'gesso-electrobun/desktop';
 import { ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
@@ -42,59 +42,66 @@ export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
   // `src/view/main.ts`), so every window is in the same appearance.
   const theme = ctx.inject(ShellService).colorScheme.pipe(map(scheme => (scheme === 'dark' ? darkTheme : lightTheme)));
 
+  // `ContextMenus` puts back the menu a right-click opens in a browser.
   return (
-    <column
-      theme={theme}
-      textStyle={theme.pipe(map(value => value.typography.body))}
-      gap={16}
-      x="center"
-      y="center"
-      width={percent(100)}
-      height={percent(100)}
-      backgroundColor="background">
-      <text text={counter.view.count.pipe(map(String))} fontSize={56} />
+    <ContextMenus>
+      <column
+        theme={theme}
+        textStyle={theme.pipe(map(value => value.typography.body))}
+        gap={16}
+        x="center"
+        y="center"
+        width={percent(100)}
+        height={percent(100)}
+        backgroundColor="background"
+        position="relative">
+        <text text={counter.view.count.pipe(map(String))} fontSize={56} />
 
-      <row gap={10} y="center">
-        <button
-          label="Count"
-          onClick={() => counter.send.increment(1)}
-          padding={10}
-          borderRadius={8}
-          backgroundColor="primary"
-          cursor="pointer">
-          <text text="Count" color="background" fontSize={14} />
-        </button>
+        <row gap={10} y="center">
+          <button
+            label="Count"
+            onClick={() => counter.send.increment(1)}
+            padding={10}
+            borderRadius={8}
+            backgroundColor="primary"
+            cursor="pointer">
+            <text text="Count" color="background" fontSize={14} />
+          </button>
 
-        {/*
+          {/*
           A window opening a window, over a channel rather than an
           import: the screen asks for one and the main process makes
           it. The new window shows the current count immediately,
           because it replicates the same source rather than being
           handed a copy.
         */}
-        <button
-          label="New window"
-          onClick={() => windows.send.open()}
-          padding={10}
-          borderRadius={8}
-          backgroundColor="surface"
-          cursor="pointer">
-          <text text="New window" fontSize={14} />
-        </button>
-      </row>
+          <button
+            label="New window"
+            onClick={() => windows.send.open()}
+            padding={10}
+            borderRadius={8}
+            backgroundColor="surface"
+            cursor="pointer">
+            <text text="New window" fontSize={14} />
+          </button>
+        </row>
 
-      <text
-        text={windows.view.count.pipe(map(open => (open === 1 ? 'One window' : `${open} windows, one source`)))}
-        fontSize={12}
-        color="textMuted"
-      />
+        <text
+          text={windows.view.count.pipe(map(open => (open === 1 ? 'One window' : `${open} windows, one source`)))}
+          fontSize={12}
+          color="textMuted"
+        />
 
-      {/*
+        {/*
         The appearance is the main process's, not this window's, so
         flipping it here changes every window that is open. That is the
         desktop shape of `setPlatformColorScheme`: one setting, replicated.
       */}
-      <Switch label="Dark" checked={counter.view.dark} onChange={next => counter.send.setDark(next)} />
-    </column>
+        <Switch label="Dark" checked={counter.view.dark} onChange={next => counter.send.setDark(next)} />
+
+        {/* Ctrl+F or Cmd+F opens it; it searches the text on screen. */}
+        <FindBar />
+      </column>
+    </ContextMenus>
   );
 }

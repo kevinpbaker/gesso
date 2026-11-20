@@ -297,3 +297,23 @@ describe('RouterService', () => {
     });
   });
 });
+
+describe('RouterService titles', () => {
+  it('is null when no route in the match has a title, so the page keeps its own', () => {
+    const { router: service } = router();
+    service.navigate('/mail/inbox/42');
+    expect(service.title.value).toBeNull();
+  });
+
+  it('works a title out from the params it was navigated with', () => {
+    const Doc = route({
+      path: '/doc/:id',
+      component: Screen,
+      title: ({ params, query }) => `${params.id} ${query.tab ?? ''}`.trim()
+    });
+    const service = new RouterService();
+    service.setRoutes({ routes: [Doc] });
+    service.navigate('/doc/a?tab=history');
+    expect(service.title.value).toBe('a history');
+  });
+});

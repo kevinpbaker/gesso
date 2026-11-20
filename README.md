@@ -83,7 +83,7 @@ Notice what isn't there. No re-render pass, so nothing to memoise and no depende
 - **Layout you can interrogate.** `engine.explain(node)` says why a box is the size it is, in sentences, in the order the rules applied. A hover inspector paints the boxes and a heatmap of what the last frame re-measured.
 - **Cost follows the change, not the tree.** A text edit deep in a 10k-node page re-measures fewer than 20 nodes. A scroll frame re-measures zero. Those are CI budgets.
 - **Two renderers, one truth.** Canvas2D and WebGPU consume the same layout records and are pixel-diffed against each other in headless Chrome.
-- **A 15 kB main thread.** The shell bundle is 15.2 kB gzipped against a 20 kB budget CI enforces, and CI greps its bytes for Canvas2D calls so the engine cannot creep back onto the thread it was moved off.
+- **An 18 kB main thread.** The shell bundle is 18.5 kB gzipped against a 20 kB budget CI enforces, and CI greps its bytes for Canvas2D calls so the engine cannot creep back onto the thread it was moved off.
 - **Tests without a browser.** `gesso-testing` mounts a tree on a manual clock and queries it through the same semantics tree a screen reader gets. A failing box assertion prints `explain`'s answer under it. 4,640 tests run in under thirty seconds with no browser.
 - **An MCP server in every app.** The channels you declared become an AI agent's tools, described from your JSDoc, and the screen is offered as the outline a screen reader hears. [Built for AI agents](#built-for-ai-agents).
 - **Routing, motion, editing, devtools.** Typed routes with guards. Springs, FLIP, and shared elements that morph across screens. A text editor with IME, undo and clipboard. A Chrome devtools panel with the tree, the frame profiler and the workers' consoles.
@@ -383,6 +383,7 @@ pnpm fixtures:layout   # re-render layout conformance cases in headless Chrome
 pnpm fixtures:text     # re-render text conformance paragraphs in real fonts
 pnpm parity:webgpu     # Canvas2D vs WebGPU pixel diff in headless Chrome (needs a WebGPU adapter)
 pnpm screenshots       # each covered route against its committed baseline
+pnpm screenshots:docker # the same, and the docs pages, in the baselines' own Linux environment
 pnpm check:a11y        # Chrome's computed accessibility tree against the committed reports
 pnpm check:install     # pack, install and run the packages in a fresh Vite project
 pnpm check:scaffold    # run the scaffold and drive the result in Chrome

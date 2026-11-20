@@ -5,6 +5,9 @@ import { UiNodeType } from '../graph/UiNodeType';
 import { parseTransform } from '../properties/UiTransform';
 import { boxShadow } from '../properties/UiBoxShadow';
 import { lightTheme } from '../environment/UiTheme';
+import { UiEnvironment } from '../environment/UiEnvironment';
+import { UiEnvironmentKeys } from '../environment/UiEnvironmentKeys';
+import { setSelectionRange } from '../selection/UiSelectable';
 import {
   computeObjectFitRect,
   createPaintState,
@@ -15,6 +18,7 @@ import {
   isPaintVisible,
   normalizeTextAlign,
   normalizeVerticalAlign,
+  paintStateOf,
   resolvePaintState,
   type PaintState
 } from './PaintState';
@@ -361,5 +365,39 @@ describe('computeObjectFitRect', () => {
 
   it('returns an empty rect for a degenerate image', () => {
     expect(computeObjectFitRect('fill', 0, 0, box)).toEqual({ x: 10, y: 20, width: 0, height: 0 });
+  });
+});
+
+describe('paintStateOf', () => {
+  it("keeps a node's state until one of its own properties is written", () => {
+    const node = nodeWith({ backgroundColor: '#ff0000' });
+    const first = paintStateOf(node);
+    expect(paintStateOf(node)).toBe(first);
+    expect(first.backgroundColor).toEqual({ r: 1, g: 0, b: 0, a: 1 });
+
+    node.setProperty('backgroundColor', '#0000ff');
+    expect(paintStateOf(node).backgroundColor).toEqual({ r: 0, g: 0, b: 1, a: 1 });
+  });
+
+  it('resolves again when the environment it inherits from is replaced', () => {
+    const node = nodeWith({ text: 'hi' });
+    node.environment = new UiEnvironment(null).set(UiEnvironmentKeys.color, '#ff0000');
+    expect(paintStateOf(node).textColor).toEqual({ r: 1, g: 0, b: 0, a: 1 });
+
+    node.environment = node.environment.set(UiEnvironmentKeys.color, '#00ff00');
+    expect(paintStateOf(node).textColor).toEqual({ r: 0, g: 1, b: 0, a: 1 });
+  });
+
+  it('reads a selection over a paragraph on every call', () => {
+    const node = nodeWith({ text: 'hello' });
+    expect(paintStateOf(node).textSelection).toBeUndefined();
+    setSelectionRange(node, 1, 3);
+    expect(paintStateOf(node).textSelection).toEqual({ start: 1, end: 3 });
+  });
+
+  it('gives each node a state of its own, so one call never overwrites another', () => {
+    const red = paintStateOf(nodeWith({ backgroundColor: '#ff0000' }));
+    paintStateOf(nodeWith({ backgroundColor: '#0000ff' }));
+    expect(red.backgroundColor).toEqual({ r: 1, g: 0, b: 0, a: 1 });
   });
 });

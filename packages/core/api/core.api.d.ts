@@ -6,748 +6,89 @@
 
 // ==== index.d.ts ====
 import {
+  AnimatedCell,
+  Canvas2DContext,
+  Constraints,
+  DecorationShape,
+  DirtyFlags,
+  FontMetrics,
+  LayoutBox,
+  LayoutRecord,
+  LayoutResult,
+  LayoutStats,
+  NodeId,
+  NodeProperty,
+  OverlayShape,
+  ParagraphLayout,
+  ParagraphTextMeasurer,
+  RenderChanges,
+  RenderContext,
+  RendererBackend,
+  Size,
+  TextMeasurer,
+  TextMeasureRequest,
+  TextOverflow,
+  TextRunMeasurer,
+  TextRunStyle,
+  TextWrap,
+  UiAlignment,
+  UiAnimation,
+  UiBorderRadius,
+  UiBorderRadiusValue,
+  UiColor,
+  UiColors,
+  UiColorValue,
+  UiContentDistribution,
+  UiCursor,
+  UiDirection,
+  UiDurationToken,
+  UiEasing,
+  UiEasingToken,
+  UiEnvironment,
+  UiEnvironmentKey,
+  UiFlexWrap,
+  UiFontWeight,
+  UiFrame,
+  UiFrameClockFactory,
+  UiFrameTime,
+  UiGridAutoFlow,
+  UiMotion,
+  UiNode,
+  UiNodeTransitions,
+  UiNodeType,
+  UiObjectFit,
+  UiOverflow,
+  UiPlacement,
+  UiPointerEvents,
+  UiPosition,
+  UiPropertyOverride,
+  UiProvision,
+  UiReducedMotionPolicy,
+  UiRenderer,
+  UiSelfAlignment,
+  UiShapes,
+  UiSpringOptions,
+  UiSpringSpec,
+  UiSpringToken,
+  UiTextAlign,
+  UiTextDirection,
+  UiTextOverflowValue,
+  UiTextWrapValue,
+  UiTransform,
+  UiTransitionSpec,
+  UiTransitionValue,
+  UiTweenOptions,
+  UiVerticalAlign
+} from "./WebGPURenderer.js";
+import {
+  UiVideoSurface,
+  VideoResolver
+} from "./VideoResolver.js";
+import {
   BehaviorSubject,
   Observable,
   Subject
 } from "rxjs";
-type UiEasing = (t: number) => number;
-declare function easingCss(easing: UiEasing): string | undefined;
-declare const linear: UiEasing;
-declare function cubicBezier(x1: number, y1: number, x2: number, y2: number): UiEasing;
-declare function steps(count: number): UiEasing;
-declare const easings: {
-  readonly linear: UiEasing;
-  readonly standard: UiEasing;
-  readonly decelerate: UiEasing;
-  readonly accelerate: UiEasing;
-  readonly emphasized: UiEasing;
-};
-interface UiColor {
-  readonly r: number;
-  readonly g: number;
-  readonly b: number;
-  readonly a: number;
-}
-declare const UiBasicColors: {
-  readonly transparent: {
-    readonly r: 0;
-    readonly g: 0;
-    readonly b: 0;
-    readonly a: 0;
-  };
-  readonly black: {
-    readonly r: 0;
-    readonly g: 0;
-    readonly b: 0;
-    readonly a: 1;
-  };
-  readonly white: {
-    readonly r: 1;
-    readonly g: 1;
-    readonly b: 1;
-    readonly a: 1;
-  };
-  readonly red: {
-    readonly r: 1;
-    readonly g: 0;
-    readonly b: 0;
-    readonly a: 1;
-  };
-  readonly green: {
-    readonly r: 0;
-    readonly g: 1;
-    readonly b: 0;
-    readonly a: 1;
-  };
-  readonly blue: {
-    readonly r: 0;
-    readonly g: 0;
-    readonly b: 1;
-    readonly a: 1;
-  };
-};
-declare function rgba(r: number, g: number, b: number, a?: number): UiColor;
-declare function rgb8(r: number, g: number, b: number, a?: number): UiColor;
-declare function colorsEqual(a: UiColor, b: UiColor): boolean;
-declare function colorToHex(color: UiColor): string;
-declare function colorToRgba(color: UiColor): string;
-declare function parseColor(value: string): UiColor | undefined;
-declare function normalizeColor(value: unknown): UiColor | undefined;
-declare function colorValuesEqual(a: unknown, b: unknown): boolean;
-interface UiTransform {
-  readonly x: number;
-  readonly y: number;
-  readonly translateX: number;
-  readonly translateY: number;
-  readonly scaleX: number;
-  readonly scaleY: number;
-  readonly rotation: number;
-}
-declare const UiTransforms: {
-  readonly identity: {
-    readonly x: 0;
-    readonly y: 0;
-    readonly translateX: 0;
-    readonly translateY: 0;
-    readonly scaleX: 1;
-    readonly scaleY: 1;
-    readonly rotation: 0;
-  };
-};
-declare function transform(partial?: Partial<UiTransform>): UiTransform;
-declare function parseTransform(value: unknown): UiTransform | undefined;
-declare function transformsEqual(a: UiTransform, b: UiTransform): boolean;
-declare function transformIsIdentity(transform: UiTransform): boolean;
-type UiInterpolator<T> = (from: T, to: T, t: number) => T;
-declare const interpolateNumber: UiInterpolator<number>;
-declare const interpolateColor: UiInterpolator<UiColor>;
-declare const interpolateTransform: UiInterpolator<Partial<UiTransform>>;
-declare function interpolatorFor(from: unknown, to: unknown): UiInterpolator<unknown> | undefined;
-type UiDurationToken = 'instant' | 'fast' | 'normal' | 'slow' | 'deliberate' | (keyof UiDurationExtensions & string);
-type UiEasingToken = keyof typeof easings | (keyof UiEasingExtensions & string);
-type UiSpringToken = 'gentle' | 'snappy' | 'stiff' | (keyof UiSpringExtensions & string);
-interface UiDurationExtensions {}
-interface UiEasingExtensions {}
-interface UiSpringExtensions {}
-interface UiSpringSpec {
-  readonly stiffness: number;
-  readonly damping: number;
-  readonly mass: number;
-}
-interface UiMotion {
-  readonly durations: Readonly<Record<UiDurationToken, number>>;
-  readonly easings: Readonly<Record<UiEasingToken, UiEasing>>;
-  readonly springs: Readonly<Record<UiSpringToken, UiSpringSpec>>;
-}
-interface UiMotionChanges {
-  readonly durations?: Readonly<Partial<Record<UiDurationToken, number>>>;
-  readonly easings?: Readonly<Partial<Record<UiEasingToken, UiEasing>>>;
-  readonly springs?: Readonly<Partial<Record<UiSpringToken, UiSpringSpec>>>;
-}
-declare const defaultMotion: UiMotion;
-declare function defineMotion(changes: UiMotionChanges): UiMotion;
-declare function durationIn(motion: UiMotion, duration: number | UiDurationToken | undefined): number;
-declare function easingIn(motion: UiMotion, easing: UiEasing | UiEasingToken | undefined): UiEasing;
-declare function springIn(motion: UiMotion, spring: UiSpringSpec | UiSpringToken | undefined): UiSpringSpec;
-interface AnimatedCell<T> {
-  value: T;
-}
-type UiReducedMotionPolicy = 'snap' | 'keep';
-interface UiAnimationOptions {
-  stepMs?: number;
-  reducedMotion?: UiReducedMotionPolicy;
-  delay?: number;
-}
-interface UiTweenOptions extends UiAnimationOptions {
-  duration: number;
-  easing?: UiEasing;
-  repeat?: boolean;
-}
-interface UiSpringOptions extends UiAnimationOptions {
-  spring: UiSpringSpec;
-  velocity?: number;
-  restDelta?: number;
-}
-declare abstract class UiAnimation<T> {
-  readonly cell: AnimatedCell<T>;
-  private readonly stepMs;
-  readonly reducedMotionPolicy: UiReducedMotionPolicy;
-  private readonly delayMs;
-  protected startedAt: number;
-  private begun;
-  private lastAdvancedAt;
-  private readonly subject;
-  private nextDueAt;
-  private lastWritten;
-  private finished;
-  protected constructor(cell: AnimatedCell<T>, stepMs: number, reducedMotionPolicy: UiReducedMotionPolicy, delayMs?: number);
-  get values(): Observable<T>;
-  get isFinished(): boolean;
-  get dueSlackMs(): number;
-  dueAt(now: number): number;
-  protected abstract sample(now: number, elapsedMs: number): {
-    value: T;
-    done: boolean;
-  };
-  begin(now: number): void;
-  get hasBegun(): boolean;
-  continueFrom(previous: UiAnimation<T>): void;
-  protected onBegin(): void;
-  advance(now: number, hold?: boolean): void;
-  private scheduleNext;
-  snap(): void;
-  cancel(): void;
-  protected abstract get target(): T;
-  protected valuesEqual(a: T, b: T): boolean;
-  private finish;
-}
-declare class UiTween<T> extends UiAnimation<T> {
-  private readonly from;
-  private readonly to;
-  private readonly duration;
-  private readonly easing;
-  private readonly repeat;
-  private readonly interpolate;
-  constructor(cell: AnimatedCell<T>, to: T, options: UiTweenOptions, interpolate: UiInterpolator<T>);
-  get isRepeating(): boolean;
-  protected get target(): T;
-  protected sample(_now: number, elapsedMs: number): {
-    value: T;
-    done: boolean;
-  };
-  protected valuesEqual(a: T, b: T): boolean;
-}
-declare class UiSpring extends UiAnimation<number> {
-  private position;
-  private previousPosition;
-  private velocity;
-  private readonly to;
-  private readonly spec;
-  private readonly restDelta;
-  private simulatedTo;
-  constructor(cell: AnimatedCell<number>, to: number, options: UiSpringOptions);
-  get destination(): number;
-  get currentVelocity(): number;
-  protected onBegin(): void;
-  protected get target(): number;
-  protected sample(_now: number, elapsedMs: number): {
-    value: number;
-    done: boolean;
-  };
-}
-declare function createTween<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): UiTween<T> | undefined;
-type UiTransitionSpec = {
-  readonly kind: 'tween';
-  readonly duration: number | UiDurationToken;
-  readonly easing?: UiEasing | UiEasingToken;
-  readonly stepMs?: number;
-  readonly reducedMotion?: UiReducedMotionPolicy;
-} | {
-  readonly kind: 'spring';
-  readonly spring: UiSpringSpec | UiSpringToken;
-  readonly restDelta?: number;
-  readonly reducedMotion?: UiReducedMotionPolicy;
-};
-type UiTransitionValue = number | UiDurationToken | UiTransitionSpec;
-declare function tween(duration: number | UiDurationToken, options?: {
-  easing?: UiEasing | UiEasingToken;
-  stepMs?: number;
-  reducedMotion?: UiReducedMotionPolicy;
-}): UiTransitionSpec;
-declare function spring(spec?: UiSpringToken | UiSpringSpec, options?: {
-  restDelta?: number;
-  reducedMotion?: UiReducedMotionPolicy;
-}): UiTransitionSpec;
-declare function normalizeTransition(value: UiTransitionValue): UiTransitionSpec;
-declare function assertTransitionMap(nodeId: string, value: unknown, isKnownProperty: (name: string) => boolean): ReadonlyMap<string, UiTransitionSpec>;
-declare enum DirtyFlags {
-  None = 0,
-  Content = 1,
-  Paint = 2,
-  Layout = 4,
-  SubtreeLayout = 8,
-  Children = 16,
-  Transform = 32,
-  Properties = 64,
-  Environment = 128,
-  Semantics = 256
-}
-declare enum UiNodeType {
-  Root = "root",
-  Column = "column",
-  Row = "row",
-  Box = "box",
-  Text = "text",
-  EditableText = "editable-text",
-  Button = "button",
-  Paint = "paint",
-  ScrollView = "scroll-view",
-  Grid = "grid",
-  Fragment = "fragment"
-}
-interface UiEnvironmentKey<T> {
-  readonly name: string;
-  readonly defaultValue: T;
-  readonly compare?: (a: T, b: T) => boolean;
-}
-declare function createEnvironmentKey<T>(options: {
-  name: string;
-  defaultValue: T;
-  compare?: (a: T, b: T) => boolean;
-}): UiEnvironmentKey<T>;
-declare function findEnvironmentKey(name: string): UiEnvironmentKey<unknown> | undefined;
-interface UiProvision<T = unknown> {
-  readonly key: UiEnvironmentKey<T>;
-  readonly value: T;
-}
-declare function provided<T>(key: UiEnvironmentKey<T>, value: T): UiProvision;
-declare class UiEnvironment {
-  readonly parent: UiEnvironment | null;
-  private readonly values;
-  constructor(parent: UiEnvironment | null, values?: ReadonlyMap<string, unknown>);
-  set<T>(key: UiEnvironmentKey<T>, value: T): UiEnvironment;
-  delete<T>(key: UiEnvironmentKey<T>): UiEnvironment;
-  get<T>(key: UiEnvironmentKey<T>): T;
-  has<T>(key: UiEnvironmentKey<T>): boolean;
-  providedKeys(): Iterable<string>;
-  get providedSize(): number;
-  getOwn(name: string): unknown;
-  providesOwn(name: string): boolean;
-}
-interface Size {
-  width: number;
-  height: number;
-}
-interface LayoutBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-interface TightenOptions {
-  width?: number;
-  height?: number;
-  minWidth?: number;
-  maxWidth?: number;
-  minHeight?: number;
-  maxHeight?: number;
-}
-declare class Constraints {
-  readonly minWidth: number;
-  readonly maxWidth: number;
-  readonly minHeight: number;
-  readonly maxHeight: number;
-  constructor(minWidth?: number, maxWidth?: number, minHeight?: number, maxHeight?: number);
-  static unbounded(): Constraints;
-  static tight(width: number, height: number): Constraints;
-  static loose(width: number, height: number): Constraints;
-  hasBoundedWidth(): boolean;
-  hasBoundedHeight(): boolean;
-}
-interface LayoutStats {
-  measured: number;
-  placed: number;
-  shifted: number;
-  relayoutRoots: number;
-  fullLayout: boolean;
-  measuredNodes: UiNode[];
-}
-interface LayoutResult {
-  root: UiNode;
-  box: LayoutBox;
-  contentWidth: number;
-  contentHeight: number;
-  scrollX: number;
-  scrollY: number;
-  clip: LayoutBox;
-}
-declare function clampSize(constraints: Constraints, width: number, height: number): Size;
-declare function constraintsEqual(a: Constraints, b: Constraints): boolean;
-declare function tightenConstraints(constraints: Constraints, options: TightenOptions): Constraints;
-type TextWrap = 'word' | 'char' | 'none';
-type TextOverflow = 'clip' | 'ellipsis';
-interface TextRunStyle {
-  fontFamily?: string;
-  fontWeight?: string | number;
-  fontSize?: number;
-  fontStyle?: string;
-  fontStretch?: string;
-  fontVariant?: string;
-  fontKerning?: string;
-  letterSpacing?: number;
-}
-interface TextRunSpan extends TextRunStyle {
-  readonly start: number;
-  readonly end: number;
-  readonly hidden?: boolean;
-}
-interface TextMeasureRequest {
-  text: string;
-  fontSize: number;
-  maxWidth?: number;
-  exactWidth?: boolean;
-  fontFamily?: string;
-  fontWeight?: string | number;
-  lineHeight?: number;
-  letterSpacing?: number;
-  fontStyle?: string;
-  fontStretch?: string;
-  fontVariant?: string;
-  fontKerning?: string;
-  wrap?: TextWrap;
-  maxLines?: number;
-  overflow?: TextOverflow;
-  spans?: readonly TextRunSpan[];
-}
-interface TextLineRun {
-  span: number;
-  start: number;
-  end: number;
-  text: string;
-  x: number;
-  width: number;
-}
-interface TextLine {
-  start: number;
-  end: number;
-  text: string;
-  width: number;
-  runs?: readonly TextLineRun[];
-}
-interface FontMetrics {
-  ascent: number;
-  descent: number;
-}
-interface ParagraphLayout {
-  lines: TextLine[];
-  width: number;
-  height: number;
-  lineHeight: number;
-  ascent: number;
-  descent: number;
-  firstBaseline: number;
-  minContentWidth: number;
-  maxContentWidth: number;
-}
-interface TextMeasurer {
-  measure(request: TextMeasureRequest): Size;
-  layout(request: TextMeasureRequest): ParagraphLayout;
-  measureRunWidth(text: string, request: TextMeasureRequest): number;
-  invalidate?(): void;
-  readonly generation?: number;
-}
-interface TextRunMeasurer {
-  measureRunWidth(text: string, request: TextMeasureRequest): number;
-  fontMetrics(request: TextMeasureRequest): FontMetrics;
-}
-interface SpannedRuns {
-  readonly spans: readonly TextRunSpan[];
-  indexAt(offset: number): number;
-  requestAt(offset: number): TextMeasureRequest;
-  hiddenAt(offset: number): boolean;
-  width(text: string, start: number, end: number): number;
-  widthOf(run: string, offset: number): number;
-  cut(text: string, start: number, end: number, x: number): TextLineRun[];
-}
-declare function spannedRunsFor(request: TextMeasureRequest, runs: Pick<TextRunMeasurer, 'measureRunWidth'>): SpannedRuns | undefined;
-declare abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
-  private readonly paragraphs;
-  private readonly fitting;
-  private generations;
-  abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
-  abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
-  layout(request: TextMeasureRequest): ParagraphLayout;
-  measure(request: TextMeasureRequest): Size;
-  get cachedParagraphs(): number;
-  get generation(): number;
-  invalidate(): void;
-}
-interface FixedMetricsOptions {
-  glyphWidth?: number;
-  ascent?: number;
-  descent?: number;
-}
-declare class CharacterCountTextMeasurer extends ParagraphTextMeasurer {
-  private readonly glyphWidth;
-  private readonly ascentFactor;
-  private readonly descentFactor;
-  constructor(options?: FixedMetricsOptions);
-  measureRunWidth(text: string, request: TextMeasureRequest): number;
-  fontMetrics(request: TextMeasureRequest): FontMetrics;
-}
-interface TextMemo {
-  readonly request: TextMeasureRequest;
-  readonly paragraph: ParagraphLayout;
-  readonly generation: number;
-  readonly fitsAnyWidth: boolean;
-}
-interface ArrangementMemo {
-  readonly kind: 'flex' | 'grid';
-  readonly pass: number;
-  readonly content: Constraints;
-  readonly contentMatters: boolean;
-}
-declare class LayoutRecord {
-  readonly node: UiNode;
-  constructor(node: UiNode);
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  measuredWidth: number;
-  measuredHeight: number;
-  outerWidth: number;
-  outerHeight: number;
-  paddingLeft: number;
-  paddingRight: number;
-  paddingTop: number;
-  paddingBottom: number;
-  marginLeft: number;
-  marginRight: number;
-  marginTop: number;
-  marginBottom: number;
-  minWidth: number;
-  maxWidth: number;
-  minHeight: number;
-  maxHeight: number;
-  flexGrow: number;
-  flexShrink: number;
-  flexBasisZero: boolean;
-  minWidthAuto: boolean;
-  minHeightAuto: boolean;
-  marginLeftAuto: boolean;
-  marginRightAuto: boolean;
-  marginTopAuto: boolean;
-  marginBottomAuto: boolean;
-  aspectRatio: number | undefined;
-  hasBaseline: boolean;
-  baseline: number;
-  minContentWidth: number;
-  minContentHeight: number;
-  maxContentWidth: number;
-  intrinsicWidth: number;
-  intrinsicHeight: number;
-  flexMain: 0 | 1 | 2;
-  flexBase: number;
-  flexMin: number;
-  flexMax: number;
-  flexMinAuto: boolean;
-  positioned: boolean;
-  absolute: boolean;
-  get displaced(): boolean;
-  top: number | undefined;
-  right: number | undefined;
-  bottom: number | undefined;
-  left: number | undefined;
-  zIndex: number;
-  lifted: boolean;
-  liftBoundary: boolean;
-  clips: boolean;
-  extentMinX: number;
-  extentMinY: number;
-  extentMaxX: number;
-  extentMaxY: number;
-  paintReachLeft: number;
-  paintReachTop: number;
-  paintReachRight: number;
-  paintReachBottom: number;
-  scrollable: boolean;
-  scrollsText: boolean;
-  hidesScrollbars: boolean;
-  textScrollbars: boolean;
-  mirrored: boolean;
-  sticky: boolean;
-  stickyOffsetX: number;
-  stickyOffsetY: number;
-  scrollbarVisibleUntil: number;
-  subgridColumns: number[] | undefined;
-  subgridColumnGap: number;
-  paintOrder: UiNode[] | null;
-  boundsMinX: number;
-  boundsMinY: number;
-  boundsMaxX: number;
-  boundsMaxY: number;
-  boundsUnbounded: boolean;
-  scrollX: number;
-  scrollY: number;
-  contentWidth: number;
-  contentHeight: number;
-  lastConstraints: Constraints;
-  arrangement: ArrangementMemo | null;
-  textBounded: TextMemo | null;
-  textUnbounded: TextMemo | null;
-  lastBaseWidth: number | undefined;
-  lastBaseHeight: number | undefined;
-  percentWidth: boolean;
-  percentHeight: boolean;
-  sameBase(baseWidth: number | undefined, baseHeight: number | undefined): boolean;
-  private alternates;
-  saveAlt(): void;
-  recallAlt(constraints: Constraints, baseWidth?: number, baseHeight?: number): boolean;
-  forgetAlts(): void;
-  contentMatters: boolean;
-  relayoutBoundary: boolean;
-  measureDirty: boolean;
-  placeDirty: boolean;
-  placedOnce: boolean;
-  transformDirty: boolean;
-  propsPass: number;
-  propsBaseWidth: number | undefined;
-  propsBaseHeight: number | undefined;
-  propsVersion: number;
-  propsFromNodeAlone: boolean;
-  reset(): void;
-}
-interface UiColors {
-  readonly background: UiColor;
-  readonly surface: UiColor;
-  readonly primary: UiColor;
-  readonly secondary: UiColor;
-  readonly text: UiColor;
-  readonly textMuted: UiColor;
-  readonly border: UiColor;
-  readonly shadow: UiColor;
-  readonly placeholder: UiColor;
-  readonly scrim: UiColor;
-  readonly controlBackground: UiColor;
-  readonly controlBackgroundHovered: UiColor;
-  readonly controlBackgroundPressed: UiColor;
-  readonly controlBorder: UiColor;
-  readonly controlForeground: UiColor;
-  readonly controlForegroundDisabled: UiColor;
-  readonly controlAccent: UiColor;
-  readonly danger: UiColor;
-  readonly focusRing: UiColor;
-  readonly selectionBackground: UiColor;
-  readonly selectionForeground: UiColor;
-  readonly tooltipBackground: UiColor;
-  readonly tooltipForeground: UiColor;
-}
-declare const lightColors: UiColors;
-declare const darkColors: UiColors;
-declare function colorsEqualPalette(a: UiColors, b: UiColors): boolean;
-interface UiShapes {
-  readonly none: number;
-  readonly extraSmall: number;
-  readonly small: number;
-  readonly medium: number;
-  readonly large: number;
-  readonly extraLarge: number;
-  readonly full: number;
-}
-declare const defaultShapes: UiShapes;
-declare function shapesEqual(a: UiShapes, b: UiShapes): boolean;
-interface UiShapeExtensions {}
-type UiShapeName = keyof UiShapes | (keyof UiShapeExtensions & string);
-declare function isShapeName(value: unknown, scale: UiShapes): value is UiShapeName;
-interface UiBorderRadius {
-  readonly topLeft: number;
-  readonly topRight: number;
-  readonly bottomRight: number;
-  readonly bottomLeft: number;
-}
-declare const UiBorderRadiuses: {
-  readonly none: {
-    readonly topLeft: 0;
-    readonly topRight: 0;
-    readonly bottomRight: 0;
-    readonly bottomLeft: 0;
-  };
-};
-declare function borderRadius(radius: number): UiBorderRadius;
-declare function borderRadiusCorners(topLeft: number, topRight: number, bottomRight: number, bottomLeft: number): UiBorderRadius;
-declare function borderRadiusEqual(a: UiBorderRadius, b: UiBorderRadius): boolean;
-declare function borderRadiusIsZero(radius: UiBorderRadius): boolean;
-declare function uniformBorderRadius(radius: UiBorderRadius): number;
-declare function normalizeBorderRadius(value: unknown): UiBorderRadius;
-declare function borderRadiusValuesEqual(a: unknown, b: unknown): boolean;
-type UiAlignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline' | 'space-between' | 'space-around' | 'space-evenly';
-type UiSelfAlignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline';
-type UiContentDistribution = 'stretch' | 'start' | 'center' | 'end' | 'space-between' | 'space-around' | 'space-evenly';
-type UiFlexWrap = 'nowrap' | 'wrap' | 'wrap-reverse';
-type UiDirection = 'row' | 'column' | 'row-reverse' | 'column-reverse' | 'horizontal' | 'vertical';
-type UiGridAutoFlow = 'row' | 'column';
-type UiSubgridAxis = 'columns';
-declare const UI_SUBGRID_AXES: readonly UiSubgridAxis[];
-declare function validateSubgrid(value: unknown): string | undefined;
-type UiPosition = 'static' | 'relative' | 'absolute' | 'sticky';
-type UiOverflow = 'visible' | 'hidden' | 'scroll' | 'auto';
-type UiPlacement = 'over' | 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end';
-type UiTextWrapValue = 'word' | 'char' | 'none';
-type UiTextOverflowValue = 'clip' | 'ellipsis';
-type UiTextAlign = 'start' | 'end' | 'left' | 'center' | 'right';
-type UiTextDirection = 'ltr' | 'rtl';
-type UiVerticalAlign = 'top' | 'middle' | 'bottom';
-type UiObjectFit = 'fill' | 'cover' | 'contain' | 'none';
-type UiPointerEvents = 'auto' | 'none';
-type UiFontWeight = number | `${number}` | 'normal' | 'bold' | 'lighter' | 'bolder';
-type UiCursor = 'default' | 'pointer' | 'text' | 'move' | 'grab' | 'grabbing' | 'crosshair' | 'not-allowed' | 'wait' | 'progress' | 'help' | 'none' | 'col-resize' | 'row-resize' | 'ew-resize' | 'ns-resize' | 'nesw-resize' | 'nwse-resize' | 'zoom-in' | 'zoom-out';
-type UiThemeColorName = keyof UiColors;
-type UiColorValue = UiColor | UiThemeColorName | (string & {});
-type UiBorderRadiusValue = UiBorderRadius | number | UiShapeName;
-type DecorationShape = DecorationFill | DecorationStroke;
-interface DecorationBox {
-  readonly x?: number;
-  readonly y?: number;
-  readonly width?: number;
-  readonly height?: number;
-  readonly right?: number;
-  readonly bottom?: number;
-  readonly outset?: number;
-  readonly radius?: number;
-  readonly after?: 'children';
-}
-interface DecorationFill extends DecorationBox {
-  readonly kind: 'fill';
-  readonly color: UiColorValue;
-}
-interface DecorationStroke extends DecorationBox {
-  readonly kind: 'stroke';
-  readonly color: UiColorValue;
-  readonly lineWidth: number;
-}
-interface DecorationRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  radius: number;
-}
-declare function decorationRect(shape: DecorationShape, rec: LayoutRecord, nodeRadius: number): DecorationRect;
-declare function decorationColor(node: UiNode, shape: DecorationShape): UiColor | undefined;
-declare function paintsAfterChildren(shape: DecorationShape): boolean;
-declare function hasDecorationPhase(shapes: readonly DecorationShape[], after: boolean): boolean;
-type NodeId = string;
-type NodeProperty = string;
-interface UiPropertyOverride {
-  readonly source: symbol;
-  readonly name: string;
-  order: number;
-  value: unknown;
-  readonly snap?: boolean;
-}
-interface UiPropertyOverrides {
-  declared: {
-    present: boolean;
-    value: unknown;
-  };
-  entries: UiPropertyOverride[];
-}
-interface UiNodeTransitions {
-  write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
-  cancel(property: NodeProperty): void;
-  readonly declared: ReadonlyMap<NodeProperty, UiTransitionSpec>;
-  release(): void;
-}
-interface UiHold {
-  readonly pending: Map<UiNode, DirtyFlags>;
-  environment: DirtyFlags;
-}
-declare class UiNode {
-  readonly id: NodeId;
-  readonly type: UiNodeType;
-  constructor(id: NodeId, type: UiNodeType);
-  parent: UiNode | null;
-  firstChild: UiNode | null;
-  lastChild: UiNode | null;
-  childOrderVersion: number;
-  previousSibling: UiNode | null;
-  nextSibling: UiNode | null;
-  dirtyFlags: DirtyFlags;
-  readonly properties: Map<string, unknown>;
-  propertyVersion: number;
-  overrides: Map<NodeProperty, UiPropertyOverrides> | null;
-  environment: UiEnvironment | null;
-  decorations: readonly DecorationShape[] | null;
-  transitions: UiNodeTransitions | null;
-  hold: UiHold | null;
-  heldBy: UiNode | null;
-  hasChildren(): boolean;
-  isDirty(): boolean;
-  getProperty<T>(property: NodeProperty): T | undefined;
-  setProperty<T>(property: NodeProperty, value: T): void;
-  removeProperty(property: NodeProperty): boolean;
-}
 declare class UiClock {
   private rate;
   private anchor;
@@ -1701,17 +1042,6 @@ interface UiLayoutProtocol {
   explain?(children: readonly UiLayoutChild[], size: Size, context: UiLayoutContext): readonly string[];
 }
 declare function isLayoutProtocol(value: unknown): value is UiLayoutProtocol;
-interface UiVideoSurface {
-  readonly frame: VideoFrame | ImageBitmap | null;
-  readonly version: number;
-  readonly width: number;
-  readonly height: number;
-}
-declare function isVideoSurface(value: unknown): value is UiVideoSurface;
-declare function videoFrameSize(surface: UiVideoSurface): {
-  width: number;
-  height: number;
-};
 type LazyAxis = 'column' | 'row';
 interface LazyListOptions {
   readonly count: Reactive<number>;
@@ -2011,6 +1341,7 @@ declare function normalizeStates(states: UiSemanticStates): UiSemanticState[];
 declare function statesEqual(a: UiSemanticStates | undefined, b: UiSemanticStates | undefined): boolean;
 declare function validateRole(value: unknown): string | undefined;
 declare function validateStates(value: unknown): string | undefined;
+type UiInputMode = 'text' | 'numeric' | 'decimal' | 'email' | 'tel' | 'url' | 'search' | 'none';
 type UiHoldUnseen = true | {
   readonly belowScale?: number;
   readonly margin?: number;
@@ -2124,6 +1455,8 @@ declare const UiProperties: {
   readonly multiline: UiPropertyDefinition<boolean | undefined>;
   readonly readOnly: UiPropertyDefinition<boolean | undefined>;
   readonly secret: UiPropertyDefinition<boolean | undefined>;
+  readonly inputMode: UiPropertyDefinition<UiInputMode | undefined>;
+  readonly spellCheck: UiPropertyDefinition<boolean | undefined>;
   readonly caretColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly selectionColor: UiPropertyDefinition<UiColorValue | undefined>;
   readonly matchColor: UiPropertyDefinition<UiColorValue | undefined>;
@@ -2253,7 +1586,7 @@ type ContainerProps = CommonProps & PropsOf<'overflow' | 'scrollbars' | 'scrollX
 type FlexContainerProps = ContainerProps & PropsOf<'gap' | 'rowGap' | 'columnGap' | 'x' | 'y' | 'flexWrap' | 'alignContent' | 'direction'>;
 type TextContentProps = PropsOf<'text' | 'spans' | 'textWrap' | 'maxLines' | 'textOverflow' | 'verticalAlign' | 'selectionColor' | 'matchColor'>;
 type TextProps = CommonProps & TextContentProps;
-type EditableTextProps = CommonProps & PropsOf<'value' | 'spans' | 'placeholder' | 'multiline' | 'readOnly' | 'secret' | 'textWrap' | 'verticalAlign' | 'caretColor' | 'selectionColor' | 'placeholderColor'>;
+type EditableTextProps = CommonProps & PropsOf<'value' | 'spans' | 'placeholder' | 'multiline' | 'readOnly' | 'secret' | 'inputMode' | 'spellCheck' | 'textWrap' | 'verticalAlign' | 'caretColor' | 'selectionColor' | 'placeholderColor'>;
 type BoxProps = ContainerProps & PropsOf<'x' | 'y' | 'image' | 'objectFit'>;
 type StackProps = BoxProps;
 type PaintElementProps = BoxProps & PropsOf<'paint' | 'path' | 'clipPath' | 'blur'>;
@@ -2585,62 +1918,11 @@ declare const DEFAULT_TEXT_COLOR: {
 declare function normalizeTextAlign(value: unknown): TextAlign;
 declare function normalizeVerticalAlign(value: unknown): VerticalAlign;
 declare function resolvePaintState(node: UiNode, out: PaintState): PaintState;
+declare function paintStateOf(node: UiNode): PaintState;
 declare function isPaintVisible(node: UiNode): boolean;
 declare function computeObjectFitRect(fit: ObjectFit, imageWidth: number, imageHeight: number, box: LayoutBox): LayoutBox;
 declare function createPaintState(): PaintState;
 declare function colorToCss(color: UiColor): string;
-interface Canvas2DGradient {
-  addColorStop(offset: number, color: string): void;
-}
-interface Canvas2DContext {
-  save(): void;
-  restore(): void;
-  translate(x: number, y: number): void;
-  scale(x: number, y: number): void;
-  rotate(angle: number): void;
-  setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
-  letterSpacing?: string;
-  fontStretch?: string;
-  fontKerning?: string;
-  direction?: CanvasDirection;
-  clearRect(x: number, y: number, width: number, height: number): void;
-  fillRect(x: number, y: number, width: number, height: number): void;
-  strokeRect(x: number, y: number, width: number, height: number): void;
-  beginPath(): void;
-  moveTo(x: number, y: number): void;
-  lineTo(x: number, y: number): void;
-  arcTo(x1: number, y1: number, x2: number, y2: number, radius: number): void;
-  closePath(): void;
-  rect(x: number, y: number, width: number, height: number): void;
-  clip(): void;
-  fill(): void;
-  stroke(): void;
-  fillText(text: string, x: number, y: number, maxWidth?: number): void;
-  measureText(text: string): TextMetrics;
-  drawImage(image: ImageBitmap | VideoFrame | OffscreenCanvas, dx: number, dy: number, dw: number, dh: number): void;
-  getTransform?(): {
-    a: number;
-    b: number;
-    c: number;
-    d: number;
-    e: number;
-    f: number;
-  };
-  createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
-  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;
-  fillStyle: string | Canvas2DGradient | CanvasPattern;
-  strokeStyle: string | Canvas2DGradient | CanvasPattern;
-  lineWidth: number;
-  lineJoin: CanvasLineJoin;
-  globalAlpha: number;
-  font: string;
-  textAlign: CanvasTextAlign;
-  textBaseline: CanvasTextBaseline;
-  shadowColor: string;
-  shadowBlur: number;
-  shadowOffsetX: number;
-  shadowOffsetY: number;
-}
 interface TextLinePlacement {
   text: string;
   start: number;
@@ -3185,6 +2467,7 @@ interface PointerControllerOptions {
     pointerMove(x: number, y: number): void;
     pointerUp(): void;
     clear(): void;
+    readonly hasSelection?: boolean;
     pointerHover?(node: UiNode | null, x: number, y: number): void;
   };
 }
@@ -3219,6 +2502,14 @@ declare class UiPointerController {
   private downPath;
   get hoveredNode(): UiNode | null;
   get pressedNode(): UiNode | null;
+  get selectionDrag(): {
+    readonly node: UiNode;
+    readonly x: number;
+    readonly y: number;
+  } | null;
+  repeatSelectionMove(): void;
+  private selecting;
+  private extendSelection;
   private captured;
   get draggingScrollbarOf(): UiNode | null;
   get overScrollbar(): boolean;
@@ -3256,6 +2547,9 @@ interface KeyboardControllerOptions {
       y: number;
     };
   };
+  scroll?: {
+    handleKey(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean;
+  };
 }
 declare class UiKeyboardController {
   private readonly dispatcher;
@@ -3265,10 +2559,33 @@ declare class UiKeyboardController {
   private readonly selection;
   private readonly find;
   private readonly activation;
+  private readonly scroll;
   private readonly root;
   constructor(dispatcher: UiInputDispatcher, focusManager: UiFocusManager, root: UiNode | (() => UiNode), options?: KeyboardControllerOptions);
   keyDown(key: string, modifiers?: UiKeyModifiers, textFollows?: boolean, code?: string): UiKeyboardEvent;
   keyUp(key: string, modifiers?: UiKeyModifiers, code?: string): UiKeyboardEvent;
+}
+declare const KEY_SCROLL_STEP = 40;
+declare class UiKeyboardScroller {
+  private readonly sink;
+  constructor(sink: ScrollSink);
+  handleKey(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean;
+  private around;
+  private largest;
+}
+declare const SELECTION_SCROLL_EDGE = 24;
+interface SelectionDrag {
+  readonly node: UiNode;
+  readonly x: number;
+  readonly y: number;
+}
+declare class UiSelectionAutoScroller {
+  private readonly sink;
+  private readonly screenBox;
+  private lastTime;
+  constructor(sink: ScrollSink,
+  screenBox: (node: UiNode) => LayoutBox);
+  advance(drag: SelectionDrag | null, time: number): boolean;
 }
 interface UiShortcutStep {
   readonly key: string;
@@ -3426,6 +2743,8 @@ interface EditingState {
   readonly clipboard?: string;
   readonly html?: string;
   readonly secret?: true;
+  readonly inputMode?: UiInputMode;
+  readonly spellCheck?: true;
 }
 interface EditingControllerOptions {
   platform?: EditingPlatform;
@@ -3577,131 +2896,6 @@ declare function isNodeFocusable(node: UiNode): boolean;
 declare function isNodeTabStop(node: UiNode): boolean;
 declare function isNodeSelectable(node: UiNode): boolean;
 declare function resolveCursor(node: UiNode | null): string | null;
-type UiFrameTime = number;
-interface UiFrameClock {
-  requestFrame(): void;
-  cancelFrame(): void;
-}
-type UiFrameClockFactory = (onFrame: (time: UiFrameTime) => void) => UiFrameClock;
-declare class UiAnimationFrameClock implements UiFrameClock {
-  private readonly onFrame;
-  private readonly requestAnimationFrame;
-  private readonly cancelAnimationFrame;
-  private handle;
-  constructor(onFrame: (time: UiFrameTime) => void);
-  requestFrame(): void;
-  cancelFrame(): void;
-}
-interface UiTimerFrameClockOptions {
-  intervalMs?: number;
-  now?: () => UiFrameTime;
-}
-interface UiHostFrameClockOptions {
-  requestAnimationFrame?: ((callback: (time: number) => void) => number) | null;
-  timeOrigin?: number;
-  fallbackMs?: number;
-  stallMs?: number;
-  minStallMs?: number;
-  now?: () => UiFrameTime;
-}
-declare class UiTimerFrameClock implements UiFrameClock {
-  private readonly onFrame;
-  private readonly intervalMs;
-  private readonly now;
-  private handle;
-  constructor(onFrame: (time: UiFrameTime) => void, options?: UiTimerFrameClockOptions);
-  requestFrame(): void;
-  cancelFrame(): void;
-}
-declare class UiHostFrameClock implements UiFrameClock {
-  private readonly onFrame;
-  private readonly onActive;
-  private pending;
-  private active;
-  private hosted;
-  private stalled;
-  private idleTicks;
-  private lastTickTime;
-  private hostOffset;
-  private readonly intervals;
-  private handle;
-  private readonly fallbackMs;
-  private readonly stallMs;
-  private readonly minStallMs;
-  private readonly now;
-  private local;
-  private localHandle;
-  private localRefreshes;
-  private localWatch;
-  private hidden;
-  private readonly timeOrigin;
-  private readonly localIntervals;
-  private lastLocalTime;
-  private lastLocalCost;
-  private display;
-  private locked;
-  private givenUp;
-  private lastRetry;
-  private retrying;
-  private readonly refreshes;
-  private refreshesSinceFrame;
-  private lastLocked;
-  private readonly costs;
-  private stride;
-  constructor(onFrame: (time: UiFrameTime) => void,
-  onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
-  get isLocal(): boolean;
-  requestFrame(): void;
-  private watchLocal;
-  setHidden(hidden: boolean): void;
-  displayInterval(ms: number, origin: number): void;
-  get isDisplayLocked(): boolean;
-  private recordLocal;
-  private compareLocal;
-  private retryLocal;
-  private toLocal;
-  private beat;
-  private refineInterval;
-  private deliverOnBeat;
-  private recordCost;
-  get displayStride(): number;
-  private armTimer;
-  private watchMs;
-  private hostTime;
-  private cadenceMs;
-  private selfPaceMs;
-  flush(): void;
-  private drawNow;
-  cancelFrame(): void;
-  private clearFallback;
-  private deliver;
-  tick(time: UiFrameTime): void;
-  private recordCadence;
-  private setActive;
-}
-declare class UiManualFrameClock implements UiFrameClock {
-  private onFrame;
-  private pending;
-  constructor(onFrame: (time: UiFrameTime) => void);
-  setCallback(onFrame: (time: UiFrameTime) => void): void;
-  requestFrame(): void;
-  cancelFrame(): void;
-  get isPending(): boolean;
-  tick(time?: UiFrameTime): void;
-}
-declare class UiFrame {
-  readonly id: number;
-  readonly time: UiFrameTime;
-  private readonly dirty;
-  constructor(id: number, time: UiFrameTime, dirty: ReadonlyMap<UiNode, DirtyFlags>);
-  get nodes(): UiNode[];
-  entries(): IterableIterator<[UiNode, DirtyFlags]>;
-  anyFlags(flags: DirtyFlags): boolean;
-  merged(later: UiFrame): UiFrame;
-  get size(): number;
-  isEmpty(): boolean;
-  dirtyFlagsFor(node: UiNode): DirtyFlags;
-}
 interface LayoutExplanation {
   readonly node: UiNode;
   readonly laidOut: boolean;
@@ -4344,6 +3538,7 @@ interface IconSpec {
   readonly style: 'fill' | 'stroke';
   readonly strokeWidth: number;
   readonly fillRule?: 'nonzero' | 'evenodd';
+  readonly scale?: number;
 }
 interface IconRasterizerOptions {
   scale?: number;
@@ -4368,11 +3563,15 @@ declare function iconKey(spec: IconSpec): string;
 declare class IconRasterizer {
   private readonly rasters;
   private readonly evictable;
-  private readonly scale;
+  private scale;
+  private readonly scaleListeners;
   private readonly capacity;
   private readonly createCanvas;
   constructor(options?: IconRasterizerOptions);
   get size(): number;
+  get pixelScale(): number;
+  setScale(scale: number): void;
+  onScaleChange(listener: () => void): () => void;
   raster(spec: IconSpec): Promise<UiImage>;
   release(spec: IconSpec): void;
   dispose(): void;
@@ -4421,49 +3620,6 @@ interface SharedElementArgs extends MotionTiming {
 declare const sharedElement: ((args: SharedElementArgs, key?: string | number) => UiModifier<SharedElementArgs>) & {
   readonly kind: UiModifierKind<SharedElementArgs>;
 };
-interface VideoPlayback {
-  readonly surface: UiVideoSurface;
-  readonly width: number;
-  readonly height: number;
-  readonly duration: number;
-  readonly frameDurationMs: number;
-  readonly positionMs: number;
-  present(positionMs: number): boolean;
-  readonly seeking?: boolean;
-  onError(listener: (error: unknown) => void): () => void;
-  onFrame?(listener: () => void): () => void;
-}
-interface VideoResolver {
-  resolve(source: string): Promise<VideoPlayback>;
-  release(source: string): void;
-  dispose(): void;
-}
-interface RangeResponse {
-  readonly data: ArrayBuffer;
-  readonly total: number;
-}
-interface DefaultVideoResolverOptions {
-  capacity?: number;
-  fetch?: (source: string) => Promise<ArrayBuffer>;
-  fetchRange?: (source: string, start: number, end: number) => Promise<RangeResponse>;
-}
-declare function canDecodeVideo(): boolean;
-declare class DefaultVideoResolver implements VideoResolver {
-  private readonly entries;
-  private readonly evictable;
-  private readonly capacity;
-  private readonly fetchBuffer;
-  private readonly fetchRange;
-  private disposed;
-  constructor(options?: DefaultVideoResolverOptions);
-  get size(): number;
-  resolve(source: string): Promise<VideoPlayback>;
-  release(source: string): void;
-  dispose(): void;
-  private open;
-  private openWhole;
-  private openRanged;
-}
 type VideoState = 'loading' | 'playing' | 'failed';
 interface VideoClock {
   positionSeconds(): number;
@@ -4581,67 +3737,6 @@ declare class CanvasSurface {
   setLogicalSize(width: number, height: number, dpr?: number): void;
 }
 declare function createCanvasSurface(host: CanvasHost): CanvasSurface;
-type OverlayShape = {
-  kind: 'fill';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-} | {
-  kind: 'stroke';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  lineWidth: number;
-} | {
-  kind: 'label';
-  box: LayoutBox;
-  text: string;
-  font: string;
-  fontSize: number;
-  fontFamily: string;
-  textColor: string;
-  background: string;
-  height: number;
-};
-declare function labelOrigin(shape: Extract<OverlayShape, {
-  kind: 'label';
-}>): {
-  x: number;
-  y: number;
-};
-declare const LABEL_PADDING_X = 4;
-declare function drawOverlayShapes(ctx: Canvas2DContext, shapes: readonly OverlayShape[]): void;
-interface LayoutReader {
-  recordFor(node: UiNode): LayoutRecord | undefined;
-  allStickyNodes?(): ReadonlySet<UiNode>;
-}
-interface RenderContext {
-  readonly layout: LayoutReader;
-  readonly text: TextMeasurer;
-  readonly now?: number;
-  readonly overlay?: readonly OverlayShape[];
-  readonly changes?: RenderChanges;
-}
-interface RenderChanges {
-  readonly frame: UiFrame;
-  readonly geometryVersion: number;
-}
-type RendererBackend = 'canvas2d' | 'webgpu';
-interface UiRenderer {
-  readonly backend: RendererBackend;
-  initialize(): Promise<void>;
-  readonly isReady: boolean;
-  render(root: UiNode, context: RenderContext): void;
-  resize(width: number, height: number, dpr: number): void;
-  fontsChanged?(): void;
-  surfaceRestored?(): void;
-  nextRepaint?(): number | undefined;
-  dispose(): void;
-}
 type LayerCanvasFactory = (width: number, height: number) => CanvasHost | null;
 interface ScrollLayerStats {
   built: number;
@@ -4708,10 +3803,12 @@ interface Canvas2DRendererOptions {
 }
 declare class Canvas2DRenderer implements UiRenderer {
   private readonly options;
+  private readonly snapped;
+  private snapScale;
   readonly backend: RendererBackend;
   private disposed;
   private readonly contentBox;
-  private readonly paint;
+  private paint;
   private precise;
   private paintOwner;
   private cullX;
@@ -4753,6 +3850,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private renderChildren;
   private renderLifted;
   private applyAncestors;
+  private snappedBox;
   private paintBackground;
   private paintShadows;
   private fillBox;
@@ -4775,7 +3873,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private pushMappedCull;
   private popCull;
 }
-declare function traceRoundedRect(ctx: Canvas2DContext, x: number, y: number, width: number, height: number, radius: number): void;
+declare function traceRoundedRect(ctx: Canvas2DContext, x: number, y: number, width: number, height: number, radius: number | UiBorderRadius): void;
 declare class CanvasTextMeasurer extends ParagraphTextMeasurer {
   private readonly context;
   private readonly widths;
@@ -5195,99 +4293,6 @@ declare function registerFontStack(family: string, fallback: readonly string[]):
 declare function fontStackFor(family: string): string;
 declare function bumpFontStack(family: string): void;
 declare function clearFontStacks(): void;
-interface WebGPUCanvasHost {
-  width: number;
-  height: number;
-  getContext(contextId: 'webgpu'): GPUCanvasContext | null;
-}
-declare class WebGPUSurface {
-  private readonly canvas;
-  private logicalW;
-  private logicalH;
-  private pixelRatio;
-  private context;
-  private configured;
-  constructor(canvas: WebGPUCanvasHost);
-  get logicalWidth(): number;
-  get logicalHeight(): number;
-  get dpr(): number;
-  get physicalWidth(): number;
-  get physicalHeight(): number;
-  getContext(): GPUCanvasContext;
-  private acquireContext;
-  configure(device: GPUDevice, format: GPUTextureFormat): void;
-  unconfigure(): void;
-  setLogicalSize(width: number, height: number, dpr?: number): boolean;
-  getCurrentTexture(): GPUTexture;
-}
-declare function createWebGPUSurface(host: WebGPUCanvasHost): WebGPUSurface;
-interface WebGPURendererOptions {
-  surface: WebGPUSurface;
-  hooks?: RenderHooks;
-  onError?: (message: string) => void;
-  onLost?: () => void;
-}
-interface RenderHooks {
-  onPrepareStart?(): void;
-  onPrepareEnd?(ms: number): void;
-  onUploadStart?(): void;
-  onUploadEnd?(ms: number): void;
-  onEncodeStart?(): void;
-  onEncodeEnd?(ms: number): void;
-}
-interface CapturedFrame {
-  width: number;
-  height: number;
-  data: Uint8ClampedArray;
-}
-interface DrawStats {
-  primitiveDraws: number;
-  texturedDraws: number;
-  texturedInstances: number;
-}
-declare class WebGPURenderer implements UiRenderer {
-  readonly backend: RendererBackend;
-  private readonly surface;
-  private hooks;
-  private device;
-  private format;
-  private primitives;
-  private textured;
-  private textures;
-  private glyphPages;
-  private readonly textCache;
-  private instanceBuffer;
-  private texturedBuffer;
-  private clipBuffer;
-  private gradientBuffer;
-  private frameLayout;
-  private frameBindGroup;
-  private cachedInstanceData;
-  private groupLayers;
-  readonly lastDraws: DrawStats;
-  private pendingCapture;
-  private lost;
-  private disposed;
-  private readonly onError;
-  private readonly onLost;
-  constructor(options: WebGPURendererOptions);
-  setHooks(hooks: RenderHooks): void;
-  initialize(): Promise<void>;
-  get isReady(): boolean;
-  get isLost(): boolean;
-  capture(): Promise<CapturedFrame>;
-  render(root: UiNode, context: RenderContext): void;
-  private groupLayer;
-  private takeCapture;
-  private clearFrame;
-  resize(width: number, height: number, dpr?: number): void;
-  fontsChanged(): void;
-  recover(): Promise<void>;
-  dispose(): void;
-  private releaseDeviceResources;
-  private uploadInstanceData;
-  private ensureBuffer;
-}
 declare class WebGPUError extends Error {
   readonly phase: 'unavailable' | 'adapter' | 'device' | 'context' | 'configure' | 'shader' | 'pipeline' | 'render' | 'lost' | 'disposed';
   readonly cause?: unknown;
@@ -5304,6 +4309,7 @@ interface ScaledImageSurface {
   width: number;
   height: number;
   getContext(contextId: '2d'): {
+    imageSmoothingQuality?: ImageSmoothingQuality;
     drawImage(image: ImageBitmap, dx: number, dy: number, dw: number, dh: number): void;
   } | null;
   transferToImageBitmap(): ImageBitmap;
@@ -5410,11 +4416,11 @@ declare class GlyphShaper {
   private shapeClusters;
   clear(): void;
 }
-declare const INSTANCE_STRIDE_FLOATS = 24;
+declare const INSTANCE_STRIDE_FLOATS = 32;
 declare const INSTANCE_STRIDE_BYTES: number;
 declare const TEXTURED_STRIDE_FLOATS = 16;
 declare const TEXTURED_STRIDE_BYTES: number;
-declare const CLIP_STRIDE_FLOATS = 16;
+declare const CLIP_STRIDE_FLOATS = 20;
 declare const CLIP_STRIDE_BYTES: number;
 declare const NO_CLIP_INDEX = -1;
 declare const enum PrimitiveKind {
@@ -5449,6 +4455,7 @@ interface GlyphCommand {
   end: number;
   page: number;
   scissor: ScissorRect | null;
+  smooth: boolean;
 }
 interface ImageCommand {
   kind: CommandKind.Image;
@@ -5508,12 +4515,13 @@ declare class WebGPUGlyphPages {
   private readonly atlas;
   private readonly textures;
   private readonly bindGroups;
+  private readonly smoothBindGroups;
   private scratch;
   private scratchContext;
   uploads: number;
   constructor(device: GPUDevice, pipeline: TexturedPipeline, atlas: WebGPUGlyphAtlas);
   flush(): void;
-  bindGroup(page: number): GPUBindGroup | null;
+  bindGroup(page: number, smooth?: boolean): GPUBindGroup | null;
   dispose(): void;
   private textureFor;
   private upload;
@@ -5795,13 +4803,11 @@ export {
   adjacentField,
   Affine,
   AlignContent,
-  AnimatedCell,
   animateLayout,
   AnimateLayoutOptions,
   AnimationDriver,
   applyCanvasTextStyle,
   assertModifierList,
-  assertTransitionMap,
   auto,
   autoFocus,
   AutoLength,
@@ -5810,11 +4816,6 @@ export {
   bandOf,
   BindingId,
   BorderEdge,
-  borderRadius,
-  borderRadiusCorners,
-  borderRadiusEqual,
-  borderRadiusIsZero,
-  borderRadiusValuesEqual,
   borders,
   borderShapes,
   BordersOptions,
@@ -5841,9 +4842,6 @@ export {
   BUTTON_INTERACTION,
   ButtonProps,
   ByteSource,
-  canDecodeVideo,
-  Canvas2DContext,
-  Canvas2DGradient,
   Canvas2DRenderer,
   Canvas2DRendererOptions,
   CanvasHost,
@@ -5851,16 +4849,13 @@ export {
   CanvasSurface,
   CanvasTextMeasurer,
   CanvasTextStyle,
-  CapturedFrame,
   capturePointer,
   CARET_BLINK_MS,
   CARET_WIDTH,
   CaretRect,
   caretRectFor,
   caretVisibleAt,
-  CharacterCountTextMeasurer,
   ChildrenBindingId,
-  clampSize,
   clearFontStacks,
   clearLinkHover,
   clearMatchRanges,
@@ -5872,12 +4867,7 @@ export {
   CLIP_STRIDE_FLOATS,
   clockOf,
   closestPropertyName,
-  colorsEqual,
-  colorsEqualPalette,
   colorToCss,
-  colorToHex,
-  colorToRgba,
-  colorValuesEqual,
   Column,
   ColumnProps,
   commandForKey,
@@ -5888,8 +4878,6 @@ export {
   ComponentResolver,
   CompositionRange,
   computeObjectFitRect,
-  Constraints,
-  constraintsEqual,
   containerBands,
   ContainerProps,
   contentOffset,
@@ -5899,25 +4887,14 @@ export {
   createCanvasSurface,
   createCanvasTextStyle,
   createElement,
-  createEnvironmentKey,
   createPaintState,
   createTextCache,
-  createTween,
-  createWebGPUSurface,
   CrossAxisAlignment,
-  cubicBezier,
   cueAt,
   CustomLayoutExplanation,
-  darkColors,
   darkTheme,
   decorated,
-  decorationColor,
-  DecorationFill,
-  decorationRect,
-  DecorationRect,
   Decorations,
-  DecorationShape,
-  DecorationStroke,
   DEFAULT_BLOCK_SIZE,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SIZE,
@@ -5926,20 +4903,15 @@ export {
   DEFAULT_TEXT_COLOR,
   DefaultImageResolver,
   DefaultImageResolverOptions,
-  defaultMotion,
   defaultShadows,
-  defaultShapes,
   defaultSpacing,
   DefaultSvgResolver,
   DefaultSvgResolverOptions,
   defaultTextStyle,
   defaultTypography,
   defaultUnits,
-  DefaultVideoResolver,
-  DefaultVideoResolverOptions,
   defaultVisualState,
   defineModifier,
-  defineMotion,
   defineProperty,
   defineThemeExtension,
   demuxMp4Audio,
@@ -5950,7 +4922,6 @@ export {
   describeShortcut,
   detectEditingPlatform,
   diffSemantics,
-  DirtyFlags,
   DirtyNodeSet,
   draggable,
   DraggableOptions,
@@ -5958,17 +4929,11 @@ export {
   dragSessionFor,
   dragSource,
   DragSourceOptions,
-  drawOverlayShapes,
-  DrawStats,
   drawSvg,
   drawText,
   dropIndexShifts,
   dropTarget,
   DropTargetOptions,
-  durationIn,
-  easingCss,
-  easingIn,
-  easings,
   edgeField,
   Edges,
   EditableLayout,
@@ -5993,14 +4958,12 @@ export {
   EXTERNAL_FILES,
   fade,
   fillTextRects,
-  findEnvironmentKey,
   FindHost,
   FindMatch,
   findMatchesIn,
   FindOptions,
   findPropertyDefinition,
   fittedShadowRadius,
-  FixedMetricsOptions,
   flattenTextSpans,
   FlexContainerProps,
   FlexDirection,
@@ -6010,7 +4973,6 @@ export {
   focusRing,
   FocusRingOptions,
   FocusSource,
-  FontMetrics,
   fontStackFor,
   formatConstraints,
   formatExplanation,
@@ -6037,7 +4999,6 @@ export {
   GridPlacement,
   GridProps,
   GridTrack,
-  hasDecorationPhase,
   hasDrawnText,
   hasTextLinks,
   hasThemeExtension,
@@ -6077,10 +5038,6 @@ export {
   InteractionProps,
   interactive,
   InteractiveOptions,
-  interpolateColor,
-  interpolateNumber,
-  interpolateTransform,
-  interpolatorFor,
   isAutoLength,
   isComponentLikeElement,
   isEditableNode,
@@ -6101,7 +5058,6 @@ export {
   isPrintable,
   isReadOnly,
   isScrollContainer,
-  isShapeName,
   isSubtreeInert,
   isSvgSource,
   isTypographyRole,
@@ -6110,25 +5066,18 @@ export {
   isUiModifier,
   isUiRole,
   isUiSemanticState,
-  isVideoSurface,
   isWebGPUAvailable,
+  KEY_SCROLL_STEP,
   KeyboardControllerOptions,
-  LABEL_PADDING_X,
   labelNode,
-  labelOrigin,
   LayerCanvasFactory,
-  LayoutBox,
   LayoutEngine,
   LayoutExplanation,
   LayoutInspector,
   LayoutInspectorOptions,
   LayoutNotifier,
   layoutParagraph,
-  LayoutReader,
-  LayoutRecord,
-  LayoutResult,
   LayoutStateExplanation,
-  LayoutStats,
   layoutTextLines,
   LazyAxis,
   LazyColumn,
@@ -6144,9 +5093,7 @@ export {
   lazySource,
   LazySourceArgs,
   lengths,
-  lightColors,
   lightTheme,
-  linear,
   linearGradient,
   lineEndAt,
   lineIndexAtY,
@@ -6191,17 +5138,12 @@ export {
   nextGraphemeEnd,
   nextWordEnd,
   NO_CLIP_INDEX,
-  NodeId,
-  NodeProperty,
   NodeTransitions,
   noInsets,
   noKeyModifiers,
   noModifiers,
-  normalizeBorderRadius,
-  normalizeColor,
   normalizeStates,
   normalizeTextAlign,
-  normalizeTransition,
   normalizeVerticalAlign,
   noThemeExtensions,
   ObjectFit,
@@ -6210,7 +5152,6 @@ export {
   offsetAtPointIn,
   offsetAtX,
   offsetForVerticalMove,
-  OverlayShape,
   overrideSources,
   OverrideSources,
   Paint,
@@ -6236,8 +5177,8 @@ export {
   PaintRecorder,
   PaintRecording,
   PaintResolver,
-  paintsAfterChildren,
   PaintState,
+  paintStateOf,
   PaintStats,
   PaintSurface,
   PaintTarget,
@@ -6250,16 +5191,12 @@ export {
   paragraphGeometry,
   ParagraphGeometry,
   paragraphGeometryFrom,
-  ParagraphLayout,
-  ParagraphTextMeasurer,
   parseAlignContent,
-  parseColor,
   parseCrossAxisAlignment,
   parseFlexDirection,
   parseMainAxisAlignment,
   parseShortcut,
   parseSvg,
-  parseTransform,
   parseWebVtt,
   pathValuesEqual,
   percent,
@@ -6292,13 +5229,11 @@ export {
   propertyValuesEqualByName,
   proportionalFontMetrics,
   PropsOf,
-  provided,
   provideEnvironment,
   publishInset,
   PublishInsetArgs,
   radialGradient,
   raiseContrast,
-  RangeResponse,
   rangeSource,
   RangeSourceOptions,
   Reactive,
@@ -6307,11 +5242,7 @@ export {
   registerFontStack,
   relativeLuminance,
   RelayoutExplanation,
-  RenderChanges,
   RenderCommand,
-  RenderContext,
-  RendererBackend,
-  RenderHooks,
   RenderList,
   RenderTextCache,
   reorderable,
@@ -6336,8 +5267,6 @@ export {
   Responsive,
   ResponsiveProps,
   rewalkSemantics,
-  rgb8,
-  rgba,
   rotateFrom,
   Row,
   RowProps,
@@ -6376,7 +5305,9 @@ export {
   ScrollViewProps,
   selectableTextNodes,
   selectableTextOf,
+  SELECTION_SCROLL_EDGE,
   SelectionControllerOptions,
+  SelectionDrag,
   SelectionHost,
   selectionRangeOf,
   selectionRects,
@@ -6394,7 +5325,6 @@ export {
   setSelectionRange,
   shadowsEqual,
   shadowsOf,
-  shapesEqual,
   SharedClaim,
   sharedElement,
   SharedElementArgs,
@@ -6411,7 +5341,6 @@ export {
   shortcuts,
   ShortcutsOptions,
   ShownAsKey,
-  Size,
   sizeContainer,
   SizeContainerArgs,
   SizeDecision,
@@ -6422,18 +5351,13 @@ export {
   spacingEqual,
   spacingSteps,
   spanAtOffset,
-  SpannedRuns,
-  spannedRunsFor,
   spannedTextOf,
   SpanPaint,
   spansDifferOnlyInPaint,
   splitMp3Frames,
-  spring,
-  springIn,
   Stack,
   StackProps,
   statesEqual,
-  steps,
   SubtreeBounds,
   SvgDocument,
   SvgDrawOptions,
@@ -6450,94 +5374,57 @@ export {
   textContentOf,
   TextContentProps,
   textInputOf,
-  TextLine,
   TextLinePlacement,
-  TextLineRun,
-  TextMeasurer,
-  TextMeasureRequest,
-  TextOverflow,
   TextProps,
   TextRange,
   textRunBackgrounds,
   textRunDecorations,
   TextRunDraw,
-  TextRunMeasurer,
   textRunOfRecordId,
   TextRunRect,
   textRuns,
-  TextRunSpan,
-  TextRunStyle,
   textSpansEqual,
   textStylesEqual,
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
-  TextWrap,
   themeExtension,
   themeExtensionsEqual,
   themesEqual,
   themeTokens,
   ThemeTokenTarget,
-  tightenConstraints,
-  TightenOptions,
   TOUCH_TARGET,
   touchActionFor,
   TouchScrollerOptions,
   tracePathData,
   traceRoundedRect,
-  transform,
   Transform,
-  transformIsIdentity,
-  transformsEqual,
-  tween,
   typographyEqual,
   TypographyProps,
   UI_ROLES,
   UI_SEMANTIC_STATES,
-  UI_SUBGRID_AXES,
-  UiAlignment,
-  UiAnimation,
-  UiAnimationFrameClock,
-  UiAnimationOptions,
   UiAutocomplete,
-  UiBasicColors,
   UiBeforeInputEvent,
   UiBinding,
-  UiBorderRadius,
-  UiBorderRadiuses,
-  UiBorderRadiusValue,
   UiBoxShadow,
   UiBoxShadows,
   UiChild,
   UiChildrenBinding,
   UiClock,
-  UiColor,
-  UiColors,
-  UiColorValue,
   UiCompositionEvent,
   UiContainerSize,
   UiContainerSizeSource,
-  UiContentDistribution,
   UiContrast,
-  UiCursor,
   UiDefinition,
   UiDensity,
-  UiDirection,
   UiDragPayload,
   UiDragSession,
   UiDragState,
   UiDropEffect,
   UiDroppedFile,
   UiDropZone,
-  UiDurationExtensions,
-  UiDurationToken,
-  UiEasing,
-  UiEasingExtensions,
-  UiEasingToken,
   UiEditingController,
   UiEditingGroup,
   UiElement,
-  UiEnvironment,
-  UiEnvironmentKey,
   UiEnvironmentKeys,
   UiEnvironmentProvider,
   UiEventBinding,
@@ -6547,19 +5434,13 @@ export {
   UiEventType,
   UiFileDropMessage,
   UiFindController,
-  UiFlexWrap,
   UiFocusEvent,
   UiFocusManager,
   UiFontKerning,
   UiFontStretch,
   UiFontStyle,
   UiFontVariant,
-  UiFontWeight,
-  UiFrame,
   UiFrameCallback,
-  UiFrameClock,
-  UiFrameClockFactory,
-  UiFrameTime,
   UiGestureEvent,
   UiGestureRecognizer,
   UiGradient,
@@ -6567,22 +5448,20 @@ export {
   UiGradientStop,
   UiGraph,
   UiGraphBuilder,
-  UiGridAutoFlow,
   UiGroupEdit,
   UiHitTester,
   UiHoldUnseen,
-  UiHostFrameClock,
-  UiHostFrameClockOptions,
   UiImage,
   UiInputDispatcher,
   UiInputEvent,
+  UiInputMode,
   UiInsetEdge,
   UiInsetRegistry,
   UiInsets,
   UiInsetSource,
-  UiInterpolator,
   UiKeyboardController,
   UiKeyboardEvent,
+  UiKeyboardScroller,
   UiKeyModifiers,
   UiLayoutChild,
   UiLayoutContext,
@@ -6592,7 +5471,6 @@ export {
   UiLinearGradient,
   UiListenerErrorReporter,
   UiLiveRegion,
-  UiManualFrameClock,
   UiModifier,
   UiModifierBundle,
   UiModifierEnvironment,
@@ -6602,52 +5480,37 @@ export {
   UiModifierLayout,
   UiModifierSet,
   UiModifierTeardown,
-  UiMotion,
-  UiMotionChanges,
-  UiNode,
   UiNodeRef,
-  UiNodeTransitions,
-  UiNodeType,
-  UiObjectFit,
   UiOrientation,
-  UiOverflow,
   UiPaint,
   UiPasteEvent,
   UiPath,
   UiPinchEvent,
   UiPinchRecognizer,
-  UiPlacement,
   UiPlatformAdapter,
   UiPoint,
   UiPointer,
   UiPointerController,
   UiPointerDevice,
   UiPointerEvent,
-  UiPointerEvents,
   UiPointerKind,
-  UiPosition,
   UiProperties,
   UiPropertyDefinition,
   UiPropertyName,
-  UiPropertyOverride,
-  UiPropertyOverrides,
   UiPropertyValueOf,
   UiPropertyValues,
   UiProps,
   UiPropValue,
-  UiProvision,
   UiRadialGradient,
-  UiReducedMotionPolicy,
-  UiRenderer,
   UiResolvedTextSpan,
   UiRole,
   UiScheduler,
   UiSchedulerOptions,
   UiScrollability,
   UiScrollBehavior,
+  UiSelectionAutoScroller,
   UiSelectionChangeEvent,
   UiSelectionController,
-  UiSelfAlignment,
   UiSemanticsAction,
   UiSemanticsBox,
   UiSemanticsMap,
@@ -6658,9 +5521,6 @@ export {
   UiSemanticsUpdate,
   UiShadowName,
   UiShadows,
-  UiShapeExtensions,
-  UiShapeName,
-  UiShapes,
   UiSharedElements,
   UiShortcut,
   UiShortcutBinding,
@@ -6670,49 +5530,28 @@ export {
   UiSourceLocation,
   UiSpacing,
   UiSpannedText,
-  UiSpring,
-  UiSpringExtensions,
-  UiSpringOptions,
-  UiSpringSpec,
-  UiSpringToken,
-  UiSubgridAxis,
-  UiTextAlign,
   UiTextChangeEvent,
   UiTextDecoration,
-  UiTextDirection,
   UiTextInput,
   UiTextInputState,
   UiTextLink,
   UiTextMetrics,
-  UiTextOverflowValue,
   UiTextPosition,
   UiTextRange,
   UiTextSpan,
   UiTextStyle,
-  UiTextWrapValue,
   UiTheme,
-  UiThemeColorName,
   UiThemeExtension,
   UiThemeExtensionOptions,
   UiThemeExtensions,
   UiThemeTouch,
-  UiTimerFrameClock,
-  UiTimerFrameClockOptions,
   UiTouchScroller,
   UiTrackSize,
-  UiTransform,
-  UiTransforms,
-  UiTransitionSpec,
-  UiTransitionValue,
-  UiTween,
-  UiTweenOptions,
   UiTypography,
   UiTypographyExtensions,
   UiTypographyRole,
   UiUnits,
   UiUnknownModifierPropertyError,
-  UiVerticalAlign,
-  UiVideoSurface,
   UiVirtualSheet,
   UiVirtualSheetOptions,
   UiVirtualWindow,
@@ -6721,18 +5560,13 @@ export {
   UiWheelController,
   UiWheelDeltaMode,
   UiWheelEvent,
-  uniformBorderRadius,
   unitsEqual,
   unknownContainerSize,
   validateGradient,
   validateRole,
   validateStates,
-  validateSubgrid,
   VerticalAlign,
   VideoClock,
-  videoFrameSize,
-  VideoPlayback,
-  VideoResolver,
   videoSource,
   VideoSourceArgs,
   VideoState,
@@ -6748,13 +5582,9 @@ export {
   visualStatesEqual,
   VttCue,
   VttTrack,
-  WebGPUCanvasHost,
   WebGPUError,
   WebGPUGlyphAtlas,
   WebGPUGlyphPages,
-  WebGPURenderer,
-  WebGPURendererOptions,
-  WebGPUSurface,
   WebGPUTextureCache,
   wheelDeltaYOf,
   withContrast,
@@ -6771,17 +5601,195 @@ export {
 };
 // ==== index.d.ts ====
 import {
+  AnimatedCell,
+  assertTransitionMap,
+  borderRadius,
+  borderRadiusCorners,
+  borderRadiusEqual,
+  borderRadiusIsUniform,
+  borderRadiusIsZero,
+  borderRadiusValuesEqual,
+  Canvas2DContext,
+  CapturedFrame,
+  CharacterCountTextMeasurer,
+  clampSize,
+  colorsEqual,
+  colorsEqualPalette,
+  colorToHex,
+  colorToRgba,
+  colorValuesEqual,
+  Constraints,
+  constraintsEqual,
+  createEnvironmentKey,
+  createTween,
+  createWebGPUSurface,
+  cubicBezier,
+  darkColors,
+  decorationColor,
+  DecorationFill,
+  decorationRect,
+  DecorationRect,
+  DecorationShape,
+  DecorationStroke,
+  defaultMotion,
+  defaultShapes,
+  defineMotion,
+  DirtyFlags,
+  drawOverlayShapes,
+  DrawStats,
+  durationIn,
+  easingCss,
+  easingIn,
+  easings,
+  findEnvironmentKey,
+  fitBorderRadius,
+  FixedMetricsOptions,
+  FontMetrics,
+  hasDecorationPhase,
+  interpolateColor,
+  interpolateNumber,
+  interpolateTransform,
+  interpolatorFor,
+  isShapeName,
+  LABEL_PADDING_X,
+  labelOrigin,
+  LayoutBox,
+  LayoutReader,
+  LayoutRecord,
+  LayoutResult,
+  LayoutStats,
+  lightColors,
+  linear,
+  NodeId,
+  NodeProperty,
+  normalizeBorderRadius,
+  normalizeColor,
+  normalizeTransition,
+  offsetBorderRadius,
+  OverlayShape,
+  paintsAfterChildren,
+  ParagraphLayout,
+  ParagraphTextMeasurer,
+  parseColor,
+  parseTransform,
+  provided,
+  RenderChanges,
+  RenderContext,
+  RendererBackend,
+  RenderHooks,
+  rgb8,
+  rgba,
+  shapesEqual,
+  Size,
+  SpannedRuns,
+  spannedRunsFor,
+  spring,
+  springIn,
+  steps,
+  TextLine,
+  TextLineRun,
+  TextMeasurer,
+  TextMeasureRequest,
+  TextOverflow,
+  TextRunMeasurer,
+  TextRunSpan,
+  TextRunStyle,
+  TextWrap,
+  tightenConstraints,
+  TightenOptions,
+  transform,
+  transformIsIdentity,
+  transformsEqual,
+  tween,
+  UI_SUBGRID_AXES,
+  UiAlignment,
+  UiAnimation,
+  UiAnimationFrameClock,
+  UiAnimationOptions,
+  UiBasicColors,
+  UiBorderRadius,
+  UiBorderRadiuses,
+  UiBorderRadiusValue,
+  UiColor,
+  UiColors,
+  UiColorValue,
+  UiContentDistribution,
+  UiCursor,
+  UiDirection,
+  UiDurationExtensions,
+  UiDurationToken,
+  UiEasing,
+  UiEasingExtensions,
+  UiEasingToken,
+  UiEnvironment,
+  UiEnvironmentKey,
+  UiFlexWrap,
+  UiFontWeight,
+  UiFrame,
+  UiFrameClock,
+  UiFrameClockFactory,
+  UiFrameTime,
+  UiGridAutoFlow,
+  UiHostFrameClock,
+  UiHostFrameClockOptions,
+  UiInterpolator,
+  UiManualFrameClock,
+  UiMotion,
+  UiMotionChanges,
+  UiNode,
+  UiNodeTransitions,
+  UiNodeType,
+  UiObjectFit,
+  UiOverflow,
+  UiPlacement,
+  UiPointerEvents,
+  UiPosition,
+  UiPropertyOverride,
+  UiPropertyOverrides,
+  UiProvision,
+  UiReducedMotionPolicy,
+  UiRenderer,
+  UiSelfAlignment,
+  UiShapeExtensions,
+  UiShapeName,
+  UiShapes,
+  UiSpring,
+  UiSpringExtensions,
+  UiSpringOptions,
+  UiSpringSpec,
+  UiSpringToken,
+  UiSubgridAxis,
+  UiTextAlign,
+  UiTextDirection,
+  UiTextOverflowValue,
+  UiTextWrapValue,
+  UiThemeColorName,
+  UiTimerFrameClock,
+  UiTimerFrameClockOptions,
+  UiTransform,
+  UiTransforms,
+  UiTransitionSpec,
+  UiTransitionValue,
+  UiTween,
+  UiTweenOptions,
+  UiVerticalAlign,
+  uniformBorderRadius,
+  validateSubgrid,
+  WebGPUCanvasHost,
+  WebGPURenderer,
+  WebGPURendererOptions,
+  WebGPUSurface
+} from "./WebGPURenderer.js";
+import {
   accumulatedOffsetTo,
   adjacentField,
   Affine,
   AlignContent,
-  AnimatedCell,
   animateLayout,
   AnimateLayoutOptions,
   AnimationDriver,
   applyCanvasTextStyle,
   assertModifierList,
-  assertTransitionMap,
   auto,
   autoFocus,
   AutoLength,
@@ -6790,11 +5798,6 @@ import {
   bandOf,
   BindingId,
   BorderEdge,
-  borderRadius,
-  borderRadiusCorners,
-  borderRadiusEqual,
-  borderRadiusIsZero,
-  borderRadiusValuesEqual,
   borders,
   borderShapes,
   BordersOptions,
@@ -6821,8 +5824,6 @@ import {
   BUTTON_INTERACTION,
   ButtonProps,
   ByteSource,
-  canDecodeVideo,
-  Canvas2DContext,
   Canvas2DRenderer,
   Canvas2DRendererOptions,
   CanvasHost,
@@ -6830,16 +5831,13 @@ import {
   CanvasSurface,
   CanvasTextMeasurer,
   CanvasTextStyle,
-  CapturedFrame,
   capturePointer,
   CARET_BLINK_MS,
   CARET_WIDTH,
   CaretRect,
   caretRectFor,
   caretVisibleAt,
-  CharacterCountTextMeasurer,
   ChildrenBindingId,
-  clampSize,
   clearFontStacks,
   clearLinkHover,
   clearMatchRanges,
@@ -6851,12 +5849,7 @@ import {
   CLIP_STRIDE_FLOATS,
   clockOf,
   closestPropertyName,
-  colorsEqual,
-  colorsEqualPalette,
   colorToCss,
-  colorToHex,
-  colorToRgba,
-  colorValuesEqual,
   Column,
   ColumnProps,
   commandForKey,
@@ -6867,8 +5860,6 @@ import {
   ComponentResolver,
   CompositionRange,
   computeObjectFitRect,
-  Constraints,
-  constraintsEqual,
   containerBands,
   ContainerProps,
   contentOffset,
@@ -6878,25 +5869,14 @@ import {
   createCanvasSurface,
   createCanvasTextStyle,
   createElement,
-  createEnvironmentKey,
   createPaintState,
   createTextCache,
-  createTween,
-  createWebGPUSurface,
   CrossAxisAlignment,
-  cubicBezier,
   cueAt,
   CustomLayoutExplanation,
-  darkColors,
   darkTheme,
   decorated,
-  decorationColor,
-  DecorationFill,
-  decorationRect,
-  DecorationRect,
   Decorations,
-  DecorationShape,
-  DecorationStroke,
   DEFAULT_BLOCK_SIZE,
   DEFAULT_FONT_FAMILY,
   DEFAULT_FONT_SIZE,
@@ -6905,20 +5885,15 @@ import {
   DEFAULT_TEXT_COLOR,
   DefaultImageResolver,
   DefaultImageResolverOptions,
-  defaultMotion,
   defaultShadows,
-  defaultShapes,
   defaultSpacing,
   DefaultSvgResolver,
   DefaultSvgResolverOptions,
   defaultTextStyle,
   defaultTypography,
   defaultUnits,
-  DefaultVideoResolver,
-  DefaultVideoResolverOptions,
   defaultVisualState,
   defineModifier,
-  defineMotion,
   defineProperty,
   defineThemeExtension,
   demuxMp4Audio,
@@ -6929,7 +5904,6 @@ import {
   describeShortcut,
   detectEditingPlatform,
   diffSemantics,
-  DirtyFlags,
   DirtyNodeSet,
   draggable,
   DraggableOptions,
@@ -6937,17 +5911,11 @@ import {
   dragSessionFor,
   dragSource,
   DragSourceOptions,
-  drawOverlayShapes,
-  DrawStats,
   drawSvg,
   drawText,
   dropIndexShifts,
   dropTarget,
   DropTargetOptions,
-  durationIn,
-  easingCss,
-  easingIn,
-  easings,
   edgeField,
   Edges,
   EditableLayout,
@@ -6972,14 +5940,12 @@ import {
   EXTERNAL_FILES,
   fade,
   fillTextRects,
-  findEnvironmentKey,
   FindHost,
   FindMatch,
   findMatchesIn,
   FindOptions,
   findPropertyDefinition,
   fittedShadowRadius,
-  FixedMetricsOptions,
   flattenTextSpans,
   FlexContainerProps,
   FlexDirection,
@@ -6989,7 +5955,6 @@ import {
   focusRing,
   FocusRingOptions,
   FocusSource,
-  FontMetrics,
   fontStackFor,
   formatConstraints,
   formatExplanation,
@@ -7016,7 +5981,6 @@ import {
   GridPlacement,
   GridProps,
   GridTrack,
-  hasDecorationPhase,
   hasDrawnText,
   hasTextLinks,
   hasThemeExtension,
@@ -7056,10 +6020,6 @@ import {
   InteractionProps,
   interactive,
   InteractiveOptions,
-  interpolateColor,
-  interpolateNumber,
-  interpolateTransform,
-  interpolatorFor,
   isAutoLength,
   isComponentLikeElement,
   isEditableNode,
@@ -7080,7 +6040,6 @@ import {
   isPrintable,
   isReadOnly,
   isScrollContainer,
-  isShapeName,
   isSubtreeInert,
   isSvgSource,
   isTypographyRole,
@@ -7089,25 +6048,18 @@ import {
   isUiModifier,
   isUiRole,
   isUiSemanticState,
-  isVideoSurface,
   isWebGPUAvailable,
+  KEY_SCROLL_STEP,
   KeyboardControllerOptions,
-  LABEL_PADDING_X,
   labelNode,
-  labelOrigin,
   LayerCanvasFactory,
-  LayoutBox,
   LayoutEngine,
   LayoutExplanation,
   LayoutInspector,
   LayoutInspectorOptions,
   LayoutNotifier,
   layoutParagraph,
-  LayoutReader,
-  LayoutRecord,
-  LayoutResult,
   LayoutStateExplanation,
-  LayoutStats,
   layoutTextLines,
   LazyAxis,
   LazyColumn,
@@ -7123,9 +6075,7 @@ import {
   lazySource,
   LazySourceArgs,
   lengths,
-  lightColors,
   lightTheme,
-  linear,
   linearGradient,
   lineEndAt,
   lineIndexAtY,
@@ -7170,17 +6120,12 @@ import {
   nextGraphemeEnd,
   nextWordEnd,
   NO_CLIP_INDEX,
-  NodeId,
-  NodeProperty,
   NodeTransitions,
   noInsets,
   noKeyModifiers,
   noModifiers,
-  normalizeBorderRadius,
-  normalizeColor,
   normalizeStates,
   normalizeTextAlign,
-  normalizeTransition,
   normalizeVerticalAlign,
   noThemeExtensions,
   ObjectFit,
@@ -7189,7 +6134,6 @@ import {
   offsetAtPointIn,
   offsetAtX,
   offsetForVerticalMove,
-  OverlayShape,
   overrideSources,
   OverrideSources,
   Paint,
@@ -7215,8 +6159,8 @@ import {
   PaintRecorder,
   PaintRecording,
   PaintResolver,
-  paintsAfterChildren,
   PaintState,
+  paintStateOf,
   PaintStats,
   PaintSurface,
   PaintTarget,
@@ -7229,16 +6173,12 @@ import {
   paragraphGeometry,
   ParagraphGeometry,
   paragraphGeometryFrom,
-  ParagraphLayout,
-  ParagraphTextMeasurer,
   parseAlignContent,
-  parseColor,
   parseCrossAxisAlignment,
   parseFlexDirection,
   parseMainAxisAlignment,
   parseShortcut,
   parseSvg,
-  parseTransform,
   parseWebVtt,
   pathValuesEqual,
   percent,
@@ -7271,13 +6211,11 @@ import {
   propertyValuesEqualByName,
   proportionalFontMetrics,
   PropsOf,
-  provided,
   provideEnvironment,
   publishInset,
   PublishInsetArgs,
   radialGradient,
   raiseContrast,
-  RangeResponse,
   rangeSource,
   RangeSourceOptions,
   Reactive,
@@ -7286,11 +6224,7 @@ import {
   registerFontStack,
   relativeLuminance,
   RelayoutExplanation,
-  RenderChanges,
   RenderCommand,
-  RenderContext,
-  RendererBackend,
-  RenderHooks,
   RenderList,
   RenderTextCache,
   reorderable,
@@ -7315,8 +6249,6 @@ import {
   Responsive,
   ResponsiveProps,
   rewalkSemantics,
-  rgb8,
-  rgba,
   rotateFrom,
   Row,
   RowProps,
@@ -7355,7 +6287,9 @@ import {
   ScrollViewProps,
   selectableTextNodes,
   selectableTextOf,
+  SELECTION_SCROLL_EDGE,
   SelectionControllerOptions,
+  SelectionDrag,
   SelectionHost,
   selectionRangeOf,
   selectionRects,
@@ -7373,7 +6307,6 @@ import {
   setSelectionRange,
   shadowsEqual,
   shadowsOf,
-  shapesEqual,
   SharedClaim,
   sharedElement,
   SharedElementArgs,
@@ -7390,7 +6323,6 @@ import {
   shortcuts,
   ShortcutsOptions,
   ShownAsKey,
-  Size,
   sizeContainer,
   SizeContainerArgs,
   SizeDecision,
@@ -7401,18 +6333,13 @@ import {
   spacingEqual,
   spacingSteps,
   spanAtOffset,
-  SpannedRuns,
-  spannedRunsFor,
   spannedTextOf,
   SpanPaint,
   spansDifferOnlyInPaint,
   splitMp3Frames,
-  spring,
-  springIn,
   Stack,
   StackProps,
   statesEqual,
-  steps,
   SubtreeBounds,
   SvgDocument,
   SvgDrawOptions,
@@ -7429,94 +6356,57 @@ import {
   textContentOf,
   TextContentProps,
   textInputOf,
-  TextLine,
   TextLinePlacement,
-  TextLineRun,
-  TextMeasurer,
-  TextMeasureRequest,
-  TextOverflow,
   TextProps,
   TextRange,
   textRunBackgrounds,
   textRunDecorations,
   TextRunDraw,
-  TextRunMeasurer,
   textRunOfRecordId,
   TextRunRect,
   textRuns,
-  TextRunSpan,
-  TextRunStyle,
   textSpansEqual,
   textStylesEqual,
   TEXTURED_STRIDE_BYTES,
   TEXTURED_STRIDE_FLOATS,
-  TextWrap,
   themeExtension,
   themeExtensionsEqual,
   themesEqual,
   themeTokens,
   ThemeTokenTarget,
-  tightenConstraints,
-  TightenOptions,
   TOUCH_TARGET,
   touchActionFor,
   TouchScrollerOptions,
   tracePathData,
   traceRoundedRect,
-  transform,
   Transform,
-  transformIsIdentity,
-  transformsEqual,
-  tween,
   typographyEqual,
   TypographyProps,
   UI_ROLES,
   UI_SEMANTIC_STATES,
-  UI_SUBGRID_AXES,
-  UiAlignment,
-  UiAnimation,
-  UiAnimationFrameClock,
-  UiAnimationOptions,
   UiAutocomplete,
-  UiBasicColors,
   UiBeforeInputEvent,
   UiBinding,
-  UiBorderRadius,
-  UiBorderRadiuses,
-  UiBorderRadiusValue,
   UiBoxShadow,
   UiBoxShadows,
   UiChild,
   UiChildrenBinding,
   UiClock,
-  UiColor,
-  UiColors,
-  UiColorValue,
   UiCompositionEvent,
   UiContainerSize,
   UiContainerSizeSource,
-  UiContentDistribution,
   UiContrast,
-  UiCursor,
   UiDefinition,
   UiDensity,
-  UiDirection,
   UiDragPayload,
   UiDragSession,
   UiDragState,
   UiDropEffect,
   UiDroppedFile,
   UiDropZone,
-  UiDurationExtensions,
-  UiDurationToken,
-  UiEasing,
-  UiEasingExtensions,
-  UiEasingToken,
   UiEditingController,
   UiEditingGroup,
   UiElement,
-  UiEnvironment,
-  UiEnvironmentKey,
   UiEnvironmentKeys,
   UiEnvironmentProvider,
   UiEventBinding,
@@ -7526,19 +6416,13 @@ import {
   UiEventType,
   UiFileDropMessage,
   UiFindController,
-  UiFlexWrap,
   UiFocusEvent,
   UiFocusManager,
   UiFontKerning,
   UiFontStretch,
   UiFontStyle,
   UiFontVariant,
-  UiFontWeight,
-  UiFrame,
   UiFrameCallback,
-  UiFrameClock,
-  UiFrameClockFactory,
-  UiFrameTime,
   UiGestureEvent,
   UiGestureRecognizer,
   UiGradient,
@@ -7546,22 +6430,20 @@ import {
   UiGradientStop,
   UiGraph,
   UiGraphBuilder,
-  UiGridAutoFlow,
   UiGroupEdit,
   UiHitTester,
   UiHoldUnseen,
-  UiHostFrameClock,
-  UiHostFrameClockOptions,
   UiImage,
   UiInputDispatcher,
   UiInputEvent,
+  UiInputMode,
   UiInsetEdge,
   UiInsetRegistry,
   UiInsets,
   UiInsetSource,
-  UiInterpolator,
   UiKeyboardController,
   UiKeyboardEvent,
+  UiKeyboardScroller,
   UiKeyModifiers,
   UiLayoutChild,
   UiLayoutContext,
@@ -7571,7 +6453,6 @@ import {
   UiLinearGradient,
   UiListenerErrorReporter,
   UiLiveRegion,
-  UiManualFrameClock,
   UiModifier,
   UiModifierBundle,
   UiModifierEnvironment,
@@ -7581,52 +6462,37 @@ import {
   UiModifierLayout,
   UiModifierSet,
   UiModifierTeardown,
-  UiMotion,
-  UiMotionChanges,
-  UiNode,
   UiNodeRef,
-  UiNodeTransitions,
-  UiNodeType,
-  UiObjectFit,
   UiOrientation,
-  UiOverflow,
   UiPaint,
   UiPasteEvent,
   UiPath,
   UiPinchEvent,
   UiPinchRecognizer,
-  UiPlacement,
   UiPlatformAdapter,
   UiPoint,
   UiPointer,
   UiPointerController,
   UiPointerDevice,
   UiPointerEvent,
-  UiPointerEvents,
   UiPointerKind,
-  UiPosition,
   UiProperties,
   UiPropertyDefinition,
   UiPropertyName,
-  UiPropertyOverride,
-  UiPropertyOverrides,
   UiPropertyValueOf,
   UiPropertyValues,
   UiProps,
   UiPropValue,
-  UiProvision,
   UiRadialGradient,
-  UiReducedMotionPolicy,
-  UiRenderer,
   UiResolvedTextSpan,
   UiRole,
   UiScheduler,
   UiSchedulerOptions,
   UiScrollability,
   UiScrollBehavior,
+  UiSelectionAutoScroller,
   UiSelectionChangeEvent,
   UiSelectionController,
-  UiSelfAlignment,
   UiSemanticsAction,
   UiSemanticsBox,
   UiSemanticsMap,
@@ -7637,9 +6503,6 @@ import {
   UiSemanticsUpdate,
   UiShadowName,
   UiShadows,
-  UiShapeExtensions,
-  UiShapeName,
-  UiShapes,
   UiSharedElements,
   UiShortcut,
   UiShortcutBinding,
@@ -7649,49 +6512,28 @@ import {
   UiSourceLocation,
   UiSpacing,
   UiSpannedText,
-  UiSpring,
-  UiSpringExtensions,
-  UiSpringOptions,
-  UiSpringSpec,
-  UiSpringToken,
-  UiSubgridAxis,
-  UiTextAlign,
   UiTextChangeEvent,
   UiTextDecoration,
-  UiTextDirection,
   UiTextInput,
   UiTextInputState,
   UiTextLink,
   UiTextMetrics,
-  UiTextOverflowValue,
   UiTextPosition,
   UiTextRange,
   UiTextSpan,
   UiTextStyle,
-  UiTextWrapValue,
   UiTheme,
-  UiThemeColorName,
   UiThemeExtension,
   UiThemeExtensionOptions,
   UiThemeExtensions,
   UiThemeTouch,
-  UiTimerFrameClock,
-  UiTimerFrameClockOptions,
   UiTouchScroller,
   UiTrackSize,
-  UiTransform,
-  UiTransforms,
-  UiTransitionSpec,
-  UiTransitionValue,
-  UiTween,
-  UiTweenOptions,
   UiTypography,
   UiTypographyExtensions,
   UiTypographyRole,
   UiUnits,
   UiUnknownModifierPropertyError,
-  UiVerticalAlign,
-  UiVideoSurface,
   UiVirtualSheet,
   UiVirtualSheetOptions,
   UiVirtualWindow,
@@ -7700,18 +6542,13 @@ import {
   UiWheelController,
   UiWheelDeltaMode,
   UiWheelEvent,
-  uniformBorderRadius,
   unitsEqual,
   unknownContainerSize,
   validateGradient,
   validateRole,
   validateStates,
-  validateSubgrid,
   VerticalAlign,
   VideoClock,
-  videoFrameSize,
-  VideoPlayback,
-  VideoResolver,
   videoSource,
   VideoSourceArgs,
   VideoState,
@@ -7727,13 +6564,9 @@ import {
   visualStatesEqual,
   VttCue,
   VttTrack,
-  WebGPUCanvasHost,
   WebGPUError,
   WebGPUGlyphAtlas,
   WebGPUGlyphPages,
-  WebGPURenderer,
-  WebGPURendererOptions,
-  WebGPUSurface,
   WebGPUTextureCache,
   wheelDeltaYOf,
   withContrast,
@@ -7748,6 +6581,17 @@ import {
   ZoomedPictureMemory,
   ZoomState
 } from "./index.js";
+import {
+  canDecodeVideo,
+  DefaultVideoResolver,
+  DefaultVideoResolverOptions,
+  isVideoSurface,
+  RangeResponse,
+  UiVideoSurface,
+  videoFrameSize,
+  VideoPlayback,
+  VideoResolver
+} from "./VideoResolver.js";
 export {
   accumulatedOffsetTo,
   adjacentField,
@@ -7763,6 +6607,7 @@ export {
   borderRadius,
   borderRadiusCorners,
   borderRadiusEqual,
+  borderRadiusIsUniform,
   borderRadiusIsZero,
   borderRadiusValuesEqual,
   borders,
@@ -7901,6 +6746,7 @@ export {
   findEnvironmentKey,
   findMatchesIn,
   findPropertyDefinition,
+  fitBorderRadius,
   fittedShadowRadius,
   flattenTextSpans,
   FlexDirection,
@@ -7978,6 +6824,7 @@ export {
   isUiSemanticState,
   isVideoSurface,
   isWebGPUAvailable,
+  KEY_SCROLL_STEP,
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
@@ -8043,6 +6890,7 @@ export {
   offsetAtPoint,
   offsetAtPointIn,
   offsetAtX,
+  offsetBorderRadius,
   offsetForVerticalMove,
   overrideSources,
   Paint,
@@ -8050,6 +6898,7 @@ export {
   paintPictures,
   PaintRecorder,
   paintsAfterChildren,
+  paintStateOf,
   PaintTarget,
   paintTextMetrics,
   paintValuesEqual,
@@ -8139,6 +6988,7 @@ export {
   ScrollView,
   selectableTextNodes,
   selectableTextOf,
+  SELECTION_SCROLL_EDGE,
   selectionRangeOf,
   selectionRects,
   selectionRectsIn,
@@ -8398,6 +7248,7 @@ export {
   type ScrollSink,
   type ScrollViewProps,
   type SelectionControllerOptions,
+  type SelectionDrag,
   type SelectionHost,
   type SemanticsMemory,
   type SemanticsPlacement,
@@ -8602,12 +7453,14 @@ export {
   UiHostFrameClock,
   UiInputDispatcher,
   UiInputEvent,
+  UiInputMode,
   UiInsetEdge,
   UiInsetRegistry,
   UiInsets,
   UiInsetSource,
   UiKeyboardController,
   UiKeyboardEvent,
+  UiKeyboardScroller,
   UiLengths,
   UiLinearGradient,
   UiLiveRegion,
@@ -8640,6 +7493,7 @@ export {
   UiResolvedTextSpan,
   UiRole,
   UiScheduler,
+  UiSelectionAutoScroller,
   UiSelectionChangeEvent,
   UiSelectionController,
   UiSelfAlignment,
@@ -8730,20 +7584,24 @@ export {
 import {
   Canvas2DContext,
   Canvas2DGradient,
+  Constraints,
+  LayoutBox,
+  LayoutRecord,
+  LayoutResult,
+  TextMeasurer,
+  UiNode,
+  UiNodeType
+} from "./WebGPURenderer.js";
+import {
   Canvas2DRenderer,
   CanvasHost,
   CanvasSurface,
-  Constraints,
-  LayoutBox,
   LayoutEngine,
-  LayoutRecord,
-  LayoutResult,
   PlatformEventTarget,
   PlatformSurface,
   PointerControllerOptions,
   ScrollContainerState,
   ScrollSink,
-  TextMeasurer,
   TouchScrollerOptions,
   UiEditingController,
   UiFocusManager,
@@ -8752,8 +7610,6 @@ import {
   UiHitTester,
   UiInputDispatcher,
   UiKeyboardController,
-  UiNode,
-  UiNodeType,
   UiPlatformAdapter,
   UiPointerController,
   UiTouchScroller,
@@ -9088,4 +7944,1344 @@ export {
   type FragmentSpec,
   type RecordedCall,
   type TrackSpec
+};
+// ==== video.d.ts ====
+import {
+  DefaultVideoResolver
+} from "./VideoResolver.js";
+export {
+  DefaultVideoResolver
+};
+// ==== VideoResolver.d.ts ====
+interface UiVideoSurface {
+  readonly frame: VideoFrame | ImageBitmap | null;
+  readonly version: number;
+  readonly width: number;
+  readonly height: number;
+}
+declare function isVideoSurface(value: unknown): value is UiVideoSurface;
+declare function videoFrameSize(surface: UiVideoSurface): {
+  width: number;
+  height: number;
+};
+interface VideoPlayback {
+  readonly surface: UiVideoSurface;
+  readonly width: number;
+  readonly height: number;
+  readonly duration: number;
+  readonly frameDurationMs: number;
+  readonly positionMs: number;
+  present(positionMs: number): boolean;
+  readonly seeking?: boolean;
+  onError(listener: (error: unknown) => void): () => void;
+  onFrame?(listener: () => void): () => void;
+}
+interface VideoResolver {
+  resolve(source: string): Promise<VideoPlayback>;
+  release(source: string): void;
+  dispose(): void;
+}
+interface RangeResponse {
+  readonly data: ArrayBuffer;
+  readonly total: number;
+}
+interface DefaultVideoResolverOptions {
+  capacity?: number;
+  fetch?: (source: string) => Promise<ArrayBuffer>;
+  fetchRange?: (source: string, start: number, end: number) => Promise<RangeResponse>;
+}
+declare function canDecodeVideo(): boolean;
+declare class DefaultVideoResolver implements VideoResolver {
+  private readonly entries;
+  private readonly evictable;
+  private readonly capacity;
+  private readonly fetchBuffer;
+  private readonly fetchRange;
+  private disposed;
+  constructor(options?: DefaultVideoResolverOptions);
+  get size(): number;
+  resolve(source: string): Promise<VideoPlayback>;
+  release(source: string): void;
+  dispose(): void;
+  private open;
+  private openWhole;
+  private openRanged;
+}
+export {
+  canDecodeVideo,
+  DefaultVideoResolver,
+  DefaultVideoResolverOptions,
+  isVideoSurface,
+  RangeResponse,
+  UiVideoSurface,
+  videoFrameSize,
+  VideoPlayback,
+  VideoResolver
+};
+// ==== webgpu.d.ts ====
+import {
+  createWebGPUSurface,
+  WebGPURenderer
+} from "./WebGPURenderer.js";
+export {
+  createWebGPUSurface,
+  WebGPURenderer
+};
+// ==== WebGPURenderer.d.ts ====
+import {
+  Observable
+} from "rxjs";
+type UiEasing = (t: number) => number;
+declare function easingCss(easing: UiEasing): string | undefined;
+declare const linear: UiEasing;
+declare function cubicBezier(x1: number, y1: number, x2: number, y2: number): UiEasing;
+declare function steps(count: number): UiEasing;
+declare const easings: {
+  readonly linear: UiEasing;
+  readonly standard: UiEasing;
+  readonly decelerate: UiEasing;
+  readonly accelerate: UiEasing;
+  readonly emphasized: UiEasing;
+};
+interface UiColor {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+  readonly a: number;
+}
+declare const UiBasicColors: {
+  readonly transparent: {
+    readonly r: 0;
+    readonly g: 0;
+    readonly b: 0;
+    readonly a: 0;
+  };
+  readonly black: {
+    readonly r: 0;
+    readonly g: 0;
+    readonly b: 0;
+    readonly a: 1;
+  };
+  readonly white: {
+    readonly r: 1;
+    readonly g: 1;
+    readonly b: 1;
+    readonly a: 1;
+  };
+  readonly red: {
+    readonly r: 1;
+    readonly g: 0;
+    readonly b: 0;
+    readonly a: 1;
+  };
+  readonly green: {
+    readonly r: 0;
+    readonly g: 1;
+    readonly b: 0;
+    readonly a: 1;
+  };
+  readonly blue: {
+    readonly r: 0;
+    readonly g: 0;
+    readonly b: 1;
+    readonly a: 1;
+  };
+};
+declare function rgba(r: number, g: number, b: number, a?: number): UiColor;
+declare function rgb8(r: number, g: number, b: number, a?: number): UiColor;
+declare function colorsEqual(a: UiColor, b: UiColor): boolean;
+declare function colorToHex(color: UiColor): string;
+declare function colorToRgba(color: UiColor): string;
+declare function parseColor(value: string): UiColor | undefined;
+declare function normalizeColor(value: unknown): UiColor | undefined;
+declare function colorValuesEqual(a: unknown, b: unknown): boolean;
+interface UiTransform {
+  readonly x: number;
+  readonly y: number;
+  readonly translateX: number;
+  readonly translateY: number;
+  readonly scaleX: number;
+  readonly scaleY: number;
+  readonly rotation: number;
+}
+declare const UiTransforms: {
+  readonly identity: {
+    readonly x: 0;
+    readonly y: 0;
+    readonly translateX: 0;
+    readonly translateY: 0;
+    readonly scaleX: 1;
+    readonly scaleY: 1;
+    readonly rotation: 0;
+  };
+};
+declare function transform(partial?: Partial<UiTransform>): UiTransform;
+declare function parseTransform(value: unknown): UiTransform | undefined;
+declare function transformsEqual(a: UiTransform, b: UiTransform): boolean;
+declare function transformIsIdentity(transform: UiTransform): boolean;
+type UiInterpolator<T> = (from: T, to: T, t: number) => T;
+declare const interpolateNumber: UiInterpolator<number>;
+declare const interpolateColor: UiInterpolator<UiColor>;
+declare const interpolateTransform: UiInterpolator<Partial<UiTransform>>;
+declare function interpolatorFor(from: unknown, to: unknown): UiInterpolator<unknown> | undefined;
+type UiDurationToken = 'instant' | 'fast' | 'normal' | 'slow' | 'deliberate' | (keyof UiDurationExtensions & string);
+type UiEasingToken = keyof typeof easings | (keyof UiEasingExtensions & string);
+type UiSpringToken = 'gentle' | 'snappy' | 'stiff' | (keyof UiSpringExtensions & string);
+interface UiDurationExtensions {}
+interface UiEasingExtensions {}
+interface UiSpringExtensions {}
+interface UiSpringSpec {
+  readonly stiffness: number;
+  readonly damping: number;
+  readonly mass: number;
+}
+interface UiMotion {
+  readonly durations: Readonly<Record<UiDurationToken, number>>;
+  readonly easings: Readonly<Record<UiEasingToken, UiEasing>>;
+  readonly springs: Readonly<Record<UiSpringToken, UiSpringSpec>>;
+}
+interface UiMotionChanges {
+  readonly durations?: Readonly<Partial<Record<UiDurationToken, number>>>;
+  readonly easings?: Readonly<Partial<Record<UiEasingToken, UiEasing>>>;
+  readonly springs?: Readonly<Partial<Record<UiSpringToken, UiSpringSpec>>>;
+}
+declare const defaultMotion: UiMotion;
+declare function defineMotion(changes: UiMotionChanges): UiMotion;
+declare function durationIn(motion: UiMotion, duration: number | UiDurationToken | undefined): number;
+declare function easingIn(motion: UiMotion, easing: UiEasing | UiEasingToken | undefined): UiEasing;
+declare function springIn(motion: UiMotion, spring: UiSpringSpec | UiSpringToken | undefined): UiSpringSpec;
+interface AnimatedCell<T> {
+  value: T;
+}
+type UiReducedMotionPolicy = 'snap' | 'keep';
+interface UiAnimationOptions {
+  stepMs?: number;
+  reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
+}
+interface UiTweenOptions extends UiAnimationOptions {
+  duration: number;
+  easing?: UiEasing;
+  repeat?: boolean;
+}
+interface UiSpringOptions extends UiAnimationOptions {
+  spring: UiSpringSpec;
+  velocity?: number;
+  restDelta?: number;
+}
+declare abstract class UiAnimation<T> {
+  readonly cell: AnimatedCell<T>;
+  private readonly stepMs;
+  readonly reducedMotionPolicy: UiReducedMotionPolicy;
+  private readonly delayMs;
+  protected startedAt: number;
+  private begun;
+  private lastAdvancedAt;
+  private readonly subject;
+  private nextDueAt;
+  private lastWritten;
+  private finished;
+  protected constructor(cell: AnimatedCell<T>, stepMs: number, reducedMotionPolicy: UiReducedMotionPolicy, delayMs?: number);
+  get values(): Observable<T>;
+  get isFinished(): boolean;
+  get dueSlackMs(): number;
+  dueAt(now: number): number;
+  protected abstract sample(now: number, elapsedMs: number): {
+    value: T;
+    done: boolean;
+  };
+  begin(now: number): void;
+  get hasBegun(): boolean;
+  continueFrom(previous: UiAnimation<T>): void;
+  protected onBegin(): void;
+  advance(now: number, hold?: boolean): void;
+  private scheduleNext;
+  snap(): void;
+  cancel(): void;
+  protected abstract get target(): T;
+  protected valuesEqual(a: T, b: T): boolean;
+  private finish;
+}
+declare class UiTween<T> extends UiAnimation<T> {
+  private readonly from;
+  private readonly to;
+  private readonly duration;
+  private readonly easing;
+  private readonly repeat;
+  private readonly interpolate;
+  constructor(cell: AnimatedCell<T>, to: T, options: UiTweenOptions, interpolate: UiInterpolator<T>);
+  get isRepeating(): boolean;
+  protected get target(): T;
+  protected sample(_now: number, elapsedMs: number): {
+    value: T;
+    done: boolean;
+  };
+  protected valuesEqual(a: T, b: T): boolean;
+}
+declare class UiSpring extends UiAnimation<number> {
+  private position;
+  private previousPosition;
+  private velocity;
+  private readonly to;
+  private readonly spec;
+  private readonly restDelta;
+  private simulatedTo;
+  constructor(cell: AnimatedCell<number>, to: number, options: UiSpringOptions);
+  get destination(): number;
+  get currentVelocity(): number;
+  protected onBegin(): void;
+  protected get target(): number;
+  protected sample(_now: number, elapsedMs: number): {
+    value: number;
+    done: boolean;
+  };
+}
+declare function createTween<T>(cell: AnimatedCell<T>, to: T, options: UiTweenOptions): UiTween<T> | undefined;
+type UiTransitionSpec = {
+  readonly kind: 'tween';
+  readonly duration: number | UiDurationToken;
+  readonly easing?: UiEasing | UiEasingToken;
+  readonly stepMs?: number;
+  readonly reducedMotion?: UiReducedMotionPolicy;
+} | {
+  readonly kind: 'spring';
+  readonly spring: UiSpringSpec | UiSpringToken;
+  readonly restDelta?: number;
+  readonly reducedMotion?: UiReducedMotionPolicy;
+};
+type UiTransitionValue = number | UiDurationToken | UiTransitionSpec;
+declare function tween(duration: number | UiDurationToken, options?: {
+  easing?: UiEasing | UiEasingToken;
+  stepMs?: number;
+  reducedMotion?: UiReducedMotionPolicy;
+}): UiTransitionSpec;
+declare function spring(spec?: UiSpringToken | UiSpringSpec, options?: {
+  restDelta?: number;
+  reducedMotion?: UiReducedMotionPolicy;
+}): UiTransitionSpec;
+declare function normalizeTransition(value: UiTransitionValue): UiTransitionSpec;
+declare function assertTransitionMap(nodeId: string, value: unknown, isKnownProperty: (name: string) => boolean): ReadonlyMap<string, UiTransitionSpec>;
+declare enum DirtyFlags {
+  None = 0,
+  Content = 1,
+  Paint = 2,
+  Layout = 4,
+  SubtreeLayout = 8,
+  Children = 16,
+  Transform = 32,
+  Properties = 64,
+  Environment = 128,
+  Semantics = 256
+}
+declare enum UiNodeType {
+  Root = "root",
+  Column = "column",
+  Row = "row",
+  Box = "box",
+  Text = "text",
+  EditableText = "editable-text",
+  Button = "button",
+  Paint = "paint",
+  ScrollView = "scroll-view",
+  Grid = "grid",
+  Fragment = "fragment"
+}
+interface UiEnvironmentKey<T> {
+  readonly name: string;
+  readonly defaultValue: T;
+  readonly compare?: (a: T, b: T) => boolean;
+}
+declare function createEnvironmentKey<T>(options: {
+  name: string;
+  defaultValue: T;
+  compare?: (a: T, b: T) => boolean;
+}): UiEnvironmentKey<T>;
+declare function findEnvironmentKey(name: string): UiEnvironmentKey<unknown> | undefined;
+interface UiProvision<T = unknown> {
+  readonly key: UiEnvironmentKey<T>;
+  readonly value: T;
+}
+declare function provided<T>(key: UiEnvironmentKey<T>, value: T): UiProvision;
+declare class UiEnvironment {
+  readonly parent: UiEnvironment | null;
+  private readonly values;
+  constructor(parent: UiEnvironment | null, values?: ReadonlyMap<string, unknown>);
+  set<T>(key: UiEnvironmentKey<T>, value: T): UiEnvironment;
+  delete<T>(key: UiEnvironmentKey<T>): UiEnvironment;
+  get<T>(key: UiEnvironmentKey<T>): T;
+  has<T>(key: UiEnvironmentKey<T>): boolean;
+  providedKeys(): Iterable<string>;
+  get providedSize(): number;
+  getOwn(name: string): unknown;
+  providesOwn(name: string): boolean;
+}
+interface Size {
+  width: number;
+  height: number;
+}
+interface LayoutBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+interface TightenOptions {
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  minHeight?: number;
+  maxHeight?: number;
+}
+declare class Constraints {
+  readonly minWidth: number;
+  readonly maxWidth: number;
+  readonly minHeight: number;
+  readonly maxHeight: number;
+  constructor(minWidth?: number, maxWidth?: number, minHeight?: number, maxHeight?: number);
+  static unbounded(): Constraints;
+  static tight(width: number, height: number): Constraints;
+  static loose(width: number, height: number): Constraints;
+  hasBoundedWidth(): boolean;
+  hasBoundedHeight(): boolean;
+}
+interface LayoutStats {
+  measured: number;
+  placed: number;
+  shifted: number;
+  relayoutRoots: number;
+  fullLayout: boolean;
+  measuredNodes: UiNode[];
+}
+interface LayoutResult {
+  root: UiNode;
+  box: LayoutBox;
+  contentWidth: number;
+  contentHeight: number;
+  scrollX: number;
+  scrollY: number;
+  clip: LayoutBox;
+}
+declare function clampSize(constraints: Constraints, width: number, height: number): Size;
+declare function constraintsEqual(a: Constraints, b: Constraints): boolean;
+declare function tightenConstraints(constraints: Constraints, options: TightenOptions): Constraints;
+type TextWrap = 'word' | 'char' | 'none';
+type TextOverflow = 'clip' | 'ellipsis';
+interface TextRunStyle {
+  fontFamily?: string;
+  fontWeight?: string | number;
+  fontSize?: number;
+  fontStyle?: string;
+  fontStretch?: string;
+  fontVariant?: string;
+  fontKerning?: string;
+  letterSpacing?: number;
+}
+interface TextRunSpan extends TextRunStyle {
+  readonly start: number;
+  readonly end: number;
+  readonly hidden?: boolean;
+}
+interface TextMeasureRequest {
+  text: string;
+  fontSize: number;
+  maxWidth?: number;
+  exactWidth?: boolean;
+  fontFamily?: string;
+  fontWeight?: string | number;
+  lineHeight?: number;
+  letterSpacing?: number;
+  fontStyle?: string;
+  fontStretch?: string;
+  fontVariant?: string;
+  fontKerning?: string;
+  wrap?: TextWrap;
+  maxLines?: number;
+  overflow?: TextOverflow;
+  spans?: readonly TextRunSpan[];
+}
+interface TextLineRun {
+  span: number;
+  start: number;
+  end: number;
+  text: string;
+  x: number;
+  width: number;
+}
+interface TextLine {
+  start: number;
+  end: number;
+  text: string;
+  width: number;
+  runs?: readonly TextLineRun[];
+}
+interface FontMetrics {
+  ascent: number;
+  descent: number;
+}
+interface ParagraphLayout {
+  lines: TextLine[];
+  width: number;
+  height: number;
+  lineHeight: number;
+  ascent: number;
+  descent: number;
+  firstBaseline: number;
+  minContentWidth: number;
+  maxContentWidth: number;
+}
+interface TextMeasurer {
+  measure(request: TextMeasureRequest): Size;
+  layout(request: TextMeasureRequest): ParagraphLayout;
+  measureRunWidth(text: string, request: TextMeasureRequest): number;
+  invalidate?(): void;
+  readonly generation?: number;
+}
+interface TextRunMeasurer {
+  measureRunWidth(text: string, request: TextMeasureRequest): number;
+  fontMetrics(request: TextMeasureRequest): FontMetrics;
+}
+interface SpannedRuns {
+  readonly spans: readonly TextRunSpan[];
+  indexAt(offset: number): number;
+  requestAt(offset: number): TextMeasureRequest;
+  hiddenAt(offset: number): boolean;
+  width(text: string, start: number, end: number): number;
+  widthOf(run: string, offset: number): number;
+  cut(text: string, start: number, end: number, x: number): TextLineRun[];
+}
+declare function spannedRunsFor(request: TextMeasureRequest, runs: Pick<TextRunMeasurer, 'measureRunWidth'>): SpannedRuns | undefined;
+declare abstract class ParagraphTextMeasurer implements TextMeasurer, TextRunMeasurer {
+  private readonly paragraphs;
+  private readonly fitting;
+  private generations;
+  abstract measureRunWidth(text: string, request: TextMeasureRequest): number;
+  abstract fontMetrics(request: TextMeasureRequest): FontMetrics;
+  layout(request: TextMeasureRequest): ParagraphLayout;
+  measure(request: TextMeasureRequest): Size;
+  get cachedParagraphs(): number;
+  get generation(): number;
+  invalidate(): void;
+}
+interface FixedMetricsOptions {
+  glyphWidth?: number;
+  ascent?: number;
+  descent?: number;
+}
+declare class CharacterCountTextMeasurer extends ParagraphTextMeasurer {
+  private readonly glyphWidth;
+  private readonly ascentFactor;
+  private readonly descentFactor;
+  constructor(options?: FixedMetricsOptions);
+  measureRunWidth(text: string, request: TextMeasureRequest): number;
+  fontMetrics(request: TextMeasureRequest): FontMetrics;
+}
+interface TextMemo {
+  readonly request: TextMeasureRequest;
+  readonly paragraph: ParagraphLayout;
+  readonly generation: number;
+  readonly fitsAnyWidth: boolean;
+}
+interface ArrangementMemo {
+  readonly kind: 'flex' | 'grid';
+  readonly pass: number;
+  readonly content: Constraints;
+  readonly contentMatters: boolean;
+}
+declare class LayoutRecord {
+  readonly node: UiNode;
+  constructor(node: UiNode);
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  measuredWidth: number;
+  measuredHeight: number;
+  outerWidth: number;
+  outerHeight: number;
+  paddingLeft: number;
+  paddingRight: number;
+  paddingTop: number;
+  paddingBottom: number;
+  marginLeft: number;
+  marginRight: number;
+  marginTop: number;
+  marginBottom: number;
+  minWidth: number;
+  maxWidth: number;
+  minHeight: number;
+  maxHeight: number;
+  flexGrow: number;
+  flexShrink: number;
+  flexBasisZero: boolean;
+  minWidthAuto: boolean;
+  minHeightAuto: boolean;
+  marginLeftAuto: boolean;
+  marginRightAuto: boolean;
+  marginTopAuto: boolean;
+  marginBottomAuto: boolean;
+  aspectRatio: number | undefined;
+  hasBaseline: boolean;
+  baseline: number;
+  minContentWidth: number;
+  minContentHeight: number;
+  maxContentWidth: number;
+  intrinsicWidth: number;
+  intrinsicHeight: number;
+  flexMain: 0 | 1 | 2;
+  flexBase: number;
+  flexMin: number;
+  flexMax: number;
+  flexMinAuto: boolean;
+  positioned: boolean;
+  absolute: boolean;
+  get displaced(): boolean;
+  top: number | undefined;
+  right: number | undefined;
+  bottom: number | undefined;
+  left: number | undefined;
+  zIndex: number;
+  lifted: boolean;
+  liftBoundary: boolean;
+  clips: boolean;
+  extentMinX: number;
+  extentMinY: number;
+  extentMaxX: number;
+  extentMaxY: number;
+  paintReachLeft: number;
+  paintReachTop: number;
+  paintReachRight: number;
+  paintReachBottom: number;
+  scrollable: boolean;
+  scrollsText: boolean;
+  hidesScrollbars: boolean;
+  textScrollbars: boolean;
+  mirrored: boolean;
+  sticky: boolean;
+  stickyOffsetX: number;
+  stickyOffsetY: number;
+  scrollbarVisibleUntil: number;
+  subgridColumns: number[] | undefined;
+  subgridColumnGap: number;
+  paintOrder: UiNode[] | null;
+  boundsMinX: number;
+  boundsMinY: number;
+  boundsMaxX: number;
+  boundsMaxY: number;
+  boundsUnbounded: boolean;
+  scrollX: number;
+  scrollY: number;
+  contentWidth: number;
+  contentHeight: number;
+  lastConstraints: Constraints;
+  arrangement: ArrangementMemo | null;
+  textBounded: TextMemo | null;
+  textUnbounded: TextMemo | null;
+  lastBaseWidth: number | undefined;
+  lastBaseHeight: number | undefined;
+  percentWidth: boolean;
+  percentHeight: boolean;
+  sameBase(baseWidth: number | undefined, baseHeight: number | undefined): boolean;
+  private alternates;
+  saveAlt(): void;
+  recallAlt(constraints: Constraints, baseWidth?: number, baseHeight?: number): boolean;
+  forgetAlts(): void;
+  contentMatters: boolean;
+  relayoutBoundary: boolean;
+  measureDirty: boolean;
+  placeDirty: boolean;
+  placedOnce: boolean;
+  transformDirty: boolean;
+  propsPass: number;
+  propsBaseWidth: number | undefined;
+  propsBaseHeight: number | undefined;
+  propsVersion: number;
+  propsFromNodeAlone: boolean;
+  reset(): void;
+}
+interface UiBorderRadius {
+  readonly topLeft: number;
+  readonly topRight: number;
+  readonly bottomRight: number;
+  readonly bottomLeft: number;
+}
+declare const UiBorderRadiuses: {
+  readonly none: {
+    readonly topLeft: 0;
+    readonly topRight: 0;
+    readonly bottomRight: 0;
+    readonly bottomLeft: 0;
+  };
+};
+declare function borderRadius(radius: number): UiBorderRadius;
+declare function borderRadiusCorners(topLeft: number, topRight: number, bottomRight: number, bottomLeft: number): UiBorderRadius;
+declare function borderRadiusEqual(a: UiBorderRadius, b: UiBorderRadius): boolean;
+declare function borderRadiusIsZero(radius: UiBorderRadius): boolean;
+declare function uniformBorderRadius(radius: UiBorderRadius): number;
+declare function borderRadiusIsUniform(radius: UiBorderRadius): boolean;
+declare function fitBorderRadius(radius: UiBorderRadius, width: number, height: number): UiBorderRadius;
+declare function offsetBorderRadius(radius: UiBorderRadius, by: number): UiBorderRadius;
+declare function normalizeBorderRadius(value: unknown): UiBorderRadius;
+declare function borderRadiusValuesEqual(a: unknown, b: unknown): boolean;
+interface UiColors {
+  readonly background: UiColor;
+  readonly surface: UiColor;
+  readonly primary: UiColor;
+  readonly secondary: UiColor;
+  readonly text: UiColor;
+  readonly textMuted: UiColor;
+  readonly border: UiColor;
+  readonly shadow: UiColor;
+  readonly placeholder: UiColor;
+  readonly scrim: UiColor;
+  readonly controlBackground: UiColor;
+  readonly controlBackgroundHovered: UiColor;
+  readonly controlBackgroundPressed: UiColor;
+  readonly controlBorder: UiColor;
+  readonly controlForeground: UiColor;
+  readonly controlForegroundDisabled: UiColor;
+  readonly controlAccent: UiColor;
+  readonly danger: UiColor;
+  readonly focusRing: UiColor;
+  readonly selectionBackground: UiColor;
+  readonly selectionForeground: UiColor;
+  readonly tooltipBackground: UiColor;
+  readonly tooltipForeground: UiColor;
+}
+declare const lightColors: UiColors;
+declare const darkColors: UiColors;
+declare function colorsEqualPalette(a: UiColors, b: UiColors): boolean;
+interface UiShapes {
+  readonly none: number;
+  readonly extraSmall: number;
+  readonly small: number;
+  readonly medium: number;
+  readonly large: number;
+  readonly extraLarge: number;
+  readonly full: number;
+}
+declare const defaultShapes: UiShapes;
+declare function shapesEqual(a: UiShapes, b: UiShapes): boolean;
+interface UiShapeExtensions {}
+type UiShapeName = keyof UiShapes | (keyof UiShapeExtensions & string);
+declare function isShapeName(value: unknown, scale: UiShapes): value is UiShapeName;
+type UiAlignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline' | 'space-between' | 'space-around' | 'space-evenly';
+type UiSelfAlignment = 'start' | 'center' | 'end' | 'stretch' | 'baseline';
+type UiContentDistribution = 'stretch' | 'start' | 'center' | 'end' | 'space-between' | 'space-around' | 'space-evenly';
+type UiFlexWrap = 'nowrap' | 'wrap' | 'wrap-reverse';
+type UiDirection = 'row' | 'column' | 'row-reverse' | 'column-reverse' | 'horizontal' | 'vertical';
+type UiGridAutoFlow = 'row' | 'column';
+type UiSubgridAxis = 'columns';
+declare const UI_SUBGRID_AXES: readonly UiSubgridAxis[];
+declare function validateSubgrid(value: unknown): string | undefined;
+type UiPosition = 'static' | 'relative' | 'absolute' | 'sticky';
+type UiOverflow = 'visible' | 'hidden' | 'scroll' | 'auto';
+type UiPlacement = 'over' | 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'left-start' | 'left-end' | 'right' | 'right-start' | 'right-end';
+type UiTextWrapValue = 'word' | 'char' | 'none';
+type UiTextOverflowValue = 'clip' | 'ellipsis';
+type UiTextAlign = 'start' | 'end' | 'left' | 'center' | 'right';
+type UiTextDirection = 'ltr' | 'rtl';
+type UiVerticalAlign = 'top' | 'middle' | 'bottom';
+type UiObjectFit = 'fill' | 'cover' | 'contain' | 'none';
+type UiPointerEvents = 'auto' | 'none';
+type UiFontWeight = number | `${number}` | 'normal' | 'bold' | 'lighter' | 'bolder';
+type UiCursor = 'default' | 'pointer' | 'text' | 'move' | 'grab' | 'grabbing' | 'crosshair' | 'not-allowed' | 'wait' | 'progress' | 'help' | 'none' | 'col-resize' | 'row-resize' | 'ew-resize' | 'ns-resize' | 'nesw-resize' | 'nwse-resize' | 'zoom-in' | 'zoom-out';
+type UiThemeColorName = keyof UiColors;
+type UiColorValue = UiColor | UiThemeColorName | (string & {});
+type UiBorderRadiusValue = UiBorderRadius | number | UiShapeName;
+type DecorationShape = DecorationFill | DecorationStroke;
+interface DecorationBox {
+  readonly x?: number;
+  readonly y?: number;
+  readonly width?: number;
+  readonly height?: number;
+  readonly right?: number;
+  readonly bottom?: number;
+  readonly outset?: number;
+  readonly radius?: number;
+  readonly after?: 'children';
+}
+interface DecorationFill extends DecorationBox {
+  readonly kind: 'fill';
+  readonly color: UiColorValue;
+}
+interface DecorationStroke extends DecorationBox {
+  readonly kind: 'stroke';
+  readonly color: UiColorValue;
+  readonly lineWidth: number;
+}
+interface DecorationRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius: number;
+  corners: UiBorderRadius;
+}
+declare function decorationRect(shape: DecorationShape, rec: LayoutRecord, nodeRadius: number | UiBorderRadius): DecorationRect;
+declare function decorationColor(node: UiNode, shape: DecorationShape): UiColor | undefined;
+declare function paintsAfterChildren(shape: DecorationShape): boolean;
+declare function hasDecorationPhase(shapes: readonly DecorationShape[], after: boolean): boolean;
+type NodeId = string;
+type NodeProperty = string;
+interface UiPropertyOverride {
+  readonly source: symbol;
+  readonly name: string;
+  order: number;
+  value: unknown;
+  readonly snap?: boolean;
+}
+interface UiPropertyOverrides {
+  declared: {
+    present: boolean;
+    value: unknown;
+  };
+  entries: UiPropertyOverride[];
+}
+interface UiNodeTransitions {
+  write(property: NodeProperty, value: unknown, flags: DirtyFlags): boolean;
+  cancel(property: NodeProperty): void;
+  readonly declared: ReadonlyMap<NodeProperty, UiTransitionSpec>;
+  release(): void;
+}
+interface UiHold {
+  readonly pending: Map<UiNode, DirtyFlags>;
+  environment: DirtyFlags;
+}
+declare class UiNode {
+  readonly id: NodeId;
+  readonly type: UiNodeType;
+  constructor(id: NodeId, type: UiNodeType);
+  parent: UiNode | null;
+  firstChild: UiNode | null;
+  lastChild: UiNode | null;
+  childOrderVersion: number;
+  previousSibling: UiNode | null;
+  nextSibling: UiNode | null;
+  dirtyFlags: DirtyFlags;
+  readonly properties: Map<string, unknown>;
+  propertyVersion: number;
+  overrides: Map<NodeProperty, UiPropertyOverrides> | null;
+  environment: UiEnvironment | null;
+  decorations: readonly DecorationShape[] | null;
+  transitions: UiNodeTransitions | null;
+  hold: UiHold | null;
+  heldBy: UiNode | null;
+  hasChildren(): boolean;
+  isDirty(): boolean;
+  getProperty<T>(property: NodeProperty): T | undefined;
+  setProperty<T>(property: NodeProperty, value: T): void;
+  removeProperty(property: NodeProperty): boolean;
+}
+interface Canvas2DGradient {
+  addColorStop(offset: number, color: string): void;
+}
+interface Canvas2DContext {
+  save(): void;
+  restore(): void;
+  translate(x: number, y: number): void;
+  scale(x: number, y: number): void;
+  rotate(angle: number): void;
+  setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  letterSpacing?: string;
+  fontStretch?: string;
+  fontKerning?: string;
+  direction?: CanvasDirection;
+  clearRect(x: number, y: number, width: number, height: number): void;
+  fillRect(x: number, y: number, width: number, height: number): void;
+  strokeRect(x: number, y: number, width: number, height: number): void;
+  beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  arcTo(x1: number, y1: number, x2: number, y2: number, radius: number): void;
+  closePath(): void;
+  rect(x: number, y: number, width: number, height: number): void;
+  clip(): void;
+  fill(): void;
+  stroke(): void;
+  fillText(text: string, x: number, y: number, maxWidth?: number): void;
+  measureText(text: string): TextMetrics;
+  drawImage(image: ImageBitmap | VideoFrame | OffscreenCanvas, dx: number, dy: number, dw: number, dh: number): void;
+  getTransform?(): {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    e: number;
+    f: number;
+  };
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): Canvas2DGradient;
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): Canvas2DGradient;
+  fillStyle: string | Canvas2DGradient | CanvasPattern;
+  strokeStyle: string | Canvas2DGradient | CanvasPattern;
+  lineWidth: number;
+  lineJoin: CanvasLineJoin;
+  globalAlpha: number;
+  font: string;
+  textAlign: CanvasTextAlign;
+  textBaseline: CanvasTextBaseline;
+  shadowColor: string;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
+}
+type UiFrameTime = number;
+interface UiFrameClock {
+  requestFrame(): void;
+  cancelFrame(): void;
+}
+type UiFrameClockFactory = (onFrame: (time: UiFrameTime) => void) => UiFrameClock;
+declare class UiAnimationFrameClock implements UiFrameClock {
+  private readonly onFrame;
+  private readonly requestAnimationFrame;
+  private readonly cancelAnimationFrame;
+  private handle;
+  constructor(onFrame: (time: UiFrameTime) => void);
+  requestFrame(): void;
+  cancelFrame(): void;
+}
+interface UiTimerFrameClockOptions {
+  intervalMs?: number;
+  now?: () => UiFrameTime;
+}
+interface UiHostFrameClockOptions {
+  requestAnimationFrame?: ((callback: (time: number) => void) => number) | null;
+  timeOrigin?: number;
+  fallbackMs?: number;
+  stallMs?: number;
+  minStallMs?: number;
+  now?: () => UiFrameTime;
+}
+declare class UiTimerFrameClock implements UiFrameClock {
+  private readonly onFrame;
+  private readonly intervalMs;
+  private readonly now;
+  private handle;
+  constructor(onFrame: (time: UiFrameTime) => void, options?: UiTimerFrameClockOptions);
+  requestFrame(): void;
+  cancelFrame(): void;
+}
+declare class UiHostFrameClock implements UiFrameClock {
+  private readonly onFrame;
+  private readonly onActive;
+  private pending;
+  private active;
+  private hosted;
+  private stalled;
+  private idleTicks;
+  private lastTickTime;
+  private hostOffset;
+  private readonly intervals;
+  private handle;
+  private readonly fallbackMs;
+  private readonly stallMs;
+  private readonly minStallMs;
+  private readonly now;
+  private local;
+  private localHandle;
+  private localRefreshes;
+  private localWatch;
+  private hidden;
+  private readonly timeOrigin;
+  private readonly localIntervals;
+  private lastLocalTime;
+  private lastLocalCost;
+  private display;
+  private locked;
+  private givenUp;
+  private lastRetry;
+  private retrying;
+  private readonly refreshes;
+  private refreshesSinceFrame;
+  private lastLocked;
+  private readonly costs;
+  private stride;
+  constructor(onFrame: (time: UiFrameTime) => void,
+  onActive: (active: boolean) => void, options?: UiHostFrameClockOptions);
+  get isLocal(): boolean;
+  requestFrame(): void;
+  private watchLocal;
+  setHidden(hidden: boolean): void;
+  displayInterval(ms: number, origin: number): void;
+  get isDisplayLocked(): boolean;
+  private recordLocal;
+  private compareLocal;
+  private retryLocal;
+  private toLocal;
+  private beat;
+  private refineInterval;
+  private deliverOnBeat;
+  private recordCost;
+  get displayStride(): number;
+  private armTimer;
+  private watchMs;
+  private hostTime;
+  private cadenceMs;
+  private selfPaceMs;
+  flush(): void;
+  private drawNow;
+  cancelFrame(): void;
+  private clearFallback;
+  private deliver;
+  tick(time: UiFrameTime): void;
+  private recordCadence;
+  private setActive;
+}
+declare class UiManualFrameClock implements UiFrameClock {
+  private onFrame;
+  private pending;
+  constructor(onFrame: (time: UiFrameTime) => void);
+  setCallback(onFrame: (time: UiFrameTime) => void): void;
+  requestFrame(): void;
+  cancelFrame(): void;
+  get isPending(): boolean;
+  tick(time?: UiFrameTime): void;
+}
+declare class UiFrame {
+  readonly id: number;
+  readonly time: UiFrameTime;
+  private readonly dirty;
+  constructor(id: number, time: UiFrameTime, dirty: ReadonlyMap<UiNode, DirtyFlags>);
+  get nodes(): UiNode[];
+  entries(): IterableIterator<[UiNode, DirtyFlags]>;
+  anyFlags(flags: DirtyFlags): boolean;
+  merged(later: UiFrame): UiFrame;
+  get size(): number;
+  isEmpty(): boolean;
+  dirtyFlagsFor(node: UiNode): DirtyFlags;
+}
+type OverlayShape = {
+  kind: 'fill';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+} | {
+  kind: 'stroke';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  lineWidth: number;
+} | {
+  kind: 'label';
+  box: LayoutBox;
+  text: string;
+  font: string;
+  fontSize: number;
+  fontFamily: string;
+  textColor: string;
+  background: string;
+  height: number;
+};
+declare function labelOrigin(shape: Extract<OverlayShape, {
+  kind: 'label';
+}>): {
+  x: number;
+  y: number;
+};
+declare const LABEL_PADDING_X = 4;
+declare function drawOverlayShapes(ctx: Canvas2DContext, shapes: readonly OverlayShape[]): void;
+interface LayoutReader {
+  recordFor(node: UiNode): LayoutRecord | undefined;
+  allStickyNodes?(): ReadonlySet<UiNode>;
+}
+interface RenderContext {
+  readonly layout: LayoutReader;
+  readonly text: TextMeasurer;
+  readonly now?: number;
+  readonly overlay?: readonly OverlayShape[];
+  readonly changes?: RenderChanges;
+}
+interface RenderChanges {
+  readonly frame: UiFrame;
+  readonly geometryVersion: number;
+}
+type RendererBackend = 'canvas2d' | 'webgpu';
+interface UiRenderer {
+  readonly backend: RendererBackend;
+  initialize(): Promise<void>;
+  readonly isReady: boolean;
+  render(root: UiNode, context: RenderContext): void;
+  resize(width: number, height: number, dpr: number): void;
+  fontsChanged?(): void;
+  surfaceRestored?(): void;
+  nextRepaint?(): number | undefined;
+  dispose(): void;
+}
+interface WebGPUCanvasHost {
+  width: number;
+  height: number;
+  getContext(contextId: 'webgpu'): GPUCanvasContext | null;
+}
+declare class WebGPUSurface {
+  private readonly canvas;
+  private logicalW;
+  private logicalH;
+  private pixelRatio;
+  private context;
+  private configured;
+  constructor(canvas: WebGPUCanvasHost);
+  get logicalWidth(): number;
+  get logicalHeight(): number;
+  get dpr(): number;
+  get physicalWidth(): number;
+  get physicalHeight(): number;
+  getContext(): GPUCanvasContext;
+  private acquireContext;
+  configure(device: GPUDevice, format: GPUTextureFormat): void;
+  unconfigure(): void;
+  setLogicalSize(width: number, height: number, dpr?: number): boolean;
+  getCurrentTexture(): GPUTexture;
+}
+declare function createWebGPUSurface(host: WebGPUCanvasHost): WebGPUSurface;
+interface WebGPURendererOptions {
+  surface: WebGPUSurface;
+  hooks?: RenderHooks;
+  onError?: (message: string) => void;
+  onLost?: () => void;
+}
+interface RenderHooks {
+  onPrepareStart?(): void;
+  onPrepareEnd?(ms: number): void;
+  onUploadStart?(): void;
+  onUploadEnd?(ms: number): void;
+  onEncodeStart?(): void;
+  onEncodeEnd?(ms: number): void;
+}
+interface CapturedFrame {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+}
+interface DrawStats {
+  primitiveDraws: number;
+  texturedDraws: number;
+  texturedInstances: number;
+}
+declare class WebGPURenderer implements UiRenderer {
+  readonly backend: RendererBackend;
+  private readonly surface;
+  private hooks;
+  private device;
+  private format;
+  private primitives;
+  private textured;
+  private textures;
+  private glyphPages;
+  private readonly textCache;
+  private instanceBuffer;
+  private texturedBuffer;
+  private clipBuffer;
+  private gradientBuffer;
+  private frameLayout;
+  private frameBindGroup;
+  private cachedInstanceData;
+  private groupLayers;
+  readonly lastDraws: DrawStats;
+  private pendingCapture;
+  private lost;
+  private disposed;
+  private readonly onError;
+  private readonly onLost;
+  constructor(options: WebGPURendererOptions);
+  setHooks(hooks: RenderHooks): void;
+  initialize(): Promise<void>;
+  get isReady(): boolean;
+  get isLost(): boolean;
+  capture(): Promise<CapturedFrame>;
+  render(root: UiNode, context: RenderContext): void;
+  private groupLayer;
+  private takeCapture;
+  private clearFrame;
+  resize(width: number, height: number, dpr?: number): void;
+  fontsChanged(): void;
+  recover(): Promise<void>;
+  dispose(): void;
+  private releaseDeviceResources;
+  private uploadInstanceData;
+  private ensureBuffer;
+}
+export {
+  AnimatedCell,
+  assertTransitionMap,
+  borderRadius,
+  borderRadiusCorners,
+  borderRadiusEqual,
+  borderRadiusIsUniform,
+  borderRadiusIsZero,
+  borderRadiusValuesEqual,
+  Canvas2DContext,
+  Canvas2DGradient,
+  CapturedFrame,
+  CharacterCountTextMeasurer,
+  clampSize,
+  colorsEqual,
+  colorsEqualPalette,
+  colorToHex,
+  colorToRgba,
+  colorValuesEqual,
+  Constraints,
+  constraintsEqual,
+  createEnvironmentKey,
+  createTween,
+  createWebGPUSurface,
+  cubicBezier,
+  darkColors,
+  decorationColor,
+  DecorationFill,
+  decorationRect,
+  DecorationRect,
+  DecorationShape,
+  DecorationStroke,
+  defaultMotion,
+  defaultShapes,
+  defineMotion,
+  DirtyFlags,
+  drawOverlayShapes,
+  DrawStats,
+  durationIn,
+  easingCss,
+  easingIn,
+  easings,
+  findEnvironmentKey,
+  fitBorderRadius,
+  FixedMetricsOptions,
+  FontMetrics,
+  hasDecorationPhase,
+  interpolateColor,
+  interpolateNumber,
+  interpolateTransform,
+  interpolatorFor,
+  isShapeName,
+  LABEL_PADDING_X,
+  labelOrigin,
+  LayoutBox,
+  LayoutReader,
+  LayoutRecord,
+  LayoutResult,
+  LayoutStats,
+  lightColors,
+  linear,
+  NodeId,
+  NodeProperty,
+  normalizeBorderRadius,
+  normalizeColor,
+  normalizeTransition,
+  offsetBorderRadius,
+  OverlayShape,
+  paintsAfterChildren,
+  ParagraphLayout,
+  ParagraphTextMeasurer,
+  parseColor,
+  parseTransform,
+  provided,
+  RenderChanges,
+  RenderContext,
+  RendererBackend,
+  RenderHooks,
+  rgb8,
+  rgba,
+  shapesEqual,
+  Size,
+  SpannedRuns,
+  spannedRunsFor,
+  spring,
+  springIn,
+  steps,
+  TextLine,
+  TextLineRun,
+  TextMeasurer,
+  TextMeasureRequest,
+  TextOverflow,
+  TextRunMeasurer,
+  TextRunSpan,
+  TextRunStyle,
+  TextWrap,
+  tightenConstraints,
+  TightenOptions,
+  transform,
+  transformIsIdentity,
+  transformsEqual,
+  tween,
+  UI_SUBGRID_AXES,
+  UiAlignment,
+  UiAnimation,
+  UiAnimationFrameClock,
+  UiAnimationOptions,
+  UiBasicColors,
+  UiBorderRadius,
+  UiBorderRadiuses,
+  UiBorderRadiusValue,
+  UiColor,
+  UiColors,
+  UiColorValue,
+  UiContentDistribution,
+  UiCursor,
+  UiDirection,
+  UiDurationExtensions,
+  UiDurationToken,
+  UiEasing,
+  UiEasingExtensions,
+  UiEasingToken,
+  UiEnvironment,
+  UiEnvironmentKey,
+  UiFlexWrap,
+  UiFontWeight,
+  UiFrame,
+  UiFrameClock,
+  UiFrameClockFactory,
+  UiFrameTime,
+  UiGridAutoFlow,
+  UiHostFrameClock,
+  UiHostFrameClockOptions,
+  UiInterpolator,
+  UiManualFrameClock,
+  UiMotion,
+  UiMotionChanges,
+  UiNode,
+  UiNodeTransitions,
+  UiNodeType,
+  UiObjectFit,
+  UiOverflow,
+  UiPlacement,
+  UiPointerEvents,
+  UiPosition,
+  UiPropertyOverride,
+  UiPropertyOverrides,
+  UiProvision,
+  UiReducedMotionPolicy,
+  UiRenderer,
+  UiSelfAlignment,
+  UiShapeExtensions,
+  UiShapeName,
+  UiShapes,
+  UiSpring,
+  UiSpringExtensions,
+  UiSpringOptions,
+  UiSpringSpec,
+  UiSpringToken,
+  UiSubgridAxis,
+  UiTextAlign,
+  UiTextDirection,
+  UiTextOverflowValue,
+  UiTextWrapValue,
+  UiThemeColorName,
+  UiTimerFrameClock,
+  UiTimerFrameClockOptions,
+  UiTransform,
+  UiTransforms,
+  UiTransitionSpec,
+  UiTransitionValue,
+  UiTween,
+  UiTweenOptions,
+  UiVerticalAlign,
+  uniformBorderRadius,
+  validateSubgrid,
+  WebGPUCanvasHost,
+  WebGPURenderer,
+  WebGPURendererOptions,
+  WebGPUSurface
 };

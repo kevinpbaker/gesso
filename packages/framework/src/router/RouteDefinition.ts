@@ -64,11 +64,18 @@ export type RouteGuard<Path extends string = string> = (context: RouteContext<Pa
  * of by position, which also means there are no route ids to keep
  * unique and no string to misspell.
  */
+/**
+ * What a route calls the page: a string, or a function of where the
+ * navigation went, for a title that names the thing on screen.
+ */
+export type RouteTitle<Path extends string = string> = string | ((context: RouteContext<Path>) => string);
+
 export interface RouteDefinition<Path extends string = string> {
   readonly path: Path;
   readonly component: ComponentType;
   readonly parent?: RouteDefinition;
   readonly guard?: RouteGuard<Path>;
+  readonly title?: RouteTitle<Path>;
   /** Parsed once, here, so matching a url never parses a pattern. */
   readonly segments: readonly PatternSegment[];
   /** Every ancestor and then this route: the chain the outlets render. */
@@ -81,6 +88,13 @@ export interface RouteOptions<Path extends string> {
   /** The route this one renders inside; its screen receives an `outlet`. */
   readonly parent?: RouteDefinition;
   readonly guard?: RouteGuard<Path>;
+  /**
+   * The page's title while this route is the deepest one with a title
+   * in the match: written to `document.title` through
+   * `ShellService.setTitle`. A layout's title stands for every child
+   * that has none of its own.
+   */
+  readonly title?: RouteTitle<Path>;
 }
 
 /**
@@ -107,6 +121,7 @@ export function route<const Path extends string>(options: RouteOptions<Path>): R
     component: options.component,
     parent,
     guard: options.guard,
+    title: options.title,
     segments,
     chain
   };

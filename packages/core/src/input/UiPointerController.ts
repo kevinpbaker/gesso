@@ -92,6 +92,8 @@ export interface PointerControllerOptions {
     pointerMove(x: number, y: number): void;
     pointerUp(): void;
     clear(): void;
+    /** Whether anything is selected; a drag that selected nothing is not one to scroll for. */
+    readonly hasSelection?: boolean;
     /**
      * The pointer moved with nothing pressed. An inline link is a run
      * of a paragraph rather than a node, so its hover cannot come from
@@ -246,6 +248,48 @@ export class UiPointerController {
   }
 
   /**
+   * The press under way when it is dragging out a text selection, in a
+   * field or across the canvas's text, with the node it started on and
+   * where the pointer last was; null otherwise. What edge auto-scrolling
+   * follows: see `UiSelectionAutoScroller`.
+   */
+  get selectionDrag(): { readonly node: UiNode; readonly x: number; readonly y: number } | null {
+    if (!this.selecting || this.downTarget === null || this.lastPosition === null) {
+      return null;
+    }
+    return { node: this.captured(), x: this.lastPosition.x, y: this.lastPosition.y };
+  }
+
+  /**
+   * Extends the selection to where the pointer is again, without a
+   * pointer event: the content under a still pointer moved, because a
+   * container scrolled under it.
+   */
+  repeatSelectionMove(): void {
+    const drag = this.selectionDrag;
+    if (drag !== null) {
+      this.extendSelection(drag.node, drag.x, drag.y);
+    }
+  }
+
+  /** Whether the press's moves are extending a selection; see `selectionDrag`. */
+  private selecting = false;
+
+  private extendSelection(captured: UiNode, x: number, y: number): void {
+    if (this.editing !== undefined && this.editing.isEditable(captured)) {
+      this.editing.pointerMove(captured, x, y);
+      this.selecting = true;
+    } else if (!this.downDefaultPrevented && this.selection !== undefined) {
+      // A press the app cancelled started no selection, so the moves
+      // after it are not extending one either.
+      this.selection.pointerMove(x, y);
+      this.selecting = this.selection.hasSelection ?? true;
+    } else {
+      this.selecting = false;
+    }
+  }
+
+  /**
    * Where the press's events go: the node it started on, or, once that
    * has been taken out of the tree, the nearest of its ancestors at the
    * time that is still in it. A row of a virtual list that scrolls out
@@ -396,13 +440,9 @@ export class UiPointerController {
       this.dispatcher.dispatch(event, captured);
       this.gestures?.pointerMove(event, captured);
       if (!event.defaultPrevented) {
-        if (this.editing !== undefined && this.editing.isEditable(captured)) {
-          this.editing.pointerMove(captured, x, y);
-        } else if (!this.downDefaultPrevented) {
-          // A press the app cancelled started no selection, so the
-          // moves after it are not extending one either.
-          this.selection?.pointerMove(x, y);
-        }
+        this.extendSelection(captured, x, y);
+      } else {
+        this.selecting = false;
       }
       return event;
     }
@@ -460,6 +500,7 @@ export class UiPointerController {
     }
     const target = this.captured();
     this.downTarget = null;
+    this.selecting = false;
     this.downPath = [];
     this.activePointer = null;
     this.editing?.pointerUp();
@@ -542,6 +583,7 @@ export class UiPointerController {
     }
     const target = this.captured();
     this.downTarget = null;
+    this.selecting = false;
     this.downPath = [];
     this.activePointer = null;
     const event = new UiPointerEvent(UiEventType.PointerCancel, this.downX, this.downY, 0, noKeyModifiers(), pointer);

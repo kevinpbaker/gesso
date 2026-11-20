@@ -69,7 +69,12 @@ export interface DatePickerProps extends ControlLayoutProps {
   min?: string;
   /** The latest. */
   max?: string;
-  /** 0 for Sunday, 1 for Monday. Default 1. */
+  /**
+   * The day weeks start on: 0 for Sunday, 1 for Monday, up to 6 for
+   * Saturday. Default: the one the platform's locale starts them on
+   * (Sunday in the US and Canada, Monday in most of Europe), or Monday
+   * where the platform cannot say.
+   */
   weekStart?: number;
   /** Offers Clear, to go back to no date. Default true. */
   clearable?: boolean;
@@ -102,7 +107,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
   const min = input(inputs.min, '');
   const max = input(inputs.max, '');
   const clearable = input(inputs.clearable, true);
-  const weekStart = inputs.weekStart?.value ?? 1;
+  const weekStart = inputs.weekStart?.value ?? localeWeekStart();
   const locale = inputs.locale?.value;
   const today = (): string => inputs.today?.value ?? todayIso();
   const invalid = combineLatest([input(inputs.invalid, false), error]).pipe(
@@ -504,4 +509,26 @@ function states(
       return result;
     })
   );
+}
+
+/**
+ * The first day of the week where `locale` is, 0 for Sunday to 6 for
+ * Saturday; Monday where the platform has no week data. The locale is
+ * the platform's language when left out, which a worker has as well as
+ * the page.
+ */
+export function localeWeekStart(locale: string | undefined = globalThis.navigator?.language): number {
+  if (locale === undefined || typeof Intl === 'undefined' || typeof Intl.Locale !== 'function') {
+    return 1;
+  }
+  try {
+    const parsed = new Intl.Locale(locale) as Intl.Locale & {
+      getWeekInfo?: () => { firstDay: number };
+      weekInfo?: { firstDay: number };
+    };
+    const firstDay = parsed.getWeekInfo?.().firstDay ?? parsed.weekInfo?.firstDay;
+    return typeof firstDay === 'number' ? firstDay % 7 : 1;
+  } catch {
+    return 1;
+  }
 }

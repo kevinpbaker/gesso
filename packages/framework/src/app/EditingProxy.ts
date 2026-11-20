@@ -247,6 +247,18 @@ export class EditingProxy {
     // nothing to insert a newline into, and a keyboard offering one is
     // offering a key that does nothing.
     this.field.setAttribute('enterkeyhint', state.multiline ? 'enter' : 'done');
+    // The keyboard a phone shows, and whether the platform marks and
+    // corrects spelling. Both default off in `prepare`, because a field
+    // in an application is more often a name or a code than prose, and
+    // both are the field's to turn on.
+    if (state.inputMode === undefined) {
+      this.field.removeAttribute('inputmode');
+    } else {
+      this.field.setAttribute('inputmode', state.inputMode);
+    }
+    const spell = state.spellCheck === true;
+    this.field.setAttribute('spellcheck', spell ? 'true' : 'false');
+    this.field.setAttribute('autocorrect', spell ? 'on' : 'off');
     if (!wasActive || this.doc.activeElement !== this.field) {
       const active = this.doc.activeElement;
       // Take focus only from the canvas or from nothing: an editable

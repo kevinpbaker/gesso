@@ -234,3 +234,33 @@ describe('GessoRuntime routing', () => {
     ]);
   });
 });
+
+describe('GessoRuntime route titles', () => {
+  const Inbox = route({ path: '/', component: HomeScreen, title: 'Inbox' });
+  const Thread = route({ path: '/thread', component: MailLayout, title: 'Threads' });
+  const Message = route({
+    path: '/thread/:id',
+    component: MailItemScreen,
+    parent: Thread,
+    title: ({ params }) => `Message ${params.id}`
+  });
+  const Untitled = route({ path: '/thread/:id/raw', component: SettingsScreen, parent: Thread });
+  const TITLED = { routes: [Inbox, Thread, Message, Untitled] };
+
+  function titles(requests: readonly ShellRequest[]): string[] {
+    return requests.flatMap(request => (request.type === 'title' ? [request.title] : []));
+  }
+
+  it("names the page after the deepest route with a title, including the first screen's", () => {
+    const requests: ShellRequest[] = [];
+    const mounted = mountRuntime(createComponent(AppRoot), { routes: TITLED, url: '/thread/7' });
+    mounted.runtime.onShellRequest(request => requests.push(request));
+    const router = mounted.runtime.services.get(RouterService);
+
+    router.navigate('/');
+    // A child with no title of its own takes its layout's.
+    router.navigate('/thread/8/raw');
+
+    expect(titles(requests)).toEqual(['Message 7', 'Inbox', 'Threads']);
+  });
+});

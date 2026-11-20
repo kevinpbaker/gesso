@@ -97,6 +97,11 @@ export function tapRenderWorker(log: ActionLog, options: RenderWorkerTapOptions 
 
   host.onmessage = event => {
     const message = event.data as ShellToRuntimeMessage | undefined;
+    if (message?.type === 'init') {
+      // The action log closes each entry on the worker's `frame`
+      // message, so it needs them whether or not the shell listens.
+      message.frameMetrics = true;
+    }
     if (message?.type === 'init' && message.appPort !== undefined) {
       // The shell's end of the hub to the application worker. Held as
       // a handle, not used: a tap that opened a port of its own would

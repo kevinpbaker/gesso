@@ -78,6 +78,13 @@ another widget, the nearest selectable node's box wins, with vertical
 distance weighted over horizontal: a point beside a line belongs to
 that line rather than to a nearer one on the row above.
 
+Dragged to the edge of a scrolling pane, or past it, the selection
+scrolls the pane, faster the further out the pointer is, and keeps
+growing while the pointer is held still there, as a browser's does
+past the bottom of a page. A pane already at its end hands the scroll
+to the one around it. The same goes for a drag inside a text field
+whose pane scrolls.
+
 A press inside a field ends the canvas selection, and focus moving into
 a field clears it too, so two selections are never lit at once.
 
@@ -155,11 +162,11 @@ so a drag that starts in a paragraph and ends inside an
 across each other, though: see
 [fields that select as one](/interaction/text-editing-and-ime#fields-that-select-as-one).
 
-**An application cannot read or write it.** There is no selection
-service and no selection-changed event: no component can ask what is
-highlighted or highlight something itself. A screen that needs to know
-has to hold that state itself, and put text on the clipboard with
-`ShellService.copyText`.
+**An application can read it, not write it.**
+`EditingService.selectedText()` says what is highlighted and
+`EditingService.copy()` puts it on the clipboard, which is how
+`ContextMenus` offers Copy. There is no selection-changed event, and no
+component can highlight something itself.
 
 **It does not outlive its nodes.** When a selected node leaves the
 tree, the whole selection is dropped, because the range that is left no

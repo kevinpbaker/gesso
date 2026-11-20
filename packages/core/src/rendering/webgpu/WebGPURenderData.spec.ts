@@ -7,6 +7,7 @@ import { RenderHarness } from '../RenderTestUtils';
 import {
   buildRenderList,
   createTextCache,
+  glyphScaleStep,
   textRuns,
   glyphCount,
   viewportScissor,
@@ -144,6 +145,27 @@ describe('buildRenderList geometry', () => {
     expect(inst.height).toBe(50);
     expect(inst.color.r).toBe(1);
     expect(inst.kind).toBe(PrimitiveKind.Fill);
+  });
+
+  it('carries each corner, fitted to the box, on the instance and on the clip it makes', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    // The top side wants 30 + 30 of 40, so all four scale by 2/3.
+    const radius = { topLeft: 30, topRight: 30, bottomRight: 6, bottomLeft: 0 };
+    const node = box(h, 'box', {
+      width: 40,
+      height: 100,
+      backgroundColor: '#f00',
+      borderRadius: radius,
+      overflow: 'hidden'
+    });
+    h.graph.appendChild(root, node);
+    const list = layoutAndBuild(h, root);
+    const o = 0 * INSTANCE_STRIDE_FLOATS;
+    expect(Array.from(list.instanceData.slice(o + 24, o + 28))).toEqual([20, 20, 4, 0]);
+    expect(readInstance(list, 0).radius).toBe(20);
+    const clip = 0 * CLIP_STRIDE_FLOATS;
+    expect(Array.from(list.clipData.slice(clip + 16, clip + 20))).toEqual([20, 20, 4, 0]);
   });
 
   it('emits background then border for a bordered box', () => {
@@ -406,6 +428,34 @@ describe('buildRenderList text', () => {
       expect(list.texturedData[offset + 14]).toBeLessThan(1);
       expect(list.texturedData[offset + 15]).toBeLessThan(1);
     }
+  });
+
+  it('samples text at 1:1 one texel to a pixel, and scaled text smoothly', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const plain = box(h, 'plain', { width: 300, height: 40, text: 'Hello', fontSize: 10, textWrap: 'none' });
+    const zoomed = box(h, 'zoomed', {
+      width: 300,
+      height: 40,
+      text: 'Hello',
+      fontSize: 10,
+      textWrap: 'none',
+      transform: { scaleX: 2, scaleY: 2 }
+    });
+    h.graph.appendChild(root, plain);
+    h.graph.appendChild(root, zoomed);
+    const list = layoutAndBuild(h, root);
+    const glyphs = list.commands.filter((c): c is GlyphCommand => c.kind === CommandKind.Glyphs);
+    expect(glyphs.map(c => c.smooth)).toEqual([false, true]);
+  });
+
+  it('rasterises a scaled run in quarter-octave steps between a quarter and eight', () => {
+    expect(glyphScaleStep(1)).toBe(1);
+    expect(glyphScaleStep(2)).toBe(2);
+    expect(glyphScaleStep(1.1)).toBeCloseTo(Math.pow(2, 0.25));
+    expect(glyphScaleStep(100)).toBe(8);
+    expect(glyphScaleStep(0.01)).toBe(0.25);
+    expect(glyphScaleStep(0)).toBe(1);
   });
 
   it('draws text that overflows a tight box, as Canvas2D does', () => {

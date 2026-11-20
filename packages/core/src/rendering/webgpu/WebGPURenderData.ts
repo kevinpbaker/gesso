@@ -1,4 +1,5 @@
 import type { UiNode } from '../../graph/UiNode';
+import { snapBorderWidth, snapBox, snapsUnder, type SnapBox } from '../PixelSnap';
 import { snapScroll } from '../ScrollSnap';
 import { UiNodeType } from '../../graph/UiNodeType';
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
@@ -6,7 +7,7 @@ import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { TextMeasurer } from '../../layout/TextMeasurer';
-import { resolvePaintState, createPaintState, computeObjectFitRect, isPaintVisible } from '../PaintState';
+import { paintStateOf, createPaintState, computeObjectFitRect, isPaintVisible } from '../PaintState';
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { TextureSource } from './WebGPUTextureCache';
 import { colorToCss } from '../PaintState';
@@ -28,9 +29,15 @@ import { GlyphShaper } from './WebGPUGlyphShaper';
 import type { MeasureRun } from './WebGPUGlyphShaper';
 import { parseColor } from './WebGPUColor';
 import type { RgbaColor } from './WebGPUColor';
-import { borderRadiusIsZero, uniformBorderRadius } from '../../properties/UiBorderRadius';
+import {
+  borderRadiusIsZero,
+  fitBorderRadius,
+  offsetBorderRadius,
+  uniformBorderRadius,
+  type UiBorderRadius
+} from '../../properties/UiBorderRadius';
 import { gradientPaint, MAX_GRADIENT_STOPS, type ResolvedGradient } from '../../properties/UiGradient';
-import { BOX_SHADOW_BLUR_REACH, boxShadowRadius, fittedShadowRadius } from '../../properties/UiBoxShadow';
+import { BOX_SHADOW_BLUR_REACH } from '../../properties/UiBoxShadow';
 import type { PaintState } from '../PaintState';
 import { normalizeColor } from '../../properties/UiColor';
 import { LABEL_PADDING_X, labelOrigin, type OverlayShape } from '../OverlayShapes';
@@ -49,13 +56,15 @@ import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSel
  *   0  pos.xy            absolute layout coordinates of the rectangle
  *   2  size.xy
  *   4  color.rgba
- *   8  radius, opacity, borderWidth
+ *   8  radius, opacity, borderWidth   radius: the largest corner, for reading a dump
  *   11 kind               (PrimitiveKind, as a float)
  *   12 transform          3x2 affine, absolute layout → logical screen
  *   18 clipIndex          index into the clip chain, -1 for none
  *   19 gradientIndex      index into the frame's gradients, -1 for none
- *   20 shadow             offsetX, offsetY, spread, the other shape's radius
- *   24 (end)
+ *   20 shadow             offsetX, offsetY, spread, the other shape's largest corner
+ *   24 radii              top left, top right, bottom right, bottom left
+ *   28 other radii        the other shape's corners, in the same order
+ *   32 (end)
  *
  * A shadow is two rounded rectangles, the blurred one and the box it
  * is cut by, and an instance describes the first. For an outer shadow
@@ -67,7 +76,7 @@ import { paragraphGeometryFrom, selectionRectsIn } from '../../selection/TextSel
  * by the offset and shrunk by the spread, with the hole's radius last.
  * Every other instance writes zeros there.
  */
-export const INSTANCE_STRIDE_FLOATS = 24;
+export const INSTANCE_STRIDE_FLOATS = 32;
 export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE_FLOATS * 4;
 
 /**
@@ -89,18 +98,19 @@ export const TEXTURED_STRIDE_FLOATS = 16;
 export const TEXTURED_STRIDE_BYTES = TEXTURED_STRIDE_FLOATS * 4;
 
 /**
- * Clip chain node layout, in floats (four vec4s):
+ * Clip chain node layout, in floats (five vec4s):
  *
  *   0  rect.xywh          the clipping box in its own layout space
- *   4  radius, parentIndex (-1 at the root), pad, pad
+ *   4  radius, parentIndex (-1 at the root), pad, pad   radius: the largest corner
  *   8  inverse a, b, c, d 3x2 affine, logical screen → clip space
  *   12 inverse tx, ty, pad, pad
- *   16 (end)
+ *   16 radii              top left, top right, bottom right, bottom left, fitted to rect
+ *   20 (end)
  *
  * An instance names its innermost rounded clip; the fragment shader
  * walks parent links to the root, so every rounded ancestor applies.
  */
-export const CLIP_STRIDE_FLOATS = 16;
+export const CLIP_STRIDE_FLOATS = 20;
 export const CLIP_STRIDE_BYTES = CLIP_STRIDE_FLOATS * 4;
 export const NO_CLIP_INDEX = -1;
 
@@ -183,6 +193,12 @@ export interface GlyphCommand {
   /** Atlas page every instance in the range samples. */
   page: number;
   scissor: ScissorRect | null;
+  /**
+   * Sampled with filtering rather than nearest: the run is drawn under a
+   * scale or a turn, so its cells cannot land one to one on the screen's
+   * pixels, and nearest sampling made zoomed text blocky.
+   */
+  smooth: boolean;
 }
 
 export interface ImageCommand {
@@ -300,7 +316,6 @@ interface RenderState {
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
 
-const paintScratch = createPaintState();
 const contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
@@ -312,7 +327,7 @@ const contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
  * letter on screen, and both the boxed pushes and the element-by-
  * element conversion showed up as the largest cost in the frame. This
  * writes floats where they are going to live, and the buffer is
- * module-level scratch — like `paintScratch` above — because a build
+ * module-level scratch, like `contentBox` above, because a build
  * is not re-entrant and a per-frame allocation is the thing being
  * avoided.
  */
@@ -498,7 +513,13 @@ export function buildRenderList(
     const { lines, font, color, fontSize, originX, originY, ctm, scissor, rtl } = options;
     const opacity = options.opacity;
     const rounded = options.rounded;
-    const style = atlas.styleFor(font, color, fontSize, dpr, rtl);
+    // Under a scale or a turn the cells are rasterised at the scale they
+    // land at, in steps, and sampled smoothly; at 1:1 they stay at the
+    // device ratio and are sampled one texel to one pixel, which is what
+    // keeps ordinary text crisp.
+    const smooth = !(ctm[0] === 1 && ctm[1] === 0 && ctm[2] === 0 && ctm[3] === 1);
+    const ratio = smooth ? dpr * glyphScaleStep(Math.sqrt(Math.abs(ctm[0] * ctm[3] - ctm[1] * ctm[2]))) : dpr;
+    const style = atlas.styleFor(font, color, fontSize, ratio, rtl);
     // A paragraph with runs draws one piece per run, each in its own
     // font, colour and size, at the x the paragraph measured for it.
     // The atlas is keyed by font and colour already, so a run is a new
@@ -530,7 +551,7 @@ export function buildRenderList(
             line.height,
             pieceFont,
             pieceColor,
-            atlas.styleFor(pieceFont, pieceColor, span?.fontSize ?? fontSize, dpr, rtl),
+            atlas.styleFor(pieceFont, pieceColor, span?.fontSize ?? fontSize, ratio, rtl),
             spanMeasure
           );
         }
@@ -604,12 +625,20 @@ export function buildRenderList(
           last !== undefined &&
           last.kind === CommandKind.Glyphs &&
           last.page === slot.page &&
+          last.smooth === smooth &&
           last.end === instance &&
           scissorsEqual(last.scissor, scissor)
         ) {
           last.end = instance + 1;
         } else {
-          commands.push({ kind: CommandKind.Glyphs, start: instance, end: instance + 1, page: slot.page, scissor });
+          commands.push({
+            kind: CommandKind.Glyphs,
+            start: instance,
+            end: instance + 1,
+            page: slot.page,
+            scissor,
+            smooth
+          });
         }
         run.glyphs++;
       }
@@ -685,7 +714,7 @@ export function buildRenderList(
       return;
     }
 
-    const paint = resolvePaintState(node, paintScratch);
+    const paint = paintStateOf(node);
     // An opacity group that paints more than once is drawn into a layer
     // of its own and blended once (`GroupOpacity.ts`). Inside it the
     // subtree draws at full strength and under none of its ancestors'
@@ -701,6 +730,11 @@ export function buildRenderList(
     // container's edge; the record keeps the flow position.
     const baseCtm = sticky ? translateTransform(state.ctm, rec.stickyOffsetX, rec.stickyOffsetY) : state.ctm;
     const nodeCtm = paint.hasTransform ? multiplyTransform(baseCtm, buildOwnTransform(rec, paint.transform)) : baseCtm;
+    // The node's box on device pixels, as Canvas2D snaps it; see
+    // `PixelSnap.ts`. Read by the clip, background and border below,
+    // all before the walk reaches the children that reuse the scratch.
+    const snapped = snapsUnder(nodeCtm[0] * dpr, nodeCtm[1], nodeCtm[2], nodeCtm[3] * dpr, dpr);
+    const box: SnapBox = snapped ? snapBox(rec, dpr, nodeCtm[4] * dpr, nodeCtm[5] * dpr, snapScratch) : rec;
     // The region is the one Canvas2D sizes its layer to. The texture
     // here is the surface's size, which costs a GPU nothing to clear,
     // so only the blend is cut to it.
@@ -758,10 +792,7 @@ export function buildRenderList(
           // A new node in the chain whose parent is the enclosing rounded
           // clip, so descendants are tested against both.
           nextRounded = clipData.length / CLIP_STRIDE_FLOATS;
-          clipData.push4(rec.x, rec.y, rec.width, rec.height);
-          clipData.push4(uniformBorderRadius(paint.borderRadius), state.rounded, 0, 0);
-          clipData.push4(inverse[0], inverse[1], inverse[2], inverse[3]);
-          clipData.push4(inverse[4], inverse[5], 0, 0);
+          pushClip(clipData, box, paint.borderRadius, state.rounded, inverse);
         }
       }
     }
@@ -783,12 +814,12 @@ export function buildRenderList(
         beginPrimitives(ownScissor);
         pushInstance(
           instanceData,
-          rec.x,
-          rec.y,
-          rec.width,
-          rec.height,
+          box.x,
+          box.y,
+          box.width,
+          box.height,
           color,
-          uniformBorderRadius(paint.borderRadius),
+          fitBorderRadius(paint.borderRadius, box.width, box.height),
           effectiveOpacity,
           0,
           PrimitiveKind.Fill,
@@ -813,12 +844,12 @@ export function buildRenderList(
         const first = paint.backgroundGradient.stops[0].color;
         pushInstance(
           instanceData,
-          rec.x,
-          rec.y,
-          rec.width,
-          rec.height,
+          box.x,
+          box.y,
+          box.width,
+          box.height,
           first,
-          uniformBorderRadius(paint.borderRadius),
+          fitBorderRadius(paint.borderRadius, box.width, box.height),
           effectiveOpacity,
           0,
           PrimitiveKind.Fill,
@@ -870,10 +901,7 @@ export function buildRenderList(
           const inverse = invertTransform(nodeCtm);
           if (inverse !== null) {
             imageRounded = clipData.length / CLIP_STRIDE_FLOATS;
-            clipData.push4(rec.x, rec.y, rec.width, rec.height);
-            clipData.push4(uniformBorderRadius(paint.borderRadius), ownRounded, 0, 0);
-            clipData.push4(inverse[0], inverse[1], inverse[2], inverse[3]);
-            clipData.push4(inverse[4], inverse[5], 0, 0);
+            pushClip(clipData, box, paint.borderRadius, ownRounded, inverse);
           }
         }
         closePrimitives();
@@ -949,14 +977,14 @@ export function buildRenderList(
         beginPrimitives(ownScissor);
         pushInstance(
           instanceData,
-          rec.x,
-          rec.y,
-          rec.width,
-          rec.height,
+          box.x,
+          box.y,
+          box.width,
+          box.height,
           color,
-          uniformBorderRadius(paint.borderRadius),
+          fitBorderRadius(paint.borderRadius, box.width, box.height),
           effectiveOpacity,
-          paint.borderWidth,
+          snapped ? snapBorderWidth(paint.borderWidth, dpr) : paint.borderWidth,
           PrimitiveKind.Border,
           nodeCtm,
           ownRounded
@@ -975,7 +1003,7 @@ export function buildRenderList(
      * `Decorations.ts`, which is the same arithmetic Canvas2D uses.
      */
     const pushDecorations = (shapes: readonly DecorationShape[], after: boolean): void => {
-      const nodeRadius = uniformBorderRadius(paint.borderRadius);
+      const nodeRadius = paint.borderRadius;
       for (const shape of shapes) {
         if ((shape.after === 'children') !== after) {
           continue;
@@ -1000,7 +1028,7 @@ export function buildRenderList(
           rect.width,
           rect.height,
           color,
-          rect.radius,
+          fitBorderRadius(rect.corners, rect.width, rect.height),
           effectiveOpacity,
           shape.kind === 'stroke' ? shape.lineWidth : 0,
           shape.kind === 'stroke' ? PrimitiveKind.Border : PrimitiveKind.Fill,
@@ -1057,10 +1085,10 @@ export function buildRenderList(
       state.cull = saved.cull;
     }
 
-    // Foreground text, after children as Canvas2D paints it. Children
-    // reused the paint scratch, so the node's own style is re-resolved.
+    // Foreground text, after children as Canvas2D paints it, from the
+    // node's own cached style, which its children's did not overwrite.
     if (hasText) {
-      const text = resolvePaintState(node, paintScratch);
+      const text = paintStateOf(node);
       contentBox.x = 0;
       contentBox.y = 0;
       contentBox.width = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
@@ -1199,9 +1227,6 @@ export function buildRenderList(
     }
 
     if (decorations !== null && hasDecorationPhase(decorations, true)) {
-      // Children reused the paint scratch; the node's own radius and
-      // opacity are read from it, so re-resolve before the second pass.
-      resolvePaintState(node, paintScratch);
       pushDecorations(decorations, true);
     }
 
@@ -1474,7 +1499,7 @@ function pushInstance(
   width: number,
   height: number,
   color: RgbaColor,
-  radius: number,
+  radius: number | UiBorderRadius,
   opacity: number,
   borderWidth: number,
   kind: PrimitiveKind,
@@ -1484,7 +1509,7 @@ function pushInstance(
   shadowX = 0,
   shadowY = 0,
   shadowSpread = 0,
-  shadowRadius = 0
+  shadowRadius: number | UiBorderRadius = 0
 ): void {
   out.ensure(INSTANCE_STRIDE_FLOATS);
   const data = out.data;
@@ -1497,7 +1522,7 @@ function pushInstance(
   data[at + 5] = color.g;
   data[at + 6] = color.b;
   data[at + 7] = color.a;
-  data[at + 8] = radius;
+  data[at + 8] = typeof radius === 'number' ? radius : uniformBorderRadius(radius);
   data[at + 9] = opacity;
   data[at + 10] = borderWidth;
   data[at + 11] = kind;
@@ -1512,8 +1537,58 @@ function pushInstance(
   data[at + 20] = shadowX;
   data[at + 21] = shadowY;
   data[at + 22] = shadowSpread;
-  data[at + 23] = shadowRadius;
+  data[at + 23] = typeof shadowRadius === 'number' ? shadowRadius : uniformBorderRadius(shadowRadius);
+  // One radius is clamped to half the shorter side, as Canvas2D clamps
+  // it; four arrive fitted by the caller, against the shape they round.
+  writeCorners(data, at + 24, typeof radius === 'number' ? Math.min(radius, width / 2, height / 2) : radius);
+  writeCorners(data, at + 28, shadowRadius);
   out.length = at + INSTANCE_STRIDE_FLOATS;
+}
+
+/** Four corners at `at`, top left first and clockwise; one radius is four of it. */
+function writeCorners(data: Float32Array, at: number, radius: number | UiBorderRadius): void {
+  if (typeof radius === 'number') {
+    data[at] = radius;
+    data[at + 1] = radius;
+    data[at + 2] = radius;
+    data[at + 3] = radius;
+    return;
+  }
+  data[at] = radius.topLeft;
+  data[at + 1] = radius.topRight;
+  data[at + 2] = radius.bottomRight;
+  data[at + 3] = radius.bottomLeft;
+}
+
+/**
+ * The scale a scaled run's glyphs are rasterised at: the scale it is
+ * drawn at, rounded to a quarter of an octave and held between a quarter
+ * and eight. Exact scales would rasterise every glyph again on every
+ * frame of a zoom; quarter octaves resample by at most 9%, which smooth
+ * sampling hides, and a zoom from 1 to 2 costs four sets of cells.
+ */
+export function glyphScaleStep(scale: number): number {
+  if (!(scale > 0)) {
+    return 1;
+  }
+  const step = Math.pow(2, Math.round(Math.log2(scale) * 4) / 4);
+  return Math.min(8, Math.max(0.25, step));
+}
+
+/** Where each node's snapped box is written; see the walk. */
+const snapScratch: SnapBox = { x: 0, y: 0, width: 0, height: 0 };
+
+/**
+ * One rounded clip in the chain: the node's box, its corners fitted to
+ * it, the parent it nests in, and the way back from the screen.
+ */
+function pushClip(clipData: FloatBuffer, rec: SnapBox, radius: UiBorderRadius, parent: number, inverse: Affine): void {
+  const corners = fitBorderRadius(radius, rec.width, rec.height);
+  clipData.push4(rec.x, rec.y, rec.width, rec.height);
+  clipData.push4(uniformBorderRadius(corners), parent, 0, 0);
+  clipData.push4(inverse[0], inverse[1], inverse[2], inverse[3]);
+  clipData.push4(inverse[4], inverse[5], 0, 0);
+  clipData.push4(corners.topLeft, corners.topRight, corners.bottomRight, corners.bottomLeft);
 }
 
 /**
@@ -1532,9 +1607,9 @@ function pushShadows(
   inset: boolean
 ): void {
   const shadows = paint.boxShadows;
-  const radius = borderRadiusIsZero(paint.borderRadius)
-    ? 0
-    : fittedShadowRadius(uniformBorderRadius(paint.borderRadius), rec.width, rec.height);
+  // Fitted to the box first, as CSS fits a box's corners before a
+  // shadow is spread from them.
+  const radius = fitBorderRadius(paint.borderRadius, rec.width, rec.height);
   for (let i = shadows.length - 1; i >= 0; i--) {
     const shadow = shadows[i]!;
     if ((shadow.inset === true) !== inset || shadow.color.a <= 0) {
@@ -1564,7 +1639,7 @@ function pushShadows(
         shadow.offsetX,
         shadow.offsetY,
         spread,
-        boxShadowRadius(radius, spread, true)
+        offsetBorderRadius(radius, -spread)
       );
       continue;
     }
@@ -1581,7 +1656,7 @@ function pushShadows(
       width + reach * 2,
       height + reach * 2,
       color,
-      boxShadowRadius(radius, spread, false),
+      offsetBorderRadius(radius, spread),
       opacity,
       blur,
       PrimitiveKind.Shadow,

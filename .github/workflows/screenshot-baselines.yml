@@ -4,13 +4,16 @@
 # only comparable with a capture from the same browser on the same
 # machine image, and the `screenshots` and `docs-screenshots` jobs in
 # ci.yml refuse to compare across a mismatch. A developer machine is not
-# that environment, so the baselines cannot be regenerated there: this
-# runs the two update scripts on the runner CI uses, with the same
-# setup as those jobs, and uploads what they wrote.
+# that environment, so the baselines cannot be regenerated on it
+# directly: this runs the two update scripts on the runner CI uses, with
+# the same setup as those jobs, and uploads what they wrote.
 #
 # Run it from the Actions tab (or `gh workflow run screenshot-baselines.yml`)
 # after moving SCREENSHOT_CHROME, then download the
 # `screenshot-baselines` artifact, copy it over the repository and commit.
+# `pnpm screenshots:docker:update` does the same on a machine with
+# Docker, in scripts/screenshots-docker/Dockerfile, which reads the pinned
+# Chrome from SCREENSHOT_CHROME below.
 # It commits nothing itself, so a new set of baselines is always a change
 # somebody looked at.
 

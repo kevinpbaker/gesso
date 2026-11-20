@@ -234,6 +234,24 @@ describe('the render worker tap', () => {
     tap.dispose();
   });
 
+  it('asks for frame messages even when the shell does not, since its entries close on them', async () => {
+    const { host, sent, send } = fakeWorkerGlobal();
+    const app = new RenderWorkerApp(createComponent(TickerDemo), host as never);
+    const log = createActionLog();
+    const tap = tapRenderWorker(log, { host: host as unknown as RenderWorkerHost });
+    app.useChannel(Ticker, { worker: tap.applicationWorker([Ticker]) });
+
+    send({
+      ...initMessage(mockCanvas(), fakeApplicationWorker(new BehaviorSubject(0)).endpoint),
+      frameMetrics: false
+    } as ShellToRuntimeMessage);
+
+    await vi.waitFor(() => {
+      expect(sent.some(message => message.type === 'frame')).toBe(true);
+    });
+    tap.dispose();
+  });
+
   it('forwards each entry to the shell as a devtools event', async () => {
     const { host, sent, send } = fakeWorkerGlobal();
     const app = new RenderWorkerApp(createComponent(TickerDemo), host as never);

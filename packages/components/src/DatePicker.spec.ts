@@ -5,7 +5,7 @@ import { createComponent, OverlayService } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
 import 'gesso-testing/matchers';
 import { Column, percent, Row, type UiNode } from 'gesso-core';
-import { DatePicker } from './DatePicker';
+import { DatePicker, localeWeekStart } from './DatePicker';
 
 let ui: Rendered;
 afterEach(() => ui?.unmount());
@@ -74,7 +74,9 @@ describe('DatePicker', () => {
 
   it('walks days, weeks and months from the keyboard, and chooses with Enter', async () => {
     const changes: string[] = [];
-    mount({ defaultValue: '', onChange: (value: string) => changes.push(value) });
+    // Monday-first, so Home and End land where the spec says whatever
+    // locale the suite runs in.
+    mount({ defaultValue: '', weekStart: 1, onChange: (value: string) => changes.push(value) });
     await open();
     await press('ArrowRight');
     expect(cursor()).toBe('Saturday, October 3, 2026');
@@ -265,5 +267,17 @@ describe('a date picker in right-to-left text', () => {
     // Up and Down are weeks, whatever the reading direction.
     await press('ArrowDown');
     expect(cursor()).toBe('Tuesday, October 20, 2026');
+  });
+});
+
+describe('localeWeekStart', () => {
+  it('starts weeks where the locale does: Sunday in the US, Monday in Germany, Saturday in Egypt', () => {
+    expect(localeWeekStart('en-US')).toBe(0);
+    expect(localeWeekStart('de-DE')).toBe(1);
+    expect(localeWeekStart('ar-EG')).toBe(6);
+  });
+
+  it('falls back to Monday when it cannot tell', () => {
+    expect(localeWeekStart('not a locale')).toBe(1);
   });
 });

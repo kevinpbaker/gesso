@@ -113,6 +113,12 @@ export class RouterService {
   /** What that url resolved to, or null when nothing matched. */
   readonly match = internalState<RouteMatch | null>(null);
   /**
+   * The title of the deepest route in the match that has one, or null
+   * when none has. The runtime writes it to the page through
+   * `ShellService.setTitle`; null leaves the page's title alone.
+   */
+  readonly title = internalState<string | null>(null);
+  /**
    * What each route remembers between the times its screen exists.
    *
    * Reached through `remember` and `forget`; exposed because a test and
@@ -383,6 +389,7 @@ export class RouterService {
     // click. A `match` subscriber has the url on the match itself.
     this.match.value = match;
     this.url.value = settled;
+    this.title.value = match === null ? null : titleOf(match);
   }
 
   /** First declared route whose pattern describes this url wins. */
@@ -493,4 +500,18 @@ function sameParams(a: object | null, b: object | null): boolean {
  */
 function inChain(chain: readonly RouteDefinition[], route: RouteDefinition): boolean {
   return chain.some(link => link === route || link.path === route.path);
+}
+
+/** The deepest title in a match's chain, worked out for where it went. */
+function titleOf(match: RouteMatch): string | null {
+  for (let index = match.chain.length - 1; index >= 0; index--) {
+    const title = match.chain[index]!.title;
+    if (title === undefined) {
+      continue;
+    }
+    return typeof title === 'string'
+      ? title
+      : title({ params: match.params as never, query: match.query, url: match.url });
+  }
+  return null;
 }

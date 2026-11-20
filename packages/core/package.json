@@ -31,7 +31,9 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./webgpu": "./src/webgpu.ts",
+    "./video": "./src/video.ts"
   },
   "publishConfig": {
     "exports": {
@@ -42,6 +44,14 @@
       "./testing": {
         "types": "./dist/testing.d.ts",
         "default": "./dist/testing.js"
+      },
+      "./webgpu": {
+        "types": "./dist/webgpu.d.ts",
+        "default": "./dist/webgpu.js"
+      },
+      "./video": {
+        "types": "./dist/video.d.ts",
+        "default": "./dist/video.js"
       }
     },
     "access": "public"

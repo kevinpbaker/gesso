@@ -12,7 +12,7 @@
  * meant one module graph, and a bundler cannot know which half of it a
  * given call reaches — so the engine was in every shell whether or not
  * anything called it. The measurement then: 169.3 kB gzipped. Now:
- * around twelve.
+ * about eighteen and a half.
  *
  * Two assertions, because the number alone is the weaker one.
  *
@@ -38,7 +38,7 @@ const at = (path: string): string => fileURLToPath(new URL(path, import.meta.url
 /**
  * The ceiling for a worker application's main thread, gzipped.
  *
- * Twelve and a bit kilobytes today. The headroom is for the shell
+ * About eighteen and a half kilobytes today. The headroom is for the shell
  * growing a feature, not for the engine coming back: the engine is a
  * hundred and fifty, so this fails by an order of magnitude on the one
  * regression it exists to catch.
@@ -58,11 +58,15 @@ async function measure(entry: string, outDir: string): Promise<Measured> {
   await build({
     logLevel: 'silent',
     resolve: {
-      alias: {
-        'gesso-framework': at('../packages/framework/src/index.ts'),
-        'gesso-core': at('../packages/core/src/index.ts'),
-        'gesso-components': at('../packages/components/src/index.ts')
-      }
+      // Exact names: a key matches as a prefix, so `gesso-core` alone
+      // turned `gesso-core/webgpu` into `index.ts/webgpu`.
+      alias: [
+        { find: /^gesso-framework$/, replacement: at('../packages/framework/src/index.ts') },
+        { find: /^gesso-core$/, replacement: at('../packages/core/src/index.ts') },
+        { find: /^gesso-core\/webgpu$/, replacement: at('../packages/core/src/webgpu.ts') },
+        { find: /^gesso-core\/video$/, replacement: at('../packages/core/src/video.ts') },
+        { find: /^gesso-components$/, replacement: at('../packages/components/src/index.ts') }
+      ]
     },
     build: {
       lib: { entry: at(entry), formats: ['es'], fileName: 'out' },

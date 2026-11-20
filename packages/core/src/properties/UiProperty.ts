@@ -73,6 +73,10 @@ import type { UiAutocomplete, UiLiveRegion, UiOrientation } from './UiSemantics'
  * `margin` is how far outside the view, in screen pixels, still counts
  * as in it, so a pan reaches it already caught up; 0 by default.
  */
+
+/** The on-screen keyboards a field can ask for; HTML's `inputmode` values. */
+export type UiInputMode = 'text' | 'numeric' | 'decimal' | 'email' | 'tel' | 'url' | 'search' | 'none';
+
 export type UiHoldUnseen = true | { readonly belowScale?: number; readonly margin?: number };
 
 const L = DirtyFlags.Layout;
@@ -1174,6 +1178,33 @@ export const UiProperties = {
     inherited: false,
     // Layout and paint draw the mask; semantics stops carrying the text.
     affects: L | P | S
+  }),
+
+  /**
+   * Which on-screen keyboard a phone shows for this field, as HTML's
+   * `inputmode` names them: `'numeric'` for digits, `'decimal'` for
+   * digits and a point, `'email'`, `'tel'`, `'url'`, `'search'`, or
+   * `'text'`, the full keyboard, when left out.
+   */
+  inputMode: defineProperty<UiInputMode | undefined>({
+    name: 'inputMode',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
+  }),
+
+  /**
+   * Whether the platform checks the spelling of what is typed here and
+   * offers corrections. Off by default, because most fields in an
+   * application are names, codes and numbers, which a spellchecker only
+   * underlines; on for prose, as a comment box or a document is.
+   * Never on for a `secret` field.
+   */
+  spellCheck: defineProperty<boolean | undefined>({
+    name: 'spellCheck',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.Properties
   }),
 
   /** Colour of the caret; defaults to the text colour. */

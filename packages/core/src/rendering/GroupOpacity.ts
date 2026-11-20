@@ -1,7 +1,7 @@
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { LayoutRecord } from '../layout/LayoutRecord';
-import { createPaintState, isPaintVisible, resolvePaintState } from './PaintState';
+import { isPaintVisible, paintStateOf } from './PaintState';
 import type { PaintState } from './PaintState';
 import { decorationRect } from './Decorations';
 import { snapScroll } from './ScrollSnap';
@@ -28,9 +28,6 @@ import { parseTransform, type UiTransform } from '../properties/UiTransform';
  * layer is blended at the opacity. The rule is shared so the two
  * backends agree on which nodes get one.
  */
-
-/** A second scratch, so probing a child never overwrites the walk's. */
-const probe = createPaintState();
 
 /** Whether a node at `opacity < 1` must be drawn into a layer and blended once. */
 export function opacityNeedsLayer(
@@ -68,7 +65,7 @@ function paintsOnce(
     return false;
   }
   const childRec = layout.recordFor(child)!;
-  return !childRec.lifted && paintsOnce(child, childRec, resolvePaintState(child, probe), layout);
+  return !childRec.lifted && paintsOnce(child, childRec, paintStateOf(child), layout);
 }
 
 /**
