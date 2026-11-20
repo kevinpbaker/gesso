@@ -9,7 +9,7 @@ import { defineConfig } from 'tsdown';
  * wrote, whichever package it is in.
  */
 export default defineConfig({
-  entry: ['src/index.ts', 'src/testing.ts'],
+  entry: ['src/index.ts', 'src/testing.ts', 'src/webgpu.ts', 'src/video.ts'],
   format: 'esm',
   dts: true,
   platform: 'neutral',

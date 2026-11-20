@@ -1074,6 +1074,9 @@ type ShellRequest = {
   type: 'leaveWarning';
   on: boolean;
 } | {
+  type: 'title';
+  title: string;
+} | {
   type: 'colorScheme';
   preference: ColorSchemePreference;
 } | {
@@ -1177,6 +1180,7 @@ interface ShellStorageResult {
 declare class ShellService {
   private handler;
   private leaving;
+  private titleText;
   private preferred;
   private readonly scheme;
   private readonly contrastState;
@@ -1218,6 +1222,7 @@ declare class ShellService {
   readonly fullscreen: ReadableCell<boolean>;
   requestFullscreen(enter: boolean): void;
   warnOnLeave(on: boolean): void;
+  setTitle(title: string): void;
   preferColorScheme(preference: ColorSchemePreference): void;
   applyFullscreen(active: boolean): void;
   openPopup(request: {
@@ -1404,11 +1409,13 @@ interface RouteContext<Path extends string = string> {
   readonly url: string;
 }
 type RouteGuard<Path extends string = string> = (context: RouteContext<Path>) => boolean | RouteTarget;
+type RouteTitle<Path extends string = string> = string | ((context: RouteContext<Path>) => string);
 interface RouteDefinition<Path extends string = string> {
   readonly path: Path;
   readonly component: ComponentType;
   readonly parent?: RouteDefinition;
   readonly guard?: RouteGuard<Path>;
+  readonly title?: RouteTitle<Path>;
   readonly segments: readonly PatternSegment[];
   readonly chain: readonly RouteDefinition[];
 }
@@ -1417,6 +1424,7 @@ interface RouteOptions<Path extends string> {
   readonly component: ComponentType;
   readonly parent?: RouteDefinition;
   readonly guard?: RouteGuard<Path>;
+  readonly title?: RouteTitle<Path>;
 }
 declare function route<const Path extends string>(options: RouteOptions<Path>): RouteDefinition<Path>;
 declare function to<Path extends string>(route: RouteDefinition<Path>, ...args: ToArgs<Path>): RouteTarget;
@@ -1461,6 +1469,7 @@ interface RouteAnswer<Path extends string, T> {
 declare class RouterService {
   readonly url: InternalState<string>;
   readonly match: InternalState<RouteMatch | null>;
+  readonly title: InternalState<string | null>;
   readonly state: RouteState;
   private routes;
   private notFound;
@@ -1508,6 +1517,7 @@ declare class MediaService {
   setResolver(resolver: ImageResolver): void;
   setVideoResolver(resolver: VideoResolver): void;
   setRasterizer(rasterizer: IconRasterizer): void;
+  setPixelRatio(ratio: number): void;
   dispose(): void;
 }
 interface FontFaceDeclaration {
@@ -1540,6 +1550,7 @@ declare class FontService {
   private readonly failed;
   private readonly batches;
   private listener;
+  private readonly waiting;
   private disposed;
   declare(families: readonly FontFamilyDeclaration[], host?: FontHost): void;
   get ready(): Promise<void>;
@@ -1609,6 +1620,8 @@ declare class GessoRuntime {
   private viewportInsetRegistry;
   private viewportInsetWrite;
   private detachViewportInsetEnvironment;
+  private routerTitle;
+  private disposed;
   private webgpuRecovery;
   private detachContextRestored;
   private constraints;
@@ -1868,6 +1881,7 @@ type ShellToRuntimeMessage = {
   textInput?: 'proxy' | 'keys';
   appPort?: MessagePort;
   accessibility?: boolean;
+  frameMetrics?: boolean;
   url?: string;
 } | {
   type: 'resize';
@@ -2125,6 +2139,10 @@ type RuntimeToShellMessage = {
 {
   type: 'leaveWarning';
   on: boolean;
+} |
+{
+  type: 'title';
+  title: string;
 } |
 {
   type: 'preferColorScheme';
@@ -3102,6 +3120,7 @@ declare class RenderWorkerApp {
   receive(message: ShellToRuntimeMessage): void;
   private serveAgent;
   private setConsoleForwarding;
+  private postFrames;
   private dispatch;
   private resolveWorker;
   private initialize;

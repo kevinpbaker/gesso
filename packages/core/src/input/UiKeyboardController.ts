@@ -46,6 +46,14 @@ export interface KeyboardControllerOptions {
    * which every `onClick` that ignores its coordinates is fine with.
    */
   activation?: { clickAt(node: UiNode): { x: number; y: number } };
+  /**
+   * Default keyboard scrolling: the arrows, Page Up and Page Down,
+   * Space and Home and End move the scroll container around the focused
+   * node, or the largest one on screen when nothing is focused. Runs
+   * after every other default, so a key that pressed a button or moved
+   * a caret is never also a scroll. See `UiKeyboardScroller`.
+   */
+  scroll?: { handleKey(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean };
 }
 
 /**
@@ -65,8 +73,9 @@ export interface KeyboardControllerOptions {
  * order: the focused editable's editing keys, then find's open/close,
  * then the canvas text selection's copy / select-all / clear, then
  * Enter or Space pressing a focused button (a `Button`, or a node whose
- * role is `button` or `link`) as a click, then Tab moving focus to the
- * next focusable node and Shift+Tab to the previous, wrapping around.
+ * role is `button` or `link`) as a click, then the scroll keys moving
+ * the nearest scroll container, then Tab moving focus to the next
+ * focusable node and Shift+Tab to the previous, wrapping around.
  *
  * The button press is the one a keyboard-only or screen-reader user
  * relies on: every control in the component library binds its own keys,
@@ -82,6 +91,7 @@ export class UiKeyboardController {
   private readonly selection: KeyboardControllerOptions['selection'];
   private readonly find: KeyboardControllerOptions['find'];
   private readonly activation: KeyboardControllerOptions['activation'];
+  private readonly scroll: KeyboardControllerOptions['scroll'];
 
   private readonly root: () => UiNode;
 
@@ -97,6 +107,7 @@ export class UiKeyboardController {
     this.selection = options.selection;
     this.find = options.find;
     this.activation = options.activation;
+    this.scroll = options.scroll;
   }
 
   /**
@@ -151,6 +162,10 @@ export class UiKeyboardController {
       // sends the same event).
       const at = this.activation?.clickAt(focused) ?? { x: 0, y: 0 };
       this.dispatcher.dispatch(new UiPointerEvent(UiEventType.Click, at.x, at.y, 1), focused);
+      event.preventDefault();
+      return event;
+    }
+    if (!event.defaultPrevented && this.scroll !== undefined && this.scroll.handleKey(focused, key, modifiers)) {
       event.preventDefault();
       return event;
     }

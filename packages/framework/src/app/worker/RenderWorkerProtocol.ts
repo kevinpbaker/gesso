@@ -60,6 +60,14 @@ export type ShellToRuntimeMessage =
        */
       accessibility?: boolean;
       /**
+       * Whether the shell wants a `frame` message after every frame.
+       * False when nothing on the shell listens (no `onFrame`), since
+       * each one is a structured clone of nested objects sixty times a
+       * second for the shell to drop. Left out, true, for a shell that
+       * predates it.
+       */
+      frameMetrics?: boolean;
+      /**
        * The window's address at start-up, so the first tree is built on
        * the screen it names. Optional for a shell that predates it,
        * which reports the address in a `url` message after this one
@@ -428,6 +436,8 @@ export type RuntimeToShellMessage =
    * otherwise.
    */
   | { type: 'leaveWarning'; on: boolean }
+  /** The page's title (ShellService.setTitle): the shell writes it to `document.title`. */
+  | { type: 'title'; title: string }
   /**
    * Report this appearance from now on (ShellService.preferColorScheme):
    * `light` or `dark`, or `auto` to follow `prefers-color-scheme` again.

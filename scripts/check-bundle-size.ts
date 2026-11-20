@@ -58,11 +58,15 @@ async function measure(entry: string, outDir: string): Promise<Measured> {
   await build({
     logLevel: 'silent',
     resolve: {
-      alias: {
-        'gesso-framework': at('../packages/framework/src/index.ts'),
-        'gesso-core': at('../packages/core/src/index.ts'),
-        'gesso-components': at('../packages/components/src/index.ts')
-      }
+      // Exact names: a key matches as a prefix, so `gesso-core` alone
+      // turned `gesso-core/webgpu` into `index.ts/webgpu`.
+      alias: [
+        { find: /^gesso-framework$/, replacement: at('../packages/framework/src/index.ts') },
+        { find: /^gesso-core$/, replacement: at('../packages/core/src/index.ts') },
+        { find: /^gesso-core\/webgpu$/, replacement: at('../packages/core/src/webgpu.ts') },
+        { find: /^gesso-core\/video$/, replacement: at('../packages/core/src/video.ts') },
+        { find: /^gesso-components$/, replacement: at('../packages/components/src/index.ts') }
+      ]
     },
     build: {
       lib: { entry: at(entry), formats: ['es'], fileName: 'out' },

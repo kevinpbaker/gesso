@@ -352,6 +352,14 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Editing',
     note: 'A password field: drawn as bullets, copies nothing, and is edited through a password input. Single-line.'
   },
+  inputMode: {
+    group: 'Editing',
+    note: "Which keyboard a phone shows: 'numeric', 'decimal', 'email', 'tel', 'url' or 'search'. The full one when unset."
+  },
+  spellCheck: {
+    group: 'Editing',
+    note: 'Whether the platform checks spelling and offers corrections. Off by default.'
+  },
   caretColor: { group: 'Editing', note: 'Colour of the caret. Falls back to the text colour.' },
   selectionColor: { group: 'Editing', note: 'Fill behind selected text.' },
   matchColor: { group: 'Editing', note: 'Fill behind a find match.' },

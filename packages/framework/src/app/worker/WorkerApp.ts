@@ -591,6 +591,7 @@ export class WorkerApp {
         // Text comes through the editing proxy below, IME and all.
         textInput: 'proxy',
         accessibility: this.options.accessibility !== false,
+        frameMetrics: this.options.onFrame !== undefined,
         appPort,
         url
       } as ShellToRuntimeMessage,
@@ -1111,6 +1112,10 @@ export class WorkerApp {
     }
     if (message.type === 'leaveWarning') {
       setLeaveWarning(window, message.on);
+      return;
+    }
+    if (message.type === 'title') {
+      document.title = message.title;
       return;
     }
     if (message.type === 'preferColorScheme') {

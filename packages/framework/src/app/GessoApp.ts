@@ -679,6 +679,10 @@ export class GessoApp {
       void written.then(copied => this.runtime.settleClipboard(request.id, copied));
       return;
     }
+    if (request.type === 'title') {
+      this.canvas.ownerDocument.title = request.title;
+      return;
+    }
     if (request.type === 'fullscreen') {
       // The canvas rather than the document body: what the application
       // draws on is what should fill the screen, and a host page with

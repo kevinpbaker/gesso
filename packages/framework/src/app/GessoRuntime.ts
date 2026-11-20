@@ -110,10 +110,9 @@ import {
   CanvasTextMeasurer,
   type TextMeasurer,
   createCanvasSurface,
-  createWebGPUSurface,
   isWebGPUAvailable,
   LayoutInspector,
-  WebGPURenderer,
+  type WebGPURenderer,
   type CanvasHost,
   type CanvasSurface,
   type RenderChanges,
@@ -121,6 +120,7 @@ import {
   type UiRenderer,
   type WebGPUCanvasHost,
   UiScheduler,
+  UiKeyboardScroller,
   UiTimerFrameClock,
   UiFrame,
   type DirtyNodeSet,
@@ -412,6 +412,10 @@ export class GessoRuntime {
   private viewportInsetWrite: ((next?: Partial<UiInsets>) => void) | null = null;
   /** Stops watching the app root's environment for a change of registry. */
   private detachViewportInsetEnvironment: (() => void) | null = null;
+  /** The router's title followed onto the page; see the constructor. */
+  private routerTitle: { unsubscribe(): void } | null = null;
+  /** Set by `dispose`, for work that finishes after it: a renderer module arriving late. */
+  private disposed = false;
   /** A WebGPU device being asked for after the last one was lost. */
   private webgpuRecovery: Promise<void> | null = null;
   /** Stops listening for the browser handing back a canvas it had thrown away. */
@@ -618,38 +622,52 @@ export class GessoRuntime {
       // renderer, which is what keeps line breaks identical.
       const measureSurface = createCanvasSurface(options.measureCanvas ?? createMeasureCanvas());
       this.textMeasurer = options.textMeasurer ?? new CanvasTextMeasurer(measureSurface.getContext2D());
-      const webgpu = new WebGPURenderer({
-        surface: createWebGPUSurface(options.canvas as unknown as WebGPUCanvasHost),
-        onError: message => this.reportRendererError(message),
-        // A frame is what notices and starts the recovery, and a page
-        // nobody is touching would otherwise not have one.
-        onLost: () => this.requestRepaint(),
-        hooks: {
-          onPrepareEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), prepare: ms }),
-          onUploadEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), upload: ms }),
-          onEncodeEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), encode: ms })
-        }
-      });
-      this.renderer = webgpu;
+      // The renderer is fetched rather than imported: Canvas2D is the
+      // default, and the WebGPU code is the largest thing in a render
+      // worker that most of them never run. Until it arrives, and then
+      // until it has a device, a renderer that is never ready holds the
+      // place, which is what the frames before a device already saw.
+      const placeholder = pendingRenderer();
+      let current: UiRenderer = placeholder;
+      this.renderer = placeholder;
       this.rendererState = 'pending';
-      this.rendererReady = webgpu
-        .initialize()
-        .then((): RendererBackend => {
-          if (this.renderer !== webgpu) {
-            return this.rendererState === 'pending' ? 'canvas2d' : this.rendererState;
+      this.rendererReady = import('gesso-core/webgpu')
+        .then(({ WebGPURenderer, createWebGPUSurface }) => {
+          if (this.disposed || this.renderer !== placeholder) {
+            // Disposed, or replaced, while the module was on its way.
+            return Promise.reject(new Error('The runtime moved on before WebGPU loaded.'));
           }
-          this.rendererState = 'webgpu';
-          this.renderer.resize(this.width, this.height, this.pixelRatio);
-          this.requestRepaint();
-          return 'webgpu';
+          const webgpu = new WebGPURenderer({
+            surface: createWebGPUSurface(options.canvas as unknown as WebGPUCanvasHost),
+            onError: message => this.reportRendererError(message),
+            // A frame is what notices and starts the recovery, and a page
+            // nobody is touching would otherwise not have one.
+            onLost: () => this.requestRepaint(),
+            hooks: {
+              onPrepareEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), prepare: ms }),
+              onUploadEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), upload: ms }),
+              onEncodeEnd: ms => (this.gpuTimings = { ...(this.gpuTimings ?? emptyGpuTimings()), encode: ms })
+            }
+          });
+          current = webgpu;
+          this.renderer = webgpu;
+          return webgpu.initialize().then((): RendererBackend => {
+            if (this.renderer !== webgpu) {
+              return this.rendererState === 'pending' ? 'canvas2d' : this.rendererState;
+            }
+            this.rendererState = 'webgpu';
+            this.renderer.resize(this.width, this.height, this.pixelRatio);
+            this.requestRepaint();
+            return 'webgpu';
+          });
         })
         .catch((error: unknown): RendererBackend => {
-          if (choice === 'webgpu') {
+          if (choice === 'webgpu' && this.renderer === current) {
             // eslint-disable-next-line no-console
             console.error('WebGPU was requested but is unavailable; drawing with Canvas2D.', error);
           }
-          this.fallBackToCanvas2D(webgpu);
-          return 'canvas2d';
+          this.fallBackToCanvas2D(current);
+          return this.rendererState === 'pending' ? 'canvas2d' : this.rendererState;
         });
     }
     this.detachContextRestored = watchContextRestored(this.canvas, () => this.surfaceRestored());
@@ -853,6 +871,13 @@ export class GessoRuntime {
     // Held like any other request when nobody is listening yet: a guard
     // that redirects the address the runtime starts at does so in this
     // constructor, and the shell's address bar still has to hear it.
+    // And the page's title, which a route may name. Subscribed before
+    // the address is applied, so the first screen's title is sent too.
+    this.routerTitle = router.title.subscribe(title => {
+      if (title !== null) {
+        this.services.get(ShellService).setTitle(title);
+      }
+    });
     router.setHistory({
       push: url => this.toShell({ type: 'history', action: 'push', url }),
       replace: url => this.toShell({ type: 'history', action: 'replace', url }),
@@ -879,6 +904,9 @@ export class GessoRuntime {
     }
     if (options.media?.videoResolver !== undefined) {
       this.services.get(MediaService).setVideoResolver(options.media.videoResolver);
+    }
+    if (options.dpr !== undefined) {
+      this.services.get(MediaService).setPixelRatio(options.dpr);
     }
 
     this.scheduler = new UiScheduler({
@@ -966,7 +994,7 @@ export class GessoRuntime {
     });
 
     if (options.width !== undefined && options.height !== undefined) {
-      this.resize(options.width, options.height, this.pixelRatio);
+      this.resize(options.width, options.height, options.dpr);
     }
   }
 
@@ -1078,7 +1106,7 @@ export class GessoRuntime {
    * touch the canvas until it has a device, so the 2D context is free.
    */
   private fallBackToCanvas2D(failed: UiRenderer): void {
-    if (this.renderer !== failed) {
+    if (this.disposed || this.renderer !== failed) {
       return;
     }
     failed.dispose();
@@ -1164,14 +1192,17 @@ export class GessoRuntime {
    * 0x0, and a zero logical size makes the renderer's cull rectangle
    * empty, which discards every node.
    */
-  resize(width: number, height: number, dpr: number = this.pixelRatio): void {
+  resize(width: number, height: number, dpr?: number): void {
     if (!(width > 0) || !(height > 0)) {
       return;
     }
-    this.pixelRatio = dpr;
+    if (dpr !== undefined) {
+      this.pixelRatio = dpr;
+      this.services.get(MediaService).setPixelRatio(dpr);
+    }
     this.width = width;
     this.height = height;
-    this.renderer.resize(width, height, dpr);
+    this.renderer.resize(width, height, this.pixelRatio);
     this.constraints = Constraints.loose(width, height);
     if (this.root === undefined) {
       return;
@@ -2321,6 +2352,9 @@ export class GessoRuntime {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.routerTitle?.unsubscribe();
+    this.routerTitle = null;
     if (this.earlyFrame !== null) {
       clearTimeout(this.earlyFrame);
       this.earlyFrame = null;
@@ -2587,7 +2621,8 @@ export class GessoRuntime {
             const box = this.engine.screenBox(node);
             return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
           }
-        }
+        },
+        scroll: new UiKeyboardScroller(scrollSink)
       }),
       // Listens at the root, so a pan reaches it only when nothing
       // between the pressed node and here claimed the gesture. That is
@@ -4878,4 +4913,21 @@ function ownerInput(value: unknown): UiOwnerInput | undefined {
     return { element: true };
   }
   return undefined;
+}
+
+/**
+ * Stands in for the WebGPU renderer while its module loads. Never
+ * ready, so the render phase skips it, exactly as it skips a WebGPU
+ * renderer that has no device yet; and it never touches the canvas, so
+ * a fallback to Canvas2D finds the 2D context free.
+ */
+function pendingRenderer(): UiRenderer {
+  return {
+    backend: 'webgpu',
+    isReady: false,
+    initialize: () => Promise.resolve(),
+    render: () => {},
+    resize: () => {},
+    dispose: () => {}
+  };
 }

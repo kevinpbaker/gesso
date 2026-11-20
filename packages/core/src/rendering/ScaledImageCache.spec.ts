@@ -57,6 +57,24 @@ describe('ScaledImageCache', () => {
     expect(copies).toHaveLength(1);
   });
 
+  it('resamples its copy at high quality, since it pays for that once', () => {
+    const qualities: (ImageSmoothingQuality | undefined)[] = [];
+    const cache = new ScaledImageCache((width, height) => {
+      const context: { imageSmoothingQuality?: ImageSmoothingQuality; drawImage(): void } = {
+        drawImage() {
+          qualities.push(context.imageSmoothingQuality);
+        }
+      };
+      return { width, height, getContext: () => context, transferToImageBitmap: () => bitmap(width, height) };
+    });
+    const source = bitmap(4000, 3000);
+
+    cache.resolve(source, 160, 120);
+    cache.resolve(source, 160, 120);
+
+    expect(qualities).toEqual(['high']);
+  });
+
   it('reuses the copy for as long as the size holds', () => {
     const { create, copies } = factory();
     const cache = new ScaledImageCache(create);

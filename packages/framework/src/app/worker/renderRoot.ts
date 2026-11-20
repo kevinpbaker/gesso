@@ -489,12 +489,16 @@ export class RenderWorkerApp {
     });
   }
 
+  /** Whether the shell asked for a `frame` message per frame; see `frameMetrics` on `init`. */
+  private postFrames = true;
+
   private dispatch(message: ShellToRuntimeMessage): void {
     if (message.type === 'init') {
       // The shell's channel to the application-logic worker, when it spawned
       // one. Held before initialize, because the channels registered
       // without a worker of their own are opened over it there.
       this.appLogicWorker = message.appPort === undefined ? undefined : portHandle(message.appPort);
+      this.postFrames = message.frameMetrics !== false;
       this.initialize(
         message.canvas,
         message.width,
@@ -805,6 +809,8 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'fullscreen', enter: request.enter });
       } else if (request.type === 'leaveWarning') {
         this.host.postMessage({ type: 'leaveWarning', on: request.on });
+      } else if (request.type === 'title') {
+        this.host.postMessage({ type: 'title', title: request.title });
       } else if (request.type === 'colorScheme') {
         this.host.postMessage({ type: 'preferColorScheme', preference: request.preference });
       } else if (request.type === 'popup') {
@@ -851,6 +857,9 @@ export class RenderWorkerApp {
       this.reportError(message, stack, 'frame');
     });
     this.runtime.onFrame(metrics => {
+      if (!this.postFrames) {
+        return;
+      }
       this.host.postMessage({
         type: 'frame',
         frame: metrics.frame,

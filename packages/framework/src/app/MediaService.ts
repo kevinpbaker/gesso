@@ -2,8 +2,8 @@ import {
   DefaultImageResolver,
   DefaultSvgResolver,
   type SvgResolver,
-  DefaultVideoResolver,
   type ImageResolver,
+  type VideoPlayback,
   type VideoResolver,
   IconRasterizer
 } from 'gesso-core';
@@ -86,11 +86,14 @@ export class MediaService {
    * Built on first use rather than in the field, because a decoder is
    * the one thing here that an app which never plays a video should
    * not be paying for — and because `canDecodeVideo()` is false on
-   * plenty of threads that render perfectly well.
+   * plenty of threads that render perfectly well. Its code is fetched
+   * on first use too, for the same reason; see `LazyVideoResolver`.
    */
   get videos(): VideoResolver {
     if (this.videoResolver === null) {
-      this.videoResolver = new DefaultVideoResolver();
+      this.videoResolver = new LazyVideoResolver(() =>
+        import('gesso-core/video').then(({ DefaultVideoResolver }) => new DefaultVideoResolver())
+      );
       this.ownsVideoResolver = true;
     }
     return this.videoResolver;
@@ -128,6 +131,17 @@ export class MediaService {
     this.ownsRasterizer = false;
   }
 
+  /**
+   * The display's pixel ratio, for the icons this service rasterises.
+   * A rasteriser the application supplied keeps whatever scale it was
+   * built with: that was the caller's choice, and it may be shared.
+   */
+  setPixelRatio(ratio: number): void {
+    if (this.ownsRasterizer) {
+      this.iconRasterizer.setScale(ratio);
+    }
+  }
+
   /** Releases every decoded bitmap, for a runtime shutting down. */
   dispose(): void {
     if (this.ownsResolver) {
@@ -139,5 +153,62 @@ export class MediaService {
     if (this.ownsRasterizer) {
       this.iconRasterizer.dispose();
     }
+  }
+}
+
+/**
+ * A video resolver whose implementation is fetched the first time a
+ * video is asked for.
+ *
+ * The default decoder is an MP4 demuxer and a `VideoDecoder` pipeline,
+ * about 7 kB gzipped, and it used to be in every render worker whether
+ * or not the app had a `Video`. Every call waits on the one import and
+ * then goes through in the order it was made, so a release that
+ * follows a resolve still follows it.
+ */
+export class LazyVideoResolver implements VideoResolver {
+  private loading: Promise<VideoResolver> | null = null;
+  private loaded: VideoResolver | null = null;
+
+  constructor(private readonly load: () => Promise<VideoResolver>) {}
+
+  resolve(source: string): Promise<VideoPlayback> {
+    return this.target().then(resolver => resolver.resolve(source));
+  }
+
+  release(source: string): void {
+    if (this.loaded !== null) {
+      this.loaded.release(source);
+      return;
+    }
+    if (this.loading !== null) {
+      void this.loading.then(
+        resolver => resolver.release(source),
+        () => {}
+      );
+    }
+  }
+
+  dispose(): void {
+    if (this.loaded !== null) {
+      this.loaded.dispose();
+      return;
+    }
+    if (this.loading !== null) {
+      void this.loading.then(
+        resolver => resolver.dispose(),
+        () => {}
+      );
+    }
+  }
+
+  private target(): Promise<VideoResolver> {
+    if (this.loading === null) {
+      this.loading = this.load().then(resolver => {
+        this.loaded = resolver;
+        return resolver;
+      });
+    }
+    return this.loading;
   }
 }

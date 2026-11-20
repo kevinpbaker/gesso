@@ -28,6 +28,13 @@ export interface IconSpec {
    * without this renders a filled blob.
    */
   readonly fillRule?: 'nonzero' | 'evenodd';
+  /**
+   * Physical pixels per logical pixel to rasterise this icon at.
+   * Left out, the rasteriser's own `pixelScale` at the time of the
+   * draw. `iconSource` passes the rasteriser's scale here, so a raster
+   * made at one pixel ratio is never handed back at another.
+   */
+  readonly scale?: number;
 }
 
 /**
@@ -48,9 +55,11 @@ export interface IconSpec {
  */
 export interface IconRasterizerOptions {
   /**
-   * Physical pixels per logical pixel to rasterise at. Two is crisp on
-   * an ordinary and on a retina display and is what the runtime passes
-   * when it does not know better; an atlas will take the real one.
+   * Physical pixels per logical pixel to rasterise at, until
+   * `setScale` says otherwise. Two is what a rasteriser starts at when
+   * nothing knows the display yet; the runtime sets the real ratio as
+   * soon as it has one, because a 2x raster drawn at 1.25x or 3x is
+   * resampled on every frame and looks soft.
    */
   scale?: number;
   /** How many released rasters to keep. */
@@ -88,13 +97,14 @@ const DEFAULT_CAPACITY = 64;
 
 export function iconKey(spec: IconSpec): string {
   const { r, g, b, a } = spec.color;
-  return `${spec.size}|${spec.viewBox}|${spec.style}|${spec.strokeWidth}|${spec.fillRule ?? 'nonzero'}|${r},${g},${b},${a}|${spec.path}`;
+  return `${spec.size}|${spec.scale ?? ''}|${spec.viewBox}|${spec.style}|${spec.strokeWidth}|${spec.fillRule ?? 'nonzero'}|${r},${g},${b},${a}|${spec.path}`;
 }
 
 export class IconRasterizer {
   private readonly rasters = new Map<string, Raster>();
   private readonly evictable: string[] = [];
-  private readonly scale: number;
+  private scale: number;
+  private readonly scaleListeners = new Set<() => void>();
   private readonly capacity: number;
   private readonly createCanvas: (width: number, height: number) => IconCanvas;
 
@@ -106,6 +116,34 @@ export class IconRasterizer {
 
   get size(): number {
     return this.rasters.size;
+  }
+
+  /** Physical pixels per logical pixel that a spec without a `scale` is drawn at. */
+  get pixelScale(): number {
+    return this.scale;
+  }
+
+  /**
+   * Changes the scale new rasters are drawn at, and tells everyone
+   * listening so they can ask again. Rasters already made are left
+   * alone: their holders release them when they ask for the new one.
+   */
+  setScale(scale: number): void {
+    if (!(scale > 0) || scale === this.scale) {
+      return;
+    }
+    this.scale = scale;
+    for (const listener of [...this.scaleListeners]) {
+      listener();
+    }
+  }
+
+  /** Calls `listener` after each change of `pixelScale`. Returns the unsubscribe. */
+  onScaleChange(listener: () => void): () => void {
+    this.scaleListeners.add(listener);
+    return () => {
+      this.scaleListeners.delete(listener);
+    };
   }
 
   raster(spec: IconSpec): Promise<UiImage> {
@@ -168,7 +206,7 @@ export class IconRasterizer {
   }
 
   private async draw(spec: IconSpec): Promise<UiImage> {
-    const side = Math.max(1, Math.round(spec.size * this.scale));
+    const side = Math.max(1, Math.round(spec.size * (spec.scale ?? this.scale)));
     const canvas = this.createCanvas(side, side);
     const ctx = canvas.getContext2D();
     if (ctx === null) {

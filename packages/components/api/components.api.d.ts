@@ -16,6 +16,7 @@ import {
   UiChild,
   UiColorValue,
   UiCursor,
+  UiInputMode,
   UiKeyboardEvent,
   UiLength,
   UiModifier,
@@ -269,6 +270,8 @@ interface TextInputProps extends ControlLayoutProps {
   required?: boolean;
   multiline?: boolean;
   secret?: boolean;
+  inputMode?: UiInputMode;
+  spellCheck?: boolean;
   onSubmit?: () => void;
   labelHidden?: boolean;
 }
