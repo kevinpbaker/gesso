@@ -4,6 +4,7 @@ import { input, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Box, Column, Row, Text, type UiChild, type UiElement, type UiSemanticState } from 'gesso-core';
 import { chevron, CHEVRON_DOWN, CHEVRON_RIGHT } from './chevron';
 import { controlled } from './controlled';
+import { toolbarItems, type ToolbarItem } from './ToolbarItems';
 import { trackFocus } from './focus';
 import {
   CONTROL_FOCUS_RING,
@@ -115,6 +116,27 @@ export function Divider(inputs: Inputs<DividerProps>, _ctx: ComponentContext): U
 export interface ToolbarProps extends ControlLayoutProps {
   label?: string;
   children?: UiChild;
+  /**
+   * Tools the toolbar draws itself, instead of (or before) `children`.
+   * Given these, it is one tab stop that the arrows walk; each button
+   * has a tooltip with its label and shortcut; and the tools that do not
+   * fit the width the toolbar is given fold, from the end, into a ⋯
+   * menu at its end. Read once for whether there are any: a toolbar
+   * built with none stays the plain row it always was.
+   */
+  items?: readonly ToolbarItem[];
+  /** A tool pressed, on the bar or in the ⋯ menu, by its `value`. */
+  onSelect?: (value: string) => void;
+  /** The ⋯ button's name and tooltip. */
+  moreLabel?: string;
+  /** Draws a one- or two-letter shortcut small in its button's corner, as drawing programs do. */
+  shortcutBadges?: boolean;
+  /**
+   * A press with the pointer leaves keyboard focus where it was, so a
+   * canvas that answers to tool keys keeps them after a tool is chosen.
+   * The keyboard still reaches every button.
+   */
+  keepFocus?: boolean;
 }
 
 /**
@@ -124,8 +146,33 @@ export interface ToolbarProps extends ControlLayoutProps {
  * than describing every button as loose furniture; the buttons inside
  * stay ordinary tab stops.
  */
-export function Toolbar(inputs: Inputs<ToolbarProps>, _ctx: ComponentContext): UiChild {
+export function Toolbar(inputs: Inputs<ToolbarProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, 'Toolbar');
+  if (inputs.items.value !== undefined) {
+    return Row(
+      {
+        ...layoutOf(inputs),
+        modifiers: modifiersOf(inputs),
+        gap: 6,
+        y: 'center',
+        padding: 4,
+        backgroundColor: 'surface',
+        borderColor: 'border',
+        borderWidth: 1,
+        borderRadius: 8,
+        role: 'toolbar',
+        label
+      },
+      ...toolbarItems(ctx, {
+        items: input(inputs.items, []),
+        onSelect: value => inputs.onSelect.emit(value),
+        moreLabel: input(inputs.moreLabel, 'More'),
+        shortcutBadges: inputs.shortcutBadges.value === true,
+        keepFocus: inputs.keepFocus.value === true
+      }),
+      followedChildren(inputs.children, () => Row())
+    );
+  }
   return Row(
     {
       ...layoutOf(inputs),

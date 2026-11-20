@@ -401,6 +401,15 @@ interface RichTextViewProps extends ControlLayoutProps {
   completions?: readonly RichTextCompletionSource[];
 }
 declare function RichTextView(inputs: Inputs<RichTextViewProps>, _ctx: ComponentContext): UiChild;
+interface ToolbarItem {
+  readonly value: string;
+  readonly label: string;
+  readonly icon?: () => UiChild;
+  readonly shortcut?: string;
+  readonly pressed?: boolean;
+  readonly disabled?: boolean;
+  readonly separator?: boolean;
+}
 interface CardProps extends ControlLayoutProps {
   title?: string;
   label?: string;
@@ -415,8 +424,13 @@ declare function Divider(inputs: Inputs<DividerProps>, _ctx: ComponentContext): 
 interface ToolbarProps extends ControlLayoutProps {
   label?: string;
   children?: UiChild;
+  items?: readonly ToolbarItem[];
+  onSelect?: (value: string) => void;
+  moreLabel?: string;
+  shortcutBadges?: boolean;
+  keepFocus?: boolean;
 }
-declare function Toolbar(inputs: Inputs<ToolbarProps>, _ctx: ComponentContext): UiChild;
+declare function Toolbar(inputs: Inputs<ToolbarProps>, ctx: ComponentContext): UiChild;
 interface TabDefinition {
   readonly value: string;
   readonly label: string;
@@ -1610,6 +1624,7 @@ export {
   type TextInputProps,
   type ToastPlacement,
   type ToastProps,
+  type ToolbarItem,
   type ToolbarProps,
   type TooltipArgs,
   type TooltipModifierOptions,

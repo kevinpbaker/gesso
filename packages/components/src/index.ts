@@ -51,6 +51,7 @@ export {
 export { type RichTextToken } from './richText/inline';
 export { RICH_TEXT_SLASH_COMMANDS, type RichTextBlockKind, type RichTextSlashCommand } from './richText/slash';
 export { Card, Divider, Toolbar, Tabs, Accordion } from './Structure';
+export type { ToolbarItem } from './ToolbarItems';
 export type {
   CardProps,
   DividerProps,
