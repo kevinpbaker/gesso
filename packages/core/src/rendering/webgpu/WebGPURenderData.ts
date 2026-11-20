@@ -7,7 +7,7 @@ import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutBox } from '../../layout/LayoutTypes';
 import type { TextMeasurer } from '../../layout/TextMeasurer';
-import { resolvePaintState, createPaintState, computeObjectFitRect, isPaintVisible } from '../PaintState';
+import { paintStateOf, createPaintState, computeObjectFitRect, isPaintVisible } from '../PaintState';
 import { videoFrameSize } from '../../properties/UiVideo';
 import type { TextureSource } from './WebGPUTextureCache';
 import { colorToCss } from '../PaintState';
@@ -316,7 +316,6 @@ interface RenderState {
 
 const IDENTITY: Affine = [1, 0, 0, 1, 0, 0];
 
-const paintScratch = createPaintState();
 const contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
@@ -328,7 +327,7 @@ const contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
  * letter on screen, and both the boxed pushes and the element-by-
  * element conversion showed up as the largest cost in the frame. This
  * writes floats where they are going to live, and the buffer is
- * module-level scratch — like `paintScratch` above — because a build
+ * module-level scratch, like `contentBox` above, because a build
  * is not re-entrant and a per-frame allocation is the thing being
  * avoided.
  */
@@ -715,7 +714,7 @@ export function buildRenderList(
       return;
     }
 
-    const paint = resolvePaintState(node, paintScratch);
+    const paint = paintStateOf(node);
     // An opacity group that paints more than once is drawn into a layer
     // of its own and blended once (`GroupOpacity.ts`). Inside it the
     // subtree draws at full strength and under none of its ancestors'
@@ -1086,10 +1085,10 @@ export function buildRenderList(
       state.cull = saved.cull;
     }
 
-    // Foreground text, after children as Canvas2D paints it. Children
-    // reused the paint scratch, so the node's own style is re-resolved.
+    // Foreground text, after children as Canvas2D paints it, from the
+    // node's own cached style, which its children's did not overwrite.
     if (hasText) {
-      const text = resolvePaintState(node, paintScratch);
+      const text = paintStateOf(node);
       contentBox.x = 0;
       contentBox.y = 0;
       contentBox.width = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
@@ -1228,9 +1227,6 @@ export function buildRenderList(
     }
 
     if (decorations !== null && hasDecorationPhase(decorations, true)) {
-      // Children reused the paint scratch; the node's own radius and
-      // opacity are read from it, so re-resolve before the second pass.
-      resolvePaintState(node, paintScratch);
       pushDecorations(decorations, true);
     }
 

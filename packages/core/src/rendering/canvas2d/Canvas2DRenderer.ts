@@ -8,7 +8,7 @@ import type { CanvasHost, CanvasSurface } from './CanvasSurface';
 import type { DeviceRect } from '../GroupOpacity';
 import type { ResolvedGradient } from '../../properties/UiGradient';
 import { gradientPaint } from '../../properties/UiGradient';
-import { colorToCss, computeObjectFitRect, createPaintState, isPaintVisible, resolvePaintState } from '../PaintState';
+import { colorToCss, computeObjectFitRect, createPaintState, isPaintVisible, paintStateOf } from '../PaintState';
 import type { PaintBoxShadow, PaintState } from '../PaintState';
 import {
   borderRadiusIsUniform,
@@ -159,7 +159,8 @@ export class Canvas2DRenderer implements UiRenderer {
 
   /** Scratch for the padded box text is drawn in; reused across nodes. */
   private readonly contentBox: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
-  private readonly paint = createPaintState();
+  /** The style `resolvePaint` last returned: a node's own cached state, see `paintStateOf`. */
+  private paint: PaintState = createPaintState();
   /** The frame's context, wrapped so a huge scroll offset keeps its precision; reset each frame. */
   private precise: PreciseContext | null = null;
   /**
@@ -371,7 +372,8 @@ export class Canvas2DRenderer implements UiRenderer {
    */
   private resolvePaint(node: UiNode): PaintState {
     this.paintOwner = node;
-    return resolvePaintState(node, this.paint);
+    this.paint = paintStateOf(node);
+    return this.paint;
   }
 
   // -------------------------------------------------------------------------

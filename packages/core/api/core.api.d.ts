@@ -1918,6 +1918,7 @@ declare const DEFAULT_TEXT_COLOR: {
 declare function normalizeTextAlign(value: unknown): TextAlign;
 declare function normalizeVerticalAlign(value: unknown): VerticalAlign;
 declare function resolvePaintState(node: UiNode, out: PaintState): PaintState;
+declare function paintStateOf(node: UiNode): PaintState;
 declare function isPaintVisible(node: UiNode): boolean;
 declare function computeObjectFitRect(fit: ObjectFit, imageWidth: number, imageHeight: number, box: LayoutBox): LayoutBox;
 declare function createPaintState(): PaintState;
@@ -3784,7 +3785,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   readonly backend: RendererBackend;
   private disposed;
   private readonly contentBox;
-  private readonly paint;
+  private paint;
   private precise;
   private paintOwner;
   private cullX;
@@ -5154,6 +5155,7 @@ export {
   PaintRecording,
   PaintResolver,
   PaintState,
+  paintStateOf,
   PaintStats,
   PaintSurface,
   PaintTarget,
@@ -6132,6 +6134,7 @@ import {
   PaintRecording,
   PaintResolver,
   PaintState,
+  paintStateOf,
   PaintStats,
   PaintSurface,
   PaintTarget,
@@ -6866,6 +6869,7 @@ export {
   paintPictures,
   PaintRecorder,
   paintsAfterChildren,
+  paintStateOf,
   PaintTarget,
   paintTextMetrics,
   paintValuesEqual,

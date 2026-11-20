@@ -40,7 +40,7 @@ import { UiGraphBuilder } from '../packages/core/src/composition/UiGraphBuilder.
 import { UiHitTester } from '../packages/core/src/input/UiHitTester.ts';
 import { UiNodeType } from '../packages/core/src/graph/UiNodeType.ts';
 import { lightTheme } from '../packages/core/src/environment/UiTheme.ts';
-import { createPaintState, resolvePaintState } from '../packages/core/src/rendering/PaintState.ts';
+import { createPaintState, paintStateOf, resolvePaintState } from '../packages/core/src/rendering/PaintState.ts';
 import type { Canvas2DContext, Canvas2DGradient } from '../packages/core/src/rendering/canvas2d/Canvas2DContext.ts';
 import type { CanvasHost } from '../packages/core/src/rendering/canvas2d/CanvasSurface.ts';
 import type { UiChild } from '../packages/core/src/composition/UiDefinition.ts';
@@ -289,6 +289,14 @@ function paintSection(): void {
     measure('resolve every node', ITERATIONS, () => {
       for (let i = 0; i < nodes.length; i++) {
         resolvePaintState(nodes[i], state);
+      }
+    });
+    // What the renderers call: each node's state is kept until its
+    // properties or its environment change, so a frame where nothing
+    // did is a version compare per node.
+    measure('cached, nothing changed', ITERATIONS, () => {
+      for (let i = 0; i < nodes.length; i++) {
+        paintStateOf(nodes[i]);
       }
     });
   }
