@@ -40,22 +40,23 @@ start, the value, the unit at its end.
   (`onChange`) and is committed once, on release (`onCommit`), so a
   scrub is one undo step.
 
-| Prop          | Type                               | Default        | What it does                                                                           |
-| ------------- | ---------------------------------- | -------------- | -------------------------------------------------------------------------------------- |
-| `value`       | `number`                           | `0`            | The value, in `unit`. Ignored while `mixed`.                                           |
-| `mixed`       | `boolean`                          | `false`        | The chosen things differ. Shows `Mixed` until a value is typed, stepped or scrubbed.   |
-| `label`       | `string`                           | `''`           | The name a screen reader says, and what is drawn at the start unless `short` is given. |
-| `short`       | `string`                           | none           | Drawn at the start instead: `X`, `W`, `°`. The scrub handle.                           |
-| `unit`        | `string`                           | none           | The unit, drawn after the value and said with it.                                      |
-| `units`       | `Record<string, number>`           | none           | Other units a value may be typed in, as how many of `unit` one of each is.             |
-| `min`, `max`  | `number`                           | unbounded      | What a typed, stepped or scrubbed value is kept within.                                |
-| `step`        | `number`                           | `1`            | What an arrow or a scrub step moves it by.                                             |
-| `precision`   | `number`                           | up to 4 places | Decimal places shown. Given, trailing zeros stay.                                      |
-| `scrubPixels` | `number`                           | `2`            | Pixels of drag per step.                                                               |
-| `disabled`    | `boolean`                          | `false`        | Refuses typing, steps and scrubs.                                                      |
-| `onChange`    | `(value) => void`                  | none           | A value still changing: each step of a scrub.                                          |
-| `onCommit`    | `(value) => void`                  | none           | A value settled: entered, left, released, stepped. One undo step each.                 |
-| `onNudge`     | `(delta, 'live' \| 'end') => void` | none           | Given this, arrows and scrubs report how far they moved instead of a value.            |
+| Prop            | Type                               | Default        | What it does                                                                           |
+| --------------- | ---------------------------------- | -------------- | -------------------------------------------------------------------------------------- |
+| `value`         | `number`                           | `0`            | The value, in `unit`. Ignored while `mixed`.                                           |
+| `mixed`         | `boolean`                          | `false`        | The chosen things differ. Shows `Mixed` until a value is typed, stepped or scrubbed.   |
+| `label`         | `string`                           | `''`           | The name a screen reader says, and what is drawn at the start unless `short` is given. |
+| `short`         | `string`                           | none           | Drawn at the start instead: `X`, `W`, `°`. The scrub handle.                           |
+| `unit`          | `string`                           | none           | The unit, drawn after the value and said with it.                                      |
+| `units`         | `Record<string, number>`           | none           | Other units a value may be typed in, as how many of `unit` one of each is.             |
+| `min`, `max`    | `number`                           | unbounded      | What a typed, stepped or scrubbed value is kept within.                                |
+| `step`          | `number`                           | `1`            | What an arrow or a scrub step moves it by.                                             |
+| `precision`     | `number`                           | up to 4 places | Decimal places shown. Given, trailing zeros stay.                                      |
+| `scrubPixels`   | `number`                           | `2`            | Pixels of drag per step.                                                               |
+| `disabled`      | `boolean`                          | `false`        | Refuses typing, steps and scrubs.                                                      |
+| `onChange`      | `(value) => void`                  | none           | A value still changing: each step of a scrub.                                          |
+| `onCommit`      | `(value) => void`                  | none           | A value settled: entered, left, released, stepped. One undo step each.                 |
+| `onNudge`       | `(delta, 'live' \| 'end') => void` | none           | Given this, arrows and scrubs report how far they moved instead of a value.            |
+| `onFocusChange` | `(focused: boolean) => void`       | none           | The field took focus or lost it. See below.                                            |
 
 ### Mixed values and nudges
 
@@ -108,14 +109,15 @@ says `expanded` or `collapsed`; Enter and Space fold it as a click does.
 A folded section's rows are not in the tree at all, so they cost no
 layout and say nothing to a screen reader.
 
-| Prop           | Type                      | Default | What it does                                              |
-| -------------- | ------------------------- | ------- | --------------------------------------------------------- |
-| `title`        | `string`                  | `''`    | The heading, and the fold button's name.                  |
-| `open`         | `boolean`                 | none    | Whether it is open. Omit to let the section keep its own. |
-| `defaultOpen`  | `boolean`                 | `true`  | Open at first, when it keeps its own.                     |
-| `onOpenChange` | `(open: boolean) => void` | none    | It was folded or opened.                                  |
-| `actions`      | `UiChild`                 | none    | Controls at the end of the heading, never folded away.    |
-| `children`     | `UiChild`                 | none    | The rows.                                                 |
+| Prop            | Type                         | Default | What it does                                              |
+| --------------- | ---------------------------- | ------- | --------------------------------------------------------- |
+| `title`         | `string`                     | `''`    | The heading, and the fold button's name.                  |
+| `open`          | `boolean`                    | none    | Whether it is open. Omit to let the section keep its own. |
+| `defaultOpen`   | `boolean`                    | `true`  | Open at first, when it keeps its own.                     |
+| `onOpenChange`  | `(open: boolean) => void`    | none    | It was folded or opened.                                  |
+| `actions`       | `UiChild`                    | none    | Controls at the end of the heading, never folded away.    |
+| `onFocusChange` | `(focused: boolean) => void` | none    | The heading took focus or lost it.                        |
+| `children`      | `UiChild`                    | none    | The rows.                                                 |
 
 ## InspectorRow
 

@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Column, Text } from 'gesso-core';
+import { Box, Column, Text } from 'gesso-core';
 import { InspectorRow, InspectorSection, UnitField, parseQuantity, sharedValue, type NudgePhase } from './Inspector';
 
 /**
@@ -142,6 +142,21 @@ describe('UnitField', () => {
     expect(commits).toEqual([]);
   });
 
+  it('says when it takes and loses focus, its blur before the focus of what takes it', () => {
+    const seen: string[] = [];
+    const ui = renderTest(
+      Column(
+        { width: 300 },
+        createComponent(UnitField, { label: 'A', onFocusChange: (on: boolean) => seen.push(`A ${on}`) }),
+        Box({ focusable: true, label: 'Canvas', onFocus: () => seen.push('canvas true') })
+      ),
+      { width: 400, height: 200 }
+    );
+    ui.fireEvent.focus(ui.getByRole('spinbutton'));
+    ui.fireEvent.focus(ui.getByLabel('Canvas'));
+    expect(seen).toEqual(['A true', 'A false', 'canvas true']);
+  });
+
   it('follows a value that changes from outside', () => {
     const value = new BehaviorSubject(5);
     const { ui, box } = field({ value });
@@ -171,6 +186,17 @@ describe('InspectorSection and InspectorRow', () => {
     ui.fireEvent.keyDown('Enter');
     ui.frame();
     expect(ui.getByText('Beam 1')).toBeDefined();
+  });
+
+  it('says when its heading takes and loses focus', () => {
+    const seen: boolean[] = [];
+    const ui = renderTest(
+      createComponent(InspectorSection, { title: 'Style', onFocusChange: (on: boolean) => seen.push(on) }),
+      { width: 300, height: 200 }
+    );
+    ui.fireEvent.focus(ui.getByRole('button'));
+    ui.fireEvent.blur();
+    expect(seen).toEqual([true, false]);
   });
 
   it('lines up the values of its rows behind one label column', () => {

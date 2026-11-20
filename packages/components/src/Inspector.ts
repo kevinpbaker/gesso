@@ -80,6 +80,14 @@ export interface InspectorSectionProps extends ControlLayoutProps {
   onOpenChange?: (open: boolean) => void;
   /** Controls at the end of the heading, as a + that adds a row. Not folded away with the content. */
   actions?: UiChild;
+  /**
+   * The heading took focus or lost it: for a panel that stays open
+   * while its controls have focus. A focus event does not bubble, so a
+   * box round the section cannot hear it. Told from the heading's own
+   * focus and blur, so moving focus from one control to the next is
+   * told as this one's blur before the next one's focus.
+   */
+  onFocusChange?: (focused: boolean) => void;
   /** The rows. */
   children?: UiChild;
 }
@@ -107,6 +115,9 @@ export function InspectorSection(inputs: Inputs<InspectorSectionProps>, _ctx: Co
       Row(
         {
           focusable: true,
+          // From the element's own events, so a blur here is told before the focus of whatever takes it.
+          onFocus: () => inputs.onFocusChange.emit(true),
+          onBlur: () => inputs.onFocusChange.emit(false),
           modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
           y: 'center',
           gap: 4,
@@ -233,6 +244,8 @@ export interface UnitFieldProps extends ControlLayoutProps {
    * a value through `onCommit`.
    */
   onNudge?: (delta: number, phase: NudgePhase) => void;
+  /** The field took focus or lost it, as `InspectorSection`'s does. */
+  onFocusChange?: (focused: boolean) => void;
 }
 
 /**
@@ -336,7 +349,11 @@ export function UnitField(inputs: Inputs<UnitFieldProps>, ctx: ComponentContext)
       editing = true;
       text.next(event.value);
     },
-    onBlur: settle,
+    onFocus: () => inputs.onFocusChange.emit(true),
+    onBlur: () => {
+      settle();
+      inputs.onFocusChange.emit(false);
+    },
     onKeyDown: (event: UiKeyboardEvent) => {
       if (event.key === 'Enter') {
         settle();
