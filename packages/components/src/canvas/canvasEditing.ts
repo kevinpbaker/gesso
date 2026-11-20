@@ -652,13 +652,16 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
 
   const showEdit = (edit: CanvasEdit, at: CanvasPoint): void => {
     const text = typed.value;
+    // While a value is typed, the readout is the field it is typed in, and the value places the point, not the
+    // pointer: what the pointer would snap to (its guides, mark and label) is not shown, so nothing beside the field
+    // says "grid" or "end" about a point the value has moved.
+    const snap = text === null ? edit.snap : null;
     feedback.next({
       marquee: null,
-      guides: edit.snap?.guides ?? [],
-      snap: edit.snap !== null && edit.snap.kind !== 'grid' && edit.snap.guides.length === 0 ? edit.snap.point : null,
-      // While a value is typed, the readout is the field it is typed in.
+      guides: snap?.guides ?? [],
+      snap: snap !== null && snap.kind !== 'grid' && snap.guides.length === 0 ? snap.point : null,
       readout: text === null ? readout(edit, at) : { text, at, field: true },
-      snapLabel: labelOf(edit.snap)
+      snapLabel: labelOf(snap)
     });
   };
   const clearFeedback = (): void =>

@@ -598,6 +598,48 @@ describe('CanvasEditor', () => {
       expect(end.kind === 'draw' && end.to).toEqual({ x: 530, y: 50 });
       void typed;
     });
+
+    it('shows no snap mark or label while a value is typed, since the value places the point, not the pointer', () => {
+      const ui = renderTest(
+        createComponent(CanvasEditor, {
+          width: 600,
+          height: 300,
+          tool: 'line',
+          clickToDraw: true,
+          shapes: [],
+          // Every point the pointer comes to snaps to the end of something.
+          snap: { toPoint: (p: { x: number; y: number }) => ({ point: p, kind: 'end', label: 'end', guides: [] }) },
+          typedValue: (text: string, edit: CanvasEdit) =>
+            edit.kind === 'draw' && Number.isFinite(Number(text))
+              ? { ...edit, to: { x: edit.from.x + Number(text), y: edit.from.y } }
+              : null
+        }),
+        { width: 600, height: 300 }
+      );
+      ui.frame();
+      ui.fireEvent.focus(ui.getByRole('listbox'));
+      const words = () => {
+        ui.clearDraws();
+        ui.frame();
+        return ui.draws.filter(call => call.name === 'fillText').map(call => String(call.args[0]));
+      };
+      ui.fireEvent.pointerDown(50, 50);
+      ui.fireEvent.pointerUp(50, 50);
+      ui.fireEvent.pointerMove(150, 60);
+      expect(words()).toContain('end');
+      ui.fireEvent.keyDown('4');
+      ui.fireEvent.keyDown('8');
+      const typing = words();
+      expect(typing).toContain('48');
+      expect(typing).not.toContain('end');
+      // The pointer moving on while it is typed brings no label back.
+      ui.fireEvent.pointerMove(170, 70);
+      expect(words()).not.toContain('end');
+      // Escape clears the value: the pointer places the point again, and says what it snaps to.
+      ui.fireEvent.keyDown('Escape');
+      ui.fireEvent.pointerMove(160, 60);
+      expect(words()).toContain('end');
+    });
   });
 
   it('moves the chosen shapes by a typed value: an arrow takes its direction, Enter a pair', () => {
