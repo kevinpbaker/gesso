@@ -1625,6 +1625,7 @@ declare class GessoRuntime {
   private viewportInsetRegistry;
   private viewportInsetWrite;
   private detachViewportInsetEnvironment;
+  private selectionScroller;
   private routerTitle;
   private findBar;
   private disposed;

@@ -30,6 +30,7 @@ export { UiKeyboardController } from './UiKeyboardController';
 export type { KeyboardControllerOptions } from './UiKeyboardController';
 export { isScrollContainer, UiWheelController } from './UiWheelController';
 export { KEY_SCROLL_STEP, UiKeyboardScroller } from './UiKeyboardScroller';
+export { SELECTION_SCROLL_EDGE, UiSelectionAutoScroller, type SelectionDrag } from './UiSelectionAutoScroller';
 export type { ScrollContainerState, ScrollSink, UiScrollability, UiScrollBehavior } from './UiWheelController';
 export { UiGestureRecognizer } from './UiGestureRecognizer';
 export { UiPinchRecognizer } from './UiPinchRecognizer';

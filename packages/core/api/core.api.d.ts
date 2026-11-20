@@ -2467,6 +2467,7 @@ interface PointerControllerOptions {
     pointerMove(x: number, y: number): void;
     pointerUp(): void;
     clear(): void;
+    readonly hasSelection?: boolean;
     pointerHover?(node: UiNode | null, x: number, y: number): void;
   };
 }
@@ -2501,6 +2502,14 @@ declare class UiPointerController {
   private downPath;
   get hoveredNode(): UiNode | null;
   get pressedNode(): UiNode | null;
+  get selectionDrag(): {
+    readonly node: UiNode;
+    readonly x: number;
+    readonly y: number;
+  } | null;
+  repeatSelectionMove(): void;
+  private selecting;
+  private extendSelection;
   private captured;
   get draggingScrollbarOf(): UiNode | null;
   get overScrollbar(): boolean;
@@ -2563,6 +2572,20 @@ declare class UiKeyboardScroller {
   handleKey(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean;
   private around;
   private largest;
+}
+declare const SELECTION_SCROLL_EDGE = 24;
+interface SelectionDrag {
+  readonly node: UiNode;
+  readonly x: number;
+  readonly y: number;
+}
+declare class UiSelectionAutoScroller {
+  private readonly sink;
+  private readonly screenBox;
+  private lastTime;
+  constructor(sink: ScrollSink,
+  screenBox: (node: UiNode) => LayoutBox);
+  advance(drag: SelectionDrag | null, time: number): boolean;
 }
 interface UiShortcutStep {
   readonly key: string;
@@ -5282,7 +5305,9 @@ export {
   ScrollViewProps,
   selectableTextNodes,
   selectableTextOf,
+  SELECTION_SCROLL_EDGE,
   SelectionControllerOptions,
+  SelectionDrag,
   SelectionHost,
   selectionRangeOf,
   selectionRects,
@@ -5483,6 +5508,7 @@ export {
   UiSchedulerOptions,
   UiScrollability,
   UiScrollBehavior,
+  UiSelectionAutoScroller,
   UiSelectionChangeEvent,
   UiSelectionController,
   UiSemanticsAction,
@@ -6261,7 +6287,9 @@ import {
   ScrollViewProps,
   selectableTextNodes,
   selectableTextOf,
+  SELECTION_SCROLL_EDGE,
   SelectionControllerOptions,
+  SelectionDrag,
   SelectionHost,
   selectionRangeOf,
   selectionRects,
@@ -6462,6 +6490,7 @@ import {
   UiSchedulerOptions,
   UiScrollability,
   UiScrollBehavior,
+  UiSelectionAutoScroller,
   UiSelectionChangeEvent,
   UiSelectionController,
   UiSemanticsAction,
@@ -6959,6 +6988,7 @@ export {
   ScrollView,
   selectableTextNodes,
   selectableTextOf,
+  SELECTION_SCROLL_EDGE,
   selectionRangeOf,
   selectionRects,
   selectionRectsIn,
@@ -7218,6 +7248,7 @@ export {
   type ScrollSink,
   type ScrollViewProps,
   type SelectionControllerOptions,
+  type SelectionDrag,
   type SelectionHost,
   type SemanticsMemory,
   type SemanticsPlacement,
@@ -7462,6 +7493,7 @@ export {
   UiResolvedTextSpan,
   UiRole,
   UiScheduler,
+  UiSelectionAutoScroller,
   UiSelectionChangeEvent,
   UiSelectionController,
   UiSelfAlignment,

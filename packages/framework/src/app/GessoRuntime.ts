@@ -121,6 +121,7 @@ import {
   type WebGPUCanvasHost,
   UiScheduler,
   UiKeyboardScroller,
+  UiSelectionAutoScroller,
   UiTimerFrameClock,
   UiFrame,
   type DirtyNodeSet,
@@ -412,6 +413,8 @@ export class GessoRuntime {
   private viewportInsetWrite: ((next?: Partial<UiInsets>) => void) | null = null;
   /** Stops watching the app root's environment for a change of registry. */
   private detachViewportInsetEnvironment: (() => void) | null = null;
+  /** Scrolls a container a selection is dragged to the edge of; see the ticks phase. */
+  private selectionScroller!: UiSelectionAutoScroller;
   /** The router's title followed onto the page; see the constructor. */
   private routerTitle: { unsubscribe(): void } | null = null;
   /** Whether a find bar is mounted, followed onto the shell; see the constructor. */
@@ -2515,6 +2518,7 @@ export class GessoRuntime {
     const focus = this.focusManager;
     focus.setRoot(root);
     const scrollSink = this.createScrollSink();
+    this.selectionScroller = new UiSelectionAutoScroller(scrollSink, node => this.engine.screenBox(node));
     // Editing is a default behaviour of the pointer and keyboard
     // controllers for EditableText targets; the shell's text input
     // (beforeinput, composition, paste) reaches the controller directly.
@@ -3714,6 +3718,18 @@ export class GessoRuntime {
     // Before the lazy lists read the offset, so the rows this frame's step
     // reveals are built on it.
     if (this.input.wheel.advance(time)) {
+      this.scheduler.wake();
+    }
+    // A selection dragged to a container's edge scrolls it, and the
+    // selection follows what the scroll brings under the pointer: the
+    // last move is replayed against the layout last frame's scroll made,
+    // and then this frame's scroll is taken. A pointer held still at the
+    // edge sends no moves, so frames are kept coming while it scrolls.
+    const drag = this.input.pointer.selectionDrag;
+    if (drag !== null) {
+      this.input.pointer.repeatSelectionMove();
+    }
+    if (this.selectionScroller.advance(drag, time)) {
       this.scheduler.wake();
     }
 
