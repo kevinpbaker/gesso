@@ -4819,6 +4819,13 @@ interface SvgDrawOptions {
 }
 declare function drawSvg(document: SvgDocument, surface: PaintSurface, box: Pick<PaintBox, 'width' | 'height'>, options?: SvgDrawOptions): void;
 declare function svgPaint(document: SvgDocument, options?: SvgDrawOptions): UiPaint;
+interface PaintTextMetrics {
+  readonly width: number;
+  readonly ascent: number;
+  readonly descent: number;
+}
+declare function paintTextMetrics(value: string, style?: PaintTextStyle): PaintTextMetrics;
+declare function measurePaintText(value: string, style?: PaintTextStyle): number;
 type PaintOp = {
   readonly op: 'save';
 } | {
@@ -6151,6 +6158,7 @@ export {
   MAX_MEASURES_PER_CHILD,
   measure,
   measureFlow,
+  measurePaintText,
   measureSpan,
   mediaLoadsInFlight,
   minmax,
@@ -6227,6 +6235,8 @@ export {
   PaintSurface,
   PaintTarget,
   PaintTextAlign,
+  paintTextMetrics,
+  PaintTextMetrics,
   PaintTextSpan,
   PaintTextStyle,
   paintValuesEqual,
@@ -7127,6 +7137,7 @@ import {
   MAX_MEASURES_PER_CHILD,
   measure,
   measureFlow,
+  measurePaintText,
   measureSpan,
   mediaLoadsInFlight,
   minmax,
@@ -7203,6 +7214,8 @@ import {
   PaintSurface,
   PaintTarget,
   PaintTextAlign,
+  paintTextMetrics,
+  PaintTextMetrics,
   PaintTextSpan,
   PaintTextStyle,
   paintValuesEqual,
@@ -7994,6 +8007,7 @@ export {
   MAX_MEASURES_PER_CHILD,
   measure,
   measureFlow,
+  measurePaintText,
   measureSpan,
   mediaLoadsInFlight,
   minmax,
@@ -8030,6 +8044,7 @@ export {
   PaintRecorder,
   paintsAfterChildren,
   PaintTarget,
+  paintTextMetrics,
   paintValuesEqual,
   paragraphGeometry,
   paragraphGeometryFrom,
@@ -8329,6 +8344,7 @@ export {
   type PaintStats,
   type PaintSurface,
   type PaintTextAlign,
+  type PaintTextMetrics,
   type PaintTextSpan,
   type PaintTextStyle,
   type ParagraphGeometry,

@@ -107,7 +107,10 @@ const sidebar: DefaultTheme.SidebarItem[] = [
   },
   {
     text: 'Rendering',
-    items: [{ text: 'Canvas2D and WebGPU', link: '/rendering/canvas2d-and-webgpu' }]
+    items: [
+      { text: 'Canvas2D and WebGPU', link: '/rendering/canvas2d-and-webgpu' },
+      { text: 'Painting your own content', link: '/rendering/painting' }
+    ]
   },
   {
     text: 'Tooling',

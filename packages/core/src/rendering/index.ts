@@ -37,6 +37,7 @@ export {
 } from './PaintState';
 export type { PaintState, UiImage, TextAlign, VerticalAlign, ObjectFit } from './PaintState';
 export { paintValuesEqual, pathValuesEqual, inputsEqual } from './PaintSurface';
+export { measurePaintText, paintTextMetrics, type PaintTextMetrics } from './PaintFont';
 export type {
   PaintSurface,
   PaintBox,
