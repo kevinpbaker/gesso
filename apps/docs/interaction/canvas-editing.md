@@ -112,6 +112,7 @@ snap mark and readout through `show`, and the pure functions under both
 | `tabSelects`        | `boolean`                               | `true`     | With shapes chosen, Tab and Shift+Tab choose the next and the previous.     |
 | `groupHandles`      | `boolean`                               | `true`     | Whether several chosen shapes share eight handles on the box round them.    |
 | `colors`            | `CanvasOverlayColors`                   | theme      | The selection, hover, guide and handle colours.                             |
+| `focusRing`         | `boolean \| FocusRingOptions`           | `false`    | A ring while the canvas has the keyboard, after a click too. See below.     |
 | `label`             | `string`                                | `'Canvas'` | The canvas's name to a screen reader.                                       |
 | `children`          | `UiChild`                               | none       | What the application draws, under the overlay.                              |
 
@@ -196,6 +197,17 @@ The canvas is one tab stop. With it focused:
 | Delete, Backspace   | `onDelete` with the chosen shapes                           |
 | Escape              | Calls off a drag; else clears the selection; else passes on |
 
+### Where the keys go
+
+A control's focus ring shows only for the keyboard: a click focuses a
+button but draws no ring. A canvas is different. It is clicked far more
+than it is tabbed to, and its keys (tool letters, arrows, Delete) do
+something, so a person must see whether the canvas or a field beside
+it will take the next key. `focusRing` draws a ring round the canvas
+whenever it has the keyboard, after a click as well as after Tab, and
+none while a field has it. Pass `true` for the theme's ring, or the
+options `focusRing` takes (`color`, `width`, `offset`, `radius`).
+
 Tab walks the shapes only while something is chosen, so Escape and
 then Tab leaves the canvas. Every other key passes on, so an
 application's own (tool letters, ⌘D, ⌘C) go on the canvas's parent or
@@ -244,7 +256,10 @@ const editing = canvasEditing(ctx, { shapes, selection, onEdit, snap: { grid: 5 
 ```
 
 `handlers` are ready to spread; `handle` has the same, each returning
-whether it did anything. `toLocal(event)` is a pointer's place in the
+whether it did anything. With `focusRing`, the ring is drawn on the
+node that carries `modifiers`, which need not be the node that takes
+focus: call `handlers.onFocus` and `handlers.onBlur` from the focusable
+node's own, and `focused` says whether it has the keyboard. `toLocal(event)` is a pointer's place in the
 canvas's pixels and `scale()` the zoom above it, both from the canvas
 node's measured boxes, so a canvas inside a zoomed page needs nothing
 more. `show({ guides, snap, readout })` draws the kit's feedback from a

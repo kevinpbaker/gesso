@@ -3,7 +3,7 @@ import { BehaviorSubject, map } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Box } from 'gesso-core';
+import { Box, type DecorationShape, type UiNode } from 'gesso-core';
 import { CanvasEditor } from './CanvasEditor';
 import type { CanvasEdit, CanvasShape } from './canvasEditing';
 import type { CanvasRect } from './geometry';
@@ -336,5 +336,57 @@ describe('CanvasEditor', () => {
     const last = edits.filter(edit => edit.phase === 'live').at(-1)!;
     expect(last.kind === 'move' && last.dx).toBe(5);
     expect(last.snap?.guides ?? []).toEqual([]);
+  });
+
+  it('rings the canvas while it has the keyboard, from a click too, and not while a field has it', () => {
+    const mountWith = (focusRing: boolean | undefined) => {
+      const ui = renderTest(
+        Box(
+          { width: 400, height: 200 },
+          createComponent(CanvasEditor, {
+            width: 300,
+            height: 200,
+            label: 'Drawing',
+            focusRing,
+            shapes: [{ id: 'a', bounds: { x: 10, y: 10, width: 50, height: 50 }, label: 'A' }]
+          }),
+          Box({
+            position: 'absolute',
+            left: 320,
+            top: 0,
+            width: 60,
+            height: 20,
+            focusable: true,
+            role: 'textbox',
+            label: 'Width'
+          })
+        ),
+        { width: 400, height: 200 }
+      );
+      ui.frame();
+      const canvas = ui.getByRole('listbox');
+      const field = ui.getByRole('textbox');
+      const rings = (node: UiNode) =>
+        (node.decorations ?? []).filter(
+          (shape: DecorationShape) => shape.kind === 'stroke' && shape.color === 'focusRing'
+        );
+      // A click on the canvas gives it the keyboard, as a person does.
+      ui.fireEvent.pointerDown(30, 30);
+      ui.fireEvent.pointerUp(30, 30);
+      ui.frame();
+      return { ui, canvas, field, rings };
+    };
+    // The plain ring is the keyboard's (focus-visible): a click shows none.
+    const plain = mountWith(undefined);
+    expect(plain.rings(plain.canvas)).toEqual([]);
+
+    const { ui, canvas, field, rings } = mountWith(true);
+    expect(rings(canvas)).toHaveLength(1);
+    ui.fireEvent.focus(field);
+    ui.frame();
+    expect(rings(canvas)).toEqual([]);
+    ui.fireEvent.focus(canvas);
+    ui.frame();
+    expect(rings(canvas)).toHaveLength(1);
   });
 });

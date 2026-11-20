@@ -9,6 +9,7 @@ import {
   Observable
 } from "rxjs";
 import {
+  FocusRingOptions,
   LayoutBox,
   ObjectFit,
   PaintSurface,
@@ -689,6 +690,7 @@ interface CanvasEditingOptions {
   readonly tabSelects?: boolean;
   readonly groupHandles?: boolean;
   readonly colors?: CanvasOverlayColors;
+  readonly focusRing?: boolean | FocusRingOptions;
 }
 interface CanvasEditing {
   readonly modifiers: readonly UiModifier[];
@@ -701,6 +703,8 @@ interface CanvasEditing {
     readonly onPanMove: (event: UiPointerEvent) => void;
     readonly onPanEnd: (event: UiPointerEvent) => void;
     readonly onKeyDown: (event: UiKeyboardEvent) => void;
+    readonly onFocus: () => void;
+    readonly onBlur: () => void;
   };
   readonly handle: {
     readonly pointerDown: (event: UiPointerEvent) => boolean;
@@ -715,6 +719,7 @@ interface CanvasEditing {
   readonly selection: InternalState<readonly string[]>;
   readonly hovered: InternalState<string | null>;
   readonly editing: Observable<boolean>;
+  readonly focused: Observable<boolean>;
   readonly cursor: Observable<UiCursor | undefined>;
   toLocal(event: {
     readonly x: number;
@@ -754,6 +759,7 @@ interface CanvasEditorProps extends ControlLayoutProps {
   tabSelects?: boolean;
   groupHandles?: boolean;
   colors?: CanvasOverlayColors;
+  focusRing?: boolean | FocusRingOptions;
   label?: string;
   children?: UiChild;
 }

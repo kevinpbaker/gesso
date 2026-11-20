@@ -4,8 +4,11 @@ import { internalState, type ComponentContext, type InternalState } from 'gesso-
 import {
   Box,
   Paint,
+  decorated,
   measure,
   measureFlow,
+  type DecorationShape,
+  type FocusRingOptions,
   type LayoutBox,
   type UiChild,
   type UiCursor,
@@ -219,6 +222,17 @@ export interface CanvasEditingOptions {
    */
   readonly groupHandles?: boolean;
   readonly colors?: CanvasOverlayColors;
+  /**
+   * A ring round the canvas while it has the keyboard, and none while a
+   * field beside it has it, so it is always clear where the next key
+   * goes. Unlike a control's ring, it shows after a click as well as
+   * after Tab: a canvas is clicked far more than it is tabbed to. True
+   * for the theme's ring, or the options `focusRing` takes. It is drawn
+   * on the node `modifiers` is on; the node that takes focus calls
+   * `handlers.onFocus` and `handlers.onBlur` (`CanvasEditor` does).
+   * Default false.
+   */
+  readonly focusRing?: boolean | FocusRingOptions;
 }
 
 /**
@@ -240,6 +254,10 @@ export interface CanvasEditing {
     readonly onPanMove: (event: UiPointerEvent) => void;
     readonly onPanEnd: (event: UiPointerEvent) => void;
     readonly onKeyDown: (event: UiKeyboardEvent) => void;
+    /** The canvas took the keyboard: its ring shows, with `focusRing`. */
+    readonly onFocus: () => void;
+    /** The canvas lost the keyboard: its ring goes. */
+    readonly onBlur: () => void;
   };
   /** The same, each saying whether it did anything: for chaining with an application's own. */
   readonly handle: {
@@ -259,6 +277,8 @@ export interface CanvasEditing {
   readonly hovered: InternalState<string | null>;
   /** Whether an edit is going on. */
   readonly editing: Observable<boolean>;
+  /** Whether the canvas has the keyboard, as `handlers.onFocus` and `onBlur` say. */
+  readonly focused: Observable<boolean>;
   /** The cursor the canvas should show: a resize cursor over a handle, a crosshair with a tool. */
   readonly cursor: Observable<UiCursor | undefined>;
   /** A pointer event's place in canvas pixels. */
@@ -350,6 +370,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     readout: null
   });
   const editing = new BehaviorSubject(false);
+  const focused = new BehaviorSubject(false);
   const overHandle = new BehaviorSubject<UiCursor | undefined>(undefined);
   const nodes = new Map<string, UiNode>();
   let pending: Pending | null = null;
@@ -965,8 +986,24 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     distinctUntilChanged()
   );
 
+  const ring =
+    options.focusRing === undefined || options.focusRing === false
+      ? null
+      : ringShapes(options.focusRing === true ? {} : options.focusRing);
+  const ringModifier =
+    ring === null
+      ? []
+      : [
+          decorated(
+            focused.pipe(
+              distinctUntilChanged(),
+              map(on => (on ? ring : NO_SHAPES))
+            )
+          )
+        ];
+
   return {
-    modifiers: [measure(screen), measureFlow(flow)],
+    modifiers: [measure(screen), measureFlow(flow), ...ringModifier],
     handlers: {
       onPointerDown: event => {
         pointerDown(event);
@@ -985,7 +1022,9 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
       },
       onKeyDown: event => {
         if (key(event)) event.preventDefault();
-      }
+      },
+      onFocus: () => focused.next(true),
+      onBlur: () => focused.next(false)
     },
     handle: { pointerDown, panStart, panMove, panEnd, key },
     overlay,
@@ -994,6 +1033,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     selection,
     hovered,
     editing,
+    focused,
     cursor,
     toLocal,
     scale,
@@ -1010,6 +1050,29 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
       });
     }
   };
+}
+
+const NO_SHAPES: readonly DecorationShape[] = [];
+
+/**
+ * The canvas's ring, as `focusRing` draws one: a band `offset` clear of
+ * the node and `width` thick. Drawn here rather than by `focusRing`
+ * because that one shows only for the keyboard's focus, and because the
+ * node the kit measures need not be the node that takes focus.
+ */
+function ringShapes(options: FocusRingOptions): readonly DecorationShape[] {
+  const width = options.width ?? 2;
+  const offset = options.offset ?? 2;
+  return [
+    {
+      kind: 'stroke',
+      color: options.color ?? 'focusRing',
+      lineWidth: width,
+      outset: offset + width,
+      ...(options.radius === undefined ? {} : { radius: options.radius }),
+      ...(options.after === undefined ? {} : { after: options.after })
+    }
+  ];
 }
 
 /** A box's corners, side middles and centre: what a shape with no snap points of its own snaps by. */
