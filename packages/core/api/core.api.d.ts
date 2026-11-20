@@ -3849,6 +3849,13 @@ declare class LayoutEngine {
     x: number;
     y: number;
   } | null;
+  unscrolledPoint(node: UiNode, at?: {
+    readonly x: number;
+    readonly y: number;
+  }): {
+    x: number;
+    y: number;
+  } | null;
   holdAdjustments(node: UiNode, before: {
     readonly x: number;
     readonly y: number;

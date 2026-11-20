@@ -125,6 +125,22 @@ describe('keepInPlace', () => {
     expect(mounted.runtime.debugVisibleBox(target()).x).toBeCloseTo(before + 100, 5);
   });
 
+  it('keeps a scroll made in the same frame as the layout change it holds against', () => {
+    // Calcwright opens a drawing (the panels change) and scrolls it into
+    // view a moment later, while the hold is still on.
+    const { mounted, panel, scroll, target, view } = mount();
+    const before = mounted.runtime.debugVisibleBox(target());
+    scroll.keepInPlace(target(), { for: 60_000 });
+    panel.value = 100;
+    view().setProperty('scrollY', 80);
+    drain(mounted);
+    const after = mounted.runtime.debugVisibleBox(target());
+    // Across, the layout's move is made up; down, the scroll of 30 stays.
+    expect(after.x).toBeCloseTo(before.x, 5);
+    expect(after.y).toBeCloseTo(before.y - 30, 5);
+    expect(view().getProperty('scrollY')).toBe(80);
+  });
+
   it('leaves the person’s own scroll alone while it holds', () => {
     const { mounted, scroll, target, view } = mount();
     scroll.keepInPlace(target(), { for: 60_000 });

@@ -4104,7 +4104,7 @@ export class GessoRuntime {
         this.holds.delete(hold);
         continue;
       }
-      const before = this.engine.screenPoint(hold.node, hold.at);
+      const before = this.engine.unscrolledPoint(hold.node, hold.at);
       if (before !== null) {
         points.push({ node: hold.node, at: hold.at, before });
       }
