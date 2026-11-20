@@ -119,6 +119,44 @@ The caret, a focused field and an anchored node are carried through every
 transform between them and their container first, so a field low on a
 page zoomed to 200% is found where it is on screen.
 
+### Keeping a node in place through a change
+
+The focused node is held for you. Any other node can be held by asking:
+`ScrollService.keepInPlace(node)`, called just before the change that
+would move it. After the next layout, the scroll containers above the
+node scroll by however far the layout moved it, **on both axes**, the
+innermost first and what it cannot make up passed to the next one out.
+The node is drawn where it was, as far as there is room to scroll.
+
+The case it is for: a click opens something, and opening it changes
+the layout around what was clicked. A panel folds away beside it, a
+column re-centres, an inspector opens on the right. Without a hold,
+the thing the person just clicked slides out from under the pointer,
+and their next click lands on whatever slid in.
+
+```tsx
+const scroll = ctx.inject(ScrollService);
+
+function open(drawing: UiNode, pointer: { x: number; y: number }) {
+  // `at` is a point in the node's own box: the shape under the pointer
+  // on a canvas that paints its own shapes stays under the pointer.
+  scroll.keepInPlace(drawing, { at: pointer });
+  editing.value = true; // the palette folds, the inspector opens
+}
+```
+
+| Option | Default      | What it does                                                                                            |
+| ------ | ------------ | ------------------------------------------------------------------------------------------------------- |
+| `at`   | the top left | The point to hold, in the node's own box.                                                               |
+| `for`  | one frame    | Milliseconds to keep holding, so a panel that animates shut over several frames is held on every frame. |
+
+It returns a function that lets go early. Only what a layout moves is
+made up: a scroll the person makes while a timed hold is on is theirs,
+and stays. A container cannot scroll past its ends, so a node in a
+column that fits its view entirely, with no room to scroll, still moves.
+Give the column room (a wider content box, padding at the ends) where
+holding matters more than a tidy edge.
+
 ## Being told that it scrolled
 
 A wheel is not the only thing that moves a list. A scrollbar drag, a

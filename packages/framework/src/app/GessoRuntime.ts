@@ -140,7 +140,7 @@ import { AudioService, type AudioAction, type AudioRequest, type AudioSample } f
 import { RouterService, type RouterRoutes } from '../router/RouterService';
 import { FindService } from './FindService';
 import { EditingService } from './EditingService';
-import { ScrollService } from './ScrollService';
+import { ScrollService, type HeldInPlace } from './ScrollService';
 import { FocusService } from './FocusService';
 import { MediaService, type MediaOptions } from './MediaService';
 import { FontService, type FontFamilyDeclaration } from './FontService';
@@ -486,6 +486,8 @@ export class GessoRuntime {
   private readonly layoutNotifier: LayoutNotifier;
   /** Animates a wheel scroll; see `SmoothScroller`. */
   private readonly smoothScroller: SmoothScroller;
+  /** What `ScrollService.keepInPlace` holds where it is on screen (see `settleLayout`). */
+  private readonly holds = new Set<HeldInPlace>();
   /**
    * Whether the document showing this runtime is on screen.
    *
@@ -943,6 +945,12 @@ export class GessoRuntime {
     this.services.get(FocusService).setManager(this.input.focus);
     this.services.get(EditingService).setController(this.input.editing);
     this.services.get(ScrollService).setScroller((node, padding) => this.scrollIntoView(node, padding));
+    this.services.get(ScrollService).setHolder(held => {
+      this.holds.add(held);
+      return () => {
+        this.holds.delete(held);
+      };
+    });
     // Keyboard navigation must keep the focused control visible — but
     // only keyboard navigation. A click has already shown the person
     // where they are, and revealing what they just pressed scrolls the
@@ -3863,7 +3871,8 @@ export class GessoRuntime {
     frame: UiFrame,
     root: UiNode,
     laidOut: boolean,
-    anchor: ScrollAnchor | null = null
+    anchor: ScrollAnchor | null = null,
+    held: readonly HeldPoint[] = []
   ): SettledLayout {
     const stats = this.engine.stats;
     const settled: SettledLayout = {
@@ -3912,6 +3921,30 @@ export class GessoRuntime {
             this.smoothScroller.stop(held.container);
             held.container.setProperty('scrollY', held.scrollY);
             this.graph.markDirty(held.container, DirtyFlags.Transform);
+            const scrolled = this.scheduler.recollect(frame);
+            settled.frame = settled.frame.merged(scrolled);
+            this.phaseTimings.layout += this.timePhase(
+              () => true,
+              () => this.engine.layoutForFrame(scrolled, this.constraints, root)
+            );
+            continue;
+          }
+        }
+        // The same for what `keepInPlace` holds, on both axes and up
+        // through every scroll container: a panel that folded beside
+        // it or a column that re-centred does not move it from under
+        // the pointer. After the focus anchor, so the two do not fight
+        // over one container: the held node is the one just clicked.
+        if (held.length > 0 && !this.layoutPending()) {
+          const adjustments = held.flatMap(point => this.engine.holdAdjustments(point.node, point.before, point.at));
+          held = [];
+          if (adjustments.length > 0) {
+            for (const adjustment of adjustments) {
+              this.smoothScroller.stop(adjustment.container);
+              adjustment.container.setProperty('scrollX', adjustment.scrollX);
+              adjustment.container.setProperty('scrollY', adjustment.scrollY);
+              this.graph.markDirty(adjustment.container, DirtyFlags.Transform);
+            }
             const scrolled = this.scheduler.recollect(frame);
             settled.frame = settled.frame.merged(scrolled);
             this.phaseTimings.layout += this.timePhase(
@@ -4053,6 +4086,32 @@ export class GessoRuntime {
     }
   }
 
+  /**
+   * Where each node `keepInPlace` holds is on screen before this frame's
+   * layout, for `settleLayout` to put it back after. A hold for one
+   * frame is spent here; a timed one ends once its time is up.
+   */
+  private heldPoints(): HeldPoint[] {
+    if (this.holds.size === 0) {
+      return [];
+    }
+    const time = now();
+    const points: HeldPoint[] = [];
+    for (const hold of [...this.holds]) {
+      if (hold.until === null) {
+        this.holds.delete(hold);
+      } else if (hold.until < time) {
+        this.holds.delete(hold);
+        continue;
+      }
+      const before = this.engine.screenPoint(hold.node, hold.at);
+      if (before !== null) {
+        points.push({ node: hold.node, at: hold.at, before });
+      }
+    }
+    return points;
+  }
+
   private handleFrame(collected: UiFrame): void {
     const root = this.root;
     if (root === undefined) {
@@ -4071,6 +4130,7 @@ export class GessoRuntime {
     // frame's layout, to hold it there after (see `settleLayout`).
     const focused = firstPass ? this.focusManager.focusedNode : null;
     const anchor = focused === null ? null : this.engine.scrollAnchor(focused);
+    const held = firstPass ? this.heldPoints() : [];
     this.phaseTimings.layout = this.timePhase(
       () => firstPass,
       () => this.engine.layoutForFrame(collected, this.constraints, root)
@@ -4080,7 +4140,7 @@ export class GessoRuntime {
     // when what it does in answer moves boxes, they are laid out again
     // before anything paints. From here on `frame` is everything the
     // frame changed, the listeners' writes included.
-    const settled = this.settleLayout(collected, root, firstPass, anchor);
+    const settled = this.settleLayout(collected, root, firstPass, anchor, held);
     const frame = settled.frame;
     const laidOut = settled.passes > 0;
     if (laidOut) {
@@ -4638,6 +4698,13 @@ export interface GpuStageTimings {
 
 function emptyGpuTimings(): GpuStageTimings {
   return { prepare: 0, upload: 0, encode: 0 };
+}
+
+/** A held node's screen point before a layout, for `settleLayout`. */
+interface HeldPoint {
+  readonly node: UiNode;
+  readonly at: { readonly x: number; readonly y: number } | undefined;
+  readonly before: { readonly x: number; readonly y: number };
 }
 
 /** What `settleLayout` leaves the rest of the frame. */

@@ -1548,6 +1548,64 @@ export class LayoutEngine {
   }
 
   /**
+   * Where a point of `node` is on screen, through every scroll and
+   * transform above it: `at` is in the node's own box, its top left
+   * when left out. Null when the node has no box. What `holdAdjustments`
+   * compares a later layout's place with.
+   */
+  screenPoint(node: UiNode, at?: { readonly x: number; readonly y: number }): { x: number; y: number } | null {
+    if (!this.records.has(node)) {
+      return null;
+    }
+    const box = this.screenBox(node, { x: at?.x ?? 0, y: at?.y ?? 0, width: 0, height: 0 });
+    return { x: box.x, y: box.y };
+  }
+
+  /**
+   * The scrolls that put a point of `node` back at `before`, a screen
+   * point `screenPoint` read before a layout moved it: on both axes,
+   * the innermost scroll container first and what it cannot make up
+   * passed to the next one out. `anchorAdjustment` holds the focused
+   * node against content growing above it; this holds any node against
+   * any layout change, a panel folding beside it or a column
+   * re-centring, as far as there is room to scroll. Empty when it did
+   * not move or nothing can scroll.
+   *
+   * A container's offset is taken to be in screen pixels, which it is
+   * unless the container is itself drawn through a transform.
+   */
+  holdAdjustments(
+    node: UiNode,
+    before: { readonly x: number; readonly y: number },
+    at?: { readonly x: number; readonly y: number }
+  ): ScrollAdjustment[] {
+    const now = this.screenPoint(node, at);
+    if (now === null) {
+      return [];
+    }
+    let dx = now.x - before.x;
+    let dy = now.y - before.y;
+    const adjustments: ScrollAdjustment[] = [];
+    for (let current = node.parent; current !== null; current = current.parent) {
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+        break;
+      }
+      const container = this.records.get(current);
+      if (container === undefined || !container.scrollable || scrollLeaderOf(current) !== null) {
+        continue;
+      }
+      const scrollX = this.clampScroll(container, 'x', container.scrollX + dx);
+      const scrollY = this.clampScroll(container, 'y', container.scrollY + dy);
+      if (scrollX !== container.scrollX || scrollY !== container.scrollY) {
+        adjustments.push({ container: current, scrollX, scrollY });
+      }
+      dx -= scrollX - container.scrollX;
+      dy -= scrollY - container.scrollY;
+    }
+    return adjustments;
+  }
+
+  /**
    * The scroll offsets each scroll ancestor would need so that `node`
    * is inside its viewport, `padding` pixels from the nearest edge,
    * innermost first. Nothing is changed: the caller writes the offsets

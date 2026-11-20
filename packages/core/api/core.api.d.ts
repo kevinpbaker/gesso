@@ -3842,6 +3842,20 @@ declare class LayoutEngine {
   screenBounds(node: UiNode): LayoutBox | null;
   scrollAnchor(node: UiNode): ScrollAnchor | null;
   anchorAdjustment(anchor: ScrollAnchor): ScrollAdjustment | null;
+  screenPoint(node: UiNode, at?: {
+    readonly x: number;
+    readonly y: number;
+  }): {
+    x: number;
+    y: number;
+  } | null;
+  holdAdjustments(node: UiNode, before: {
+    readonly x: number;
+    readonly y: number;
+  }, at?: {
+    readonly x: number;
+    readonly y: number;
+  }): ScrollAdjustment[];
   revealAdjustments(node: UiNode, padding?: number, inner?: LayoutBox): ScrollAdjustment[];
   private revealThroughTransforms;
   private spanIn;

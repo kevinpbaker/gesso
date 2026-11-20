@@ -1644,6 +1644,7 @@ declare class GessoRuntime {
   private hitTester;
   private readonly layoutNotifier;
   private readonly smoothScroller;
+  private readonly holds;
   private visible;
   private readonly animations;
   private readonly sharedElements;
@@ -1812,6 +1813,7 @@ declare class GessoRuntime {
   private finishSettling;
   private warnLayoutPasses;
   private updateHolds;
+  private heldPoints;
   private handleFrame;
   private scheduleAnimationTick;
   private scheduleRendererRepaint;
@@ -2913,10 +2915,28 @@ declare class EditingService {
   offsetNear(node: UiNode | null, x: number, y: number): number | null;
   select(anchor: UiTextPosition, focus: UiTextPosition): boolean;
 }
+interface KeepInPlaceOptions {
+  readonly at?: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly for?: number;
+}
+interface HeldInPlace {
+  readonly node: UiNode;
+  readonly at: {
+    readonly x: number;
+    readonly y: number;
+  } | undefined;
+  readonly until: number | null;
+}
 declare class ScrollService {
   private scroller;
+  private holder;
   setScroller(scroller: ((node: UiNode, padding: number) => void) | null): void;
+  setHolder(holder: ((held: HeldInPlace) => () => void) | null): void;
   scrollIntoView(node: UiNode, padding?: number): void;
+  keepInPlace(node: UiNode, options?: KeepInPlaceOptions): () => void;
 }
 declare class FocusService {
   readonly focused: InternalState<UiNode | null>;
@@ -3183,6 +3203,7 @@ export {
   Input,
   InspectionHost,
   InspectionService,
+  KeepInPlaceOptions,
   liveInput,
   MARK_PREFIX,
   markInstant,
@@ -3514,6 +3535,7 @@ import {
   Input,
   InspectionHost,
   InspectionService,
+  KeepInPlaceOptions,
   liveInput,
   MARK_PREFIX,
   markInstant,
@@ -3885,6 +3907,7 @@ export {
   type InputValue,
   type InspectionHost,
   type JsonSchema,
+  type KeepInPlaceOptions,
   type MediaOptions,
   type MediaSessionLike,
   type MessageEndpoint,
