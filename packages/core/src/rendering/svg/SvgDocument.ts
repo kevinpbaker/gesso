@@ -13,9 +13,9 @@ import { parseSvgXml, type SvgXmlElement } from './SvgXml';
  *
  * What a design tool exports is what is read: shapes and paths, groups
  * and `<use>`, transforms, solid fills and strokes with their
- * opacities, linear and radial gradients, clip paths, masks, a filter
- * that is one drop shadow, a `<style>` of simple selectors, and nested
- * `<svg>`. What is not drawn yet is named in `unsupported`, so a file
+ * opacities, text in a font (filled, one line a run), linear and
+ * radial gradients, clip paths, masks, a filter that is one drop
+ * shadow, a `<style>` of simple selectors, and nested `<svg>`. What is not drawn yet is named in `unsupported`, so a file
  * that leans on it can say so rather than look subtly wrong.
  */
 export interface SvgDocument {
@@ -62,7 +62,7 @@ export interface SvgSelector {
 }
 
 /** Elements drawn as nothing, because nothing here draws them yet. */
-const UNSUPPORTED_ELEMENTS = new Set(['text', 'image', 'foreignObject', 'pattern', 'marker']);
+const UNSUPPORTED_ELEMENTS = new Set(['image', 'foreignObject', 'pattern', 'marker', 'textPath']);
 /** Attributes that point at one of those. */
 const UNSUPPORTED_ATTRIBUTES: Readonly<Record<string, string>> = {
   'marker-start': 'marker',

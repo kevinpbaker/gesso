@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { percent } from '../../layout/UiLength';
+import { measurePaintText } from '../PaintFont';
 import { PaintRecorder, type PaintOp } from '../PaintRecording';
 import { parseSvg } from './SvgDocument';
 import { drawSvg, parseTransform, svgPaint, type SvgDrawOptions } from './SvgDraw';
@@ -42,6 +43,17 @@ describe('reading the file', () => {
     expect(root?.children[0]?.children[0]?.attributes.d).toBe('M0 0');
   });
 
+  it('keeps text and children in the order the file has them', () => {
+    const root = parseSvgXml('<svg><text>Baker <tspan>Structural</tspan> Ltd</text></svg>');
+    const text = root!.children[0]!;
+    expect(text.text).toBe('Baker  Ltd');
+    expect(text.content.map(part => (typeof part === 'string' ? part : `<${part.name}>`))).toEqual([
+      'Baker ',
+      '<tspan>',
+      ' Ltd'
+    ]);
+  });
+
   it('takes its size from width and height, else its viewBox', () => {
     expect(parseSvg('<svg width="209" height="149" viewBox="0 0 209 149"/>')).toMatchObject({
       width: 209,
@@ -54,9 +66,9 @@ describe('reading the file', () => {
 
   it('says what it cannot draw, once each', () => {
     const document = parseSvg(
-      '<svg viewBox="0 0 10 10"><text>A</text><text>B</text><rect filter="url(#f)"/><image/></svg>'
+      '<svg viewBox="0 0 10 10"><image/><image/><rect filter="url(#f)"/><text><textPath>A</textPath></text></svg>'
     );
-    expect(document.unsupported).toEqual(['text', 'image', 'filter']);
+    expect(document.unsupported).toEqual(['image', 'textPath', 'filter']);
   });
 
   it('draws a mask and a drop shadow, and says so of any other filter or a mask that names nothing', () => {
@@ -353,6 +365,47 @@ describe('drawing it', () => {
     ]);
     expect(only(ops, 'beginMaskedLayer')).toHaveLength(1);
     expect(only(ops, 'fill')).toHaveLength(3);
+  });
+
+  it("draws a logo's live text: each run in its font, after the last, filled, with white space collapsed", () => {
+    const ops = draw(
+      '<svg viewBox="0 0 200 40"><style>.name{font-family:Helvetica, Arial, sans-serif;font-weight:bold}</style>' +
+        '<text class="name" x="10" y="30" font-size="20" fill="#1d4ed8">  Baker\n   <tspan font-weight="normal" fill="#64748b">Structural</tspan></text></svg>',
+      { width: 200, height: 40 }
+    );
+    const texts = only(ops, 'text');
+    expect(texts).toHaveLength(2);
+    const [name, rest] = texts as Extract<PaintOp, { op: 'text' }>[];
+    expect(name).toMatchObject({
+      value: 'Baker ',
+      x: 10,
+      y: 30,
+      style: { fontSize: 20, fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: 700 }
+    });
+    // The tspan carries on where the first run ended, in its own weight and colour.
+    expect(rest).toMatchObject({ value: 'Structural', y: 30, style: { fontSize: 20, fontWeight: 400 } });
+    expect(rest!.x).toBeGreaterThan(10);
+    expect(only(ops, 'fillColor', 'text').map(op => op.op)).toEqual(['fillColor', 'text', 'fillColor', 'text']);
+    expect(only(ops, 'fillColor')[1]).toEqual({
+      op: 'fillColor',
+      color: { r: 0x64 / 255, g: 0x74 / 255, b: 0x8b / 255, a: 1 }
+    });
+  });
+
+  it('places a chunk by its text-anchor, moves runs by x, y, dx and dy, and skips text with no fill', () => {
+    const ops = draw(
+      '<svg viewBox="0 0 100 100"><text x="50" y="20" text-anchor="middle" font-size="10">AB<tspan dx="2">CD</tspan></text>' +
+        '<text x="5" y="40">one<tspan x="5" dy="12">two</tspan></text><text fill="none" x="0" y="90">gone</text></svg>',
+      { width: 100, height: 100 }
+    );
+    const texts = only(ops, 'text') as Extract<PaintOp, { op: 'text' }>[];
+    expect(texts.map(t => t.value)).toEqual(['AB', 'CD', 'one', 'two']);
+    const width = (value: string) => measurePaintText(value, { fontSize: 10, fontWeight: 400 });
+    const whole = width('AB') + 2 + width('CD');
+    expect(texts[0]!.x).toBeCloseTo(50 - whole / 2);
+    expect(texts[1]!.x).toBeCloseTo(50 - whole / 2 + width('AB') + 2);
+    expect(texts[2]).toMatchObject({ x: 5, y: 40 });
+    expect(texts[3]).toMatchObject({ x: 5, y: 52 });
   });
 
   it('draws a <use> that reaches itself as nothing, rather than forever', () => {

@@ -2,10 +2,10 @@
  * Just enough XML to read an SVG file, in a worker.
  *
  * A render worker has no `DOMParser`, and an SVG file is XML, so the
- * file is read here: elements, their attributes and their nesting.
- * Text is kept only where SVG gives it meaning to a drawing, inside
- * `<style>`; everything else that is not an element (the declaration,
- * a doctype, comments, processing instructions) is skipped.
+ * file is read here: elements, their attributes and their nesting, and
+ * the text inside them (a `<style>`'s rules, a `<text>`'s words);
+ * everything else that is not an element (the declaration, a doctype,
+ * comments, processing instructions) is skipped.
  *
  * Forgiving on purpose, in the way `tracePathData` is: a file a
  * design tool exported is well formed, and one that is not is better
@@ -20,6 +20,8 @@ export interface SvgXmlElement {
   readonly children: readonly SvgXmlElement[];
   /** The text directly inside it, joined; empty for an element with none. */
   readonly text: string;
+  /** Its text and its children in the order the file has them, for a `<text>` whose words run between `<tspan>`s. */
+  readonly content: readonly (string | SvgXmlElement)[];
 }
 
 interface Building {
@@ -27,6 +29,18 @@ interface Building {
   readonly attributes: Record<string, string>;
   readonly children: SvgXmlElement[];
   text: string;
+  readonly content: (string | SvgXmlElement)[];
+}
+
+/** Text added to an element, kept both joined and in its place among the children. */
+function addText(element: Building, text: string): void {
+  element.text += text;
+  const last = element.content.at(-1);
+  if (typeof last === 'string') {
+    element.content[element.content.length - 1] = last + text;
+  } else {
+    element.content.push(text);
+  }
 }
 
 /**
@@ -45,6 +59,7 @@ export function parseSvgXml(source: string): SvgXmlElement | null {
       root ??= element;
     } else {
       parent.children.push(element);
+      parent.content.push(element);
     }
   };
 
@@ -54,7 +69,7 @@ export function parseSvgXml(source: string): SvgXmlElement | null {
       break;
     }
     if (open > index && stack.length > 0) {
-      stack.at(-1)!.text += decodeEntities(source.slice(index, open));
+      addText(stack.at(-1)!, decodeEntities(source.slice(index, open)));
     }
     if (source.startsWith('<!--', open)) {
       const end = source.indexOf('-->', open + 4);
@@ -65,7 +80,7 @@ export function parseSvgXml(source: string): SvgXmlElement | null {
       const end = source.indexOf(']]>', open + 9);
       const text = source.slice(open + 9, end === -1 ? source.length : end);
       if (stack.length > 0) {
-        stack.at(-1)!.text += text;
+        addText(stack.at(-1)!, text);
       }
       index = end === -1 ? source.length : end + 3;
       continue;
@@ -89,7 +104,7 @@ export function parseSvgXml(source: string): SvgXmlElement | null {
       continue;
     }
     const tag = readTag(source, open);
-    stack.push({ name: tag.name, attributes: tag.attributes, children: [], text: '' });
+    stack.push({ name: tag.name, attributes: tag.attributes, children: [], text: '', content: [] });
     if (tag.selfClosing) {
       close();
     }

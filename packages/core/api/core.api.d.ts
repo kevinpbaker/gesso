@@ -4269,6 +4269,7 @@ interface SvgXmlElement {
   readonly attributes: Readonly<Record<string, string>>;
   readonly children: readonly SvgXmlElement[];
   readonly text: string;
+  readonly content: readonly (string | SvgXmlElement)[];
 }
 interface SvgDocument {
   readonly root: SvgXmlElement;

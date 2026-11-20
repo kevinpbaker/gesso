@@ -149,6 +149,12 @@ interface Style {
   /** What `currentColor` is here, when an element set `color`. */
   readonly color: UiColorValue | null;
   readonly visible: boolean;
+  /** The font a `<text>` is set in; the family undefined for the surface's own. */
+  readonly fontFamily: string | undefined;
+  readonly fontSize: number;
+  readonly fontWeight: number;
+  readonly fontStyle: 'normal' | 'italic' | 'oblique';
+  readonly textAnchor: 'start' | 'middle' | 'end';
 }
 
 const BLACK: Paint = { kind: 'color', color: { r: 0, g: 0, b: 0, a: 1 } };
@@ -168,7 +174,12 @@ const INITIAL_STYLE: Style = {
   dashOffset: 0,
   clipRule: 'nonzero',
   color: null,
-  visible: true
+  visible: true,
+  fontFamily: undefined,
+  fontSize: 16,
+  fontWeight: 400,
+  fontStyle: 'normal',
+  textAnchor: 'start'
 };
 
 /** Drawn only when something points at them, or not at all. */
@@ -186,7 +197,7 @@ const NOT_DRAWN = new Set([
   'filter',
   'pattern',
   'marker',
-  'text',
+  'tspan',
   'image',
   'foreignObject'
 ]);
@@ -231,6 +242,9 @@ function drawElement(element: SvgXmlElement, inherited: Style, viewport: SvgRect
         break;
       case 'use':
         drawUse(element, style, viewport, at);
+        break;
+      case 'text':
+        drawText(element, style, viewport, at);
         break;
       default: {
         const shape = shapeOf(element, name, viewport);
@@ -598,6 +612,205 @@ function ellipse(cx: number, cy: number, rx: number, ry: number): Shape | null {
   }
   const d = `M${cx - rx} ${cy}A${rx} ${ry} 0 1 0 ${cx + rx} ${cy}` + `A${rx} ${ry} 0 1 0 ${cx - rx} ${cy}Z`;
   return { trace: surface => surface.path(d) };
+}
+
+/** A font size as SVG writes one: a number or px, pt, em (of the parent's) or a percentage of the parent's; keywords near CSS's. */
+function fontSizeOf(value: string, parent: number): number | undefined {
+  const trimmed = value.trim();
+  const keywords: Readonly<Record<string, number>> = {
+    'xx-small': 9,
+    'x-small': 10,
+    small: 13,
+    medium: 16,
+    large: 18,
+    'x-large': 24,
+    'xx-large': 32,
+    smaller: parent / 1.2,
+    larger: parent * 1.2
+  };
+  if (keywords[trimmed] !== undefined) {
+    return keywords[trimmed];
+  }
+  const parsed = parseFloat(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return undefined;
+  }
+  if (trimmed.endsWith('%')) {
+    return (parsed / 100) * parent;
+  }
+  if (trimmed.endsWith('em')) {
+    return parsed * parent;
+  }
+  if (trimmed.endsWith('pt')) {
+    return (parsed * 4) / 3;
+  }
+  return parsed;
+}
+
+/** A font weight as a number: `bold` 700, `normal` 400, `bolder` and `lighter` from the parent's. */
+function fontWeightOf(value: string, parent: number): number | undefined {
+  const trimmed = value.trim();
+  if (trimmed === 'normal') {
+    return 400;
+  }
+  if (trimmed === 'bold') {
+    return 700;
+  }
+  if (trimmed === 'bolder') {
+    return parent < 400 ? 400 : parent < 600 ? 700 : 900;
+  }
+  if (trimmed === 'lighter') {
+    return parent > 700 ? 700 : parent > 500 ? 400 : 100;
+  }
+  const parsed = parseFloat(trimmed);
+  return Number.isFinite(parsed) && parsed >= 1 && parsed <= 1000 ? parsed : undefined;
+}
+
+/** One run of a `<text>`: its words, its style, and where it moves the pen first. */
+interface TextRun {
+  readonly value: string;
+  readonly style: Style;
+  readonly x: number | undefined;
+  readonly y: number | undefined;
+  readonly dx: number;
+  readonly dy: number;
+}
+
+/** The first of a list of lengths, as `x`, `y`, `dx` and `dy` may hold one per character. */
+function firstLength(value: string | undefined, extent: number): number | undefined {
+  const first = value?.trim().split(/[\s,]+/)[0];
+  return first === undefined || first === '' ? undefined : length(first, extent);
+}
+
+/**
+ * Draws a `<text>`: its words and its `<tspan>`s' in the order the file
+ * has them, each run after the last unless it says where to go (`x`,
+ * `y`, `dx`, `dy`, the first of a list), in its own font, filled. Runs
+ * from one absolute `x` to the next are a chunk, which `text-anchor`
+ * places as a whole. White space is collapsed as SVG's default does.
+ *
+ * Each run is one line through `PaintSurface.text`, so what SVG does per
+ * character (`rotate`, a list of positions, `textLength`) and a text
+ * stroke are not drawn: a logo's name in a font, which is what a file
+ * exported with live text holds, is.
+ */
+function drawText(element: SvgXmlElement, style: Style, viewport: SvgRect, context: Context): void {
+  const runs: TextRun[] = [];
+  const collect = (from: SvgXmlElement, at: Style, positioned: boolean): void => {
+    let pending = positioned
+      ? {
+          x: firstLength(from.attributes.x, viewport.width),
+          y: firstLength(from.attributes.y, viewport.height),
+          dx: firstLength(from.attributes.dx, viewport.width) ?? 0,
+          dy: firstLength(from.attributes.dy, viewport.height) ?? 0
+        }
+      : { x: undefined, y: undefined, dx: 0, dy: 0 };
+    for (const part of from.content) {
+      if (typeof part === 'string') {
+        runs.push({ value: part, style: at, ...pending });
+        pending = { x: undefined, y: undefined, dx: 0, dy: 0 };
+        continue;
+      }
+      const name = localName(part.name);
+      if (name !== 'tspan' && name !== 'a') {
+        continue;
+      }
+      const declared = declarationsOf(part, context.document);
+      if (declared.display === 'none') {
+        continue;
+      }
+      // A child's own position wins; one it does not give is the parent's still to come.
+      const child = cascade(at, declared, context);
+      const before = runs.length;
+      collect(part, child, name === 'tspan');
+      if (
+        runs.length > before &&
+        (pending.x !== undefined || pending.y !== undefined || pending.dx !== 0 || pending.dy !== 0)
+      ) {
+        const first = runs[before]!;
+        runs[before] = {
+          ...first,
+          x: first.x ?? pending.x,
+          y: first.y ?? pending.y,
+          dx: first.dx + pending.dx,
+          dy: first.dy + pending.dy
+        };
+        pending = { x: undefined, y: undefined, dx: 0, dy: 0 };
+      }
+    }
+  };
+  collect(element, style, true);
+  // White space as SVG's default: each run of it one space, none at either end.
+  let spaced = true;
+  const words = runs.map(run => {
+    let value = run.value.replace(/[\t\n\r ]+/g, ' ');
+    if (spaced && value.startsWith(' ')) {
+      value = value.slice(1);
+    }
+    if (value !== '') {
+      spaced = value.endsWith(' ');
+    }
+    return { ...run, value };
+  });
+  const last = words.findLastIndex(run => run.value !== '');
+  if (last !== -1) {
+    words[last] = { ...words[last]!, value: words[last]!.value.replace(/ $/, '') };
+  }
+  const { surface } = context;
+  const font = (at: Style) => ({
+    fontSize: at.fontSize,
+    ...(at.fontFamily === undefined ? {} : { fontFamily: at.fontFamily }),
+    fontWeight: at.fontWeight,
+    fontStyle: at.fontStyle
+  });
+  // Placed: the pen moved run by run, and each chunk shifted by its anchor once its width is known.
+  const placed: { run: TextRun; x: number; y: number; width: number }[] = [];
+  let penX = 0;
+  let penY = 0;
+  let chunk: { start: number; from: number; anchor: Style['textAnchor'] } | null = null;
+  const endChunk = (): void => {
+    if (chunk === null || chunk.anchor === 'start') {
+      return;
+    }
+    const width = penX - chunk.from;
+    const shift = chunk.anchor === 'middle' ? width / 2 : width;
+    for (let i = chunk.start; i < placed.length; i++) {
+      placed[i] = { ...placed[i]!, x: placed[i]!.x - shift };
+    }
+  };
+  for (const run of words) {
+    if (run.x !== undefined || chunk === null) {
+      endChunk();
+      penX = run.x ?? penX;
+      chunk = { start: placed.length, from: penX + run.dx, anchor: run.style.textAnchor };
+    }
+    penY = run.y ?? penY;
+    penX += run.dx;
+    penY += run.dy;
+    if (run.value === '') {
+      continue;
+    }
+    const width = surface.measureText(run.value, font(run.style));
+    placed.push({ run, x: penX, y: penY, width });
+    penX += width;
+  }
+  endChunk();
+  for (const { run, x, y, width } of placed) {
+    const at = run.style;
+    if (!at.visible || at.fill.kind === 'none' || at.fillOpacity <= 0) {
+      continue;
+    }
+    surface.save();
+    if (at.fillOpacity < 1) {
+      surface.alpha(at.fillOpacity);
+    }
+    // The run's box, for a gradient laid out on the bounding box.
+    const box: Shape = { trace: target => target.rect(x, y - at.fontSize * 0.8, width, at.fontSize) };
+    if (setPaint(at.fill, 'fill', box, at, viewport, context)) {
+      surface.text(run.value, x, y, font(at));
+    }
+    surface.restore();
+  }
 }
 
 function paintShape(shape: Shape, style: Style, viewport: SvgRect, context: Context): void {
@@ -1035,6 +1248,15 @@ function cascade(parent: Style, declared: Record<string, string>, context: Conte
     }),
     dashOffset: pick('dashOffset', 'stroke-dashoffset', number),
     clipRule: pick('clipRule', 'clip-rule', value => (value === 'evenodd' ? 'evenodd' : 'nonzero')),
+    fontFamily: pick('fontFamily', 'font-family', value => (value.trim() === '' ? undefined : value.trim())),
+    fontSize: pick('fontSize', 'font-size', value => fontSizeOf(value, here.fontSize)),
+    fontWeight: pick('fontWeight', 'font-weight', value => fontWeightOf(value, here.fontWeight)),
+    fontStyle: pick('fontStyle', 'font-style', value =>
+      value === 'italic' || value === 'oblique' || value === 'normal' ? value : undefined
+    ),
+    textAnchor: pick('textAnchor', 'text-anchor', value =>
+      value === 'middle' || value === 'end' || value === 'start' ? value : undefined
+    ),
     visible: pick('visible', 'visibility', value =>
       value === 'visible' || value === 'inherit' ? true : value === 'hidden' || value === 'collapse' ? false : undefined
     )
