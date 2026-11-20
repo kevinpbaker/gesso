@@ -153,6 +153,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Slider', link: '/components/slider' },
       { text: 'RangeSlider', link: '/components/range-slider' },
       { text: 'NumberInput', link: '/components/number-input' },
+      { text: 'Property inspector', link: '/components/inspector' },
       { text: 'DataTable', link: '/components/data-table' },
       { text: 'DataGrid', link: '/components/data-grid' },
       { text: 'Tree', link: '/components/tree' },

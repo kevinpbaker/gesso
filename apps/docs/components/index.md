@@ -161,7 +161,8 @@ The pages, by what they are for:
 - **Entering a value:** [TextInput and TextArea](/components/text-input),
   [RichTextEditor](/components/rich-text-editor),
   [Slider](/components/slider), [RangeSlider](/components/range-slider),
-  [NumberInput](/components/number-input).
+  [NumberInput](/components/number-input), and the
+  [property inspector](/components/inspector)'s sections, rows and unit fields.
 - **Showing data:** [DataTable](/components/data-table),
   [DataGrid](/components/data-grid), [Tree](/components/tree), [LazyList](/components/lazy-list).
 - **Arranging a screen:** [Tabs](/components/tabs),

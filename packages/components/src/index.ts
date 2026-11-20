@@ -52,6 +52,18 @@ export { type RichTextToken } from './richText/inline';
 export { RICH_TEXT_SLASH_COMMANDS, type RichTextBlockKind, type RichTextSlashCommand } from './richText/slash';
 export { Card, Divider, Toolbar, Tabs, Accordion } from './Structure';
 export type { ToolbarItem } from './ToolbarItems';
+export {
+  InspectorSection,
+  InspectorRow,
+  UnitField,
+  sharedValue,
+  parseQuantity,
+  type InspectorSectionProps,
+  type InspectorRowProps,
+  type UnitFieldProps,
+  type NudgePhase,
+  type SharedValue
+} from './Inspector';
 export type {
   CardProps,
   DividerProps,

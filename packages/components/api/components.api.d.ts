@@ -459,6 +459,47 @@ interface AccordionProps extends ControlLayoutProps {
   exclusive?: boolean;
 }
 declare function Accordion(inputs: Inputs<AccordionProps>, _ctx: ComponentContext): UiChild;
+interface SharedValue<T> {
+  readonly value: T | undefined;
+  readonly mixed: boolean;
+}
+declare function sharedValue<T>(values: readonly T[], equal?: (a: T, b: T) => boolean): SharedValue<T>;
+interface InspectorSectionProps extends ControlLayoutProps {
+  title?: string;
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  actions?: UiChild;
+  children?: UiChild;
+}
+declare function InspectorSection(inputs: Inputs<InspectorSectionProps>, _ctx: ComponentContext): UiChild;
+interface InspectorRowProps extends ControlLayoutProps {
+  label?: string;
+  labelWidth?: number;
+  children?: UiChild;
+}
+declare function InspectorRow(inputs: Inputs<InspectorRowProps>, _ctx: ComponentContext): UiChild;
+type NudgePhase = 'live' | 'end';
+interface UnitFieldProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  value?: number;
+  mixed?: boolean;
+  label?: string;
+  short?: string;
+  unit?: string;
+  units?: Readonly<Record<string, number>>;
+  min?: number;
+  max?: number;
+  step?: number;
+  precision?: number;
+  scrubPixels?: number;
+  disabled?: boolean;
+  onChange?: (value: number) => void;
+  onCommit?: (value: number) => void;
+  onNudge?: (delta: number, phase: NudgePhase) => void;
+}
+declare function UnitField(inputs: Inputs<UnitFieldProps>, ctx: ComponentContext): UiChild;
+declare function parseQuantity(text: string, unit: string, units: Readonly<Record<string, number>> | undefined): number | undefined;
 interface SplitPaneProps extends ControlLayoutProps {
   split?: number;
   defaultSplit?: number;
@@ -1424,6 +1465,8 @@ export {
   hsvOfHex,
   Icon,
   Image,
+  InspectorRow,
+  InspectorSection,
   isFormulaError,
   isMenuBarSubmenu,
   isoDate,
@@ -1449,6 +1492,7 @@ export {
   PALETTE,
   parseCellName,
   parseIsoDate,
+  parseQuantity,
   pattern,
   plainNodeOf,
   PlainView,
@@ -1467,6 +1511,7 @@ export {
   ScrollArea,
   SegmentedControl,
   Select,
+  sharedValue,
   Skeleton,
   SkeletonText,
   Slider,
@@ -1555,6 +1600,8 @@ export {
   type Hsv,
   type IconProps,
   type ImageProps,
+  type InspectorRowProps,
+  type InspectorSectionProps,
   type Keymap,
   type LazyListProps,
   type LinkProps,
@@ -1575,6 +1622,7 @@ export {
   type NavigationIcon,
   type NavigationItem,
   type NavigationRailProps,
+  type NudgePhase,
   type NumberInputProps,
   type OverlayHandle,
   type OverlayOptions,
@@ -1612,6 +1660,7 @@ export {
   type SegmentedOption,
   type SelectOption,
   type SelectProps,
+  type SharedValue,
   type SkeletonProps,
   type SkeletonTextProps,
   type SliderProps,
@@ -1635,6 +1684,7 @@ export {
   type TreeDecoration,
   type TreeNode,
   type TreeProps,
+  type UnitFieldProps,
   type Validator,
   type ValueOf,
   type VideoControlsOptions,
@@ -1643,6 +1693,7 @@ export {
   type VideoProps,
   type VideoReadout,
   type VirtualList,
+  UnitField,
   useOverlay,
   Video,
   VideoControls,
