@@ -1497,14 +1497,21 @@ export class LayoutEngine {
    * it there across a layout: taken before the layout, and handed to
    * `anchorAdjustment` after it. Null when the node has no box yet, or
    * no scroll container above it (one that follows another's scroll,
-   * `scrollWith`, is passed over: its offset is not its own).
+   * `scrollWith`, is passed over: its offset is not its own), or when
+   * the node, its container or a node between them is
+   * `overflowAnchor: 'none'`.
    */
   scrollAnchor(node: UiNode): ScrollAnchor | null {
     const rec = this.records.get(node);
-    if (rec === undefined) {
+    if (rec === undefined || node.properties.get('overflowAnchor') === 'none') {
       return null;
     }
     for (let current = node.parent; current !== null; current = current.parent) {
+      // As CSS reads it: 'none' on a node opts out what is inside it,
+      // and on the container, everything it scrolls.
+      if (current.properties.get('overflowAnchor') === 'none') {
+        return null;
+      }
       const container = this.records.get(current);
       if (container === undefined || !container.scrollable || scrollLeaderOf(current) !== null) {
         continue;

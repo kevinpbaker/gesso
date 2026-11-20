@@ -242,7 +242,8 @@ or `300,200` means depends on the tool and the units, so
 `typedValue(text, edit)` does. It is given the edit as the pointer makes
 it and returns it made exact, or null for text it cannot read. The
 shape follows the typed value as it is typed, and the pointer still
-sets the direction.
+sets the direction. While a value is typed, the pointer's snap mark,
+its label and its guides are not shown: the value places the point.
 
 ```ts
 typedValue: (text, edit) => {

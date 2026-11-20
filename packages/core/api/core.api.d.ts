@@ -1505,6 +1505,7 @@ declare const UiProperties: {
   readonly scrollWith: UiPropertyDefinition<UiNode | null | undefined>;
   readonly scrollWithAxis: UiPropertyDefinition<"both" | "x" | "y" | undefined>;
   readonly overscrollBehavior: UiPropertyDefinition<"auto" | "contain" | undefined>;
+  readonly overflowAnchor: UiPropertyDefinition<"auto" | "none" | undefined>;
   readonly hitTestable: UiPropertyDefinition<boolean | undefined>;
   readonly virtualIndex: UiPropertyDefinition<number | undefined>;
   readonly virtualLead: UiPropertyDefinition<boolean | undefined>;
@@ -1573,7 +1574,7 @@ type GridItemProps = PropsOf<'column' | 'columnSpan' | 'row' | 'rowSpan'>;
 type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 'inset' | 'zIndex' | 'lift' | 'liftBoundary' | 'anchor' | 'anchorPoint' | 'anchorRect' | 'placement' | 'anchorOffset'>;
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform' | 'rasterize' | 'holdUnseen'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
-type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'touchEmulation' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput'>;
+type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'touchEmulation' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput' | 'overflowAnchor'>;
 type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
 type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textScale' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets' | 'provide'>;
 type ModifierProps = {

@@ -125,6 +125,13 @@ export interface ToolbarProps extends ControlLayoutProps {
    * built with none stays the plain row it always was.
    */
   items?: readonly ToolbarItem[];
+  /**
+   * With `items`: the tools wrap onto more rows when they do not fit,
+   * instead of folding into a ⋯ menu. Still one tab stop: Left and
+   * Right walk every tool across the rows, and Up and Down go to the
+   * nearest tool in the row above or below. Read once.
+   */
+  wrap?: boolean;
   /** A tool pressed, on the bar or in the ⋯ menu, by its `value`. */
   onSelect?: (value: string) => void;
   /** The ⋯ button's name and tooltip. */
@@ -176,6 +183,7 @@ export function Toolbar(inputs: Inputs<ToolbarProps>, ctx: ComponentContext): Ui
         moreLabel: input(inputs.moreLabel, 'More'),
         shortcutBadges: inputs.shortcutBadges.value === true,
         keepFocus: inputs.keepFocus.value === true,
+        wrap: inputs.wrap.value === true,
         onFocusChange: focused => inputs.onFocusChange.emit(focused)
       }),
       followedChildren(inputs.children, () => Row())

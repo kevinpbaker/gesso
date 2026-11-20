@@ -1786,6 +1786,37 @@ export const UiProperties = {
     affects: DirtyFlags.None
   }),
 
+  /**
+   * `'none'` opts out of the focus anchor: a layout that moves the
+   * focused node within its scroll container leaves the container's
+   * offset alone, so the node moves on screen as its box moved.
+   *
+   * Named after the CSS property it means the same thing as, and read
+   * where CSS reads it: on the focused node or any node above it, up to
+   * and including its scroll container. On a node it covers the node
+   * and everything inside it; on a scroll container, every focused node
+   * it holds. `'auto'`, the default, holds the focused node still.
+   *
+   * The case it is for: a node that moves its own box to keep what it
+   * draws still. A canvas that grows up or left moves its box up by as
+   * much as it grew and draws its content that much lower in it, so the
+   * content is where it was; anchoring would scroll by the move and
+   * carry the content away. CSS would pick another anchor then; the
+   * runtime anchors only the focused node, so with `'none'` nothing is
+   * anchored for that layout.
+   *
+   * `ScrollService.keepInPlace` holds are not affected: a node asked for
+   * by name is held whatever this says.
+   *
+   * Read before each layout, so it affects nothing laid out or painted.
+   */
+  overflowAnchor: defineProperty<'auto' | 'none' | undefined>({
+    name: 'overflowAnchor',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.None
+  }),
+
   // -------------------------------------------------------------------------
   // Interaction and internal markers
   // -------------------------------------------------------------------------

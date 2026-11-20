@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Box, Column, ScrollView, type UiNode } from 'gesso-core';
 import { internalState } from '../InternalState';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
+import { ScrollService } from './ScrollService';
 
 /**
  * Holding the focused node in place in its scroll container.
@@ -21,19 +22,23 @@ function drain(mounted: MountedRuntime, limit = 200): void {
   }
 }
 
-function mount(scrolled = 0) {
+/** Where `overflowAnchor: 'none'` goes: the focused field, the column round it, or the scroll container. */
+type OptOut = 'field' | 'column' | 'list';
+
+function mount(scrolled = 0, optOut?: OptOut) {
   const summary = internalState(40);
   const offset = internalState(scrolled);
+  const none = (on: OptOut) => (optOut === on ? { overflowAnchor: 'none' as const } : {});
   let field: UiNode | null = null;
   let list: UiNode | null = null;
   const mounted = mountRuntime(
     ScrollView(
-      { width: 300, height: 200, scrollY: offset, ref: (n: UiNode | null) => (list = n) },
+      { width: 300, height: 200, scrollY: offset, ref: (n: UiNode | null) => (list = n), ...none('list') },
       Column(
-        { width: 300 },
+        { width: 300, ...none('column') },
         Box({ width: 300, height: summary }),
         Box({ width: 300, height: 120 }),
-        Box({ width: 200, height: 30, focusable: true, ref: (n: UiNode | null) => (field = n) }),
+        Box({ width: 200, height: 30, focusable: true, ref: (n: UiNode | null) => (field = n), ...none('field') }),
         Box({ width: 300, height: 800 })
       )
     )
@@ -124,5 +129,79 @@ describe('scroll anchoring', () => {
     summary.value = 70;
     drain(mounted);
     expect(list!.getProperty('scrollY')).toBeCloseTo(310, 5);
+  });
+});
+
+/**
+ * `overflowAnchor: 'none'`, as in CSS.
+ *
+ * Calcwright's open drawing grows up and left: its box moves up by what
+ * it grew, and it draws its content that much lower in the box, so what
+ * is drawn stays put. The drawing has the keyboard, so the anchor
+ * scrolled the desk by the move and carried the drawing down the screen.
+ */
+describe('overflowAnchor', () => {
+  for (const on of ['field', 'column', 'list'] as const) {
+    it(`'none' on the ${on} leaves the scroll as it is when the focused field moves up`, () => {
+      const { mounted, summary, field, list } = mount(50, on);
+      mounted.runtime.input.focus.focus(field());
+      drain(mounted);
+      const before = mounted.runtime.debugVisibleBox(field()).y;
+
+      summary.value = 10;
+      drain(mounted);
+      expect(list().getProperty('scrollY')).toBe(50);
+      expect(mounted.runtime.debugVisibleBox(field()).y).toBeCloseTo(before - 30, 5);
+    });
+  }
+
+  it('without it, the same move still scrolls to hold the field', () => {
+    const { mounted, summary, field, list } = mount(50);
+    mounted.runtime.input.focus.focus(field());
+    drain(mounted);
+
+    summary.value = 10;
+    drain(mounted);
+    expect(list().getProperty('scrollY')).toBeCloseTo(20, 5);
+  });
+
+  it("'auto' holds the field, as no value does", () => {
+    const summary = internalState(40);
+    let field: UiNode | null = null;
+    let list: UiNode | null = null;
+    const mounted = mountRuntime(
+      ScrollView(
+        { width: 300, height: 200, scrollY: 50, overflowAnchor: 'auto', ref: (n: UiNode | null) => (list = n) },
+        Column(
+          { width: 300 },
+          Box({ width: 300, height: summary }),
+          Box({ width: 300, height: 120 }),
+          Box({ width: 200, height: 30, focusable: true, ref: (n: UiNode | null) => (field = n) }),
+          Box({ width: 300, height: 800 })
+        )
+      )
+    );
+    drain(mounted);
+    mounted.runtime.input.focus.focus(field!);
+    drain(mounted);
+
+    summary.value = 10;
+    drain(mounted);
+    expect(list!.getProperty('scrollY')).toBeCloseTo(20, 5);
+  });
+
+  it('keeps a keepInPlace hold working under it', () => {
+    // The opt-out is from the focus anchor only: a node held by name is
+    // held, whether it is the focused one or not.
+    const { mounted, summary, field, list } = mount(50, 'list');
+    mounted.runtime.input.focus.focus(field());
+    drain(mounted);
+    const before = mounted.runtime.debugVisibleBox(field()).y;
+
+    mounted.runtime.services.get(ScrollService).keepInPlace(field());
+    summary.value = 10;
+    drain(mounted);
+    expect(list().getProperty('scrollY')).toBeCloseTo(20, 5);
+    expect(mounted.runtime.debugVisibleBox(field()).y).toBeCloseTo(before, 5);
   });
 });
