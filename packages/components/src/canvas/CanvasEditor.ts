@@ -34,6 +34,10 @@ export interface CanvasEditorProps extends ControlLayoutProps {
    * ring, which shows for the keyboard only.
    */
   focusRing?: boolean | FocusRingOptions;
+  /** A click begins a shape with a tool and the next press ends it; a drag still draws. See `canvasEditing`. */
+  clickToDraw?: boolean | ((tool: string) => boolean);
+  /** A value typed for the edit in progress, made exact by the application. See `canvasEditing`. */
+  typedValue?: (text: string, edit: CanvasEdit) => CanvasEdit | null;
   /** The canvas's name to a screen reader: what is being edited. Default `Canvas`. */
   label?: string;
   /** What the application draws: a `paint` node, or nodes. Drawn under the editor's overlay. */
@@ -76,7 +80,9 @@ export function CanvasEditor(inputs: Inputs<CanvasEditorProps>, ctx: ComponentCo
     tabSelects: inputs.tabSelects.value,
     groupHandles: inputs.groupHandles.value,
     colors: inputs.colors.value,
-    focusRing: inputs.focusRing.value
+    focusRing: inputs.focusRing.value,
+    clickToDraw: inputs.clickToDraw.value,
+    typedValue: inputs.typedValue.value
   });
   const ringed = inputs.focusRing.value !== undefined && inputs.focusRing.value !== false;
 

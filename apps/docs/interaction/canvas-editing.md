@@ -113,6 +113,8 @@ snap mark and readout through `show`, and the pure functions under both
 | `groupHandles`      | `boolean`                               | `true`     | Whether several chosen shapes share eight handles on the box round them.    |
 | `colors`            | `CanvasOverlayColors`                   | theme      | The selection, hover, guide and handle colours.                             |
 | `focusRing`         | `boolean \| FocusRingOptions`           | `false`    | A ring while the canvas has the keyboard, after a click too. See below.     |
+| `clickToDraw`       | `boolean \| (tool) => boolean`          | `false`    | A click begins a shape and the next press ends it. See below.               |
+| `typedValue`        | `(text, edit) => CanvasEdit \| null`    | none       | A typed size for the edit in progress, made exact. See below.               |
 | `label`             | `string`                                | `'Canvas'` | The canvas's name to a screen reader.                                       |
 | `children`          | `UiChild`                               | none       | What the application draws, under the overlay.                              |
 
@@ -165,6 +167,7 @@ as the example does.
 | `gridOrigin` | `0, 0`  | Where the grid's lines cross, in canvas pixels: the application's own origin.             |
 | `angle`      | `45`    | Shift holds a line or a handle to multiples of this many degrees.                         |
 | `toPoint`    | none    | The application's own snaps, tried first: a tangent, a perpendicular, a point on a curve. |
+| `candidates` | none    | Every snap of the application's in reach, best first. Tab steps through them.             |
 
 What snaps to what:
 
@@ -183,6 +186,28 @@ What snaps to what:
 - A move snaps to the grid by the pressed shape's `anchor`, a real point
   of it, so the numbers it writes stay round.
 
+### Tab through what is in reach
+
+Two snaps can be within reach of one place: a hole's centre and a
+tangent to it, an end and the middle of a short line. While a point is
+dragged or drawn, Tab moves it to the next snap in reach and Shift+Tab
+to the one before, as in AutoCAD. The choice holds while the pointer
+moves, as long as that snap stays in reach.
+
+The application gives what is in reach with `candidates(point, context)`,
+best first; the first is what the point snaps to. `context.reach` is
+how near counts, in canvas pixels at the zoom now, and `context.from`
+is the point a line is drawn from, for a tangent or a perpendicular.
+With no `candidates`, Tab steps through the shapes' `snapPoints` in
+reach, nearest first. A move snaps a whole shape and has no list to
+step through.
+
+```ts
+snap: {
+  candidates: (p, { from, reach }) => mySnapsNear(p, from, reach); // [{ point, kind, label: 'center', guides: [] }, …]
+}
+```
+
 ### Snap labels
 
 A `SnapHit` from `toPoint` can carry a `label`, and so can a
@@ -200,19 +225,63 @@ toPoint: p => {
 };
 ```
 
+## Drawing by clicks, and typed sizes
+
+With `clickToDraw`, a click with a tool begins a shape, the shape
+follows the pointer, and the next press ends it where it lands: line,
+dimension, rectangle and circle tools in a CAD program work this way. A
+drag still draws as before. Escape, or putting the tool down, calls the
+shape off. Pass a test of the tool's name to have only some tools do
+it.
+
+Engineers draw to size. While a shape is drawn or anything is dragged,
+a digit, `.`, `-`, `<` or `Ø` opens the readout as a field, and the
+keys after it go there; Backspace edits it, Escape clears it, and Enter
+ends the edit at that value. The kit does not read the text: what `480`
+or `300,200` means depends on the tool and the units, so
+`typedValue(text, edit)` does. It is given the edit as the pointer makes
+it and returns it made exact, or null for text it cannot read. The
+shape follows the typed value as it is typed, and the pointer still
+sets the direction.
+
+```ts
+typedValue: (text, edit) => {
+  if (edit.kind !== 'draw') return null;
+  const length = parseLength(text); // `480`, `0.48m`, `1ft 6in`, in canvas pixels
+  if (length === null) return null;
+  const run = Math.hypot(edit.to.x - edit.from.x, edit.to.y - edit.from.y);
+  if (run === 0) return null;
+  const k = length / run; // along the pointer's direction
+  return {
+    ...edit,
+    to: { x: edit.from.x + (edit.to.x - edit.from.x) * k, y: edit.from.y + (edit.to.y - edit.from.y) * k }
+  };
+};
+```
+
+With shapes chosen and nothing in progress, a typed value is a move:
+an arrow moves them by it in the arrow's direction (the edit
+`typedValue` is given points that way), and Enter with a pair such as
+`50,20` moves them by the pair, as the application reads it.
+`commitTyped(text)` on `canvasEditing` commits a value from elsewhere,
+an agent or a field of the application's own, and `typed` is the text
+being typed.
+
 ## Keyboard
 
 The canvas is one tab stop. With it focused:
 
-| Key                 | What it does                                                |
-| ------------------- | ----------------------------------------------------------- |
-| Arrows              | Move the chosen shapes by `nudge`; Shift ten times          |
-| Alt+Right, Alt+Left | Widen or narrow the chosen box from its right side          |
-| Alt+Down, Alt+Up    | Make it taller or shorter from its bottom                   |
-| Tab, Shift+Tab      | With shapes chosen, choose the next or the previous shape   |
-| ⌘A or Ctrl+A        | Choose every shape that is not locked                       |
-| Delete, Backspace   | `onDelete` with the chosen shapes                           |
-| Escape              | Calls off a drag; else clears the selection; else passes on |
+| Key                        | What it does                                                      |
+| -------------------------- | ----------------------------------------------------------------- |
+| Arrows                     | Move the chosen shapes by `nudge`; Shift ten times                |
+| Alt+Right, Alt+Left        | Widen or narrow the chosen box from its right side                |
+| Alt+Down, Alt+Up           | Make it taller or shorter from its bottom                         |
+| Tab, Shift+Tab             | With shapes chosen, choose the next or the previous shape         |
+| ⌘A or Ctrl+A               | Choose every shape that is not locked                             |
+| Delete, Backspace          | `onDelete` with the chosen shapes                                 |
+| Escape                     | Calls off a drag; else clears the selection; else passes on       |
+| Tab while dragging         | The next snap in reach; Shift+Tab the one before                  |
+| A digit, with `typedValue` | Opens the readout as a field for an exact value; Enter commits it |
 
 ### Where the keys go
 
@@ -273,7 +342,9 @@ const editing = canvasEditing(ctx, { shapes, selection, onEdit, snap: { grid: 5 
 ```
 
 `handlers` are ready to spread; `handle` has the same, each returning
-whether it did anything. With `focusRing`, the ring is drawn on the
+whether it did anything. With `clickToDraw`, the canvas also passes on
+`onPointerUp`, which begins a clicked shape, and `onPointerMove` while
+a tool is picked, which moves it. With `focusRing`, the ring is drawn on the
 node that carries `modifiers`, which need not be the node that takes
 focus: call `handlers.onFocus` and `handlers.onBlur` from the focusable
 node's own, and `focused` says whether it has the keyboard. `toLocal(event)` is a pointer's place in the

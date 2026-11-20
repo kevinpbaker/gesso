@@ -583,6 +583,7 @@ interface CanvasOverlayState {
   readonly readout: {
     readonly text: string;
     readonly at: CanvasPoint;
+    readonly field?: boolean;
   } | null;
   readonly snapLabel?: {
     readonly text: string;
@@ -607,7 +608,7 @@ declare function paintCanvasOverlay(surface: PaintSurface, state: CanvasOverlayS
 declare function paintReadout(surface: PaintSurface, text: string, at: CanvasPoint, size: {
   readonly width: number;
   readonly height: number;
-}, scale?: number, look?: Pick<CanvasOverlayColors, 'readout' | 'readoutText' | 'readoutFont'>): void;
+}, scale?: number, look?: Pick<CanvasOverlayColors, 'readout' | 'readoutText' | 'readoutFont' | 'selection' | 'handle'>, field?: boolean): void;
 interface CanvasShape {
   readonly id: string;
   readonly bounds: CanvasRect;
@@ -671,10 +672,13 @@ interface CanvasSnapOptions {
   readonly grid?: number;
   readonly gridOrigin?: CanvasPoint;
   readonly angle?: number;
-  readonly toPoint?: (point: CanvasPoint, context: {
-    readonly from: CanvasPoint | null;
-    readonly ids: readonly string[];
-  }) => SnapHit | null;
+  readonly toPoint?: (point: CanvasPoint, context: CanvasSnapContext) => SnapHit | null;
+  readonly candidates?: (point: CanvasPoint, context: CanvasSnapContext) => readonly SnapHit[];
+}
+interface CanvasSnapContext {
+  readonly from: CanvasPoint | null;
+  readonly ids: readonly string[];
+  readonly reach: number;
 }
 interface CanvasEditingOptions {
   readonly shapes: Observable<readonly CanvasShape[]>;
@@ -697,6 +701,8 @@ interface CanvasEditingOptions {
   readonly groupHandles?: boolean;
   readonly colors?: CanvasOverlayColors;
   readonly focusRing?: boolean | FocusRingOptions;
+  readonly clickToDraw?: boolean | ((tool: string) => boolean);
+  readonly typedValue?: (text: string, edit: CanvasEdit) => CanvasEdit | null;
 }
 interface CanvasEditing {
   readonly modifiers: readonly UiModifier[];
@@ -714,6 +720,8 @@ interface CanvasEditing {
   };
   readonly handle: {
     readonly pointerDown: (event: UiPointerEvent) => boolean;
+    readonly pointerUp: (event: UiPointerEvent) => boolean;
+    readonly pointerMove: (event: UiPointerEvent) => boolean;
     readonly panStart: (event: UiPointerEvent) => boolean;
     readonly panMove: (event: UiPointerEvent) => boolean;
     readonly panEnd: (event: UiPointerEvent) => boolean;
@@ -726,6 +734,8 @@ interface CanvasEditing {
   readonly hovered: InternalState<string | null>;
   readonly editing: Observable<boolean>;
   readonly focused: Observable<boolean>;
+  readonly typed: Observable<string | null>;
+  commitTyped(text?: string): boolean;
   readonly cursor: Observable<UiCursor | undefined>;
   toLocal(event: {
     readonly x: number;
@@ -767,6 +777,8 @@ interface CanvasEditorProps extends ControlLayoutProps {
   groupHandles?: boolean;
   colors?: CanvasOverlayColors;
   focusRing?: boolean | FocusRingOptions;
+  clickToDraw?: boolean | ((tool: string) => boolean);
+  typedValue?: (text: string, edit: CanvasEdit) => CanvasEdit | null;
   label?: string;
   children?: UiChild;
 }
@@ -1862,6 +1874,7 @@ export {
   type CanvasPoint,
   type CanvasRect,
   type CanvasShape,
+  type CanvasSnapContext,
   type CanvasSnapOptions,
   type CaptionsProps,
   type CardProps,
