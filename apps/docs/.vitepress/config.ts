@@ -54,6 +54,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Pointer and keyboard', link: '/interaction/pointer-and-keyboard' },
       { text: 'Touch and gestures', link: '/interaction/touch-and-gestures' },
       { text: 'Drag and drop', link: '/interaction/drag-and-drop' },
+      { text: 'Canvas editing', link: '/interaction/canvas-editing' },
       { text: 'Shortcuts', link: '/interaction/shortcuts' },
       { text: 'Focus and traps', link: '/interaction/focus-and-traps' },
       { text: 'Text editing and IME', link: '/interaction/text-editing-and-ime' },

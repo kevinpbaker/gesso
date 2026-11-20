@@ -11,14 +11,17 @@ import {
 import {
   LayoutBox,
   ObjectFit,
+  PaintSurface,
   Reactive,
   UiChild,
   UiColorValue,
+  UiCursor,
   UiKeyboardEvent,
   UiLength,
   UiModifier,
   UiNode,
   UiNodeRef,
+  UiPointerEvent,
   UiSelfAlignment,
   UiThemeExtension,
   UiTrackSize,
@@ -500,6 +503,235 @@ interface UnitFieldProps extends ControlLayoutProps {
 }
 declare function UnitField(inputs: Inputs<UnitFieldProps>, ctx: ComponentContext): UiChild;
 declare function parseQuantity(text: string, unit: string, units: Readonly<Record<string, number>> | undefined): number | undefined;
+interface CanvasPoint {
+  readonly x: number;
+  readonly y: number;
+}
+interface CanvasRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+type BoxHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+declare const BOX_HANDLES: readonly BoxHandle[];
+declare function boxHandlePoint(rect: CanvasRect, handle: BoxHandle): CanvasPoint;
+declare function boxHandleCursor(handle: BoxHandle): 'nwse-resize' | 'nesw-resize' | 'ns-resize' | 'ew-resize';
+declare function resizeRect(rect: CanvasRect, handle: BoxHandle, dx: number, dy: number, keepAspect?: boolean): CanvasRect;
+declare function unionRect(rects: readonly CanvasRect[]): CanvasRect | null;
+declare function rectFrom(a: CanvasPoint, b: CanvasPoint): CanvasRect;
+declare function rectsTouch(a: CanvasRect, b: CanvasRect): boolean;
+declare function rectContains(outer: CanvasRect, inner: CanvasRect): boolean;
+declare function pointInRect(p: CanvasPoint, r: CanvasRect, slack?: number): boolean;
+interface SnapGuide {
+  readonly axis: 'x' | 'y';
+  readonly at: number;
+}
+interface SnapHit {
+  readonly point: CanvasPoint;
+  readonly kind: string;
+  readonly guides: readonly SnapGuide[];
+}
+interface SnapTarget extends CanvasPoint {
+  readonly kind?: string;
+}
+declare function snapPoint(p: CanvasPoint, targets: readonly SnapTarget[], options: {
+  readonly reach: number;
+  readonly grid?: number;
+}): {
+  point: CanvasPoint;
+  hit: SnapHit | null;
+};
+declare function snapMove(box: CanvasRect, others: readonly CanvasRect[], options: {
+  readonly reach: number;
+  readonly grid?: number;
+  readonly points?: readonly SnapTarget[];
+  readonly targets?: readonly SnapTarget[];
+}): {
+  dx: number;
+  dy: number;
+  hit: SnapHit | null;
+};
+declare function holdAngle(from: CanvasPoint, to: CanvasPoint, step?: number): CanvasPoint;
+declare function readoutNumber(n: number): string;
+declare function readoutText(kind: 'length' | 'box' | 'move', from: CanvasPoint, to: CanvasPoint, options?: {
+  readonly scale?: number;
+  readonly unit?: string;
+  readonly yUp?: boolean;
+}): string;
+interface CanvasOverlayState {
+  readonly hovered: CanvasRect | null;
+  readonly selected: readonly CanvasRect[];
+  readonly box: CanvasRect | null;
+  readonly points: readonly CanvasPoint[];
+  readonly marquee: CanvasRect | null;
+  readonly guides: readonly SnapGuide[];
+  readonly snap: CanvasPoint | null;
+  readonly readout: {
+    readonly text: string;
+    readonly at: CanvasPoint;
+  } | null;
+}
+declare const EMPTY_OVERLAY: CanvasOverlayState;
+interface CanvasOverlayColors {
+  readonly selection?: UiColorValue;
+  readonly hover?: UiColorValue;
+  readonly guide?: UiColorValue;
+  readonly handle?: UiColorValue;
+}
+declare const HANDLE_SIZE = 7;
+declare function paintCanvasOverlay(surface: PaintSurface, state: CanvasOverlayState, size: {
+  readonly width: number;
+  readonly height: number;
+}, scale?: number, colors?: CanvasOverlayColors): void;
+declare function paintReadout(surface: PaintSurface, text: string, at: CanvasPoint, size: {
+  readonly width: number;
+  readonly height: number;
+}, scale?: number): void;
+interface CanvasShape {
+  readonly id: string;
+  readonly bounds: CanvasRect;
+  readonly label: string;
+  readonly description?: string;
+  readonly handles?: 'box' | 'none' | readonly CanvasHandle[];
+  readonly locked?: boolean;
+  readonly hit?: (point: CanvasPoint, slack: number) => boolean;
+  readonly snapPoints?: readonly SnapTarget[];
+}
+interface CanvasHandle {
+  readonly id: string;
+  readonly at: CanvasPoint;
+  readonly anchor?: CanvasPoint;
+  readonly cursor?: UiCursor;
+}
+type CanvasEditPhase = 'start' | 'live' | 'end' | 'cancel';
+type CanvasEdit = {
+  readonly kind: 'move';
+  readonly ids: readonly string[];
+  readonly dx: number;
+  readonly dy: number;
+  readonly phase: CanvasEditPhase;
+  readonly snap: SnapHit | null;
+} | {
+  readonly kind: 'resize';
+  readonly ids: readonly string[];
+  readonly handle: BoxHandle;
+  readonly from: CanvasRect;
+  readonly to: CanvasRect;
+  readonly phase: CanvasEditPhase;
+  readonly snap: SnapHit | null;
+} | {
+  readonly kind: 'handle';
+  readonly id: string;
+  readonly handle: string;
+  readonly from: CanvasPoint;
+  readonly to: CanvasPoint;
+  readonly phase: CanvasEditPhase;
+  readonly snap: SnapHit | null;
+} | {
+  readonly kind: 'draw';
+  readonly tool: string;
+  readonly from: CanvasPoint;
+  readonly to: CanvasPoint;
+  readonly phase: CanvasEditPhase;
+  readonly snap: SnapHit | null;
+};
+interface CanvasSnapOptions {
+  readonly reach?: number;
+  readonly grid?: number;
+  readonly angle?: number;
+  readonly toPoint?: (point: CanvasPoint, context: {
+    readonly from: CanvasPoint | null;
+    readonly ids: readonly string[];
+  }) => SnapHit | null;
+}
+interface CanvasEditingOptions {
+  readonly shapes: Observable<readonly CanvasShape[]>;
+  readonly selection?: InternalState<readonly string[]>;
+  readonly hovered?: InternalState<string | null>;
+  readonly tool?: Observable<string | null>;
+  readonly onEdit?: (edit: CanvasEdit) => void;
+  readonly onDelete?: (ids: readonly string[]) => void;
+  readonly onPress?: (point: CanvasPoint, event: UiPointerEvent) => boolean;
+  readonly snap?: CanvasSnapOptions | false;
+  readonly readout?: (edit: CanvasEdit) => string | null | undefined;
+  readonly units?: {
+    readonly scale: number;
+    readonly unit: string;
+    readonly yUp?: boolean;
+  };
+  readonly marquee?: 'touch' | 'contain';
+  readonly nudge?: number;
+  readonly tabSelects?: boolean;
+  readonly colors?: CanvasOverlayColors;
+}
+interface CanvasEditing {
+  readonly modifiers: readonly UiModifier[];
+  readonly handlers: {
+    readonly onPointerDown: (event: UiPointerEvent) => void;
+    readonly onPointerUp: (event: UiPointerEvent) => void;
+    readonly onPointerMove: (event: UiPointerEvent) => void;
+    readonly onPointerLeave: () => void;
+    readonly onPanStart: (event: UiPointerEvent) => void;
+    readonly onPanMove: (event: UiPointerEvent) => void;
+    readonly onPanEnd: (event: UiPointerEvent) => void;
+    readonly onKeyDown: (event: UiKeyboardEvent) => void;
+  };
+  readonly handle: {
+    readonly pointerDown: (event: UiPointerEvent) => boolean;
+    readonly panStart: (event: UiPointerEvent) => boolean;
+    readonly panMove: (event: UiPointerEvent) => boolean;
+    readonly panEnd: (event: UiPointerEvent) => boolean;
+    readonly key: (event: UiKeyboardEvent) => boolean;
+  };
+  readonly overlay: UiChild;
+  readonly shapeNodes: UiChild;
+  readonly activeDescendant: Observable<UiNode | null>;
+  readonly selection: InternalState<readonly string[]>;
+  readonly hovered: InternalState<string | null>;
+  readonly editing: Observable<boolean>;
+  readonly cursor: Observable<UiCursor | undefined>;
+  toLocal(event: {
+    readonly x: number;
+    readonly y: number;
+  }): CanvasPoint;
+  scale(): number;
+  show(feedback: {
+    readonly guides?: readonly SnapGuide[];
+    readonly snap?: CanvasPoint | null;
+    readonly readout?: {
+      readonly text: string;
+      readonly at: CanvasPoint;
+    } | null;
+  } | null): void;
+}
+declare function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptions): CanvasEditing;
+declare function boxPoints(r: CanvasRect): SnapTarget[];
+interface CanvasEditorProps extends ControlLayoutProps {
+  shapes: readonly CanvasShape[];
+  selection?: readonly string[];
+  defaultSelection?: readonly string[];
+  onSelectionChange?: (ids: readonly string[]) => void;
+  onHoverChange?: (id: string | null) => void;
+  tool?: string | null;
+  onEdit?: (edit: CanvasEdit) => void;
+  onDelete?: (ids: readonly string[]) => void;
+  onPress?: (point: CanvasPoint, event: UiPointerEvent) => boolean;
+  snap?: CanvasSnapOptions | false;
+  readout?: (edit: CanvasEdit) => string | null | undefined;
+  units?: {
+    readonly scale: number;
+    readonly unit: string;
+    readonly yUp?: boolean;
+  };
+  marquee?: 'touch' | 'contain';
+  nudge?: number;
+  tabSelects?: boolean;
+  colors?: CanvasOverlayColors;
+  label?: string;
+  children?: UiChild;
+}
+declare function CanvasEditor(inputs: Inputs<CanvasEditorProps>, ctx: ComponentContext): UiChild;
 interface SplitPaneProps extends ControlLayoutProps {
   split?: number;
   defaultSplit?: number;
@@ -1425,8 +1657,14 @@ export {
   allOf,
   Avatar,
   Badge,
+  BOX_HANDLES,
+  boxHandleCursor,
+  boxHandlePoint,
+  boxPoints,
   Breadcrumb,
   Button,
+  canvasEditing,
+  CanvasEditor,
   Captions,
   Card,
   cellName,
@@ -1451,6 +1689,7 @@ export {
   Divider,
   Drawer,
   email,
+  EMPTY_OVERLAY,
   field,
   fieldArray,
   filterCombobox,
@@ -1461,7 +1700,9 @@ export {
   formatFormulaNumber,
   formatFormulaValue,
   formulaError,
+  HANDLE_SIZE,
   hexOfHsv,
+  holdAngle,
   hsvOfHex,
   Icon,
   Image,
@@ -1489,6 +1730,8 @@ export {
   normalizeHex,
   NumberInput,
   Pagination,
+  paintCanvasOverlay,
+  paintReadout,
   PALETTE,
   parseCellName,
   parseIsoDate,
@@ -1496,14 +1739,21 @@ export {
   pattern,
   plainNodeOf,
   PlainView,
+  pointInRect,
   Popover,
   ProgressBar,
   quantize,
   RadioGroup,
   range,
   RangeSlider,
+  readoutNumber,
+  readoutText,
+  rectContains,
+  rectFrom,
+  rectsTouch,
   referenceCompletions,
   required,
+  resizeRect,
   RICH_TEXT_SLASH_COMMANDS,
   RichTextEditor,
   richTextShortcuts,
@@ -1515,6 +1765,8 @@ export {
   Skeleton,
   SkeletonText,
   Slider,
+  snapMove,
+  snapPoint,
   Spinner,
   SplitPane,
   stepIndex,
@@ -1542,6 +1794,7 @@ export {
   type AvatarSize,
   type BadgeProps,
   type BadgeTone,
+  type BoxHandle,
   type BreadcrumbItem,
   type BreadcrumbProps,
   type ButtonPaint,
@@ -1551,6 +1804,18 @@ export {
   type ButtonTokens,
   type ButtonTone,
   type ButtonVariant,
+  type CanvasEdit,
+  type CanvasEditing,
+  type CanvasEditingOptions,
+  type CanvasEditorProps,
+  type CanvasEditPhase,
+  type CanvasHandle,
+  type CanvasOverlayColors,
+  type CanvasOverlayState,
+  type CanvasPoint,
+  type CanvasRect,
+  type CanvasShape,
+  type CanvasSnapOptions,
   type CaptionsProps,
   type CardProps,
   type CheckboxProps,
@@ -1664,6 +1929,9 @@ export {
   type SkeletonProps,
   type SkeletonTextProps,
   type SliderProps,
+  type SnapGuide,
+  type SnapHit,
+  type SnapTarget,
   type SpinnerProps,
   type SplitPaneProps,
   type SwitchProps,
@@ -1693,6 +1961,7 @@ export {
   type VideoProps,
   type VideoReadout,
   type VirtualList,
+  unionRect,
   UnitField,
   useOverlay,
   Video,

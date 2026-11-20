@@ -123,4 +123,5 @@ screen reader and an agent cannot reach them unless something says
 they are there. The node itself can carry a role and a label (`role:
 'image'` with a sentence that says what the picture shows). A canvas
 people edit shape by shape needs more: each shape as a node a screen reader can choose and an
-agent can operate.
+agent can operate. That is what the
+[canvas editing kit](/interaction/canvas-editing) does.

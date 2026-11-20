@@ -1,0 +1,5 @@
+---
+'gesso-components': minor
+---
+
+The canvas editing kit: `CanvasEditor`, and `canvasEditing(ctx, options)` under it, for a canvas whose shapes the application owns. The application describes its shapes (an id, a box, a name, optionally its own handles, hit test and snap points) and paints them; the kit chooses by click, Shift-click and marquee, outlines the shape under the pointer, puts eight handles on a chosen box (a side handle moves one side, Shift on a corner keeps the proportions) or a shape's own handles, snaps to points, edges, centres and a grid with guides and a mark, shows a measured readout beside the pointer, answers the arrows, Alt+arrows, Tab, ⌘A, Delete and Escape, and puts each shape in the semantics tree as an option a screen reader or an agent chooses. Edits (`move`, `resize`, `handle`, `draw`) go `start`, `live`, `end` or `cancel`, each value a total since `start`, so one drag is one undo step and Escape rolls it back. The pure parts (`resizeRect`, `snapPoint`, `snapMove`, `holdAngle`, `readoutText`, `paintCanvasOverlay`, `paintReadout`) work without a canvas. Designed against Calcwright's drawings, Flatwright's parts and Mockz's screens.

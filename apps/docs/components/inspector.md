@@ -134,4 +134,5 @@ width and height, each a `UnitField` with its own `short` label and
 ## Next
 
 [NumberInput](/components/number-input) is the form's number field,
-with steppers and no unit.
+with steppers and no unit. The [canvas editing kit](/interaction/canvas-editing)
+is the canvas an inspector usually sits beside.

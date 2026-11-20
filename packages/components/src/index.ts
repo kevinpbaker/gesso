@@ -64,6 +64,7 @@ export {
   type NudgePhase,
   type SharedValue
 } from './Inspector';
+export * from './canvas';
 export type {
   CardProps,
   DividerProps,
