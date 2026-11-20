@@ -1,5 +1,6 @@
-import { Row, Text, type UiChild, type UiNodeRef, type UiTextDecoration } from 'gesso-core';
+import { Row, Text, type UiChild, type UiNode, type UiNodeRef, type UiTextDecoration } from 'gesso-core';
 
+import { registerLinkMenu } from './ContextMenus';
 import {
   computed,
   input,
@@ -284,10 +285,28 @@ export function Link(inputs: Inputs<LinkProps>, ctx: ComponentContext): UiChild 
     }
   };
 
+  // What a right-click on the link offers; see `ContextMenus`.
+  const menuEntry = {
+    openElsewhere: () => activate(true),
+    get url() {
+      return inputs.to.value === undefined ? inputs.href.value : undefined;
+    }
+  };
+  const ref = (node: UiNode | null): void => {
+    const previous = focus.node();
+    if (previous !== null && previous !== node) {
+      registerLinkMenu(previous, null);
+    }
+    focus.ref(node);
+    if (node !== null) {
+      registerLinkMenu(node, menuEntry);
+    }
+  };
+
   return Row(
     {
       ...layoutOf(inputs),
-      ref: focus.ref,
+      ref,
       modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING),
       x: 'center',
       y: 'center',

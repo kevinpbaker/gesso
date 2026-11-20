@@ -979,6 +979,7 @@ export class GessoRuntime {
     });
     this.services.get(FocusService).setManager(this.input.focus);
     this.services.get(EditingService).setController(this.input.editing);
+    this.services.get(EditingService).setSelection(this.input.selection, this.services.get(ShellService));
     this.services.get(ScrollService).setScroller((node, padding) => this.scrollIntoView(node, padding));
     this.services.get(ScrollService).setHolder(held => {
       this.holds.add(held);

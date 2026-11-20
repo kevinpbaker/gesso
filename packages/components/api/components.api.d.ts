@@ -899,6 +899,10 @@ interface MenuProps {
   submenu?: boolean;
 }
 declare function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild;
+interface ContextMenusProps extends ControlLayoutProps {
+  children?: UiChild;
+}
+declare function ContextMenus(inputs: Inputs<ContextMenusProps>, ctx: ComponentContext): UiChild;
 declare const MENU_SEPARATOR: '-';
 interface MenuBarSubmenu<T> {
   readonly label: string;
@@ -1705,6 +1709,7 @@ export {
   columnLetters,
   Combobox,
   comboboxRank,
+  ContextMenus,
   controlDescription,
   controlled,
   controlMessage,
@@ -1855,6 +1860,7 @@ export {
   type ColorPickerProps,
   type ComboboxOption,
   type ComboboxProps,
+  type ContextMenusProps,
   type ControlFocus,
   type ControlLayoutProps,
   type ControlledValue,

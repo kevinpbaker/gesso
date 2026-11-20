@@ -2942,9 +2942,23 @@ declare class TextService {
   measure(request: TextMeasureRequest): Size;
   widthOf(text: string, style: Omit<TextMeasureRequest, 'text' | 'maxWidth'>): number;
 }
+interface EditingClipboard {
+  copyText(text: string): Promise<boolean>;
+  readText(): Promise<string | null>;
+}
 declare class EditingService {
   private controller;
+  private selection;
+  private clipboard;
   setController(controller: UiEditingController | null): void;
+  setSelection(selection: UiSelectionController | null, clipboard: EditingClipboard | null): void;
+  get focusedField(): UiNode | null;
+  selectedText(): string;
+  copyText(text: string): Promise<boolean>;
+  copy(): Promise<boolean>;
+  cut(): Promise<boolean>;
+  paste(): Promise<boolean>;
+  selectAll(): boolean;
   caretRectOf(node: UiNode | null, offset?: number): CaretRect | null;
   offsetNear(node: UiNode | null, x: number, y: number): number | null;
   select(anchor: UiTextPosition, focus: UiTextPosition): boolean;
