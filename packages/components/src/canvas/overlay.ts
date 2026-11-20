@@ -20,7 +20,13 @@ export interface CanvasOverlayState {
   readonly marquee: CanvasRect | null;
   readonly guides: readonly SnapGuide[];
   readonly snap: CanvasPoint | null;
-  readonly readout: { readonly text: string; readonly at: CanvasPoint } | null;
+  /** `field`: a value being typed, drawn as a field with a caret rather than a plate. */
+  readonly readout: { readonly text: string; readonly at: CanvasPoint; readonly field?: boolean } | null;
+  /**
+   * What the snap is, in small type beside the point it snapped to:
+   * `center`, `tangent`, `grid`. Placed clear of the readout.
+   */
+  readonly snapLabel?: { readonly text: string; readonly at: CanvasPoint } | null;
 }
 
 export const EMPTY_OVERLAY: CanvasOverlayState = {
@@ -31,7 +37,8 @@ export const EMPTY_OVERLAY: CanvasOverlayState = {
   marquee: null,
   guides: [],
   snap: null,
-  readout: null
+  readout: null,
+  snapLabel: null
 };
 
 export interface CanvasOverlayColors {
@@ -151,10 +158,133 @@ export function paintCanvasOverlay(
     surface.lineWidth(px);
   }
 
+  const readout =
+    state.readout === null ? null : readoutPlate(state.readout.text, state.readout.at, size, scale, colors.readoutFont);
+  if (state.snapLabel !== undefined && state.snapLabel !== null && state.snapLabel.text.length > 0) {
+    paintSnapLabel(surface, state.snapLabel.text, state.snapLabel.at, readout, size, scale, colors);
+  }
   if (state.readout !== null) {
-    paintReadout(surface, state.readout.text, state.readout.at, size, scale, colors);
+    paintReadout(surface, state.readout.text, state.readout.at, size, scale, colors, state.readout.field === true);
   }
   surface.restore();
+}
+
+interface Plate {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * The words beside a snap mark: small type on a plate of the handles'
+ * fill, in the guide colour. It goes at the place nearest the point
+ * that is inside the canvas and clear of the readout: one of the
+ * point's four diagonals, or against the readout's edges where the
+ * readout has turned over in a corner. The readout sits below right of
+ * the pointer, which is within reach of the point, so above right is
+ * nearly always where it goes.
+ */
+function paintSnapLabel(
+  surface: PaintSurface,
+  text: string,
+  at: CanvasPoint,
+  readout: Plate | null,
+  size: { readonly width: number; readonly height: number },
+  scale: number,
+  colors: CanvasOverlayColors
+): void {
+  const px = 1 / (scale > 0 ? scale : 1);
+  const style = { fontSize: 10 * px, fontWeight: 500, fontFamily: colors.readoutFont };
+  const metrics = paintTextMetrics(text, style);
+  const padX = 3 * px;
+  const padY = 1 * px;
+  const width = metrics.width + 2 * padX;
+  const height = metrics.ascent + metrics.descent + 2 * padY;
+  const gap = 8 * px;
+  const places: Plate[] = [
+    { x: at.x + gap, y: at.y - gap - height, width, height },
+    { x: at.x - gap - width, y: at.y - gap - height, width, height },
+    { x: at.x - gap - width, y: at.y + gap, width, height },
+    { x: at.x + gap, y: at.y + gap, width, height }
+  ];
+  const margin = 2 * px;
+  const inside = (p: Plate) =>
+    p.x >= margin && p.y >= margin && p.x + p.width <= size.width - margin && p.y + p.height <= size.height - margin;
+  const clear = (p: Plate) =>
+    readout === null ||
+    !(
+      p.x < readout.x + readout.width + margin &&
+      readout.x < p.x + p.width + margin &&
+      p.y < readout.y + readout.height + margin &&
+      readout.y < p.y + p.height + margin
+    );
+  if (readout !== null) {
+    // In a corner, where the readout has turned over onto the point's
+    // other sides: against the readout's own edges instead.
+    const above = readout.y - margin - height;
+    const below = readout.y + readout.height + margin;
+    const left = readout.x - margin - width;
+    const right = readout.x + readout.width + margin;
+    const flushLeft = readout.x;
+    const flushRight = readout.x + readout.width - width;
+    const flushTop = readout.y;
+    const flushBottom = readout.y + readout.height - height;
+    for (const [x, y] of [
+      [flushLeft, above],
+      [flushRight, above],
+      [flushLeft, below],
+      [flushRight, below],
+      [left, flushTop],
+      [left, flushBottom],
+      [right, flushTop],
+      [right, flushBottom]
+    ]) {
+      places.push({ x, y, width, height });
+    }
+  }
+  const far = (p: Plate) =>
+    Math.hypot(Math.max(p.x - at.x, at.x - (p.x + p.width), 0), Math.max(p.y - at.y, at.y - (p.y + p.height), 0));
+  const fits = places.filter(p => inside(p) && clear(p));
+  const place =
+    fits.length > 0 ? fits.reduce((best, p) => (far(p) < far(best) ? p : best)) : (places.find(clear) ?? places[0]);
+  surface.save();
+  surface.fillColor(colors.handle ?? 'background');
+  surface.alpha(0.85);
+  surface.beginPath();
+  surface.roundRect(place.x, place.y, place.width, place.height, 2 * px);
+  surface.fill();
+  surface.alpha(1);
+  surface.fillColor(colors.guide ?? 'danger');
+  surface.text(text, place.x + padX, place.y + padY + metrics.ascent, style);
+  surface.restore();
+}
+
+/** Where `paintReadout` puts its plate, and the text's measures. */
+function readoutPlate(
+  text: string,
+  at: CanvasPoint,
+  size: { readonly width: number; readonly height: number },
+  scale: number,
+  font: string | undefined
+): (Plate & { readonly ascent: number; readonly padX: number; readonly padY: number }) | null {
+  if (text.length === 0) {
+    return null;
+  }
+  const px = 1 / (scale > 0 ? scale : 1);
+  const metrics = paintTextMetrics(text, { fontSize: 11 * px, fontWeight: 500, fontFamily: font });
+  const padX = 6 * px;
+  const padY = 3 * px;
+  const width = metrics.width + 2 * padX;
+  const height = metrics.ascent + metrics.descent + 2 * padY;
+  const gap = 14 * px;
+  let x = at.x + gap;
+  let y = at.y + gap;
+  if (x + width > size.width - 2 * px) x = at.x - gap - width;
+  if (y + height > size.height - 2 * px) y = at.y - gap - height;
+  x = Math.max(2 * px, x);
+  y = Math.max(2 * px, y);
+  return { x, y, width, height, ascent: metrics.ascent, padX, padY };
 }
 
 function handleSquare(
@@ -185,33 +315,44 @@ export function paintReadout(
   at: CanvasPoint,
   size: { readonly width: number; readonly height: number },
   scale = 1,
-  look: Pick<CanvasOverlayColors, 'readout' | 'readoutText' | 'readoutFont'> = {}
+  look: Pick<CanvasOverlayColors, 'readout' | 'readoutText' | 'readoutFont' | 'selection' | 'handle'> = {},
+  field = false
 ): void {
-  if (text.length === 0) {
+  const plate = readoutPlate(text, at, size, scale, look.readoutFont);
+  if (plate === null) {
     return;
   }
   const px = 1 / (scale > 0 ? scale : 1);
   const style = { fontSize: 11 * px, fontWeight: 500, fontFamily: look.readoutFont };
-  const metrics = paintTextMetrics(text, style);
-  const padX = 6 * px;
-  const padY = 3 * px;
-  const width = metrics.width + 2 * padX;
-  const height = metrics.ascent + metrics.descent + 2 * padY;
-  const gap = 14 * px;
-  let x = at.x + gap;
-  let y = at.y + gap;
-  if (x + width > size.width - 2 * px) x = at.x - gap - width;
-  if (y + height > size.height - 2 * px) y = at.y - gap - height;
-  x = Math.max(2 * px, x);
-  y = Math.max(2 * px, y);
+  if (field) {
+    // A value being typed: a field, light with a rim and a caret, so it does not read as the readout's answer.
+    const caret = plate.x + plate.width - plate.padX + px;
+    surface.save();
+    surface.lineWidth(px);
+    surface.fillColor(look.handle ?? 'background');
+    surface.beginPath();
+    surface.roundRect(plate.x, plate.y, plate.width + 2 * px, plate.height, 4 * px);
+    surface.fill();
+    surface.strokeColor(look.selection ?? 'primary');
+    surface.stroke();
+    surface.fillColor(look.readout ?? 'text');
+    surface.text(text, plate.x + plate.padX, plate.y + plate.padY + plate.ascent, style);
+    surface.strokeColor(look.readout ?? 'text');
+    surface.beginPath();
+    surface.moveTo(caret, plate.y + plate.padY);
+    surface.lineTo(caret, plate.y + plate.height - plate.padY);
+    surface.stroke();
+    surface.restore();
+    return;
+  }
   surface.save();
   surface.fillColor(look.readout ?? 'text');
   surface.alpha(0.88);
   surface.beginPath();
-  surface.roundRect(x, y, width, height, 4 * px);
+  surface.roundRect(plate.x, plate.y, plate.width, plate.height, 4 * px);
   surface.fill();
   surface.alpha(1);
   surface.fillColor(look.readoutText ?? 'background');
-  surface.text(text, x + padX, y + padY + metrics.ascent, style);
+  surface.text(text, plate.x + plate.padX, plate.y + plate.padY + plate.ascent, style);
   surface.restore();
 }

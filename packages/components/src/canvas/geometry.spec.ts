@@ -98,3 +98,17 @@ describe('boxes', () => {
     expect(unionRect([R, { x: 0, y: 0, width: 10, height: 10 }])).toEqual({ x: 0, y: 0, width: 300, height: 200 });
   });
 });
+
+describe('snap labels', () => {
+  it('carries a target’s label to the hit, for a point and for a move', () => {
+    const targets = [{ x: 50, y: 50, kind: 'centre', label: 'center' }];
+    expect(snapPoint({ x: 52, y: 49 }, targets, { reach: 8 }).hit?.label).toBe('center');
+    const moved = snapMove({ x: 0, y: 0, width: 10, height: 10 }, [], {
+      reach: 8,
+      points: [{ x: 47, y: 47 }],
+      targets
+    });
+    expect(moved.hit?.label).toBe('center');
+    expect(snapPoint({ x: 52, y: 49 }, [{ x: 50, y: 50 }], { reach: 8 }).hit?.label).toBeUndefined();
+  });
+});

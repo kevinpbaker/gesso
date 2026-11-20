@@ -1,5 +1,5 @@
 import { input, internalState, type ComponentContext, type Inputs, type InternalState } from 'gesso-framework';
-import { Box, type UiChild, type UiPointerEvent } from 'gesso-core';
+import { Box, type FocusRingOptions, type UiChild, type UiPointerEvent } from 'gesso-core';
 import { followedChildren, layoutOf, modifiersOf, CONTROL_FOCUS_RING, type ControlLayoutProps } from '../internals';
 import { canvasEditing, type CanvasEdit, type CanvasShape, type CanvasSnapOptions } from './canvasEditing';
 import type { CanvasPoint } from './geometry';
@@ -27,6 +27,17 @@ export interface CanvasEditorProps extends ControlLayoutProps {
   tabSelects?: boolean;
   groupHandles?: boolean;
   colors?: CanvasOverlayColors;
+  /**
+   * A ring round the canvas while it has the keyboard, after a click as
+   * well as after Tab, and none while a field has it. True for the
+   * theme's ring, or `focusRing`'s options. Default: the control's own
+   * ring, which shows for the keyboard only.
+   */
+  focusRing?: boolean | FocusRingOptions;
+  /** A click begins a shape with a tool and the next press ends it; a drag still draws. See `canvasEditing`. */
+  clickToDraw?: boolean | ((tool: string) => boolean);
+  /** A value typed for the edit in progress, made exact by the application. See `canvasEditing`. */
+  typedValue?: (text: string, edit: CanvasEdit) => CanvasEdit | null;
   /** The canvas's name to a screen reader: what is being edited. Default `Canvas`. */
   label?: string;
   /** What the application draws: a `paint` node, or nodes. Drawn under the editor's overlay. */
@@ -68,13 +79,20 @@ export function CanvasEditor(inputs: Inputs<CanvasEditorProps>, ctx: ComponentCo
     nudge: inputs.nudge.value,
     tabSelects: inputs.tabSelects.value,
     groupHandles: inputs.groupHandles.value,
-    colors: inputs.colors.value
+    colors: inputs.colors.value,
+    focusRing: inputs.focusRing.value,
+    clickToDraw: inputs.clickToDraw.value,
+    typedValue: inputs.typedValue.value
   });
+  const ringed = inputs.focusRing.value !== undefined && inputs.focusRing.value !== false;
 
   return Box(
     {
       ...layoutOf(inputs),
-      modifiers: modifiersOf(inputs, CONTROL_FOCUS_RING, ...editing.modifiers),
+      // With a ring of its own, not the control's too: two rings would say the same thing.
+      modifiers: ringed
+        ? modifiersOf(inputs, ...editing.modifiers)
+        : modifiersOf(inputs, CONTROL_FOCUS_RING, ...editing.modifiers),
       position: 'relative',
       overflow: 'hidden',
       focusable: true,

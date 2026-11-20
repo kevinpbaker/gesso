@@ -9,7 +9,8 @@ export {
   type CanvasEditKind,
   type CanvasShape,
   type CanvasHandle,
-  type CanvasSnapOptions
+  type CanvasSnapOptions,
+  type CanvasSnapContext
 } from './canvasEditing';
 export {
   BOX_HANDLES,

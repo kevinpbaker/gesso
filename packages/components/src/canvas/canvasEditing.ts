@@ -4,8 +4,11 @@ import { internalState, type ComponentContext, type InternalState } from 'gesso-
 import {
   Box,
   Paint,
+  decorated,
   measure,
   measureFlow,
+  type DecorationShape,
+  type FocusRingOptions,
   type LayoutBox,
   type UiChild,
   type UiCursor,
@@ -170,12 +173,30 @@ export interface CanvasSnapOptions {
   /**
    * The application's own snaps, tried first for a point being drawn or
    * dragged: a tangent, a perpendicular, a point on a curve. Null for
-   * none here, and the editor's own snapping follows.
+   * none here, and the editor's own snapping follows. `reach` is how
+   * near counts, in canvas pixels at the zoom now.
    */
-  readonly toPoint?: (
-    point: CanvasPoint,
-    context: { readonly from: CanvasPoint | null; readonly ids: readonly string[] }
-  ) => SnapHit | null;
+  readonly toPoint?: (point: CanvasPoint, context: CanvasSnapContext) => SnapHit | null;
+  /**
+   * Every snap the application has within `reach` of a point being drawn
+   * or dragged, best first: a hole's centre and a tangent to it, close
+   * together. The first is what the point snaps to, and Tab and Shift+Tab
+   * step through the rest while dragging, as in AutoCAD. Asked before
+   * `toPoint`; an empty list leaves the point to `toPoint` and the
+   * editor's own snapping. Left out, Tab steps through the shapes'
+   * `snapPoints` in reach, nearest first.
+   */
+  readonly candidates?: (point: CanvasPoint, context: CanvasSnapContext) => readonly SnapHit[];
+}
+
+/** What `toPoint` and `candidates` are told about the point they snap. */
+export interface CanvasSnapContext {
+  /** The point a line is drawn or a handle held from, or null. */
+  readonly from: CanvasPoint | null;
+  /** The shapes being moved or reshaped, which are not to be snapped to. */
+  readonly ids: readonly string[];
+  /** How near a snap has to be, in canvas pixels: `reach` at the zoom now. */
+  readonly reach: number;
 }
 
 export interface CanvasEditingOptions {
@@ -219,6 +240,40 @@ export interface CanvasEditingOptions {
    */
   readonly groupHandles?: boolean;
   readonly colors?: CanvasOverlayColors;
+  /**
+   * A ring round the canvas while it has the keyboard, and none while a
+   * field beside it has it, so it is always clear where the next key
+   * goes. Unlike a control's ring, it shows after a click as well as
+   * after Tab: a canvas is clicked far more than it is tabbed to. True
+   * for the theme's ring, or the options `focusRing` takes. It is drawn
+   * on the node `modifiers` is on; the node that takes focus calls
+   * `handlers.onFocus` and `handlers.onBlur` (`CanvasEditor` does).
+   * Default false.
+   */
+  readonly focusRing?: boolean | FocusRingOptions;
+  /**
+   * Whether a tool also draws by clicks: a click begins the shape, it
+   * follows the pointer, and the next press ends it. A drag still draws
+   * as before. True for every tool, or a test of the tool's name. Escape
+   * calls it off, and so does putting the tool down. Default false.
+   */
+  readonly clickToDraw?: boolean | ((tool: string) => boolean);
+  /**
+   * A value typed for the edit in progress, made exact. While a shape is
+   * drawn or anything is dragged, a digit, `.`, `-`, `<` or `Ø` opens the
+   * readout as a field and the keys after it go there; with shapes
+   * chosen and nothing in progress, the same opens a field for a move.
+   * Each change and the pointer's every move call this with the text and
+   * the edit as the pointer makes it, and what it returns is shown;
+   * Enter ends the edit there. Return the edit made exact (a draw's `to`
+   * at the typed length along the pointer's direction, a move's `dx` and
+   * `dy`), or null for text it cannot read, which leaves the edit to the
+   * pointer. An arrow with a value typed is a move by that value: the
+   * edit it is given points the arrow's way. Backspace edits the text
+   * and Escape clears it. The text is the application's to read, with
+   * its own units: `480`, `480<30`, `300,200`, `Ø100`, `1ft 6in`.
+   */
+  readonly typedValue?: (text: string, edit: CanvasEdit) => CanvasEdit | null;
 }
 
 /**
@@ -240,10 +295,18 @@ export interface CanvasEditing {
     readonly onPanMove: (event: UiPointerEvent) => void;
     readonly onPanEnd: (event: UiPointerEvent) => void;
     readonly onKeyDown: (event: UiKeyboardEvent) => void;
+    /** The canvas took the keyboard: its ring shows, with `focusRing`. */
+    readonly onFocus: () => void;
+    /** The canvas lost the keyboard: its ring goes. */
+    readonly onBlur: () => void;
   };
   /** The same, each saying whether it did anything: for chaining with an application's own. */
   readonly handle: {
     readonly pointerDown: (event: UiPointerEvent) => boolean;
+    /** A release: true when a click began a shape (`clickToDraw`). */
+    readonly pointerUp: (event: UiPointerEvent) => boolean;
+    /** A move with no button down: true when it moved a shape begun with a click. */
+    readonly pointerMove: (event: UiPointerEvent) => boolean;
     readonly panStart: (event: UiPointerEvent) => boolean;
     readonly panMove: (event: UiPointerEvent) => boolean;
     readonly panEnd: (event: UiPointerEvent) => boolean;
@@ -259,6 +322,18 @@ export interface CanvasEditing {
   readonly hovered: InternalState<string | null>;
   /** Whether an edit is going on. */
   readonly editing: Observable<boolean>;
+  /** Whether the canvas has the keyboard, as `handlers.onFocus` and `onBlur` say. */
+  readonly focused: Observable<boolean>;
+  /** The value being typed for the edit in progress (`typedValue`), or null. */
+  readonly typed: Observable<string | null>;
+  /**
+   * Ends the edit in progress at a value, as if it were typed and Enter
+   * pressed: for a field of the application's own, or an agent. With no
+   * text, the value being typed. With nothing in progress and shapes
+   * chosen, a move of them. False when there was nothing to commit to,
+   * or `typedValue` could not read it.
+   */
+  commitTyped(text?: string): boolean;
   /** The cursor the canvas should show: a resize cursor over a handle, a crosshair with a tool. */
   readonly cursor: Observable<UiCursor | undefined>;
   /** A pointer event's place in canvas pixels. */
@@ -275,6 +350,8 @@ export interface CanvasEditing {
       readonly guides?: readonly SnapGuide[];
       readonly snap?: CanvasPoint | null;
       readonly readout?: { readonly text: string; readonly at: CanvasPoint } | null;
+      /** What the snap is, written beside `snap`: `center`, `tangent`. */
+      readonly snapLabel?: string | null;
     } | null
   ): void;
 }
@@ -318,8 +395,31 @@ type Gesture =
       readonly tool: string;
       readonly from: CanvasPoint;
       readonly fromSnap: SnapHit | null;
+      /** Begun with a click rather than a drag: it follows the pointer until the next press. */
+      readonly byClick: boolean;
       last: CanvasEdit;
     };
+
+/** The keys held, as a step of a gesture reads them. */
+interface Mods {
+  readonly shift: boolean;
+  readonly alt: boolean;
+  readonly meta: boolean;
+  readonly ctrl: boolean;
+}
+
+function modsOf(event: { readonly modifiers: Mods }): Mods {
+  const { shift, alt, meta, ctrl } = event.modifiers;
+  return { shift, alt, meta, ctrl };
+}
+
+/** What a snap is, to know it again after a step: Tab's choice is kept while it stays in reach. */
+function snapKey(hit: SnapHit): string {
+  return `${hit.point.x},${hit.point.y},${hit.kind}`;
+}
+
+/** A key that opens the typed field: a number's start, an angle's `<`, a diameter's `Ø`. */
+const STARTS_TYPING = /^[0-9.\-<Øø⌀]$/;
 
 const NOWHERE: LayoutBox = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -343,13 +443,17 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
   }
   const screen = new BehaviorSubject<LayoutBox>(NOWHERE);
   const flow = new BehaviorSubject<LayoutBox>(NOWHERE);
-  const feedback = new BehaviorSubject<Pick<CanvasOverlayState, 'marquee' | 'guides' | 'snap' | 'readout'>>({
+  const feedback = new BehaviorSubject<
+    Pick<CanvasOverlayState, 'marquee' | 'guides' | 'snap' | 'readout' | 'snapLabel'>
+  >({
     marquee: null,
     guides: [],
     snap: null,
-    readout: null
+    readout: null,
+    snapLabel: null
   });
   const editing = new BehaviorSubject(false);
+  const focused = new BehaviorSubject(false);
   const overHandle = new BehaviorSubject<UiCursor | undefined>(undefined);
   const nodes = new Map<string, UiNode>();
   let pending: Pending | null = null;
@@ -373,10 +477,8 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     }
   };
   const emit = (edit: CanvasEdit): void => options.onEdit?.(edit);
-  const snapping = (event: {
-    readonly modifiers: { readonly meta: boolean; readonly ctrl: boolean };
-  }): CanvasSnapOptions | null =>
-    options.snap === false || event.modifiers.meta || event.modifiers.ctrl ? null : (options.snap ?? {});
+  const snapping = (mods: { readonly meta: boolean; readonly ctrl: boolean }): CanvasSnapOptions | null =>
+    options.snap === false || mods.meta || mods.ctrl ? null : (options.snap ?? {});
   const reach = (snap: CanvasSnapOptions): number => (snap.reach ?? 8) / scale();
 
   const hitShape = (p: CanvasPoint): CanvasShape | null => {
@@ -447,16 +549,67 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     return { boxes, points };
   };
 
+  /**
+   * The snaps a dragged point could take where it is, best first: the
+   * first is what it snaps to, and Tab steps through the rest. Set by
+   * every step that snaps a point.
+   */
+  let choices: readonly SnapHit[] = [];
+  /** The snap Tab stepped to, by `snapKey`; kept while it stays in reach, dropped once it leaves. */
+  let chosenSnap: string | null = null;
+
+  /** The host's `candidates`, else its `toPoint`, else the shapes' own points in reach, nearest first. */
+  const choicesAt = (
+    p: CanvasPoint,
+    snap: CanvasSnapOptions,
+    ids: readonly string[],
+    from: CanvasPoint | null
+  ): readonly SnapHit[] => {
+    const context = { from, ids, reach: reach(snap) };
+    const listed = snap.candidates?.(p, context);
+    if (listed !== undefined && listed.length > 0) return listed;
+    const own = snap.toPoint?.(p, context);
+    if (own !== null && own !== undefined) return [own];
+    const near = othersOf(ids)
+      .points.map((target, i) => ({ target, i, d: Math.hypot(target.x - p.x, target.y - p.y) }))
+      .filter(t => t.d <= context.reach)
+      // Of two as near, the later first, as `snapPoint` takes it.
+      .sort((a, b) => a.d - b.d || b.i - a.i);
+    const seen = new Set<string>();
+    const hits: SnapHit[] = [];
+    for (const { target } of near) {
+      // Two shapes' corners in one place are one place to Tab to.
+      const where = `${target.x},${target.y}`;
+      if (seen.has(where)) continue;
+      seen.add(where);
+      const point = { x: target.x, y: target.y };
+      const hit: SnapHit = { point, kind: target.kind ?? 'point', guides: [] };
+      hits.push(target.label === undefined ? hit : { ...hit, label: target.label });
+    }
+    return hits;
+  };
+
   const pointSnap = (
     p: CanvasPoint,
-    event: UiPointerEvent,
+    mods: Mods,
     ids: readonly string[],
     from: CanvasPoint | null
   ): { point: CanvasPoint; hit: SnapHit | null } => {
-    const snap = snapping(event);
-    if (snap === null) return { point: p, hit: null };
-    const own = snap.toPoint?.(p, { from, ids });
-    if (own !== null && own !== undefined) return { point: own.point, hit: own };
+    const snap = snapping(mods);
+    if (snap === null) {
+      choices = [];
+      return { point: p, hit: null };
+    }
+    choices = choicesAt(p, snap, ids, from);
+    if (choices.length > 0) {
+      let i = chosenSnap === null ? 0 : choices.findIndex(hit => snapKey(hit) === chosenSnap);
+      if (i < 0) {
+        i = 0;
+        chosenSnap = null;
+      }
+      return { point: choices[i].point, hit: choices[i] };
+    }
+    chosenSnap = null;
     return snapPoint(p, othersOf(ids).points, { reach: reach(snap), grid: snap.grid, gridOrigin: snap.gridOrigin });
   };
 
@@ -494,30 +647,62 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     return { text, at };
   };
 
+  /** A value being typed for the edit in progress, or for a nudge: `480`, `300,200`. Null when none. */
+  const typed = new BehaviorSubject<string | null>(null);
+
   const showEdit = (edit: CanvasEdit, at: CanvasPoint): void => {
+    const text = typed.value;
     feedback.next({
       marquee: null,
       guides: edit.snap?.guides ?? [],
       snap: edit.snap !== null && edit.snap.kind !== 'grid' && edit.snap.guides.length === 0 ? edit.snap.point : null,
-      readout: readout(edit, at)
+      // While a value is typed, the readout is the field it is typed in.
+      readout: text === null ? readout(edit, at) : { text, at, field: true },
+      snapLabel: labelOf(edit.snap)
     });
   };
-  const clearFeedback = (): void => feedback.next({ marquee: null, guides: [], snap: null, readout: null });
+  const clearFeedback = (): void =>
+    feedback.next({ marquee: null, guides: [], snap: null, readout: null, snapLabel: null });
 
   // -------------------------------------------------------------------------
   // Pointer
   // -------------------------------------------------------------------------
 
+  /** Where the pointer was at a gesture's last step, and the keys held: Tab and typing step again from there. */
+  let at: { readonly p: CanvasPoint; readonly mods: Mods } | null = null;
+  /** The last step as the pointer made it, before a typed value made it exact. */
+  let raw: CanvasEdit | null = null;
+
+  const clicksToDraw = (name: string): boolean =>
+    typeof options.clickToDraw === 'function' ? options.clickToDraw(name) : options.clickToDraw === true;
+
+  /** What a gesture's own state is at its start: nothing chosen with Tab, nothing typed. */
+  const fresh = (): void => {
+    at = null;
+    raw = null;
+    chosenSnap = null;
+    choices = [];
+    if (typed.value !== null) typed.next(null);
+  };
+
   const pointerDown = (event: UiPointerEvent): boolean => {
     const p = toLocal(event);
     panned = false;
     pending = null;
+    // A shape begun with a click ends with the next press, where it lands.
+    const g = gesture;
+    if (g !== null && g.kind === 'draw' && g.byClick) {
+      if (typed.value !== null) typed.next(null);
+      step(g, p, modsOf(event));
+      finish(g);
+      return true;
+    }
     if (options.onPress?.(p, event) === true) {
       return true;
     }
     const drawing = tool.value;
     if (drawing !== null) {
-      const snapped = pointSnap(p, event, [], null);
+      const snapped = pointSnap(p, modsOf(event), [], null);
       pending = { kind: 'draw', tool: drawing, at: snapped.point, snap: snapped.hit };
       return true;
     }
@@ -543,12 +728,42 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     return true;
   };
 
-  const pointerUp = (_event: UiPointerEvent): void => {
+  const pointerUp = (event: UiPointerEvent): boolean => {
     // A click (no drag) on one of several chosen shapes chooses it alone.
     if (!panned && pending?.kind === 'move' && !pending.shift && selection.value.length > 1) {
       select([pending.id]);
     }
+    // A click with a tool that draws by clicks: the shape begins, and follows the pointer until the next click.
+    if (!panned && pending?.kind === 'draw' && clicksToDraw(pending.tool)) {
+      const start = pending;
+      pending = null;
+      fresh();
+      at = { p: start.at, mods: modsOf(event) };
+      startDraw(start, { shift: event.modifiers.shift, alt: event.modifiers.alt }, true);
+      return true;
+    }
     if (!panned) pending = null;
+    return false;
+  };
+
+  const startDraw = (
+    start: Extract<Pending, { kind: 'draw' }>,
+    modifiers: { readonly shift: boolean; readonly alt: boolean },
+    byClick: boolean
+  ): void => {
+    frozenTargets = othersOf([]);
+    const first: CanvasEdit = {
+      modifiers,
+      kind: 'draw',
+      tool: start.tool,
+      from: start.at,
+      to: start.at,
+      phase: 'start',
+      snap: start.snap
+    };
+    gesture = { kind: 'draw', tool: start.tool, from: start.at, fromSnap: start.snap, byClick, last: first };
+    editing.next(true);
+    emit(first);
   };
 
   const panStart = (event: UiPointerEvent): boolean => {
@@ -556,6 +771,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     if (start === null) return false;
     panned = true;
     pending = null;
+    fresh();
     const modifiers = { shift: event.modifiers.shift, alt: event.modifiers.alt };
     switch (start.kind) {
       case 'move': {
@@ -606,44 +822,34 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         gesture = { kind: 'marquee', start: start.at, adding: start.adding };
         editing.next(true);
         return true;
-      case 'draw': {
-        frozenTargets = othersOf([]);
-        const first: CanvasEdit = {
-          modifiers,
-          kind: 'draw',
-          tool: start.tool,
-          from: start.at,
-          to: start.at,
-          phase: 'start',
-          snap: start.snap
-        };
-        gesture = { kind: 'draw', tool: start.tool, from: start.at, fromSnap: start.snap, last: first };
-        break;
-      }
+      case 'draw':
+        startDraw(start, modifiers, false);
+        return true;
     }
     editing.next(true);
     emit(gesture.last);
     return true;
   };
 
-  const panMove = (event: UiPointerEvent): boolean => {
-    const g = gesture;
-    if (g === null) return false;
-    const p = toLocal(event);
+  /**
+   * One step of a gesture with the pointer at `p`: the edit as the
+   * pointer makes it, made exact by a value being typed, reported and
+   * shown. A pointer move, Tab and each key typed all step.
+   */
+  const step = (g: Exclude<Gesture, { kind: 'marquee' }>, p: CanvasPoint, mods: Mods): void => {
+    at = { p, mods };
+    const held = { shift: mods.shift, alt: mods.alt };
+    let next: CanvasEdit;
     switch (g.kind) {
-      case 'marquee': {
-        feedback.next({ marquee: rectFrom(g.start, p), guides: [], snap: null, readout: null });
-        return true;
-      }
       case 'move': {
         let dx = p.x - g.start.x;
         let dy = p.y - g.start.y;
-        if (event.modifiers.shift) {
+        if (mods.shift) {
           if (Math.abs(dx) > Math.abs(dy)) dy = 0;
           else dx = 0;
         }
         let hit: SnapHit | null = null;
-        const snap = snapping(event);
+        const snap = snapping(mods);
         const box = unionRect(g.boxes);
         if (snap !== null && box !== null) {
           const moved = { ...box, x: box.x + dx, y: box.y + dy };
@@ -656,25 +862,19 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
             points: g.points.map(q => ({ x: q.x + dx, y: q.y + dy })),
             targets: others.points
           });
-          dx += event.modifiers.shift && dx === 0 ? 0 : shifted.dx;
-          dy += event.modifiers.shift && dy === 0 ? 0 : shifted.dy;
+          dx += mods.shift && dx === 0 ? 0 : shifted.dx;
+          dy += mods.shift && dy === 0 ? 0 : shifted.dy;
           hit = shifted.hit;
         }
-        g.last = { kind: 'move', ids: g.ids, dx, dy, phase: 'live', snap: hit, modifiers: keys(event) };
+        next = { kind: 'move', ids: g.ids, dx, dy, phase: 'live', snap: hit, modifiers: held };
         break;
       }
       case 'box': {
         const corner = boxHandlePoint(g.from, g.handle);
-        const raw = { x: corner.x + p.x - g.start.x, y: corner.y + p.y - g.start.y };
-        const snapped = pointSnap(raw, event, g.ids, null);
-        const to = resizeRect(
-          g.from,
-          g.handle,
-          snapped.point.x - corner.x,
-          snapped.point.y - corner.y,
-          event.modifiers.shift
-        );
-        g.last = {
+        const moved = { x: corner.x + p.x - g.start.x, y: corner.y + p.y - g.start.y };
+        const snapped = pointSnap(moved, mods, g.ids, null);
+        const to = resizeRect(g.from, g.handle, snapped.point.x - corner.x, snapped.point.y - corner.y, mods.shift);
+        next = {
           kind: 'resize',
           ids: g.ids,
           handle: g.handle,
@@ -682,20 +882,20 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
           to,
           phase: 'live',
           snap: snapped.hit,
-          modifiers: keys(event)
+          modifiers: held
         };
         break;
       }
       case 'own': {
-        const raw = { x: g.handle.at.x + p.x - g.start.x, y: g.handle.at.y + p.y - g.start.y };
+        const moved = { x: g.handle.at.x + p.x - g.start.x, y: g.handle.at.y + p.y - g.start.y };
         const anchor = g.handle.anchor ?? null;
         const free = g.handle.snaps === false;
-        let snapped = free ? { point: raw, hit: null } : pointSnap(raw, event, [g.id], anchor);
-        if (!free && event.modifiers.shift && anchor !== null) {
-          snapped = { point: holdAngle(anchor, raw, snapAngle()), hit: null };
+        let snapped = free ? { point: moved, hit: null } : pointSnap(moved, mods, [g.id], anchor);
+        if (!free && mods.shift && anchor !== null) {
+          snapped = { point: holdAngle(anchor, moved, snapAngle()), hit: null };
         }
-        g.last = {
-          modifiers: keys(event),
+        next = {
+          modifiers: held,
           kind: 'handle',
           id: g.id,
           handle: g.handle.id,
@@ -707,38 +907,61 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         break;
       }
       case 'draw': {
-        let snapped = pointSnap(p, event, [], g.from);
-        if (event.modifiers.shift) {
+        let snapped = pointSnap(p, mods, [], g.from);
+        if (mods.shift) {
           snapped = { point: holdAngle(g.from, p, snapAngle()), hit: null };
         }
-        g.last = {
+        next = {
           kind: 'draw',
           tool: g.tool,
           from: g.from,
           to: snapped.point,
           phase: 'live',
           snap: snapped.hit,
-          modifiers: keys(event)
+          modifiers: held
         };
         break;
       }
     }
+    raw = next;
+    const text = typed.value;
+    const exact = text === null || options.typedValue === undefined ? null : options.typedValue(text, next);
+    g.last = exact === null ? next : ({ ...exact, phase: 'live' } as CanvasEdit);
     emit(g.last);
     showEdit(g.last, p);
+  };
+
+  const panMove = (event: UiPointerEvent): boolean => {
+    const g = gesture;
+    if (g === null) return false;
+    const p = toLocal(event);
+    if (g.kind === 'marquee') {
+      feedback.next({ marquee: rectFrom(g.start, p), guides: [], snap: null, readout: null, snapLabel: null });
+      return true;
+    }
+    step(g, p, modsOf(event));
     return true;
   };
 
-  const keys = (event: UiPointerEvent) => ({ shift: event.modifiers.shift, alt: event.modifiers.alt });
-
   const snapAngle = (): number => (options.snap === false ? 45 : (options.snap?.angle ?? 45));
+
+  /** A gesture done: its last edit again as `end`. */
+  const finish = (g: Exclude<Gesture, { kind: 'marquee' }>): void => {
+    gesture = null;
+    frozenTargets = null;
+    fresh();
+    editing.next(false);
+    emit({ ...g.last, phase: 'end' } as CanvasEdit);
+    clearFeedback();
+  };
 
   const panEnd = (event: UiPointerEvent): boolean => {
     const g = gesture;
-    if (g === null) return false;
-    gesture = null;
-    frozenTargets = null;
-    editing.next(false);
+    // A shape begun with a click is not ended by letting go of a drag.
+    if (g === null || (g.kind === 'draw' && g.byClick)) return false;
     if (g.kind === 'marquee') {
+      gesture = null;
+      editing.next(false);
       const area = rectFrom(g.start, toLocal(event));
       const mode = options.marquee ?? 'touch';
       const inside = shapes.value
@@ -749,8 +972,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
       clearFeedback();
       return true;
     }
-    emit({ ...g.last, phase: 'end' } as CanvasEdit);
-    clearFeedback();
+    finish(g);
     return true;
   };
 
@@ -759,6 +981,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     if (g === null) return false;
     gesture = null;
     frozenTargets = null;
+    fresh();
     editing.next(false);
     if (g.kind !== 'marquee') {
       emit({ ...g.last, phase: 'cancel' } as CanvasEdit);
@@ -766,14 +989,24 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     clearFeedback();
     return true;
   };
+  // A tool put down or changed while a shape begun with a click follows the pointer: it is called off.
+  ctx.effect(tool.pipe(distinctUntilChanged()), next => {
+    const g = gesture;
+    if (g !== null && g.kind === 'draw' && g.byClick && next !== g.tool) cancel();
+  });
 
-  const pointerMove = (event: UiPointerEvent): void => {
-    if (gesture !== null || event.buttons !== 0) return;
+  const pointerMove = (event: UiPointerEvent): boolean => {
+    const g = gesture;
+    if (g !== null && g.kind === 'draw' && g.byClick) {
+      step(g, toLocal(event), modsOf(event));
+      return true;
+    }
+    if (gesture !== null || event.buttons !== 0) return false;
     const p = toLocal(event);
     if (tool.value !== null) {
       overHandle.next('crosshair');
       if (hovered.value !== null) hovered.value = null;
-      return;
+      return false;
     }
     const onHandle = hitHandle(p);
     overHandle.next(
@@ -787,6 +1020,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     );
     const id = onHandle === null ? (hitShape(p)?.id ?? null) : null;
     if (hovered.value !== id) hovered.value = id;
+    return false;
   };
 
   const pointerLeave = (): void => {
@@ -803,9 +1037,125 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     emit({ ...edit, phase: 'end' } as CanvasEdit);
   };
 
+  /** Tab's step to the next snap in reach of the point being dragged, or the one before. */
+  const cycle = (direction: 1 | -1): void => {
+    const g = gesture;
+    if (g === null || g.kind === 'marquee' || at === null || choices.length < 2) return;
+    const now =
+      chosenSnap === null
+        ? 0
+        : Math.max(
+            0,
+            choices.findIndex(hit => snapKey(hit) === chosenSnap)
+          );
+    chosenSnap = snapKey(choices[(now + direction + choices.length) % choices.length]);
+    step(g, at.p, at.mods);
+  };
+
+  /** The typed value changed: the edit in progress steps again with it, or the field shows by the chosen shapes. */
+  const setTyped = (text: string | null): void => {
+    typed.next(text);
+    const g = gesture;
+    if (g !== null && g.kind !== 'marquee') {
+      if (at !== null) step(g, at.p, at.mods);
+      return;
+    }
+    const box = unionRect(chosen().map(shape => shape.bounds));
+    if (text === null || box === null) {
+      clearFeedback();
+      return;
+    }
+    feedback.next({
+      marquee: null,
+      guides: [],
+      snap: null,
+      readout: { text, at: { x: box.x + box.width, y: box.y + box.height }, field: true },
+      snapLabel: null
+    });
+  };
+
+  /**
+   * A value for the edit in progress, from the keys or from the
+   * application: the host's `typedValue` makes the edit exact and the
+   * edit ends there. With nothing in progress and shapes chosen, it is a
+   * move from where they are. False when there is nothing to commit to
+   * or the host could not read the text.
+   */
+  const commitTyped = (text?: string): boolean => {
+    const value = text ?? typed.value;
+    if (value === null || options.typedValue === undefined) return false;
+    const g = gesture;
+    if (g !== null) {
+      if (g.kind === 'marquee') return false;
+      const exact = options.typedValue(value, raw ?? g.last);
+      if (exact === null) return false;
+      g.last = { ...exact, phase: 'live' } as CanvasEdit;
+      emit(g.last);
+      finish(g);
+      return true;
+    }
+    const ids = selection.value;
+    if (ids.length === 0) return false;
+    const exact = options.typedValue(value, { kind: 'move', ids, dx: 0, dy: 0, phase: 'end', snap: null });
+    if (exact === null) return false;
+    setTyped(null);
+    keyEdit(exact);
+    return true;
+  };
+
+  /** A key while a value can be typed: a digit opens the field, and then the field takes the keys. */
+  const typedKey = (event: UiKeyboardEvent, ids: readonly string[]): boolean => {
+    const text = typed.value;
+    const g = gesture;
+    const live = g !== null && g.kind !== 'marquee';
+    const k = event.key;
+    if (k.length === 1 && (text !== null || ((live || (g === null && ids.length > 0)) && STARTS_TYPING.test(k)))) {
+      setTyped((text ?? '') + k);
+      return true;
+    }
+    if (text === null) return false;
+    switch (k) {
+      case 'Backspace':
+        setTyped(text.length > 1 ? text.slice(0, -1) : null);
+        return true;
+      case 'Escape':
+        setTyped(null);
+        return true;
+      case 'Enter':
+        commitTyped(text);
+        return true;
+      case 'ArrowLeft':
+      case 'ArrowRight':
+      case 'ArrowUp':
+      case 'ArrowDown': {
+        if (g !== null || ids.length === 0 || options.typedValue === undefined) return true;
+        // A nudge by the value typed: the arrow gives the direction, the host the distance.
+        const nudge = options.nudge ?? 1;
+        const horizontal = k === 'ArrowLeft' || k === 'ArrowRight';
+        const sign = k === 'ArrowLeft' || k === 'ArrowUp' ? -1 : 1;
+        const exact = options.typedValue(text, {
+          kind: 'move',
+          ids,
+          dx: horizontal ? sign * nudge : 0,
+          dy: horizontal ? 0 : sign * nudge,
+          phase: 'end',
+          snap: null
+        });
+        if (exact !== null) {
+          setTyped(null);
+          keyEdit(exact);
+        }
+        return true;
+      }
+      default:
+        return false;
+    }
+  };
+
   const key = (event: UiKeyboardEvent): boolean => {
     const ids = selection.value;
     const mod = event.modifiers.meta || event.modifiers.ctrl;
+    if (options.typedValue !== undefined && !mod && typedKey(event, ids)) return true;
     switch (event.key) {
       case 'Escape':
         if (cancel()) return true;
@@ -825,6 +1175,11 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         select(shapes.value.filter(shape => shape.locked !== true).map(shape => shape.id));
         return true;
       case 'Tab': {
+        // While a point is dragged, Tab steps through what it could snap to, and is not a way out of the canvas.
+        if (gesture !== null && gesture.kind !== 'marquee' && !mod) {
+          cycle(event.modifiers.shift ? -1 : 1);
+          return true;
+        }
         if (ids.length === 0 || options.tabSelects === false || mod) return false;
         const open = shapes.value.filter(shape => shape.locked !== true);
         if (open.length === 0) return false;
@@ -965,14 +1320,34 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     distinctUntilChanged()
   );
 
+  const ring =
+    options.focusRing === undefined || options.focusRing === false
+      ? null
+      : ringShapes(options.focusRing === true ? {} : options.focusRing);
+  const ringModifier =
+    ring === null
+      ? []
+      : [
+          decorated(
+            focused.pipe(
+              distinctUntilChanged(),
+              map(on => (on ? ring : NO_SHAPES))
+            )
+          )
+        ];
+
   return {
-    modifiers: [measure(screen), measureFlow(flow)],
+    modifiers: [measure(screen), measureFlow(flow), ...ringModifier],
     handlers: {
       onPointerDown: event => {
         pointerDown(event);
       },
-      onPointerUp: pointerUp,
-      onPointerMove: pointerMove,
+      onPointerUp: event => {
+        pointerUp(event);
+      },
+      onPointerMove: event => {
+        pointerMove(event);
+      },
       onPointerLeave: pointerLeave,
       onPanStart: event => {
         panStart(event);
@@ -985,15 +1360,20 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
       },
       onKeyDown: event => {
         if (key(event)) event.preventDefault();
-      }
+      },
+      onFocus: () => focused.next(true),
+      onBlur: () => focused.next(false)
     },
-    handle: { pointerDown, panStart, panMove, panEnd, key },
+    handle: { pointerDown, pointerUp, pointerMove, panStart, panMove, panEnd, key },
     overlay,
     shapeNodes,
     activeDescendant,
     selection,
     hovered,
     editing,
+    focused,
+    typed,
+    commitTyped,
     cursor,
     toLocal,
     scale,
@@ -1002,14 +1382,45 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         clearFeedback();
         return;
       }
+      const at = next.snap ?? null;
+      const words = next.snapLabel ?? null;
       feedback.next({
         marquee: null,
         guides: next.guides ?? [],
-        snap: next.snap ?? null,
-        readout: next.readout ?? null
+        snap: at,
+        readout: next.readout ?? null,
+        snapLabel: at === null || words === null || words === '' ? null : { text: words, at }
       });
     }
   };
+}
+
+const NO_SHAPES: readonly DecorationShape[] = [];
+
+/** A hit's words for the overlay, at the point it snapped to. */
+function labelOf(hit: SnapHit | null): CanvasOverlayState['snapLabel'] {
+  return hit === null || hit.label === undefined || hit.label === '' ? null : { text: hit.label, at: hit.point };
+}
+
+/**
+ * The canvas's ring, as `focusRing` draws one: a band `offset` clear of
+ * the node and `width` thick. Drawn here rather than by `focusRing`
+ * because that one shows only for the keyboard's focus, and because the
+ * node the kit measures need not be the node that takes focus.
+ */
+function ringShapes(options: FocusRingOptions): readonly DecorationShape[] {
+  const width = options.width ?? 2;
+  const offset = options.offset ?? 2;
+  return [
+    {
+      kind: 'stroke',
+      color: options.color ?? 'focusRing',
+      lineWidth: width,
+      outset: offset + width,
+      ...(options.radius === undefined ? {} : { radius: options.radius }),
+      ...(options.after === undefined ? {} : { after: options.after })
+    }
+  ];
 }
 
 /** A box's corners, side middles and centre: what a shape with no snap points of its own snaps by. */

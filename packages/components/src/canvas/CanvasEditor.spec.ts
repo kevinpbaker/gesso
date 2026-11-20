@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject, map } from 'rxjs';
 
-import { createComponent } from 'gesso-framework';
+import { createComponent, type ComponentContext, type Inputs } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Box } from 'gesso-core';
+import { Box, type DecorationShape, type UiChild, type UiNode } from 'gesso-core';
 import { CanvasEditor } from './CanvasEditor';
-import type { CanvasEdit, CanvasShape } from './canvasEditing';
+import { canvasEditing, type CanvasEdit, type CanvasEditing, type CanvasShape } from './canvasEditing';
 import type { CanvasRect } from './geometry';
 
 /**
@@ -336,5 +336,346 @@ describe('CanvasEditor', () => {
     const last = edits.filter(edit => edit.phase === 'live').at(-1)!;
     expect(last.kind === 'move' && last.dx).toBe(5);
     expect(last.snap?.guides ?? []).toEqual([]);
+  });
+
+  it('rings the canvas while it has the keyboard, from a click too, and not while a field has it', () => {
+    const mountWith = (focusRing: boolean | undefined) => {
+      const ui = renderTest(
+        Box(
+          { width: 400, height: 200 },
+          createComponent(CanvasEditor, {
+            width: 300,
+            height: 200,
+            label: 'Drawing',
+            focusRing,
+            shapes: [{ id: 'a', bounds: { x: 10, y: 10, width: 50, height: 50 }, label: 'A' }]
+          }),
+          Box({
+            position: 'absolute',
+            left: 320,
+            top: 0,
+            width: 60,
+            height: 20,
+            focusable: true,
+            role: 'textbox',
+            label: 'Width'
+          })
+        ),
+        { width: 400, height: 200 }
+      );
+      ui.frame();
+      const canvas = ui.getByRole('listbox');
+      const field = ui.getByRole('textbox');
+      const rings = (node: UiNode) =>
+        (node.decorations ?? []).filter(
+          (shape: DecorationShape) => shape.kind === 'stroke' && shape.color === 'focusRing'
+        );
+      // A click on the canvas gives it the keyboard, as a person does.
+      ui.fireEvent.pointerDown(30, 30);
+      ui.fireEvent.pointerUp(30, 30);
+      ui.frame();
+      return { ui, canvas, field, rings };
+    };
+    // The plain ring is the keyboard's (focus-visible): a click shows none.
+    const plain = mountWith(undefined);
+    expect(plain.rings(plain.canvas)).toEqual([]);
+
+    const { ui, canvas, field, rings } = mountWith(true);
+    expect(rings(canvas)).toHaveLength(1);
+    ui.fireEvent.focus(field);
+    ui.frame();
+    expect(rings(canvas)).toEqual([]);
+    ui.fireEvent.focus(canvas);
+    ui.frame();
+    expect(rings(canvas)).toHaveLength(1);
+  });
+
+  it('writes the label of what a drawn point snaps to beside the mark', () => {
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 300,
+        height: 200,
+        tool: 'line',
+        shapes: [],
+        snap: {
+          toPoint: (p: { x: number; y: number }) =>
+            Math.hypot(p.x - 150, p.y - 100) <= 8
+              ? { point: { x: 150, y: 100 }, kind: 'centre', label: 'center', guides: [] }
+              : null
+        }
+      }),
+      { width: 300, height: 200 }
+    );
+    ui.frame();
+    const words = () => ui.draws.filter(call => call.name === 'fillText').map(call => call.args[0]);
+    ui.fireEvent.pointerDown(40, 40);
+    ui.fireEvent.pointerMove(100, 80, { buttons: 1 });
+    ui.fireEvent.pointerMove(147, 102, { buttons: 1 });
+    ui.clearDraws();
+    ui.frame();
+    expect(words()).toContain('center');
+    ui.fireEvent.pointerMove(220, 160, { buttons: 1 });
+    ui.clearDraws();
+    ui.frame();
+    expect(words()).not.toContain('center');
+    ui.fireEvent.pointerUp(220, 160);
+  });
+
+  it('steps through the snaps in reach with Tab and Shift+Tab while dragging, as in AutoCAD', () => {
+    const edits: CanvasEdit[] = [];
+    const centre = { point: { x: 150, y: 100 }, kind: 'centre', label: 'center', guides: [] };
+    const tangent = { point: { x: 155, y: 104 }, kind: 'tangent', label: 'tangent', guides: [] };
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 300,
+        height: 200,
+        tool: 'dimension',
+        shapes: [],
+        snap: {
+          // Both within reach of where the pointer goes; the host says which comes first.
+          candidates: (p: { x: number; y: number }, context: { reach: number }) =>
+            Math.hypot(p.x - 152, p.y - 101) <= context.reach ? [centre, tangent] : []
+        },
+        onEdit: (edit: CanvasEdit) => edits.push(edit)
+      }),
+      { width: 300, height: 200 }
+    );
+    ui.frame();
+    const canvas = ui.getByRole('listbox');
+    ui.fireEvent.focus(canvas);
+    const to = () => {
+      const last = edits.at(-1)!;
+      return last.kind === 'draw' ? [last.to, last.snap?.label] : null;
+    };
+    ui.fireEvent.pointerDown(40, 40);
+    ui.fireEvent.pointerMove(100, 80, { buttons: 1 });
+    ui.fireEvent.pointerMove(152, 101, { buttons: 1 });
+    expect(to()).toEqual([{ x: 150, y: 100 }, 'center']);
+    ui.fireEvent.keyDown('Tab');
+    expect(to()).toEqual([{ x: 155, y: 104 }, 'tangent']);
+    ui.fireEvent.keyDown('Tab');
+    expect(to()).toEqual([{ x: 150, y: 100 }, 'center']);
+    ui.fireEvent.keyDown('Tab', { shift: true });
+    expect(to()).toEqual([{ x: 155, y: 104 }, 'tangent']);
+    // A small move keeps the choice while it is still in reach.
+    ui.fireEvent.pointerMove(153, 101, { buttons: 1 });
+    expect(to()).toEqual([{ x: 155, y: 104 }, 'tangent']);
+    ui.fireEvent.pointerUp(153, 101);
+    const last = edits.at(-1)!;
+    expect(last.phase).toBe('end');
+    expect(last.kind === 'draw' && last.to).toEqual({ x: 155, y: 104 });
+  });
+
+  it('steps through the shapes’ own snap points with Tab when the host gives no list', () => {
+    const edits: CanvasEdit[] = [];
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 300,
+        height: 200,
+        tool: 'line',
+        shapes: [
+          {
+            id: 'a',
+            bounds: { x: 100, y: 100, width: 40, height: 40 },
+            label: 'A',
+            snapPoints: [{ x: 120, y: 120, label: 'center' }]
+          },
+          {
+            id: 'b',
+            bounds: { x: 100, y: 100, width: 40, height: 40 },
+            label: 'B',
+            snapPoints: [{ x: 124, y: 121, label: 'end' }]
+          }
+        ],
+        snap: {},
+        onEdit: (edit: CanvasEdit) => edits.push(edit)
+      }),
+      { width: 300, height: 200 }
+    );
+    ui.frame();
+    ui.fireEvent.focus(ui.getByRole('listbox'));
+    ui.fireEvent.pointerDown(20, 20);
+    ui.fireEvent.pointerMove(60, 60, { buttons: 1 });
+    ui.fireEvent.pointerMove(121, 120, { buttons: 1 });
+    const label = () => edits.at(-1)?.snap?.label;
+    expect(label()).toBe('center');
+    ui.fireEvent.keyDown('Tab');
+    expect(label()).toBe('end');
+    ui.fireEvent.keyDown('Tab');
+    expect(label()).toBe('center');
+    ui.fireEvent.pointerUp(121, 120);
+  });
+
+  describe('click to draw', () => {
+    const mountDrawing = (typedValue?: (text: string, edit: CanvasEdit) => CanvasEdit | null) => {
+      const edits: CanvasEdit[] = [];
+      const ui = renderTest(
+        createComponent(CanvasEditor, {
+          width: 600,
+          height: 300,
+          tool: 'line',
+          clickToDraw: true,
+          shapes: [],
+          snap: false,
+          typedValue,
+          onEdit: (edit: CanvasEdit) => edits.push(edit)
+        }),
+        { width: 600, height: 300 }
+      );
+      ui.frame();
+      ui.fireEvent.focus(ui.getByRole('listbox'));
+      const click = (x: number, y: number) => {
+        ui.fireEvent.pointerDown(x, y);
+        ui.fireEvent.pointerUp(x, y);
+        ui.frame();
+      };
+      const draws = () => edits.filter(edit => edit.kind === 'draw');
+      return { ui, edits, click, draws };
+    };
+
+    it('starts a shape with a click and ends it with the next, the pointer moving between', () => {
+      const { ui, click, draws } = mountDrawing();
+      click(50, 50);
+      expect(draws().map(edit => edit.phase)).toEqual(['start']);
+      ui.fireEvent.pointerMove(120, 90);
+      const live = draws().at(-1)!;
+      expect(live.phase).toBe('live');
+      expect(live.kind === 'draw' && [live.from, live.to]).toEqual([
+        { x: 50, y: 50 },
+        { x: 120, y: 90 }
+      ]);
+      click(200, 100);
+      const end = draws().at(-1)!;
+      expect(end.phase).toBe('end');
+      expect(end.kind === 'draw' && end.to).toEqual({ x: 200, y: 100 });
+      // The second click's release starts nothing.
+      expect(draws().filter(edit => edit.phase === 'start')).toHaveLength(1);
+    });
+
+    it('still draws with a drag, and Escape calls a clicked shape off', () => {
+      const { ui, click, draws } = mountDrawing();
+      ui.fireEvent.pointerDown(10, 10);
+      ui.fireEvent.pointerMove(30, 10, { buttons: 1 });
+      ui.fireEvent.pointerMove(60, 10, { buttons: 1 });
+      ui.fireEvent.pointerUp(60, 10);
+      expect(draws().map(edit => edit.phase)).toEqual(['start', 'live', 'live', 'end']);
+      click(100, 100);
+      ui.fireEvent.pointerMove(150, 100);
+      ui.fireEvent.keyDown('Escape');
+      expect(draws().at(-1)?.phase).toBe('cancel');
+      ui.fireEvent.pointerMove(170, 100);
+      expect(draws().at(-1)?.phase).toBe('cancel');
+    });
+
+    it('takes a typed length and Enter: 480 along the pointer’s direction', () => {
+      // The host's reading of the text: a length along the line's direction, in canvas pixels here.
+      const typedValue = (text: string, edit: CanvasEdit): CanvasEdit | null => {
+        const length = Number(text);
+        if (edit.kind !== 'draw' || !Number.isFinite(length)) return null;
+        const [dx, dy] = [edit.to.x - edit.from.x, edit.to.y - edit.from.y];
+        const run = Math.hypot(dx, dy);
+        if (run === 0) return null;
+        return { ...edit, to: { x: edit.from.x + (dx / run) * length, y: edit.from.y + (dy / run) * length } };
+      };
+      const { ui, click, draws } = mountDrawing(typedValue);
+      const typed: (string | null)[] = [];
+      click(50, 50);
+      ui.fireEvent.pointerMove(150, 50);
+      ui.fireEvent.keyDown('4');
+      ui.fireEvent.keyDown('8');
+      ui.fireEvent.keyDown('9');
+      ui.fireEvent.keyDown('Backspace');
+      ui.fireEvent.keyDown('0');
+      // Shown as it is typed: the shape at the typed length, and the field in the readout.
+      const preview = draws().at(-1)!;
+      expect(preview.kind === 'draw' && preview.to).toEqual({ x: 530, y: 50 });
+      ui.clearDraws();
+      ui.frame();
+      expect(ui.draws.filter(call => call.name === 'fillText').map(call => call.args[0])).toContain('480');
+      ui.fireEvent.keyDown('Enter');
+      const end = draws().at(-1)!;
+      expect(end.phase).toBe('end');
+      expect(end.kind === 'draw' && end.to).toEqual({ x: 530, y: 50 });
+      void typed;
+    });
+  });
+
+  it('moves the chosen shapes by a typed value: an arrow takes its direction, Enter a pair', () => {
+    const edits: CanvasEdit[] = [];
+    // The host's reading: `25` along the move's direction, `10,5` across and down.
+    const typedValue = (text: string, edit: CanvasEdit): CanvasEdit | null => {
+      if (edit.kind !== 'move') return null;
+      const pair = /^(-?[\d.]+),(-?[\d.]+)$/.exec(text);
+      if (pair !== null) return { ...edit, dx: Number(pair[1]), dy: Number(pair[2]) };
+      const n = Number(text);
+      const run = Math.hypot(edit.dx, edit.dy);
+      return Number.isFinite(n) && run > 0 ? { ...edit, dx: (edit.dx / run) * n, dy: (edit.dy / run) * n } : null;
+    };
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 300,
+        height: 200,
+        defaultSelection: ['a'],
+        shapes: [{ id: 'a', bounds: { x: 10, y: 10, width: 40, height: 40 }, label: 'A' }],
+        typedValue,
+        onEdit: (edit: CanvasEdit) => edits.push(edit)
+      }),
+      { width: 300, height: 200 }
+    );
+    ui.frame();
+    ui.fireEvent.focus(ui.getByRole('listbox'));
+    ui.fireEvent.keyDown('2');
+    ui.fireEvent.keyDown('5');
+    ui.fireEvent.keyDown('ArrowLeft');
+    const nudge = edits.at(-1)!;
+    expect(nudge.phase).toBe('end');
+    expect(nudge.kind === 'move' && [nudge.dx, nudge.dy]).toEqual([-25, 0]);
+    for (const key of ['1', '0', ',', '5']) ui.fireEvent.keyDown(key);
+    ui.fireEvent.keyDown('Enter');
+    const pair = edits.at(-1)!;
+    expect(pair.kind === 'move' && [pair.dx, pair.dy, pair.phase]).toEqual([10, 5, 'end']);
+    // With nothing typed, the arrows nudge as before.
+    ui.fireEvent.keyDown('ArrowRight');
+    const plain = edits.at(-1)!;
+    expect(plain.kind === 'move' && [plain.dx, plain.dy]).toEqual([1, 0]);
+  });
+
+  it('commits a value the application was given, as if typed: an agent, or a field of its own', () => {
+    let api: CanvasEditing | null = null;
+    const edits: CanvasEdit[] = [];
+    const Harness = (_inputs: Inputs<Record<string, never>>, ctx: ComponentContext): UiChild => {
+      const editing = canvasEditing(ctx, {
+        shapes: new BehaviorSubject<readonly CanvasShape[]>([]),
+        tool: new BehaviorSubject<string | null>('line'),
+        clickToDraw: true,
+        snap: false,
+        typedValue: (text, edit) =>
+          edit.kind === 'draw' ? { ...edit, to: { x: edit.from.x + Number(text), y: edit.from.y } } : null,
+        onEdit: edit => edits.push(edit)
+      });
+      api = editing;
+      return Box(
+        {
+          width: 300,
+          height: 200,
+          focusable: true,
+          role: 'listbox',
+          modifiers: editing.modifiers,
+          ...editing.handlers
+        },
+        editing.overlay,
+        editing.shapeNodes
+      );
+    };
+    const ui = renderTest(createComponent(Harness, {}), { width: 300, height: 200 });
+    ui.frame();
+    // Nothing in progress: nothing to commit to.
+    expect(api!.commitTyped('30')).toBe(false);
+    ui.fireEvent.pointerDown(20, 20);
+    ui.fireEvent.pointerUp(20, 20);
+    ui.fireEvent.pointerMove(60, 40);
+    expect(api!.commitTyped('30')).toBe(true);
+    const end = edits.at(-1)!;
+    expect(end.kind === 'draw' && [end.phase, end.to]).toEqual(['end', { x: 50, y: 20 }]);
   });
 });
