@@ -165,11 +165,26 @@ export interface SnapHit {
   readonly point: CanvasPoint;
   readonly kind: string;
   readonly guides: readonly SnapGuide[];
+  /**
+   * The words the overlay writes beside the snap mark, in the person's
+   * language: `end`, `center`, `tangent`, `on the line`, `grid`. No
+   * words when left out.
+   */
+  readonly label?: string;
 }
 
 /** A point another can snap to, and what kind of point it is. */
 export interface SnapTarget extends CanvasPoint {
   readonly kind?: string;
+  /** What a hit on it says beside the mark: `end`, `center`. */
+  readonly label?: string;
+}
+
+/** A hit on a target, with the target's label when it has one. */
+function targetHit(target: SnapTarget): SnapHit {
+  const point = { x: target.x, y: target.y };
+  const hit = { point, kind: target.kind ?? 'point', guides: [] };
+  return target.label === undefined ? hit : { ...hit, label: target.label };
 }
 
 /**
@@ -194,8 +209,8 @@ export function snapPoint(
     }
   }
   if (best !== null) {
-    const point = { x: best.x, y: best.y };
-    return { point, hit: { point, kind: best.kind ?? 'point', guides: [] } };
+    const hit = targetHit(best);
+    return { point: hit.point, hit };
   }
   const lineX = nearestOn(
     p.x,
@@ -265,8 +280,7 @@ export function snapMove(
     }
   }
   if (pointBest !== null) {
-    const point = { x: pointBest.at.x, y: pointBest.at.y };
-    return { dx: pointBest.dx, dy: pointBest.dy, hit: { point, kind: pointBest.at.kind ?? 'point', guides: [] } };
+    return { dx: pointBest.dx, dy: pointBest.dy, hit: targetHit(pointBest.at) };
   }
   const xs = [box.x, box.x + box.width / 2, box.x + box.width];
   const ys = [box.y, box.y + box.height / 2, box.y + box.height];

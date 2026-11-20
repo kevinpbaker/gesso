@@ -539,9 +539,11 @@ interface SnapHit {
   readonly point: CanvasPoint;
   readonly kind: string;
   readonly guides: readonly SnapGuide[];
+  readonly label?: string;
 }
 interface SnapTarget extends CanvasPoint {
   readonly kind?: string;
+  readonly label?: string;
 }
 declare function snapPoint(p: CanvasPoint, targets: readonly SnapTarget[], options: {
   readonly reach: number;
@@ -579,6 +581,10 @@ interface CanvasOverlayState {
   readonly guides: readonly SnapGuide[];
   readonly snap: CanvasPoint | null;
   readonly readout: {
+    readonly text: string;
+    readonly at: CanvasPoint;
+  } | null;
+  readonly snapLabel?: {
     readonly text: string;
     readonly at: CanvasPoint;
   } | null;
@@ -733,6 +739,7 @@ interface CanvasEditing {
       readonly text: string;
       readonly at: CanvasPoint;
     } | null;
+    readonly snapLabel?: string | null;
   } | null): void;
 }
 declare function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptions): CanvasEditing;

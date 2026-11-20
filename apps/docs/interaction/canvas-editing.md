@@ -183,6 +183,23 @@ What snaps to what:
 - A move snaps to the grid by the pressed shape's `anchor`, a real point
   of it, so the numbers it writes stay round.
 
+### Snap labels
+
+A `SnapHit` from `toPoint` can carry a `label`, and so can a
+`SnapTarget` in a shape's `snapPoints`. The overlay writes it in small
+type beside the snap mark (`end`, `center`, `tangent`, `on the line`,
+`grid`), so the person knows what the drag will land on before they
+let go. It goes at the place nearest the mark that is inside the canvas
+and clear of the readout. The words are the application's, in its own
+language; with no `label`, nothing is written.
+
+```ts
+toPoint: p => {
+  const centre = holeCentreNear(p);
+  return centre === null ? null : { point: centre, kind: 'centre', label: 'center', guides: [] };
+};
+```
+
 ## Keyboard
 
 The canvas is one tab stop. With it focused:
@@ -262,14 +279,14 @@ focus: call `handlers.onFocus` and `handlers.onBlur` from the focusable
 node's own, and `focused` says whether it has the keyboard. `toLocal(event)` is a pointer's place in the
 canvas's pixels and `scale()` the zoom above it, both from the canvas
 node's measured boxes, so a canvas inside a zoomed page needs nothing
-more. `show({ guides, snap, readout })` draws the kit's feedback from a
-drag the application runs itself.
+more. `show({ guides, snap, snapLabel, readout })` draws the kit's
+feedback from a drag the application runs itself.
 
 ## Painting the overlay yourself
 
 `paintCanvasOverlay(surface, state, size, scale)` draws hover,
-selection, handles, marquee, guides, snap mark and readout from a
-`CanvasOverlayState`, and `paintReadout(surface, text, at, size, scale, look)`
+selection, handles, marquee, guides, snap mark, snap label and readout
+from a `CanvasOverlayState`, and `paintReadout(surface, text, at, size, scale, look)`
 draws the readout alone. The readout's plate is measured with
 `paintTextMetrics` (see [Painting your own content](/rendering/painting)),
 so it fits what it says, and it flips to the other side of the pointer

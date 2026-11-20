@@ -295,6 +295,8 @@ export interface CanvasEditing {
       readonly guides?: readonly SnapGuide[];
       readonly snap?: CanvasPoint | null;
       readonly readout?: { readonly text: string; readonly at: CanvasPoint } | null;
+      /** What the snap is, written beside `snap`: `center`, `tangent`. */
+      readonly snapLabel?: string | null;
     } | null
   ): void;
 }
@@ -363,11 +365,14 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
   }
   const screen = new BehaviorSubject<LayoutBox>(NOWHERE);
   const flow = new BehaviorSubject<LayoutBox>(NOWHERE);
-  const feedback = new BehaviorSubject<Pick<CanvasOverlayState, 'marquee' | 'guides' | 'snap' | 'readout'>>({
+  const feedback = new BehaviorSubject<
+    Pick<CanvasOverlayState, 'marquee' | 'guides' | 'snap' | 'readout' | 'snapLabel'>
+  >({
     marquee: null,
     guides: [],
     snap: null,
-    readout: null
+    readout: null,
+    snapLabel: null
   });
   const editing = new BehaviorSubject(false);
   const focused = new BehaviorSubject(false);
@@ -520,10 +525,12 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
       marquee: null,
       guides: edit.snap?.guides ?? [],
       snap: edit.snap !== null && edit.snap.kind !== 'grid' && edit.snap.guides.length === 0 ? edit.snap.point : null,
-      readout: readout(edit, at)
+      readout: readout(edit, at),
+      snapLabel: labelOf(edit.snap)
     });
   };
-  const clearFeedback = (): void => feedback.next({ marquee: null, guides: [], snap: null, readout: null });
+  const clearFeedback = (): void =>
+    feedback.next({ marquee: null, guides: [], snap: null, readout: null, snapLabel: null });
 
   // -------------------------------------------------------------------------
   // Pointer
@@ -653,7 +660,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     const p = toLocal(event);
     switch (g.kind) {
       case 'marquee': {
-        feedback.next({ marquee: rectFrom(g.start, p), guides: [], snap: null, readout: null });
+        feedback.next({ marquee: rectFrom(g.start, p), guides: [], snap: null, readout: null, snapLabel: null });
         return true;
       }
       case 'move': {
@@ -1042,17 +1049,25 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         clearFeedback();
         return;
       }
+      const at = next.snap ?? null;
+      const words = next.snapLabel ?? null;
       feedback.next({
         marquee: null,
         guides: next.guides ?? [],
-        snap: next.snap ?? null,
-        readout: next.readout ?? null
+        snap: at,
+        readout: next.readout ?? null,
+        snapLabel: at === null || words === null || words === '' ? null : { text: words, at }
       });
     }
   };
 }
 
 const NO_SHAPES: readonly DecorationShape[] = [];
+
+/** A hit's words for the overlay, at the point it snapped to. */
+function labelOf(hit: SnapHit | null): CanvasOverlayState['snapLabel'] {
+  return hit === null || hit.label === undefined || hit.label === '' ? null : { text: hit.label, at: hit.point };
+}
 
 /**
  * The canvas's ring, as `focusRing` draws one: a band `offset` clear of

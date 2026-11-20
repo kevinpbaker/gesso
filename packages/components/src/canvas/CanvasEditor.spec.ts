@@ -389,4 +389,35 @@ describe('CanvasEditor', () => {
     ui.frame();
     expect(rings(canvas)).toHaveLength(1);
   });
+
+  it('writes the label of what a drawn point snaps to beside the mark', () => {
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 300,
+        height: 200,
+        tool: 'line',
+        shapes: [],
+        snap: {
+          toPoint: (p: { x: number; y: number }) =>
+            Math.hypot(p.x - 150, p.y - 100) <= 8
+              ? { point: { x: 150, y: 100 }, kind: 'centre', label: 'center', guides: [] }
+              : null
+        }
+      }),
+      { width: 300, height: 200 }
+    );
+    ui.frame();
+    const words = () => ui.draws.filter(call => call.name === 'fillText').map(call => call.args[0]);
+    ui.fireEvent.pointerDown(40, 40);
+    ui.fireEvent.pointerMove(100, 80, { buttons: 1 });
+    ui.fireEvent.pointerMove(147, 102, { buttons: 1 });
+    ui.clearDraws();
+    ui.frame();
+    expect(words()).toContain('center');
+    ui.fireEvent.pointerMove(220, 160, { buttons: 1 });
+    ui.clearDraws();
+    ui.frame();
+    expect(words()).not.toContain('center');
+    ui.fireEvent.pointerUp(220, 160);
+  });
 });
