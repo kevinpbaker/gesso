@@ -270,7 +270,12 @@ export class SemanticsMirror {
       color: 'transparent',
       background: 'transparent',
       font: '1px sans-serif',
-      zIndex: '2147483646'
+      zIndex: '2147483646',
+      // Not text to select: ⌘A outside a field selected every element
+      // in here, and the browser drew its selection boxes over the app.
+      // A text field is selectable again (see `describe`).
+      userSelect: 'none',
+      webkitUserSelect: 'none'
     } as Partial<CSSStyleDeclaration>);
     this.doc.body.appendChild(container);
     this.detach = this.listen();
@@ -442,6 +447,14 @@ export class SemanticsMirror {
 
   /** Writes a record onto its element as ARIA, clearing what it no longer says. */
   private describe(element: HTMLElement, record: UiSemanticsRecord): void {
+    // A text field's value is its content, which a person may select;
+    // the rest of the mirror is not text to select. Written only when it
+    // changes, as every style write here costs the element its style.
+    const select = record.role !== undefined && VALUE_IN_CONTENT.has(record.role) ? 'text' : '';
+    if ((element.style.userSelect || '') !== select) {
+      element.style.userSelect = select;
+      element.style.webkitUserSelect = select;
+    }
     for (const attribute of RECORD_ATTRIBUTES) {
       element.removeAttribute(attribute);
     }

@@ -269,6 +269,24 @@ describe('SemanticsMirror', () => {
     expect(elementFor('nav').style.overflow).toBe('clip');
   });
 
+  it('is not text a select-all takes, except a text field, whose value a person may select', () => {
+    // ⌘A outside a field selected every mirrored element, and the
+    // browser drew its blue selection boxes over the whole app.
+    const { container, elementFor, apply } = setup();
+    apply({
+      patches: [
+        { op: 'add', node: record('p', { role: 'paragraph', label: 'Some prose' }) },
+        { op: 'add', node: record('name', { role: 'textbox', label: 'Name', valueText: 'Ada' }) }
+      ]
+    });
+    expect([container.style.userSelect, container.style.webkitUserSelect]).toEqual(['none', 'none']);
+    expect(elementFor('p').style.userSelect ?? '').toBe('');
+    expect([elementFor('name').style.userSelect, elementFor('name').style.webkitUserSelect]).toEqual(['text', 'text']);
+    // A field that becomes prose is not selectable again.
+    apply({ patches: [{ op: 'update', node: record('name', { role: 'paragraph', label: 'Ada' }) }] });
+    expect(elementFor('name').style.userSelect).toBe('');
+  });
+
   it('mirrors a record as an element carrying its ARIA', () => {
     const { container, elementFor, apply } = setup();
 
