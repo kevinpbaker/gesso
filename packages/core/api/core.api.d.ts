@@ -4431,6 +4431,7 @@ interface GlyphCommand {
   end: number;
   page: number;
   scissor: ScissorRect | null;
+  smooth: boolean;
 }
 interface ImageCommand {
   kind: CommandKind.Image;
@@ -4490,12 +4491,13 @@ declare class WebGPUGlyphPages {
   private readonly atlas;
   private readonly textures;
   private readonly bindGroups;
+  private readonly smoothBindGroups;
   private scratch;
   private scratchContext;
   uploads: number;
   constructor(device: GPUDevice, pipeline: TexturedPipeline, atlas: WebGPUGlyphAtlas);
   flush(): void;
-  bindGroup(page: number): GPUBindGroup | null;
+  bindGroup(page: number, smooth?: boolean): GPUBindGroup | null;
   dispose(): void;
   private textureFor;
   private upload;

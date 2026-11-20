@@ -193,6 +193,12 @@ export interface GlyphCommand {
   /** Atlas page every instance in the range samples. */
   page: number;
   scissor: ScissorRect | null;
+  /**
+   * Sampled with filtering rather than nearest: the run is drawn under a
+   * scale or a turn, so its cells cannot land one to one on the screen's
+   * pixels, and nearest sampling made zoomed text blocky.
+   */
+  smooth: boolean;
 }
 
 export interface ImageCommand {
@@ -508,7 +514,13 @@ export function buildRenderList(
     const { lines, font, color, fontSize, originX, originY, ctm, scissor, rtl } = options;
     const opacity = options.opacity;
     const rounded = options.rounded;
-    const style = atlas.styleFor(font, color, fontSize, dpr, rtl);
+    // Under a scale or a turn the cells are rasterised at the scale they
+    // land at, in steps, and sampled smoothly; at 1:1 they stay at the
+    // device ratio and are sampled one texel to one pixel, which is what
+    // keeps ordinary text crisp.
+    const smooth = !(ctm[0] === 1 && ctm[1] === 0 && ctm[2] === 0 && ctm[3] === 1);
+    const ratio = smooth ? dpr * glyphScaleStep(Math.sqrt(Math.abs(ctm[0] * ctm[3] - ctm[1] * ctm[2]))) : dpr;
+    const style = atlas.styleFor(font, color, fontSize, ratio, rtl);
     // A paragraph with runs draws one piece per run, each in its own
     // font, colour and size, at the x the paragraph measured for it.
     // The atlas is keyed by font and colour already, so a run is a new
@@ -540,7 +552,7 @@ export function buildRenderList(
             line.height,
             pieceFont,
             pieceColor,
-            atlas.styleFor(pieceFont, pieceColor, span?.fontSize ?? fontSize, dpr, rtl),
+            atlas.styleFor(pieceFont, pieceColor, span?.fontSize ?? fontSize, ratio, rtl),
             spanMeasure
           );
         }
@@ -614,12 +626,20 @@ export function buildRenderList(
           last !== undefined &&
           last.kind === CommandKind.Glyphs &&
           last.page === slot.page &&
+          last.smooth === smooth &&
           last.end === instance &&
           scissorsEqual(last.scissor, scissor)
         ) {
           last.end = instance + 1;
         } else {
-          commands.push({ kind: CommandKind.Glyphs, start: instance, end: instance + 1, page: slot.page, scissor });
+          commands.push({
+            kind: CommandKind.Glyphs,
+            start: instance,
+            end: instance + 1,
+            page: slot.page,
+            scissor,
+            smooth
+          });
         }
         run.glyphs++;
       }
@@ -1542,6 +1562,21 @@ function writeCorners(data: Float32Array, at: number, radius: number | UiBorderR
   data[at + 1] = radius.topRight;
   data[at + 2] = radius.bottomRight;
   data[at + 3] = radius.bottomLeft;
+}
+
+/**
+ * The scale a scaled run's glyphs are rasterised at: the scale it is
+ * drawn at, rounded to a quarter of an octave and held between a quarter
+ * and eight. Exact scales would rasterise every glyph again on every
+ * frame of a zoom; quarter octaves resample by at most 9%, which smooth
+ * sampling hides, and a zoom from 1 to 2 costs four sets of cells.
+ */
+export function glyphScaleStep(scale: number): number {
+  if (!(scale > 0)) {
+    return 1;
+  }
+  const step = Math.pow(2, Math.round(Math.log2(scale) * 4) / 4);
+  return Math.min(8, Math.max(0.25, step));
 }
 
 /** Where each node's snapped box is written; see the walk. */

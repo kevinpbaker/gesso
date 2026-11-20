@@ -7,6 +7,7 @@ import { RenderHarness } from '../RenderTestUtils';
 import {
   buildRenderList,
   createTextCache,
+  glyphScaleStep,
   textRuns,
   glyphCount,
   viewportScissor,
@@ -427,6 +428,34 @@ describe('buildRenderList text', () => {
       expect(list.texturedData[offset + 14]).toBeLessThan(1);
       expect(list.texturedData[offset + 15]).toBeLessThan(1);
     }
+  });
+
+  it('samples text at 1:1 one texel to a pixel, and scaled text smoothly', () => {
+    const h = new RenderHarness();
+    const root = h.graph.root;
+    const plain = box(h, 'plain', { width: 300, height: 40, text: 'Hello', fontSize: 10, textWrap: 'none' });
+    const zoomed = box(h, 'zoomed', {
+      width: 300,
+      height: 40,
+      text: 'Hello',
+      fontSize: 10,
+      textWrap: 'none',
+      transform: { scaleX: 2, scaleY: 2 }
+    });
+    h.graph.appendChild(root, plain);
+    h.graph.appendChild(root, zoomed);
+    const list = layoutAndBuild(h, root);
+    const glyphs = list.commands.filter((c): c is GlyphCommand => c.kind === CommandKind.Glyphs);
+    expect(glyphs.map(c => c.smooth)).toEqual([false, true]);
+  });
+
+  it('rasterises a scaled run in quarter-octave steps between a quarter and eight', () => {
+    expect(glyphScaleStep(1)).toBe(1);
+    expect(glyphScaleStep(2)).toBe(2);
+    expect(glyphScaleStep(1.1)).toBeCloseTo(Math.pow(2, 0.25));
+    expect(glyphScaleStep(100)).toBe(8);
+    expect(glyphScaleStep(0.01)).toBe(0.25);
+    expect(glyphScaleStep(0)).toBe(1);
   });
 
   it('draws text that overflows a tight box, as Canvas2D does', () => {

@@ -98,9 +98,12 @@ fn roundedRectDistance(point: vec2f, origin: vec2f, size: vec2f, radii: vec4f) -
 }
 
 // How much of a pixel lies inside a shape, from the signed distance of
-// its centre in logical pixels.
-fn coverage(signedDistance: f32, dpr: f32) -> f32 {
-  return clamp(0.5 - signedDistance * dpr, 0.0, 1.0);
+// its centre in the shape's own units and how many device pixels one of
+// those units covers: the device ratio at 1:1, and that times any scale
+// the shape is drawn under, so a zoomed or shrunk edge is still one
+// device pixel soft rather than as soft as the zoom.
+fn coverage(signedDistance: f32, pixelsPerUnit: f32) -> f32 {
+  return clamp(0.5 - signedDistance * pixelsPerUnit, 0.0, 1.0);
 }
 
 // Coverage of the fragment at framebuffer position fragPx under every
@@ -124,7 +127,10 @@ fn clipCoverage(fragPx: vec2f, dpr: f32, clipIndex: f32) -> f32 {
       screen.x * inverse.x + screen.y * inverse.z + translation.x,
       screen.x * inverse.y + screen.y * inverse.w + translation.y
     );
-    result = min(result, coverage(roundedRectDistance(local, rect.xy, rect.zw, radii), dpr));
+    // The inverse maps logical screen pixels to the clip's own units, so
+    // its determinant's root is the clip's units per logical pixel.
+    let unitsPerLogical = sqrt(max(abs(inverse.x * inverse.w - inverse.z * inverse.y), 1e-12));
+    result = min(result, coverage(roundedRectDistance(local, rect.xy, rect.zw, radii), dpr / unitsPerLogical));
     index = i32(header.y);
     depth = depth + 1;
   }
@@ -254,13 +260,13 @@ fn shadowRow(x: f32, y: f32, sigma: f32, corner: f32, halfSize: vec2f) -> f32 {
 // Coverage at a point of a rounded rectangle blurred by a Gaussian of
 // the given standard deviation. The row integral is weighted by the
 // Gaussian over the three deviations either side that it reaches.
-fn blurredRoundedRect(point: vec2f, origin: vec2f, size: vec2f, radii: vec4f, sigma: f32, dpr: f32) -> f32 {
+fn blurredRoundedRect(point: vec2f, origin: vec2f, size: vec2f, radii: vec4f, sigma: f32, pixelsPerUnit: f32) -> f32 {
   if (size.x <= 0.0 || size.y <= 0.0) {
     return 0.0;
   }
-  if (sigma * dpr < 0.25) {
+  if (sigma * pixelsPerUnit < 0.25) {
     // Under a quarter of a device pixel: the sharp shape, anti-aliased.
-    return coverage(roundedRectDistance(point, origin, size, radii), dpr);
+    return coverage(roundedRectDistance(point, origin, size, radii), pixelsPerUnit);
   }
   let halfSize = size * 0.5;
   let p = point - (origin + halfSize);
@@ -285,7 +291,7 @@ fn blurredRoundedRect(point: vec2f, origin: vec2f, size: vec2f, radii: vec4f, si
 
 // A shadow's alpha at a point of its quad; see the instance layout in
 // WebGPURenderData.ts for what each field holds.
-fn shadowAlpha(kind: u32, local: vec2f, size: vec2f, radii: vec4f, blur: f32, shadow: vec4f, other: vec4f, dpr: f32) -> f32 {
+fn shadowAlpha(kind: u32, local: vec2f, size: vec2f, radii: vec4f, blur: f32, shadow: vec4f, other: vec4f, pixelsPerUnit: f32) -> f32 {
   let sigma = blur * 0.5;
   let offset = shadow.xy;
   let spread = shadow.z;
@@ -297,14 +303,14 @@ fn shadowAlpha(kind: u32, local: vec2f, size: vec2f, radii: vec4f, blur: f32, sh
     let shapeSize = size - vec2f(reach, reach) * 2.0;
     let boxOrigin = shapeOrigin - offset + vec2f(spread, spread);
     let boxSize = shapeSize - vec2f(spread, spread) * 2.0;
-    let blurred = blurredRoundedRect(local, shapeOrigin, shapeSize, radii, sigma, dpr);
-    return blurred * (1.0 - coverage(roundedRectDistance(local, boxOrigin, boxSize, other), dpr));
+    let blurred = blurredRoundedRect(local, shapeOrigin, shapeSize, radii, sigma, pixelsPerUnit);
+    return blurred * (1.0 - coverage(roundedRectDistance(local, boxOrigin, boxSize, other), pixelsPerUnit));
   }
   // Inset: the quad is the box; everything but the blurred hole is shadow.
   let holeOrigin = offset + vec2f(spread, spread);
   let holeSize = size - vec2f(spread, spread) * 2.0;
-  let inside = coverage(roundedRectDistance(local, vec2f(0.0, 0.0), size, radii), dpr);
-  return inside * (1.0 - blurredRoundedRect(local, holeOrigin, holeSize, other, sigma, dpr));
+  let inside = coverage(roundedRectDistance(local, vec2f(0.0, 0.0), size, radii), pixelsPerUnit);
+  return inside * (1.0 - blurredRoundedRect(local, holeOrigin, holeSize, other, sigma, pixelsPerUnit));
 }
 
 struct VertexOutput {
@@ -343,7 +349,11 @@ fn vs(
   // fragments just outside a fractional or rounded edge exist to be
   // shaded: coverage decides the edge, not rasterisation, which only
   // produces fragments whose centres lie inside the geometry.
-  let inflate = 1.0 / uView.z;
+  // One device pixel in the instance's own units, under its scale: a
+  // shrunk shape inflated by a pixel of its own space would stop short of
+  // the soft edge its coverage asks for.
+  let scale = sqrt(max(abs(transformA.x * transformB.y - transformA.y * transformB.x), 1e-12));
+  let inflate = 1.0 / (uView.z * scale);
   let local = vertex * instanceSize + (vertex * 2.0 - 1.0) * inflate;
   let world = instancePos + local;
   let transformed = vec2f(
@@ -367,9 +377,13 @@ fn vs(
 @fragment
 fn fs(in: VertexOutput) -> @location(0) vec4f {
   let dpr = uView.z;
+  // Device pixels per unit of the instance's own space: the device ratio
+  // at 1:1, times the scale the instance is drawn under. Read before any
+  // branch, as a derivative must be.
+  let pixelsPerUnit = 1.0 / max(length(dpdx(in.localPos)), 1e-6);
   let dist = roundedRectDistance(in.localPos, vec2f(0.0, 0.0), in.size, in.radii);
 
-  var shape = coverage(dist, dpr);
+  var shape = coverage(dist, pixelsPerUnit);
   if (in.kind >= KIND_SHADOW) {
     shape = shadowAlpha(
       in.kind,
@@ -379,13 +393,13 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
       in.radiusOpacityBorder.z,
       in.shadow,
       in.otherRadii,
-      dpr
+      pixelsPerUnit
     );
   } else if (in.kind == KIND_BORDER) {
     // Border: the band between the outer edge and the inner edge inset
     // by borderWidth.
     let bw = max(in.radiusOpacityBorder.z, 0.0);
-    shape = min(shape, coverage(-(dist + bw), dpr));
+    shape = min(shape, coverage(-(dist + bw), pixelsPerUnit));
   }
   let alpha = shape * clipCoverage(in.position.xy, dpr, in.clipIndex);
   if (alpha <= 0.0) {
