@@ -6,6 +6,7 @@ import { WebGPUError } from './WebGPUError';
 import { INSTANCE_STRIDE_BYTES } from './WebGPURenderData';
 import { RenderHarness } from '../RenderTestUtils';
 import { UiNodeType } from '../../graph/UiNodeType';
+import type { UiNode } from '../../graph/UiNode';
 import { Constraints } from '../../layout/LayoutTypes';
 
 function createMockDevice(): GPUDevice {
@@ -265,6 +266,63 @@ describe('WebGPURenderer incremental upload', () => {
         value: originalNavigator,
         configurable: true
       });
+    }
+  });
+
+  it('uploads a frame that changed, compares against a buffer kept across frames, and handles one that shrank', async () => {
+    const device = createMockDevice();
+    const adapter = createMockAdapter(device);
+    const originalNavigator = globalThis.navigator;
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        gpu: { requestAdapter: vi.fn(async () => adapter), getPreferredCanvasFormat: vi.fn(() => 'bgra8unorm') }
+      },
+      configurable: true
+    });
+    try {
+      const { host } = createMockHost(createMockContext());
+      const renderer = new WebGPURenderer({ surface: new WebGPUSurface(host) });
+      await renderer.initialize();
+      renderer.resize(800, 600, 1);
+
+      const h = new RenderHarness();
+      const root = h.createNode('app', UiNodeType.Column);
+      const box = (id: string): UiNode => {
+        const node = h.createNode(id, UiNodeType.Box);
+        node.setProperty('width', 100);
+        node.setProperty('height', 50);
+        node.setProperty('backgroundColor', '#f00');
+        return node;
+      };
+      const a = box('a');
+      const b = box('b');
+      h.graph.appendChild(root, a);
+      h.graph.appendChild(root, b);
+      const writeBuffer = device.queue.writeBuffer as ReturnType<typeof vi.fn>;
+      const instanceWrites = (): number =>
+        writeBuffer.mock.calls.filter((call: unknown[]) => call[1] === 0 && call[2] instanceof ArrayBuffer).length;
+      const frame = (): void => {
+        h.layout(root);
+        renderer.render(root, { layout: h.engine, text: h.measurer });
+      };
+
+      frame();
+      const first = instanceWrites();
+      a.setProperty('backgroundColor', '#00f');
+      frame();
+      expect(instanceWrites()).toBe(first + 1);
+      frame();
+      expect(instanceWrites()).toBe(first + 1);
+
+      // One box fewer: a shorter frame than the buffer kept, which must
+      // count as a change and not compare equal to its first half.
+      h.graph.removeNode(b);
+      frame();
+      expect(instanceWrites()).toBe(first + 2);
+      frame();
+      expect(instanceWrites()).toBe(first + 2);
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', { value: originalNavigator, configurable: true });
     }
   });
 });

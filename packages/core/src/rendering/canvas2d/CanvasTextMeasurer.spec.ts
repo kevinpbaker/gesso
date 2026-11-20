@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CanvasTextMeasurer } from './CanvasTextMeasurer';
-import { RecordingCanvasContext } from '../RenderTestUtils';
+import { callArgs, RecordingCanvasContext } from '../RenderTestUtils';
 
 /** The recording context reports 8px per character and no font metrics. */
 describe('CanvasTextMeasurer', () => {
@@ -81,5 +81,36 @@ describe('CanvasTextMeasurer', () => {
     }
     const afterChurn = measurer.measure({ text: 'hello', fontSize: 14 });
     expect(afterChurn.width).toBe(40);
+  });
+});
+
+describe('CanvasTextMeasurer width cache', () => {
+  const request = { text: '', fontSize: 14 };
+  const measured = (ctx: RecordingCanvasContext, text: string): number =>
+    callArgs(ctx, 'measureText').filter(args => args[0] === text).length;
+
+  it('keeps a width in use however many others pass through', () => {
+    const ctx = new RecordingCanvasContext();
+    const measurer = new CanvasTextMeasurer(ctx);
+    for (let i = 0; i < 20_000; i++) {
+      measurer.measureRunWidth(`cell ${i}`, request);
+      if (i % 500 === 0) {
+        measurer.measureRunWidth('Total', request);
+      }
+    }
+    // It used to be dropped with everything else each time the cache
+    // filled, and measured again on the next frame.
+    expect(measured(ctx, 'Total')).toBe(1);
+  });
+
+  it('drops a width nobody asked for over a whole generation, so the memory stays bounded', () => {
+    const ctx = new RecordingCanvasContext();
+    const measurer = new CanvasTextMeasurer(ctx);
+    measurer.measureRunWidth('once', request);
+    for (let i = 0; i < 10_000; i++) {
+      measurer.measureRunWidth(`cell ${i}`, request);
+    }
+    measurer.measureRunWidth('once', request);
+    expect(measured(ctx, 'once')).toBe(2);
   });
 });

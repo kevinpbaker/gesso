@@ -71,13 +71,33 @@ describe('a provided channel', () => {
     ]);
   });
 
-  it('posts a change made outside a command at once, as it is made', async () => {
+  it('sends what changed outside a command once the task is done, in one message', async () => {
     const { title, count, sent } = await providePanel();
 
     title.next('Drafts');
-    expect(typesOf(sent)).toEqual(['channel:patch']);
     count.next(4);
-    expect(typesOf(sent)).toEqual(['channel:patch', 'channel:patch']);
+    expect(sent).toEqual([]);
+
+    await Promise.resolve();
+    expect(typesOf(sent)).toEqual(['channel:patch']);
+    const [message] = sent as { patches: { projection: string; value: unknown }[] }[];
+    expect(message!.patches.map(patch => [patch.projection, patch.value])).toEqual([
+      ['title', 'Drafts'],
+      ['count', 4]
+    ]);
+  });
+
+  it('compares and sends only the last of several values a key took in one task', async () => {
+    const { count, sent } = await providePanel();
+
+    for (let tick = 1; tick <= 10; tick++) {
+      count.next(tick);
+    }
+    await Promise.resolve();
+
+    expect(sent).toEqual([
+      { type: 'channel:patch', patches: [{ op: 'set', projection: 'count', path: [], value: 10 }] }
+    ]);
   });
 
   it('puts what a failing command published on the wire ahead of its error', () => {
@@ -112,23 +132,19 @@ describe('a provided channel', () => {
     title.next('Sent');
     deliver({ type: 'channel:sync' }); // a client that reattached: everything again, in full
     title.next('Archive');
+    await Promise.resolve();
 
-    expect(typesOf(sent)).toEqual([
-      'channel:patch',
-      'channel:error',
-      'channel:patch',
-      'channel:patch',
-      'channel:patch'
-    ]);
+    // 'Drafts' goes out ahead of the command's error; 'Sent' needs no
+    // patch of its own, because the full resend that follows carries it.
+    expect(typesOf(sent)).toEqual(['channel:patch', 'channel:error', 'channel:patch', 'channel:patch']);
     const patches = sent.filter((_, index) => index !== 1) as { patches: { projection: string; value: unknown }[] }[];
     expect(patches[0].patches).toEqual([{ op: 'set', projection: 'title', path: [], value: 'Drafts' }]);
-    expect(patches[1].patches).toEqual([{ op: 'set', projection: 'title', path: [], value: 'Sent' }]);
-    expect(patches[2].patches.map(patch => [patch.projection, patch.value])).toEqual([
+    expect(patches[1].patches.map(patch => [patch.projection, patch.value])).toEqual([
       ['title', 'Sent'],
       ['count', 0],
       ['open', false]
     ]);
-    expect(patches[3].patches).toEqual([{ op: 'set', projection: 'title', path: [], value: 'Archive' }]);
+    expect(patches[2].patches).toEqual([{ op: 'set', projection: 'title', path: [], value: 'Archive' }]);
   });
 });
 

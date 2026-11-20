@@ -3878,11 +3878,13 @@ declare class Canvas2DRenderer implements UiRenderer {
 declare function traceRoundedRect(ctx: Canvas2DContext, x: number, y: number, width: number, height: number, radius: number | UiBorderRadius): void;
 declare class CanvasTextMeasurer extends ParagraphTextMeasurer {
   private readonly context;
-  private readonly widths;
+  private widths;
+  private olderWidths;
   private readonly metrics;
   private readonly style;
   constructor(context: Canvas2DContext);
   measureRunWidth(text: string, request: TextMeasureRequest): number;
+  private remember;
   invalidate(): void;
   fontMetrics(request: TextMeasureRequest): FontMetrics;
 }
@@ -9081,6 +9083,8 @@ declare class WebGPURenderer implements UiRenderer {
   private frameLayout;
   private frameBindGroup;
   private cachedInstanceData;
+  private cachedInstanceLength;
+  private readonly viewUniform;
   private groupLayers;
   readonly lastDraws: DrawStats;
   private pendingCapture;

@@ -123,7 +123,18 @@ export class WebGPURenderer implements UiRenderer {
   private gradientBuffer: GPUBuffer | null = null;
   private frameLayout: GPUBindGroupLayout | null = null;
   private frameBindGroup: GPUBindGroup | null = null;
+  /**
+   * The instance data last uploaded, to skip an upload that would change
+   * nothing: the first `cachedInstanceLength` floats of a buffer kept
+   * across frames and grown only when a frame needs more. A frame that
+   * changed used to copy its whole instance data into a new array for
+   * the next frame to compare with, one allocation the size of the scene
+   * per animated frame. -1 when the GPU buffer holds nothing known.
+   */
   private cachedInstanceData: Float32Array | null = null;
+  private cachedInstanceLength = -1;
+  /** The view uniform, written in place each frame. */
+  private readonly viewUniform = new Float32Array(VIEW_UNIFORM_FLOATS);
   /**
    * The textures opacity groups are drawn in, one per depth of nesting,
    * so a group inside a group never clears what holds it. Made the first
@@ -281,7 +292,7 @@ export class WebGPURenderer implements UiRenderer {
       if (buffer !== this.instanceBuffer) {
         this.instanceBuffer = buffer;
         // New GPU memory is undefined; force a full upload.
-        this.cachedInstanceData = null;
+        this.cachedInstanceLength = -1;
       }
       this.uploadInstanceData(list.instanceData);
     }
@@ -321,7 +332,7 @@ export class WebGPURenderer implements UiRenderer {
     if (list.gradientCount > 0) {
       device.queue.writeBuffer(gradientBuffer, 0, list.gradientData.buffer, 0, list.gradientData.byteLength);
     }
-    const view = new Float32Array(VIEW_UNIFORM_FLOATS);
+    const view = this.viewUniform;
     view[0] = this.surface.logicalWidth || 1;
     view[1] = this.surface.logicalHeight || 1;
     view[2] = this.surface.dpr || 1;
@@ -603,6 +614,7 @@ export class WebGPURenderer implements UiRenderer {
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
     this.cachedInstanceData = null;
+    this.cachedInstanceLength = -1;
     this.texturedBuffer?.destroy();
     this.texturedBuffer = null;
     this.clipBuffer?.destroy();
@@ -623,11 +635,17 @@ export class WebGPURenderer implements UiRenderer {
   }
 
   private uploadInstanceData(data: Float32Array): void {
-    if (this.cachedInstanceData !== null && arraysEqual(this.cachedInstanceData, data)) {
+    const length = data.length;
+    const kept = this.cachedInstanceData;
+    if (kept !== null && this.cachedInstanceLength === length && sameFloats(kept, data, length)) {
       return;
     }
     this.device!.queue.writeBuffer(this.instanceBuffer!, 0, data.buffer, 0, data.byteLength);
-    this.cachedInstanceData = new Float32Array(data);
+    if (kept === null || kept.length < length) {
+      this.cachedInstanceData = new Float32Array(Math.max(length, (kept?.length ?? 0) * 2));
+    }
+    this.cachedInstanceData!.set(data);
+    this.cachedInstanceLength = length;
   }
 
   /**
@@ -665,11 +683,9 @@ function setScissor(pass: GPURenderPassEncoder, current: ScissorRect | null, nex
   return next;
 }
 
-function arraysEqual(a: Float32Array, b: Float32Array): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-  for (let i = 0; i < a.length; i++) {
+/** Whether the first `length` floats of `a` and `b` are the same. */
+function sameFloats(a: Float32Array, b: Float32Array, length: number): boolean {
+  for (let i = 0; i < length; i++) {
     if (a[i] !== b[i]) {
       return false;
     }

@@ -50,14 +50,24 @@ export class ProvidedChannel {
    * across the barrier and applied by the replica on its own; they now
    * leave together, as one message, the moment the command returns.
    *
-   * Only a command's: a patch published anywhere else (a timer, a
-   * recalculation the application thread schedules) is posted at once,
-   * because nothing marks where that work ends but the end of the turn,
-   * and waiting for that would leave a caller that has just run it
-   * synchronously, a test above all, looking at a port with nothing on
-   * it yet.
+   * Work outside a command (a timer, a recalculation the application
+   * thread schedules) has nothing that marks where it ends, so its
+   * values are held in `dirty` and sent by a microtask, once the task
+   * that published them has run to the end. Each used to be compared
+   * and posted as it came: a store that wrote three keys in a row sent
+   * three messages, and a stream that ticked twice in one task paid a
+   * structural diff and a structured clone for a value nobody drew. A
+   * caller that runs such work synchronously, a test above all, awaits
+   * a microtask before it reads the port.
    */
   private pending: Patch[] = [];
+  /**
+   * The newest value of each key that changed since the last send, not
+   * yet compared with what the client holds. Compared once, when sent.
+   */
+  private readonly dirty = new Map<string, unknown>();
+  private flushQueued = false;
+  private disposed = false;
   /** How many commands are running, nested ones counted. */
   private commanding = 0;
 
@@ -177,22 +187,36 @@ export class ProvidedChannel {
         return;
       }
     }
-    const patches = diffProjection(key, this.previous.get(key), value);
-    this.previous.set(key, value);
-    if (patches.length === 0) {
-      return;
-    }
-    if (this.commanding === 0) {
-      this.post({ type: 'channel:patch', patches });
-      return;
-    }
-    for (const patch of patches) {
-      this.pending.push(patch);
+    this.dirty.set(key, value);
+    if (this.commanding === 0 && !this.flushQueued) {
+      this.flushQueued = true;
+      queueMicrotask(() => {
+        this.flushQueued = false;
+        if (!this.disposed) {
+          this.sendPending();
+        }
+      });
     }
   }
 
-  /** Puts the patches a command has published so far on the wire now. */
+  /** Compares each changed key's newest value with the client's, once, into `pending`. */
+  private collectDirty(): void {
+    if (this.dirty.size === 0) {
+      return;
+    }
+    for (const [key, value] of this.dirty) {
+      const patches = diffProjection(key, this.previous.get(key), value);
+      this.previous.set(key, value);
+      for (const patch of patches) {
+        this.pending.push(patch);
+      }
+    }
+    this.dirty.clear();
+  }
+
+  /** Puts the patches published so far on the wire now. */
   private sendPending(): void {
+    this.collectDirty();
     if (this.pending.length === 0) {
       return;
     }
@@ -204,6 +228,9 @@ export class ProvidedChannel {
 
   /** Re-sends every key in full, for a client that reattached. */
   private resend(): void {
+    // The full values supersede anything still waiting to be compared.
+    this.collectDirty();
+    this.pending = [];
     const patches: Patch[] = [];
     for (const [key, value] of this.previous) {
       patches.push({ op: 'set', projection: key, path: [], value });
@@ -226,6 +253,7 @@ export class ProvidedChannel {
     // What was published before the end is delivered, as it was when
     // every patch left at once.
     this.sendPending();
+    this.disposed = true;
     this.subscriptions.unsubscribe();
     this.port.onmessage = null;
   }

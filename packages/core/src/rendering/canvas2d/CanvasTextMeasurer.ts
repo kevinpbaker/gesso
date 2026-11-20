@@ -4,7 +4,8 @@ import { proportionalFontMetrics } from '../../layout/ParagraphLayout';
 import type { Canvas2DContext } from './Canvas2DContext';
 import { applyCanvasTextStyle, createCanvasTextStyle, runCanvasStyleInto } from '../TextRenderer';
 
-const MAX_CACHE_ENTRIES = 8192;
+/** Widths held in each of the cache's two generations; at most twice this in all. */
+const GENERATION_ENTRIES = 4096;
 
 /**
  * Canvas-backed measurer shared by the layout engine and the
@@ -16,12 +17,20 @@ const MAX_CACHE_ENTRIES = 8192;
  * a stable paragraph re-laid out at the same width costs no
  * measureText calls at all.
  *
- * The cache is a flat map with a crude size cap: when the cap is
- * hit it is cleared wholesale. Revisit with an LRU only if profiling
- * shows measureText dominating.
+ * The width cache is two generations rather than one map with a cap.
+ * It used to be cleared wholesale when it filled, so a screen with more
+ * distinct runs than the cap (a long document, a table of thousands of
+ * cells) dropped the widths it was using along with the ones it was
+ * not, and re-measured all of them on the next frame. Now new widths
+ * go into the current generation; when that fills it becomes the
+ * previous one, and a width found there is copied forward. A width in
+ * use survives every turnover, one unused for a whole generation is
+ * dropped, and the memory is bounded as before, with nothing to keep
+ * per entry for recency.
  */
 export class CanvasTextMeasurer extends ParagraphTextMeasurer {
-  private readonly widths = new Map<string, number>();
+  private widths = new Map<string, number>();
+  private olderWidths = new Map<string, number>();
   private readonly metrics = new Map<string, FontMetrics>();
   /** One style object per measurer, refilled per call; see `runCanvasStyleInto`. */
   private readonly style = createCanvasTextStyle();
@@ -40,19 +49,31 @@ export class CanvasTextMeasurer extends ParagraphTextMeasurer {
     if (cached !== undefined) {
       return cached;
     }
+    const older = this.olderWidths.get(key);
+    if (older !== undefined) {
+      this.remember(key, older);
+      return older;
+    }
     applyCanvasTextStyle(this.context, this.style);
     const width = this.context.measureText(text).width;
-    if (this.widths.size >= MAX_CACHE_ENTRIES) {
-      this.widths.clear();
+    this.remember(key, width);
+    return width;
+  }
+
+  /** Puts a width in the current generation, turning the generations over first if it is full. */
+  private remember(key: string, width: number): void {
+    if (this.widths.size >= GENERATION_ENTRIES) {
+      this.olderWidths = this.widths;
+      this.widths = new Map();
     }
     this.widths.set(key, width);
-    return width;
   }
 
   /** Drops every cached width, metric and paragraph; see `TextMeasurer.invalidate`. */
   override invalidate(): void {
     super.invalidate();
     this.widths.clear();
+    this.olderWidths.clear();
     this.metrics.clear();
   }
 

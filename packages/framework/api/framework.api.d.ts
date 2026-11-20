@@ -4367,6 +4367,9 @@ declare class ProvidedChannel {
   private readonly previous;
   private readonly checked;
   private pending;
+  private readonly dirty;
+  private flushQueued;
+  private disposed;
   private commanding;
   private synced;
   constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
@@ -4374,6 +4377,7 @@ declare class ProvidedChannel {
   private runCommand;
   private sync;
   private publish;
+  private collectDirty;
   private sendPending;
   private resend;
   private post;
