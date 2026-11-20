@@ -75,6 +75,11 @@ export interface CanvasShape {
   readonly hit?: (point: CanvasPoint, slack: number) => boolean;
   /** Points other things snap to: its ends, corners, centre, middles. */
   readonly snapPoints?: readonly SnapTarget[];
+  /**
+   * The point a move of it snaps to the grid by: a corner or an end, so
+   * its numbers stay round. Its box's top left when left out.
+   */
+  readonly anchor?: CanvasPoint;
 }
 
 /** A handle of a shape's own. */
@@ -85,6 +90,10 @@ export interface CanvasHandle {
   /** The point Shift holds the drag at 45° round: a line end's other end. */
   readonly anchor?: CanvasPoint;
   readonly cursor?: UiCursor;
+  /** `'none'` leaves it undrawn, for a handle the application draws itself (a turning handle's circle). Default `'square'`. */
+  readonly look?: 'square' | 'none';
+  /** False drags it freely, unsnapped and with no angle held: a turning handle steps by its own rule. Default true. */
+  readonly snaps?: boolean;
 }
 
 /** Where an edit is: begun, moving, let go, or called off with Escape. */
@@ -100,7 +109,13 @@ export type CanvasEditPhase = 'start' | 'live' | 'end' | 'cancel';
  * `end`, roll it back at `cancel`), and an edit the model refused part
  * of does not drift.
  */
-export type CanvasEdit =
+export type CanvasEdit = CanvasEditKind & {
+  /** The keys held when it was made, for an application whose own rules take them: Shift to square a box. */
+  readonly modifiers?: { readonly shift: boolean; readonly alt: boolean };
+};
+
+/** The kinds of `CanvasEdit`, without what every one carries. */
+export type CanvasEditKind =
   | {
       readonly kind: 'move';
       readonly ids: readonly string[];
@@ -142,6 +157,8 @@ export interface CanvasSnapOptions {
   readonly reach?: number;
   /** A grid, in canvas pixels, for what snaps to nothing else. */
   readonly grid?: number;
+  /** Where the grid's lines cross, in canvas pixels: the application's own origin. 0, 0 when left out. */
+  readonly gridOrigin?: CanvasPoint;
   /** Shift holds a line or a handle to multiples of this many degrees. Default 45. */
   readonly angle?: number;
   /**
@@ -269,6 +286,9 @@ type Gesture =
       readonly ids: readonly string[];
       readonly start: CanvasPoint;
       readonly boxes: readonly CanvasRect[];
+      /** The moving shapes' own snap points, where they were at the start. */
+      readonly points: readonly SnapTarget[];
+      readonly anchor: CanvasPoint | undefined;
       last: CanvasEdit;
     }
   | {
@@ -401,8 +421,15 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     return null;
   };
 
+  /**
+   * What a drag snaps to, as it was when the drag began: what moves with
+   * the dragged shapes (a dimension glued to a corner) must not become a
+   * target, and the targets need not be gathered again every frame.
+   */
+  let frozenTargets: { boxes: CanvasRect[]; points: SnapTarget[] } | null = null;
   /** Everything not being moved, to snap to. */
   const othersOf = (ids: readonly string[]): { boxes: CanvasRect[]; points: SnapTarget[] } => {
+    if (frozenTargets !== null) return frozenTargets;
     const moving = new Set(ids);
     const boxes: CanvasRect[] = [];
     const points: SnapTarget[] = [];
@@ -424,7 +451,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     if (snap === null) return { point: p, hit: null };
     const own = snap.toPoint?.(p, { from, ids });
     if (own !== null && own !== undefined) return { point: own.point, hit: own };
-    return snapPoint(p, othersOf(ids).points, { reach: reach(snap), grid: snap.grid });
+    return snapPoint(p, othersOf(ids).points, { reach: reach(snap), grid: snap.grid, gridOrigin: snap.gridOrigin });
   };
 
   const readout = (edit: CanvasEdit, at: CanvasPoint): CanvasOverlayState['readout'] => {
@@ -518,23 +545,31 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     if (!panned) pending = null;
   };
 
-  const panStart = (_event: UiPointerEvent): boolean => {
+  const panStart = (event: UiPointerEvent): boolean => {
     const start = pending;
     if (start === null) return false;
     panned = true;
     pending = null;
+    const modifiers = { shift: event.modifiers.shift, alt: event.modifiers.alt };
     switch (start.kind) {
       case 'move': {
         const ids = selection.value.includes(start.id) ? selection.value : [start.id];
-        const boxes = ids.map(id => byId(id)?.bounds).filter((b): b is CanvasRect => b !== undefined);
-        const first: CanvasEdit = { kind: 'move', ids, dx: 0, dy: 0, phase: 'start', snap: null };
-        gesture = { kind: 'move', ids, start: start.at, boxes, last: first };
+        frozenTargets = othersOf(ids);
+        const moving = ids.map(byId).filter((shape): shape is CanvasShape => shape !== undefined);
+        const boxes = moving.map(shape => shape.bounds);
+        const points = shapes.value.some(shape => shape.snapPoints !== undefined)
+          ? moving.flatMap(shape => shape.snapPoints ?? boxPoints(shape.bounds))
+          : [];
+        const first: CanvasEdit = { kind: 'move', ids, dx: 0, dy: 0, phase: 'start', snap: null, modifiers };
+        gesture = { kind: 'move', ids, start: start.at, boxes, points, anchor: byId(start.id)?.anchor, last: first };
         break;
       }
       case 'box': {
         const from = handleBox();
         if (from === null) return false;
+        frozenTargets = othersOf(selection.value);
         const first: CanvasEdit = {
+          modifiers,
           kind: 'resize',
           ids: selection.value,
           handle: start.handle,
@@ -547,7 +582,9 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         break;
       }
       case 'own': {
+        frozenTargets = othersOf([start.id]);
         const first: CanvasEdit = {
+          modifiers,
           kind: 'handle',
           id: start.id,
           handle: start.handle.id,
@@ -564,7 +601,9 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         editing.next(true);
         return true;
       case 'draw': {
+        frozenTargets = othersOf([]);
         const first: CanvasEdit = {
+          modifiers,
           kind: 'draw',
           tool: start.tool,
           from: start.at,
@@ -603,22 +642,19 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         if (snap !== null && box !== null) {
           const moved = { ...box, x: box.x + dx, y: box.y + dy };
           const others = othersOf(g.ids);
-          const points = g.ids.flatMap(id => {
-            const shape = byId(id);
-            const own = shape?.snapPoints ?? (shape === undefined ? [] : boxPoints(shape.bounds));
-            return own.map(q => ({ x: q.x + dx, y: q.y + dy }));
-          });
           const shifted = snapMove(moved, others.boxes, {
             reach: reach(snap),
             grid: snap.grid,
-            points: shapes.value.some(s => s.snapPoints !== undefined) ? points : [],
+            gridOrigin: snap.gridOrigin,
+            anchor: g.anchor === undefined ? undefined : { x: g.anchor.x + dx, y: g.anchor.y + dy },
+            points: g.points.map(q => ({ x: q.x + dx, y: q.y + dy })),
             targets: others.points
           });
           dx += event.modifiers.shift && dx === 0 ? 0 : shifted.dx;
           dy += event.modifiers.shift && dy === 0 ? 0 : shifted.dy;
           hit = shifted.hit;
         }
-        g.last = { kind: 'move', ids: g.ids, dx, dy, phase: 'live', snap: hit };
+        g.last = { kind: 'move', ids: g.ids, dx, dy, phase: 'live', snap: hit, modifiers: keys(event) };
         break;
       }
       case 'box': {
@@ -632,17 +668,28 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
           snapped.point.y - corner.y,
           event.modifiers.shift
         );
-        g.last = { kind: 'resize', ids: g.ids, handle: g.handle, from: g.from, to, phase: 'live', snap: snapped.hit };
+        g.last = {
+          kind: 'resize',
+          ids: g.ids,
+          handle: g.handle,
+          from: g.from,
+          to,
+          phase: 'live',
+          snap: snapped.hit,
+          modifiers: keys(event)
+        };
         break;
       }
       case 'own': {
         const raw = { x: g.handle.at.x + p.x - g.start.x, y: g.handle.at.y + p.y - g.start.y };
         const anchor = g.handle.anchor ?? null;
-        let snapped = pointSnap(raw, event, [g.id], anchor);
-        if (event.modifiers.shift && anchor !== null) {
+        const free = g.handle.snaps === false;
+        let snapped = free ? { point: raw, hit: null } : pointSnap(raw, event, [g.id], anchor);
+        if (!free && event.modifiers.shift && anchor !== null) {
           snapped = { point: holdAngle(anchor, raw, snapAngle()), hit: null };
         }
         g.last = {
+          modifiers: keys(event),
           kind: 'handle',
           id: g.id,
           handle: g.handle.id,
@@ -658,7 +705,15 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
         if (event.modifiers.shift) {
           snapped = { point: holdAngle(g.from, p, snapAngle()), hit: null };
         }
-        g.last = { kind: 'draw', tool: g.tool, from: g.from, to: snapped.point, phase: 'live', snap: snapped.hit };
+        g.last = {
+          kind: 'draw',
+          tool: g.tool,
+          from: g.from,
+          to: snapped.point,
+          phase: 'live',
+          snap: snapped.hit,
+          modifiers: keys(event)
+        };
         break;
       }
     }
@@ -667,12 +722,15 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     return true;
   };
 
+  const keys = (event: UiPointerEvent) => ({ shift: event.modifiers.shift, alt: event.modifiers.alt });
+
   const snapAngle = (): number => (options.snap === false ? 45 : (options.snap?.angle ?? 45));
 
   const panEnd = (event: UiPointerEvent): boolean => {
     const g = gesture;
     if (g === null) return false;
     gesture = null;
+    frozenTargets = null;
     editing.next(false);
     if (g.kind === 'marquee') {
       const area = rectFrom(g.start, toLocal(event));
@@ -694,6 +752,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     const g = gesture;
     if (g === null) return false;
     gesture = null;
+    frozenTargets = null;
     editing.next(false);
     if (g.kind !== 'marquee') {
       emit({ ...g.last, phase: 'cancel' } as CanvasEdit);
@@ -808,7 +867,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
     map(([all, ids, over, fb, busy]): CanvasOverlayState => {
       const picked = ids.map(id => all.find(shape => shape.id === id)).filter((s): s is CanvasShape => s !== undefined);
       const box = busy && gesture?.kind !== 'marquee' ? null : handleBox();
-      const own = busy ? [] : ownHandles().map(handle => handle.at);
+      const own = busy ? [] : ownHandles().flatMap(handle => (handle.look === 'none' ? [] : [handle.at]));
       const hover =
         over === null || ids.includes(over) || busy ? null : (all.find(shape => shape.id === over)?.bounds ?? null);
       return {

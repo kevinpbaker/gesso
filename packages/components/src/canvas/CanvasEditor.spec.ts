@@ -223,4 +223,91 @@ describe('CanvasEditor', () => {
     ui.fireEvent.pointerUp(170, 35);
     expect(edits.some(edit => edit.kind === 'resize')).toBe(false);
   });
+
+  it('drags a handle that does not snap freely, tells the keys held, and leaves an undrawn handle to the app', () => {
+    const edits: CanvasEdit[] = [];
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 300,
+        height: 200,
+        defaultSelection: ['a'],
+        snap: { grid: 50 },
+        shapes: [
+          {
+            id: 'a',
+            bounds: { x: 50, y: 50, width: 100, height: 60 },
+            label: 'A',
+            handles: [{ id: 'turn', at: { x: 100, y: 28 }, snaps: false, look: 'none' }]
+          }
+        ],
+        onEdit: (edit: CanvasEdit) => edits.push(edit)
+      }),
+      { width: 300, height: 200 }
+    );
+    ui.frame();
+    ui.fireEvent.pointerDown(100, 28);
+    ui.fireEvent.pointerMove(110, 31, { buttons: 1, modifiers: { shift: true } });
+    ui.fireEvent.pointerMove(113, 33, { buttons: 1, modifiers: { shift: true } });
+    ui.fireEvent.pointerUp(113, 33);
+    const last = edits.at(-1)!;
+    expect(last.kind === 'handle' && last.handle).toBe('turn');
+    // Not on the grid of 50, and not held to 45°: where the pointer took it.
+    expect(last.kind === 'handle' && last.to).toEqual({ x: 113, y: 33 });
+    expect(last.modifiers).toEqual({ shift: true, alt: false });
+  });
+
+  it('snaps a move by the pressed shape’s anchor, to targets as they were when it began', () => {
+    const model = new BehaviorSubject([
+      { id: 'a', x: 20, y: 20 },
+      // Under a, where a dimension glued to it would be.
+      { id: 'glued', x: 20, y: 20 }
+    ]);
+    const edits: CanvasEdit[] = [];
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 400,
+        height: 200,
+        snap: { grid: 10, gridOrigin: { x: 5, y: 5 }, reach: 1 },
+        shapes: model.pipe(
+          map(all =>
+            all.map(m => ({
+              id: m.id,
+              bounds: { x: m.x, y: m.y, width: 40, height: 40 },
+              label: m.id,
+              anchor: { x: m.x + 3, y: m.y + 3 },
+              snapPoints: [{ x: m.x + 3, y: m.y + 3 }]
+            }))
+          )
+        ),
+        onEdit: (edit: CanvasEdit) => {
+          edits.push(edit);
+          // What is glued to a moves with it, as Calcwright's dimensions do.
+          if (edit.kind === 'move') {
+            model.next([
+              { id: 'a', x: 20 + edit.dx, y: 20 + edit.dy },
+              { id: 'glued', x: 20 + edit.dx, y: 20 + edit.dy }
+            ]);
+          }
+        }
+      }),
+      { width: 400, height: 200 }
+    );
+    ui.frame();
+    // a is on top (drawn last is hit first), so put it last.
+    ui.fireEvent.pointerDown(30, 30);
+    ui.fireEvent.pointerMove(40, 30, { buttons: 1 });
+    ui.fireEvent.pointerMove(47, 31, { buttons: 1 });
+    ui.frame();
+    ui.fireEvent.pointerMove(52, 32, { buttons: 1 });
+    ui.frame();
+    // The same place again: what moved with it is now exactly under the moving point.
+    ui.fireEvent.pointerMove(52, 32, { buttons: 1 });
+    ui.fireEvent.pointerUp(52, 32);
+    const live = edits.filter(edit => edit.phase === 'live');
+    // The anchor at 23 + dx lands on the grid through 5: 23 + 22 = 45.
+    const last = live.at(-1)!;
+    expect(last.kind === 'move' && [last.dx, last.dy]).toEqual([22, 2]);
+    // The glued shape moved with it, and was never snapped to.
+    expect(live.every(edit => edit.snap?.kind !== 'point')).toBe(true);
+  });
 });

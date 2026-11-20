@@ -541,6 +541,7 @@ interface SnapTarget extends CanvasPoint {
 declare function snapPoint(p: CanvasPoint, targets: readonly SnapTarget[], options: {
   readonly reach: number;
   readonly grid?: number;
+  readonly gridOrigin?: CanvasPoint;
 }): {
   point: CanvasPoint;
   hit: SnapHit | null;
@@ -548,6 +549,8 @@ declare function snapPoint(p: CanvasPoint, targets: readonly SnapTarget[], optio
 declare function snapMove(box: CanvasRect, others: readonly CanvasRect[], options: {
   readonly reach: number;
   readonly grid?: number;
+  readonly gridOrigin?: CanvasPoint;
+  readonly anchor?: CanvasPoint;
   readonly points?: readonly SnapTarget[];
   readonly targets?: readonly SnapTarget[];
 }): {
@@ -603,15 +606,24 @@ interface CanvasShape {
   readonly locked?: boolean;
   readonly hit?: (point: CanvasPoint, slack: number) => boolean;
   readonly snapPoints?: readonly SnapTarget[];
+  readonly anchor?: CanvasPoint;
 }
 interface CanvasHandle {
   readonly id: string;
   readonly at: CanvasPoint;
   readonly anchor?: CanvasPoint;
   readonly cursor?: UiCursor;
+  readonly look?: 'square' | 'none';
+  readonly snaps?: boolean;
 }
 type CanvasEditPhase = 'start' | 'live' | 'end' | 'cancel';
-type CanvasEdit = {
+type CanvasEdit = CanvasEditKind & {
+  readonly modifiers?: {
+    readonly shift: boolean;
+    readonly alt: boolean;
+  };
+};
+type CanvasEditKind = {
   readonly kind: 'move';
   readonly ids: readonly string[];
   readonly dx: number;
@@ -645,6 +657,7 @@ type CanvasEdit = {
 interface CanvasSnapOptions {
   readonly reach?: number;
   readonly grid?: number;
+  readonly gridOrigin?: CanvasPoint;
   readonly angle?: number;
   readonly toPoint?: (point: CanvasPoint, context: {
     readonly from: CanvasPoint | null;
@@ -1815,6 +1828,7 @@ export {
   type CanvasEdit,
   type CanvasEditing,
   type CanvasEditingOptions,
+  type CanvasEditKind,
   type CanvasEditorProps,
   type CanvasEditPhase,
   type CanvasHandle,

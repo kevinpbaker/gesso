@@ -180,8 +180,10 @@ export interface SnapTarget extends CanvasPoint {
 export function snapPoint(
   p: CanvasPoint,
   targets: readonly SnapTarget[],
-  options: { readonly reach: number; readonly grid?: number }
+  options: { readonly reach: number; readonly grid?: number; readonly gridOrigin?: CanvasPoint }
 ): { point: CanvasPoint; hit: SnapHit | null } {
+  const ox = options.gridOrigin?.x ?? 0;
+  const oy = options.gridOrigin?.y ?? 0;
   let best: SnapTarget | null = null;
   let bestDistance = options.reach;
   for (const target of targets) {
@@ -207,8 +209,8 @@ export function snapPoint(
   );
   if (lineX !== null || lineY !== null) {
     const point = {
-      x: lineX ?? onGrid(p.x, options.grid),
-      y: lineY ?? onGrid(p.y, options.grid)
+      x: lineX ?? onGrid(p.x, options.grid, ox),
+      y: lineY ?? onGrid(p.y, options.grid, oy)
     };
     const guides: SnapGuide[] = [];
     if (lineX !== null) guides.push({ axis: 'x', at: lineX });
@@ -216,7 +218,7 @@ export function snapPoint(
     return { point, hit: { point, kind: 'aligned', guides } };
   }
   if (options.grid !== undefined && options.grid > 0) {
-    const point = { x: onGrid(p.x, options.grid), y: onGrid(p.y, options.grid) };
+    const point = { x: onGrid(p.x, options.grid, ox), y: onGrid(p.y, options.grid, oy) };
     return { point, hit: { point, kind: 'grid', guides: [] } };
   }
   return { point: p, hit: null };
@@ -235,10 +237,22 @@ export function snapMove(
   options: {
     readonly reach: number;
     readonly grid?: number;
+    /** Where the grid's lines cross, in canvas pixels: an application's own origin. 0, 0 when left out. */
+    readonly gridOrigin?: CanvasPoint;
+    /**
+     * The point the grid snaps, where it is now (moved): a corner or an
+     * end of what moves, so its numbers stay round. The box's top left
+     * when left out.
+     */
+    readonly anchor?: CanvasPoint;
     readonly points?: readonly SnapTarget[];
     readonly targets?: readonly SnapTarget[];
   }
 ): { dx: number; dy: number; hit: SnapHit | null } {
+  const gx = options.gridOrigin?.x ?? 0;
+  const gy = options.gridOrigin?.y ?? 0;
+  const ax = options.anchor?.x ?? box.x;
+  const ay = options.anchor?.y ?? box.y;
   const points = options.points ?? [];
   const targets = options.targets ?? [];
   let pointBest: { dx: number; dy: number; at: SnapTarget; d: number } | null = null;
@@ -271,17 +285,17 @@ export function snapMove(
     dx = sx.shift;
     guides.push({ axis: 'x', at: sx.at });
   } else if (options.grid !== undefined && options.grid > 0) {
-    dx = onGrid(box.x, options.grid) - box.x;
+    dx = onGrid(ax, options.grid, gx) - ax;
   }
   if (sy !== null) {
     dy = sy.shift;
     guides.push({ axis: 'y', at: sy.at });
   } else if (options.grid !== undefined && options.grid > 0) {
-    dy = onGrid(box.y, options.grid) - box.y;
+    dy = onGrid(ay, options.grid, gy) - ay;
   }
   if (guides.length === 0) {
     const gridded = options.grid !== undefined && options.grid > 0;
-    return { dx, dy, hit: gridded ? { point: { x: box.x + dx, y: box.y + dy }, kind: 'grid', guides } : null };
+    return { dx, dy, hit: gridded ? { point: { x: ax + dx, y: ay + dy }, kind: 'grid', guides } : null };
   }
   const point = { x: sx?.at ?? box.x + dx, y: sy?.at ?? box.y + dy };
   return { dx, dy, hit: { point, kind: 'edge', guides } };
@@ -299,8 +313,8 @@ export function holdAngle(from: CanvasPoint, to: CanvasPoint, step = 45): Canvas
   return { x: from.x + length * Math.cos(held), y: from.y + length * Math.sin(held) };
 }
 
-function onGrid(value: number, grid: number | undefined): number {
-  return grid === undefined || grid <= 0 ? value : Math.round(value / grid) * grid;
+function onGrid(value: number, grid: number | undefined, origin = 0): number {
+  return grid === undefined || grid <= 0 ? value : origin + Math.round((value - origin) / grid) * grid;
 }
 
 function nearestOn(value: number, candidates: readonly number[], reach: number): number | null {

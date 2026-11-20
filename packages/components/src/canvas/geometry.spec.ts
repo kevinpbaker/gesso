@@ -61,6 +61,21 @@ describe('snapping', () => {
     expect(moved.hit?.kind).toBe('end');
   });
 
+  it('snaps a move to the grid by its anchor, from the grid’s own origin', () => {
+    // A grid of 10 crossing at 3, 7: the anchor at 21, 30 goes to 23, 27.
+    const moved = snapMove({ x: 0, y: 0, width: 50, height: 50 }, [], {
+      reach: 1,
+      grid: 10,
+      gridOrigin: { x: 3, y: 7 },
+      anchor: { x: 21, y: 30 }
+    });
+    expect([moved.dx, moved.dy]).toEqual([2, -3]);
+    expect(snapPoint({ x: 21, y: 30 }, [], { reach: 1, grid: 10, gridOrigin: { x: 3, y: 7 } }).point).toEqual({
+      x: 23,
+      y: 27
+    });
+  });
+
   it('holds a line to 45° steps at its length', () => {
     const held = holdAngle({ x: 0, y: 0 }, { x: 100, y: 10 });
     expect(held.x).toBeCloseTo(Math.hypot(100, 10), 9);

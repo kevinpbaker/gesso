@@ -6,6 +6,7 @@ export {
   type CanvasEditingOptions,
   type CanvasEdit,
   type CanvasEditPhase,
+  type CanvasEditKind,
   type CanvasShape,
   type CanvasHandle,
   type CanvasSnapOptions

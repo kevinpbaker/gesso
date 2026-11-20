@@ -119,20 +119,24 @@ snap mark and readout through `show`, and the pure functions under both
 
 <<< @/src/examples/CanvasEditingExample.tsx#model
 
-| Field         | Type                                | What it does                                                               |
-| ------------- | ----------------------------------- | -------------------------------------------------------------------------- |
-| `id`          | `string`                            | Stable across rebuilds. What selections and edits name it by.              |
-| `bounds`      | `CanvasRect`                        | Its box in the canvas's own pixels (y down).                               |
-| `label`       | `string`                            | Its name to a screen reader and an agent. Say what it is and its size.     |
-| `description` | `string`                            | More, said after the name.                                                 |
-| `handles`     | `'box' \| 'none' \| CanvasHandle[]` | Eight on its box (the default), none, or its own: a line's two ends.       |
-| `locked`      | `boolean`                           | Not chosen by a click or a marquee. Still in the semantics tree, disabled. |
-| `hit`         | `(point, slack) => boolean`         | Whether a point is on it. Its box when left out; a line wants its own.     |
-| `snapPoints`  | `SnapTarget[]`                      | What others snap to. Its corners, side middles and centre when left out.   |
+| Field         | Type                                | What it does                                                                                                                  |
+| ------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `string`                            | Stable across rebuilds. What selections and edits name it by.                                                                 |
+| `bounds`      | `CanvasRect`                        | Its box in the canvas's own pixels (y down).                                                                                  |
+| `label`       | `string`                            | Its name to a screen reader and an agent. Say what it is and its size.                                                        |
+| `description` | `string`                            | More, said after the name.                                                                                                    |
+| `handles`     | `'box' \| 'none' \| CanvasHandle[]` | Eight on its box (the default), none, or its own: a line's two ends.                                                          |
+| `locked`      | `boolean`                           | Not chosen by a click or a marquee. Still in the semantics tree, disabled.                                                    |
+| `hit`         | `(point, slack) => boolean`         | Whether a point is on it. Its box when left out; a line wants its own.                                                        |
+| `snapPoints`  | `SnapTarget[]`                      | What others snap to. Its corners, side middles and centre when left out.                                                      |
+| `anchor`      | `CanvasPoint`                       | The point a move of it snaps to the grid by: a corner or an end, so its numbers stay round. Its box's top left when left out. |
 
 A `CanvasHandle` is an `id`, a point `at`, and optionally an `anchor`,
 the point Shift holds the drag at 45° round (a line end's other end),
-and a `cursor`.
+and a `cursor`. `look: 'none'` leaves it for the application to draw (a
+turning handle's circle), and `snaps: false` drags it freely, unsnapped
+and with no angle held, for a handle that steps by a rule of its own:
+a turning handle in 15° steps.
 
 ### CanvasEdit
 
@@ -143,19 +147,22 @@ and a `cursor`.
 | `handle` | `id`, `handle`, `from`, `to`                 | A handle of a shape's own.                  |
 | `draw`   | `tool`, `from`, `to`                         | A drag with a tool.                         |
 
-Each also has `phase` and `snap`, what it snapped to (`null` for
-nothing). Several shapes resized together get one `resize` with the box
+Each also has `phase`, `snap`, what it snapped to (`null` for
+nothing), and `modifiers`, whether Shift and Alt were held, for an
+application whose own rules take them (Shift to square a box, or to
+turn freely). Several shapes resized together get one `resize` with the box
 round all of them as `from` and `to`; scale each shape by the change,
 as the example does.
 
 ## Snapping
 
-| Option    | Default | What it does                                                                              |
-| --------- | ------- | ----------------------------------------------------------------------------------------- |
-| `reach`   | `8`     | Screen pixels a point has to come within to snap, whatever the zoom.                      |
-| `grid`    | none    | A grid, in canvas pixels, for what snaps to nothing else.                                 |
-| `angle`   | `45`    | Shift holds a line or a handle to multiples of this many degrees.                         |
-| `toPoint` | none    | The application's own snaps, tried first: a tangent, a perpendicular, a point on a curve. |
+| Option       | Default | What it does                                                                              |
+| ------------ | ------- | ----------------------------------------------------------------------------------------- |
+| `reach`      | `8`     | Screen pixels a point has to come within to snap, whatever the zoom.                      |
+| `grid`       | none    | A grid, in canvas pixels, for what snaps to nothing else.                                 |
+| `gridOrigin` | `0, 0`  | Where the grid's lines cross, in canvas pixels: the application's own origin.             |
+| `angle`      | `45`    | Shift holds a line or a handle to multiples of this many degrees.                         |
+| `toPoint`    | none    | The application's own snaps, tried first: a tangent, a perpendicular, a point on a curve. |
 
 What snaps to what:
 
@@ -168,6 +175,11 @@ What snaps to what:
   axis (a guide each), else the grid.
 - ⌘ or Ctrl held turns snapping off for the drag, and `snap={false}`
   turns it off.
+- What a drag snaps to is taken when it begins. A dimension glued to a
+  corner moves with the corner, and a shape that moves with what is
+  dragged is not something to snap to.
+- A move snaps to the grid by the pressed shape's `anchor`, a real point
+  of it, so the numbers it writes stay round.
 
 ## Keyboard
 
