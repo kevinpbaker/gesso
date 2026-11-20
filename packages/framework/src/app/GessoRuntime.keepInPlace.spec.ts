@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { Box, Column, Row, ScrollView, type UiNode } from 'gesso-core';
+import { Subject } from 'rxjs';
+
+import { Box, Column, Row, ScrollView, measure, type LayoutBox, type UiNode } from 'gesso-core';
 import { internalState } from '../InternalState';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
 import { ScrollService } from './ScrollService';
@@ -123,6 +125,36 @@ describe('keepInPlace', () => {
     panel.value = 100;
     drain(mounted);
     expect(mounted.runtime.debugVisibleBox(target()).x).toBeCloseTo(before + 100, 5);
+  });
+
+  it('holds through a move a layout listener makes a pass later in the same frame', () => {
+    // Calcwright's inspector opens when the drawing it inspects is laid
+    // out open: the page moves on the second pass, not the first.
+    const panel = internalState(200);
+    const trigger = internalState(10);
+    const seen = new Subject<LayoutBox>();
+    seen.subscribe(box => {
+      if (box.width > 10) panel.value = 0;
+    });
+    let target: UiNode | null = null;
+    const mounted = mountRuntime(
+      ScrollView(
+        { width: 400, height: 300, scrollX: 300 },
+        Row(
+          { width: 1600, height: 100 },
+          Box({ width: trigger, height: 10, modifiers: [measure(seen)] }),
+          Box({ width: panel, height: 100 }),
+          Box({ width: 120, height: 80, ref: (n: UiNode | null) => (target = n) }),
+          Box({ width: 1200, height: 100 })
+        )
+      )
+    );
+    drain(mounted);
+    const before = mounted.runtime.debugVisibleBox(target!).x;
+    mounted.runtime.services.get(ScrollService).keepInPlace(target!);
+    trigger.value = 20;
+    drain(mounted);
+    expect(mounted.runtime.debugVisibleBox(target!).x).toBeCloseTo(before, 5);
   });
 
   it('keeps a scroll made in the same frame as the layout change it holds against', () => {

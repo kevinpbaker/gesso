@@ -25,6 +25,7 @@ export interface CanvasEditorProps extends ControlLayoutProps {
   marquee?: 'touch' | 'contain';
   nudge?: number;
   tabSelects?: boolean;
+  groupHandles?: boolean;
   colors?: CanvasOverlayColors;
   /** The canvas's name to a screen reader: what is being edited. Default `Canvas`. */
   label?: string;
@@ -66,6 +67,7 @@ export function CanvasEditor(inputs: Inputs<CanvasEditorProps>, ctx: ComponentCo
     marquee: inputs.marquee.value,
     nudge: inputs.nudge.value,
     tabSelects: inputs.tabSelects.value,
+    groupHandles: inputs.groupHandles.value,
     colors: inputs.colors.value
   });
 

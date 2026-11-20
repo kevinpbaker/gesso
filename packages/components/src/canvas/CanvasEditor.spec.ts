@@ -199,4 +199,28 @@ describe('CanvasEditor', () => {
     click(60, 60);
     expect(selected()).toHaveLength(1);
   });
+
+  it('puts no handles on several chosen shapes when told not to group them', () => {
+    const edits: CanvasEdit[] = [];
+    const ui = renderTest(
+      createComponent(CanvasEditor, {
+        width: 300,
+        height: 200,
+        groupHandles: false,
+        defaultSelection: ['a', 'b'],
+        shapes: [
+          { id: 'a', bounds: { x: 10, y: 10, width: 50, height: 50 }, label: 'A' },
+          { id: 'b', bounds: { x: 100, y: 10, width: 50, height: 50 }, label: 'B' }
+        ],
+        onEdit: (edit: CanvasEdit) => edits.push(edit)
+      }),
+      { width: 300, height: 200 }
+    );
+    ui.frame();
+    // Where the box round both would have its east handle: a drag there resizes nothing.
+    ui.fireEvent.pointerDown(150, 35);
+    ui.fireEvent.pointerMove(170, 35, { buttons: 1 });
+    ui.fireEvent.pointerUp(170, 35);
+    expect(edits.some(edit => edit.kind === 'resize')).toBe(false);
+  });
 });

@@ -110,6 +110,7 @@ snap mark and readout through `show`, and the pure functions under both
 | `marquee`           | `'touch' \| 'contain'`                  | `'touch'`  | Whether a marquee chooses what it touches or what it holds whole.           |
 | `nudge`             | `number`                                | `1`        | Canvas pixels an arrow moves; Shift ten times.                              |
 | `tabSelects`        | `boolean`                               | `true`     | With shapes chosen, Tab and Shift+Tab choose the next and the previous.     |
+| `groupHandles`      | `boolean`                               | `true`     | Whether several chosen shapes share eight handles on the box round them.    |
 | `colors`            | `CanvasOverlayColors`                   | theme      | The selection, hover, guide and handle colours.                             |
 | `label`             | `string`                                | `'Canvas'` | The canvas's name to a screen reader.                                       |
 | `children`          | `UiChild`                               | none       | What the application draws, under the overlay.                              |
@@ -240,12 +241,16 @@ drag the application runs itself.
 
 `paintCanvasOverlay(surface, state, size, scale)` draws hover,
 selection, handles, marquee, guides, snap mark and readout from a
-`CanvasOverlayState`, and `paintReadout(surface, text, at, size, scale)`
+`CanvasOverlayState`, and `paintReadout(surface, text, at, size, scale, look)`
 draws the readout alone. The readout's plate is measured with
 `paintTextMetrics` (see [Painting your own content](/rendering/painting)),
 so it fits what it says, and it flips to the other side of the pointer
 at the canvas's edge. Every size is divided by `scale`, so handles and
-text are the same size on screen at any zoom.
+text are the same size on screen at any zoom. `colors` (and `look` for
+`paintReadout` alone) sets the selection, guide and handle colours and
+the readout's plate, ink and font, so an application's own palette and
+type carry over: Calcwright's readout is `ink` on its paper, in its text
+face.
 
 ## Next
 

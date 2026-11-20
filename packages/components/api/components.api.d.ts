@@ -432,6 +432,7 @@ interface ToolbarProps extends ControlLayoutProps {
   moreLabel?: string;
   shortcutBadges?: boolean;
   keepFocus?: boolean;
+  onFocusChange?: (focused: boolean) => void;
 }
 declare function Toolbar(inputs: Inputs<ToolbarProps>, ctx: ComponentContext): UiChild;
 interface TabDefinition {
@@ -473,6 +474,7 @@ interface InspectorSectionProps extends ControlLayoutProps {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   actions?: UiChild;
+  onFocusChange?: (focused: boolean) => void;
   children?: UiChild;
 }
 declare function InspectorSection(inputs: Inputs<InspectorSectionProps>, _ctx: ComponentContext): UiChild;
@@ -500,6 +502,7 @@ interface UnitFieldProps extends ControlLayoutProps {
   onChange?: (value: number) => void;
   onCommit?: (value: number) => void;
   onNudge?: (delta: number, phase: NudgePhase) => void;
+  onFocusChange?: (focused: boolean) => void;
 }
 declare function UnitField(inputs: Inputs<UnitFieldProps>, ctx: ComponentContext): UiChild;
 declare function parseQuantity(text: string, unit: string, units: Readonly<Record<string, number>> | undefined): number | undefined;
@@ -578,6 +581,9 @@ interface CanvasOverlayColors {
   readonly hover?: UiColorValue;
   readonly guide?: UiColorValue;
   readonly handle?: UiColorValue;
+  readonly readout?: UiColorValue;
+  readonly readoutText?: UiColorValue;
+  readonly readoutFont?: string;
 }
 declare const HANDLE_SIZE = 7;
 declare function paintCanvasOverlay(surface: PaintSurface, state: CanvasOverlayState, size: {
@@ -587,7 +593,7 @@ declare function paintCanvasOverlay(surface: PaintSurface, state: CanvasOverlayS
 declare function paintReadout(surface: PaintSurface, text: string, at: CanvasPoint, size: {
   readonly width: number;
   readonly height: number;
-}, scale?: number): void;
+}, scale?: number, look?: Pick<CanvasOverlayColors, 'readout' | 'readoutText' | 'readoutFont'>): void;
 interface CanvasShape {
   readonly id: string;
   readonly bounds: CanvasRect;
@@ -663,6 +669,7 @@ interface CanvasEditingOptions {
   readonly marquee?: 'touch' | 'contain';
   readonly nudge?: number;
   readonly tabSelects?: boolean;
+  readonly groupHandles?: boolean;
   readonly colors?: CanvasOverlayColors;
 }
 interface CanvasEditing {
@@ -727,6 +734,7 @@ interface CanvasEditorProps extends ControlLayoutProps {
   marquee?: 'touch' | 'contain';
   nudge?: number;
   tabSelects?: boolean;
+  groupHandles?: boolean;
   colors?: CanvasOverlayColors;
   label?: string;
   children?: UiChild;

@@ -189,6 +189,12 @@ export interface CanvasEditingOptions {
   readonly nudge?: number;
   /** With shapes chosen, Tab and Shift+Tab choose the next and the previous. Default true. */
   readonly tabSelects?: boolean;
+  /**
+   * Whether several chosen shapes share eight handles on the box round
+   * them, a `resize` with all their ids. Default true; false for an
+   * application that resizes one shape at a time.
+   */
+  readonly groupHandles?: boolean;
   readonly colors?: CanvasOverlayColors;
 }
 
@@ -368,7 +374,7 @@ export function canvasEditing(ctx: ComponentContext, options: CanvasEditingOptio
       const handles = picked[0].handles ?? 'box';
       return handles === 'box' ? picked[0].bounds : null;
     }
-    return unionRect(picked.map(shape => shape.bounds));
+    return options.groupHandles === false ? null : unionRect(picked.map(shape => shape.bounds));
   };
   const ownHandles = (): readonly CanvasHandle[] => {
     const picked = chosen();

@@ -1,6 +1,6 @@
 import { paintTextMetrics, type PaintSurface, type UiColorValue } from 'gesso-core';
 
-import { BOX_HANDLES, boxHandlePoint, type CanvasPoint, type CanvasRect, type SnapGuide } from './geometry';
+import { BOX_HANDLES, boxHandlePoint, unionRect, type CanvasPoint, type CanvasRect, type SnapGuide } from './geometry';
 
 /**
  * What a canvas editor draws over the content: the outline under the
@@ -43,6 +43,12 @@ export interface CanvasOverlayColors {
   readonly guide?: UiColorValue;
   /** The handles' fill. Default `background`. */
   readonly handle?: UiColorValue;
+  /** The readout's plate. Default `text`, so it stands out from what it is over. */
+  readonly readout?: UiColorValue;
+  /** The readout's words. Default `background`. */
+  readonly readoutText?: UiColorValue;
+  /** The readout's font family, as `PaintTextStyle.fontFamily` names one. Default the theme's. */
+  readonly readoutFont?: string;
 }
 
 /** The side of a handle, on screen. */
@@ -84,16 +90,18 @@ export function paintCanvasOverlay(
     surface.alpha(1);
   }
 
+  // Several chosen: one dashed box round all of them, with or without handles.
+  const all = state.selected.length > 1 ? unionRect(state.selected) : null;
+  if (all !== null) {
+    surface.strokeColor(selection);
+    surface.lineDash([4 * px, 3 * px]);
+    surface.beginPath();
+    surface.rect(all.x, all.y, all.width, all.height);
+    surface.stroke();
+    surface.lineDash([]);
+  }
   if (state.box !== null) {
     const box = state.box;
-    if (state.selected.length > 1) {
-      surface.strokeColor(selection);
-      surface.lineDash([4 * px, 3 * px]);
-      surface.beginPath();
-      surface.rect(box.x, box.y, box.width, box.height);
-      surface.stroke();
-      surface.lineDash([]);
-    }
     for (const handle of BOX_HANDLES) {
       handleSquare(surface, boxHandlePoint(box, handle), px, selection, colors.handle);
     }
@@ -144,7 +152,7 @@ export function paintCanvasOverlay(
   }
 
   if (state.readout !== null) {
-    paintReadout(surface, state.readout.text, state.readout.at, size, scale);
+    paintReadout(surface, state.readout.text, state.readout.at, size, scale, colors);
   }
   surface.restore();
 }
@@ -176,13 +184,14 @@ export function paintReadout(
   text: string,
   at: CanvasPoint,
   size: { readonly width: number; readonly height: number },
-  scale = 1
+  scale = 1,
+  look: Pick<CanvasOverlayColors, 'readout' | 'readoutText' | 'readoutFont'> = {}
 ): void {
   if (text.length === 0) {
     return;
   }
   const px = 1 / (scale > 0 ? scale : 1);
-  const style = { fontSize: 11 * px, fontWeight: 500 };
+  const style = { fontSize: 11 * px, fontWeight: 500, fontFamily: look.readoutFont };
   const metrics = paintTextMetrics(text, style);
   const padX = 6 * px;
   const padY = 3 * px;
@@ -196,13 +205,13 @@ export function paintReadout(
   x = Math.max(2 * px, x);
   y = Math.max(2 * px, y);
   surface.save();
-  surface.fillColor('text');
+  surface.fillColor(look.readout ?? 'text');
   surface.alpha(0.88);
   surface.beginPath();
   surface.roundRect(x, y, width, height, 4 * px);
   surface.fill();
   surface.alpha(1);
-  surface.fillColor('background');
+  surface.fillColor(look.readoutText ?? 'background');
   surface.text(text, x + padX, y + padY + metrics.ascent, style);
   surface.restore();
 }
