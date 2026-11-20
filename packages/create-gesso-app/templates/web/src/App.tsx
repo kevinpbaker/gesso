@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
 import { percent } from 'gesso-core';
-import { Switch } from 'gesso-components';
+import { FindBar, Switch } from 'gesso-components';
 import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 
 /**
@@ -34,7 +34,14 @@ export function App(_inputs: Inputs<{}>, _context: ComponentContext) {
   const hinted = internalState(true);
 
   return (
-    <column gap={16} x="center" y="center" width={percent(100)} height={percent(100)} backgroundColor="background">
+    <column
+      gap={16}
+      x="center"
+      y="center"
+      width={percent(100)}
+      height={percent(100)}
+      backgroundColor="background"
+      position="relative">
       <text text="Hello from a render worker" fontSize={22} fontWeight="bold" />
 
       <row gap={12} y="center">
@@ -58,6 +65,14 @@ export function App(_inputs: Inputs<{}>, _context: ComponentContext) {
       />
 
       <Switch label="Show the hint" checked={hinted} onChange={next => (hinted.value = next)} />
+
+      {/*
+        Ctrl+F or Cmd+F opens it. The browser's own find cannot see a
+        canvas, so while this is mounted the shell takes the shortcut
+        and the bar searches the text on screen. It places itself in the
+        top corner of the nearest positioned box, which is this column.
+      */}
+      <FindBar />
     </column>
   );
 }

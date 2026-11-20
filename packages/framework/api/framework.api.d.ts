@@ -1077,6 +1077,9 @@ type ShellRequest = {
   type: 'title';
   title: string;
 } | {
+  type: 'findShortcut';
+  on: boolean;
+} | {
   type: 'colorScheme';
   preference: ColorSchemePreference;
 } | {
@@ -1181,6 +1184,7 @@ declare class ShellService {
   private handler;
   private leaving;
   private titleText;
+  private findClaimed;
   private preferred;
   private readonly scheme;
   private readonly contrastState;
@@ -1222,6 +1226,7 @@ declare class ShellService {
   readonly fullscreen: ReadableCell<boolean>;
   requestFullscreen(enter: boolean): void;
   warnOnLeave(on: boolean): void;
+  claimFindShortcut(on: boolean): void;
   setTitle(title: string): void;
   preferColorScheme(preference: ColorSchemePreference): void;
   applyFullscreen(active: boolean): void;
@@ -1621,6 +1626,7 @@ declare class GessoRuntime {
   private viewportInsetWrite;
   private detachViewportInsetEnvironment;
   private routerTitle;
+  private findBar;
   private disposed;
   private webgpuRecovery;
   private detachContextRestored;
@@ -2145,6 +2151,10 @@ type RuntimeToShellMessage = {
   title: string;
 } |
 {
+  type: 'findShortcut';
+  on: boolean;
+} |
+{
   type: 'preferColorScheme';
   preference: ColorSchemePreference;
 } |
@@ -2379,6 +2389,7 @@ declare class WorkerApp {
   private ownsAppLogicWorker;
   private canvas;
   private host;
+  private findClaimed;
   private resizeObserver;
   private hostSize;
   private stopPixelRatio;
@@ -2910,6 +2921,7 @@ declare class FindService {
   readonly query: InternalState<string>;
   readonly matchCount: InternalState<number>;
   readonly activeMatch: InternalState<number>;
+  readonly hasBar: InternalState<boolean>;
   private controller;
   private detach;
   private field;

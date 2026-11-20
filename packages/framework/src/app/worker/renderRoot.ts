@@ -811,6 +811,8 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'leaveWarning', on: request.on });
       } else if (request.type === 'title') {
         this.host.postMessage({ type: 'title', title: request.title });
+      } else if (request.type === 'findShortcut') {
+        this.host.postMessage({ type: 'findShortcut', on: request.on });
       } else if (request.type === 'colorScheme') {
         this.host.postMessage({ type: 'preferColorScheme', preference: request.preference });
       } else if (request.type === 'popup') {

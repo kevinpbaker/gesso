@@ -52,3 +52,18 @@ describe('ShellService.setTitle', () => {
     ]);
   });
 });
+
+describe('ShellService.claimFindShortcut', () => {
+  it('tells the shell of each change once, and a shell that arrives later that it is claimed', () => {
+    const service = new ShellService();
+    service.claimFindShortcut(true);
+    const requests: ShellRequest[] = [];
+    service.setHandler(request => requests.push(request));
+    service.claimFindShortcut(true);
+    service.claimFindShortcut(false);
+    expect(requests).toEqual([
+      { type: 'findShortcut', on: true },
+      { type: 'findShortcut', on: false }
+    ]);
+  });
+});

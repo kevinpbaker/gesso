@@ -127,10 +127,13 @@ defaults beside the selection's. They run after the application's own
 closes the bar and a second Escape drops the match it left selected.
 
 Cancelling the browser's own `Ctrl+F` is the shell's decision, because
-the worker's answer cannot come back in time to cancel a default.
-`createApp` takes `interceptFind`, and it is off by default: taking the
-shortcut from an application that has no find bar would leave the
-person with neither.
+the worker's answer cannot come back in time to cancel a default. The
+runtime tells the shell whether a `FindBar` is mounted, and the shell
+takes the shortcut exactly while one is: an application with a bar
+gets it with nothing to configure, and one without keeps the browser's,
+since taking it would leave the person with neither. `interceptFind`
+on `createApp` overrides that, `true` for an application with a find of
+its own making and `false` to leave the browser's in place regardless.
 
 ```ts
 createApp({ renderWorker: () => new Worker(url), interceptFind: true });

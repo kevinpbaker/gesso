@@ -414,6 +414,8 @@ export class GessoRuntime {
   private detachViewportInsetEnvironment: (() => void) | null = null;
   /** The router's title followed onto the page; see the constructor. */
   private routerTitle: { unsubscribe(): void } | null = null;
+  /** Whether a find bar is mounted, followed onto the shell; see the constructor. */
+  private findBar: { unsubscribe(): void } | null = null;
   /** Set by `dispose`, for work that finishes after it: a renderer module arriving late. */
   private disposed = false;
   /** A WebGPU device being asked for after the last one was lost. */
@@ -871,6 +873,11 @@ export class GessoRuntime {
     // Held like any other request when nobody is listening yet: a guard
     // that redirects the address the runtime starts at does so in this
     // constructor, and the shell's address bar still has to hear it.
+    // And whether the app has a find bar, which decides whether the
+    // shell takes Ctrl/Cmd+F from the browser.
+    this.findBar = this.services
+      .get(FindService)
+      .hasBar.subscribe(on => this.services.get(ShellService).claimFindShortcut(on));
     // And the page's title, which a route may name. Subscribed before
     // the address is applied, so the first screen's title is sent too.
     this.routerTitle = router.title.subscribe(title => {
@@ -2355,6 +2362,8 @@ export class GessoRuntime {
     this.disposed = true;
     this.routerTitle?.unsubscribe();
     this.routerTitle = null;
+    this.findBar?.unsubscribe();
+    this.findBar = null;
     if (this.earlyFrame !== null) {
       clearTimeout(this.earlyFrame);
       this.earlyFrame = null;

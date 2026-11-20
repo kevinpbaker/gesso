@@ -1,6 +1,6 @@
 import { map } from 'rxjs/operators';
 
-import { Switch } from 'gesso-components';
+import { FindBar, Switch } from 'gesso-components';
 import { darkTheme, lightTheme, percent } from 'gesso-core';
 import { DesktopWindows } from 'gesso-electrobun/desktop';
 import { ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
@@ -51,7 +51,8 @@ export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
       y="center"
       width={percent(100)}
       height={percent(100)}
-      backgroundColor="background">
+      backgroundColor="background"
+      position="relative">
       <text text={counter.view.count.pipe(map(String))} fontSize={56} />
 
       <row gap={10} y="center">
@@ -95,6 +96,9 @@ export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
         desktop shape of `setPlatformColorScheme`: one setting, replicated.
       */}
       <Switch label="Dark" checked={counter.view.dark} onChange={next => counter.send.setDark(next)} />
+
+      {/* Ctrl+F or Cmd+F opens it; it searches the text on screen. */}
+      <FindBar />
     </column>
   );
 }

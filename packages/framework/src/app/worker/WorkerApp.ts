@@ -232,9 +232,11 @@ export interface WorkerAppOptions {
   onInspect?: (report: UiNodeReport | null) => void;
   /**
    * Cancel the browser's Ctrl/Cmd+F on the canvas, so the app's own
-   * find bar takes it. Off by default: the browser's find bar cannot
-   * see a canvas, but taking the shortcut from an app that has no find
-   * of its own would leave the user with neither.
+   * find bar takes it. Left out, the shell takes it exactly while a
+   * `FindBar` is mounted, which the runtime reports: the browser's find
+   * bar cannot see a canvas, but taking the shortcut from an app with no
+   * find of its own would leave the user with neither. `true` takes it
+   * always, for an app with a find of its own making; `false` never.
    *
    * A flag rather than something the runtime decides, because the
    * worker's answer cannot come back in time to cancel a default —
@@ -411,6 +413,8 @@ export class WorkerApp {
   private ownsAppLogicWorker = false;
   private canvas: HTMLCanvasElement | undefined;
   private host: HTMLElement | undefined;
+  /** Whether the app has a find bar mounted; see `interceptFind`. */
+  private findClaimed = false;
   private resizeObserver: ResizeObserver | null = null;
   /** The host's last size, for a pixel ratio that changes on its own; see `watchPixelRatio`. */
   private hostSize: { width: number; height: number } | null = null;
@@ -746,7 +750,8 @@ export class WorkerApp {
     // reach here from the canvas, the editing proxy and the semantics
     // mirror, so the flush belongs here rather than in one listener.
     this.flushPendingMove();
-    if ((this.options.interceptFind === true && isFind(event)) || this.options.interceptKey?.(event) === true) {
+    const takeFind = this.options.interceptFind ?? this.findClaimed;
+    if ((takeFind && isFind(event)) || this.options.interceptKey?.(event) === true) {
       event.preventDefault();
     }
     if (event.key === 'Tab' || isSelectAll(event)) {
@@ -1123,6 +1128,10 @@ export class WorkerApp {
     }
     if (message.type === 'title') {
       document.title = message.title;
+      return;
+    }
+    if (message.type === 'findShortcut') {
+      this.findClaimed = message.on;
       return;
     }
     if (message.type === 'preferColorScheme') {

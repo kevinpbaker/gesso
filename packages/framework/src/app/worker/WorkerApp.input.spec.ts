@@ -504,6 +504,57 @@ describe('hover coalescing', () => {
   });
 
   /**
+   * Ctrl/Cmd+F belongs to the app while it has a find bar and to the
+   * browser while it has none, which only the worker knows; it says so
+   * as the bar mounts and unmounts.
+   */
+  it('takes Ctrl/Cmd+F from the browser exactly while the app has a find bar', () => {
+    const findBar = (on: boolean): void =>
+      shell.internals.handleWorkerMessage({
+        data: { type: 'findShortcut', on }
+      } as MessageEvent<RuntimeToShellMessage>);
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    let prevented = 0;
+    const find = () =>
+      ({
+        ...key(),
+        key: 'f',
+        ctrlKey: true,
+        metaKey: true,
+        preventDefault: () => prevented++
+      }) as unknown as KeyboardEvent;
+
+    shell.canvas.dispatch('keydown', find());
+    expect(prevented).toBe(0);
+
+    findBar(true);
+    shell.canvas.dispatch('keydown', find());
+    expect(prevented).toBe(1);
+
+    findBar(false);
+    shell.canvas.dispatch('keydown', find());
+    expect(prevented).toBe(1);
+  });
+
+  it('leaves Ctrl/Cmd+F to the browser when the application says never, find bar or not', () => {
+    const shell = setup({ interceptFind: false });
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    shell.internals.handleWorkerMessage({
+      data: { type: 'findShortcut', on: true }
+    } as MessageEvent<RuntimeToShellMessage>);
+    let prevented = 0;
+    shell.canvas.dispatch('keydown', {
+      ...key(),
+      key: 'f',
+      ctrlKey: true,
+      metaKey: true,
+      preventDefault: () => prevented++
+    } as unknown as KeyboardEvent);
+    expect(prevented).toBe(0);
+  });
+
+  /**
    * F10 and a lone Alt for a menu bar. A browser acts on Alt when it is
    * released, so cancelling only the press left the release to open the
    * browser's own menu over the application's.

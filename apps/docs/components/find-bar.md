@@ -92,13 +92,11 @@ const find = ctx.inject(FindService);
 ```
 
 The example does exactly that, and it has a reason to. In the render
-worker the browser keeps Ctrl/Cmd+F for its own find bar unless the
-shell is told to cancel it, which is `interceptFind: true` on
-`createApp`. It is off by default, because taking the shortcut from an
-app with no find bar would leave the reader with neither. This page's
-example runs in an embedded canvas that does not set it, so the button
-is the reliable way in here; an application that ships a `FindBar`
-should turn the flag on.
+worker the shell takes Ctrl/Cmd+F from the browser while a `FindBar` is
+mounted, which the runtime tells it, so an application that ships one
+gets the shortcut with nothing to configure. This page's example runs
+in an embedded canvas, where the page around it keeps its own find, so
+the button is the reliable way in here.
 
 ## Keyboard
 

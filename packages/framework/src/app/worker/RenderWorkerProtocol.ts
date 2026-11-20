@@ -438,6 +438,8 @@ export type RuntimeToShellMessage =
   | { type: 'leaveWarning'; on: boolean }
   /** The page's title (ShellService.setTitle): the shell writes it to `document.title`. */
   | { type: 'title'; title: string }
+  /** Whether the app has a find bar (ShellService.claimFindShortcut), so the shell takes Ctrl/Cmd+F. */
+  | { type: 'findShortcut'; on: boolean }
   /**
    * Report this appearance from now on (ShellService.preferColorScheme):
    * `light` or `dark`, or `auto` to follow `prefers-color-scheme` again.

@@ -688,6 +688,11 @@ export class GessoApp {
       void written.then(copied => this.runtime.settleClipboard(request.id, copied));
       return;
     }
+    if (request.type === 'findShortcut') {
+      // Nothing to do on one thread: the platform adapter cancels the
+      // browser's default for any key the find controller claimed.
+      return;
+    }
     if (request.type === 'title') {
       this.canvas.ownerDocument.title = request.title;
       return;

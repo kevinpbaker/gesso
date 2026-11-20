@@ -25,6 +25,7 @@ export type ShellRequest =
   | { type: 'fullscreen'; enter: boolean }
   | { type: 'leaveWarning'; on: boolean }
   | { type: 'title'; title: string }
+  | { type: 'findShortcut'; on: boolean }
   | { type: 'colorScheme'; preference: ColorSchemePreference }
   | { type: 'popup'; id: number; url: string; name: string; width: number; height: number }
   | { type: 'storage'; id: number; op: ShellStorageOp; key: string; value?: string }
@@ -179,6 +180,8 @@ export class ShellService {
   private leaving = false;
   /** What `setTitle` last said; null until it is asked. */
   private titleText: string | null = null;
+  /** What `claimFindShortcut` last said. */
+  private findClaimed = false;
   /** What `preferColorScheme` last asked for; null until it is asked. */
   private preferred: ColorSchemePreference | null = null;
   private readonly scheme = internalState<ColorScheme>('light');
@@ -307,6 +310,9 @@ export class ShellService {
     }
     if (handler !== null && this.titleText !== null) {
       handler({ type: 'title', title: this.titleText });
+    }
+    if (handler !== null && this.findClaimed) {
+      handler({ type: 'findShortcut', on: true });
     }
     if (handler !== null && this.preferred !== null) {
       handler({ type: 'colorScheme', preference: this.preferred });
@@ -576,6 +582,21 @@ export class ShellService {
    * `title` sets this as it is navigated to; call it directly for a
    * title that follows something else, such as an unsaved document.
    */
+  /**
+   * Whether the app has its own find, so the shell takes Ctrl/Cmd+F from
+   * the browser, whose find cannot see a canvas. The runtime says so
+   * while a `FindBar` is mounted; an app with none keeps the browser's.
+   * A state, like `warnOnLeave`, and asked for on the shell because a
+   * keydown's default is cancelled there or not at all.
+   */
+  claimFindShortcut(on: boolean): void {
+    if (on === this.findClaimed) {
+      return;
+    }
+    this.findClaimed = on;
+    this.handler?.({ type: 'findShortcut', on });
+  }
+
   setTitle(title: string): void {
     if (title === this.titleText) {
       return;

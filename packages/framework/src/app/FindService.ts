@@ -22,6 +22,12 @@ export class FindService {
   readonly matchCount = internalState(0);
   /** Which match is active, 1-based for display, or 0 when there is none. */
   readonly activeMatch = internalState(0);
+  /**
+   * Whether a find bar's field is mounted, so Ctrl/Cmd+F has somewhere
+   * to go. The runtime tells the shell, which takes the shortcut from
+   * the browser only while this holds.
+   */
+  readonly hasBar = internalState(false);
 
   private controller: UiFindController | null = null;
   private detach: (() => void) | null = null;
@@ -52,6 +58,9 @@ export class FindService {
   setField(node: UiNode | null): void {
     this.field = node;
     this.controller?.setField(node);
+    if (this.hasBar.value !== (node !== null)) {
+      this.hasBar.value = node !== null;
+    }
   }
 
   /** Starts a session. The app shows its bar; the field takes the caret. */

@@ -69,4 +69,21 @@ describe('FindBar', () => {
     // the service's field regardless, so opening put the caret nowhere.
     expect(ui.runtime.input.focus.focusedNode).toBe(ui.getByRole('searchbox'));
   });
+
+  it('claims Ctrl/Cmd+F from the browser while it is mounted, and gives it back when it goes', () => {
+    const shown = new BehaviorSubject(true);
+    const ui = mount(shown.pipe(map(on => (on ? [createComponent(FindBar, {})] : []))));
+    const said: boolean[] = [];
+    ui.runtime.onShellRequest(request => {
+      if (request.type === 'findShortcut') {
+        said.push(request.on);
+      }
+    });
+    ui.frame();
+
+    shown.next(false);
+    ui.frame();
+
+    expect(said).toEqual([true, false]);
+  });
 });
