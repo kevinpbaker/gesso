@@ -32,8 +32,24 @@ because they are slow:
 | `pnpm check:a11y`          | Chrome's own computed accessibility tree matches the committed reports, and Tab reaches every control         |
 | `pnpm parity:webgpu`       | Canvas2D and WebGPU draw the same pixels                                                                      |
 | `pnpm fixtures:text:check` | Text still breaks where Chrome breaks                                                                         |
+| `pnpm screenshots:docker`  | Every covered route and docs page still paints its committed baseline                                         |
 
 Run them one at a time. They share Chrome's devtools port.
+
+### Screenshot baselines
+
+The route and docs screenshots are compared with baselines captured on
+GitHub's Ubuntu runner with a pinned Chrome for Testing, because canvas
+text is rasterised with the system's fonts and a capture from any other
+machine is not comparable; `pnpm screenshots` refuses to try. With
+Docker running, `pnpm screenshots:docker` runs both gates in a container
+that is that environment, and `pnpm screenshots:docker:update` captures
+new baselines there, ready to commit. On Apple silicon the container
+runs as x86-64 under emulation, so a run takes a few minutes. Docker
+Desktop needs "Use Rosetta for x86_64/amd64 emulation" on (under QEMU the
+bundler crashes) and about 12 GB of memory, which the docs build needs
+under emulation. The `screenshot-baselines` workflow does the same on
+the runner itself.
 
 ## What a change looks like here
 

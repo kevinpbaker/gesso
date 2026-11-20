@@ -383,6 +383,7 @@ pnpm fixtures:layout   # re-render layout conformance cases in headless Chrome
 pnpm fixtures:text     # re-render text conformance paragraphs in real fonts
 pnpm parity:webgpu     # Canvas2D vs WebGPU pixel diff in headless Chrome (needs a WebGPU adapter)
 pnpm screenshots       # each covered route against its committed baseline
+pnpm screenshots:docker # the same, and the docs pages, in the baselines' own Linux environment
 pnpm check:a11y        # Chrome's computed accessibility tree against the committed reports
 pnpm check:install     # pack, install and run the packages in a fresh Vite project
 pnpm check:scaffold    # run the scaffold and drive the result in Chrome
