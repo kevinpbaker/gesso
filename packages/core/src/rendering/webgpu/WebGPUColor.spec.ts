@@ -10,8 +10,8 @@ describe('parseColor', () => {
     expect(parseColor('#ff0000')).toEqual({ r: 1, g: 0, b: 0, a: 1 });
   });
 
-  it('parses hex with alpha', () => {
-    expect(parseColor('#80ff0000')).toEqual({ r: 1, g: 0, b: 0, a: expect.closeTo(0.502, 3) });
+  it('reads an eight-digit hex as RRGGBBAA, as CSS and the rest of the framework do', () => {
+    expect(parseColor('#ff000080')).toEqual({ r: 1, g: 0, b: 0, a: expect.closeTo(0.502, 3) });
   });
 
   it('parses rgb()', () => {

@@ -181,16 +181,8 @@ function parseHexColor(hex: string): UiColor | undefined {
 }
 
 function parseRgbColor(source: string): UiColor | undefined {
-  const open = source.indexOf('(');
-  const close = source.indexOf(')');
-  if (open < 0 || close < 0) {
-    return undefined;
-  }
-  const parts = source
-    .slice(open + 1, close)
-    .split(',')
-    .map(s => s.trim());
-  if (parts.length < 3) {
+  const parts = functionArguments(source);
+  if (parts === undefined || parts.length < 3) {
     return undefined;
   }
   const values: number[] = [];
@@ -250,9 +242,12 @@ const parseCache = new Map<string, UiColor>();
 /**
  * Parses a CSS color string into a UiColor.
  *
- * Supports hex (#rgb, #rgba, #rrggbb, #rrggbbaa), rgb()/rgba(),
- * and a small set of named colors. Returns undefined for unsupported
- * values.
+ * Supports hex (#rgb, #rgba, #rrggbb, #rrggbbaa), rgb()/rgba() and
+ * hsl()/hsla() in either the comma or the space-and-slash syntax,
+ * oklch(), oklab(), color(srgb ...) and color(display-p3 ...), and a
+ * small set of named colors. Wide-gamut colours are converted to sRGB,
+ * which is what the canvas draws in, and clipped to it. Returns
+ * undefined for unsupported values.
  *
  * The result is memoized on the raw input string, which matters for
  * more than the parse itself: resolving a node's paint state parses
@@ -291,7 +286,171 @@ function parseColorUncached(value: string): UiColor | undefined {
   if (trimmed.startsWith('rgb')) {
     return parseRgbColor(trimmed);
   }
+  if (trimmed.startsWith('hsl')) {
+    return parseHslColor(trimmed);
+  }
+  if (trimmed.startsWith('oklch(') || trimmed.startsWith('oklab(')) {
+    return parseOklabColor(trimmed);
+  }
+  if (trimmed.startsWith('color(')) {
+    return parseColorFunction(trimmed);
+  }
   return undefined;
+}
+
+/**
+ * A CSS colour function's arguments, in either syntax: the legacy
+ * commas (`rgb(0, 128, 255, 0.5)`) or the current spaces with the alpha
+ * after a slash (`rgb(0 128 255 / 50%)`). The alpha, when given, is
+ * always the fourth entry.
+ */
+function functionArguments(source: string): string[] | undefined {
+  const open = source.indexOf('(');
+  const close = source.lastIndexOf(')');
+  if (open < 0 || close < open) {
+    return undefined;
+  }
+  const body = source.slice(open + 1, close).trim();
+  if (body.includes(',')) {
+    return body.split(',').map(part => part.trim());
+  }
+  const [channels, alpha] = body.split('/');
+  const parts = channels!.trim().split(/\s+/);
+  if (alpha !== undefined) {
+    parts.push(alpha.trim());
+  }
+  return parts;
+}
+
+/** A number, or a percentage of `hundredPercent`; NaN for anything else. */
+function amount(part: string, hundredPercent: number): number {
+  if (part.endsWith('%')) {
+    return (Number(part.slice(0, -1)) / 100) * hundredPercent;
+  }
+  return part === 'none' ? 0 : Number(part);
+}
+
+/** An alpha argument: a number or a percentage, 1 when absent. */
+function alphaOf(part: string | undefined): number {
+  return part === undefined ? 1 : amount(part, 1);
+}
+
+/** A hue in degrees, from degrees, turns, radians or a bare number. */
+function hueOf(part: string): number {
+  if (part.endsWith('deg')) {
+    return Number(part.slice(0, -3));
+  }
+  if (part.endsWith('turn')) {
+    return Number(part.slice(0, -4)) * 360;
+  }
+  if (part.endsWith('rad')) {
+    return (Number(part.slice(0, -3)) * 180) / Math.PI;
+  }
+  return part === 'none' ? 0 : Number(part);
+}
+
+function finiteColor(r: number, g: number, b: number, a: number): UiColor | undefined {
+  if (![r, g, b, a].every(Number.isFinite)) {
+    return undefined;
+  }
+  return { r: clamp01(r), g: clamp01(g), b: clamp01(b), a: clamp01(a) };
+}
+
+/** `hsl()` and `hsla()`. */
+function parseHslColor(source: string): UiColor | undefined {
+  const parts = functionArguments(source);
+  if (parts === undefined || parts.length < 3) {
+    return undefined;
+  }
+  const h = (((hueOf(parts[0]!) % 360) + 360) % 360) / 360;
+  const sat = amount(parts[1]!, 100) / 100;
+  const light = amount(parts[2]!, 100) / 100;
+  const channel = (n: number): number => {
+    const k = (n + h * 12) % 12;
+    const chroma = sat * Math.min(light, 1 - light);
+    return light - chroma * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  return finiteColor(channel(0), channel(8), channel(4), alphaOf(parts[3]));
+}
+
+/** sRGB's transfer function, from a linear channel to an encoded one. */
+function encodeSrgb(linear: number): number {
+  const sign = linear < 0 ? -1 : 1;
+  const value = Math.abs(linear);
+  return sign * (value <= 0.0031308 ? 12.92 * value : 1.055 * Math.pow(value, 1 / 2.4) - 0.055);
+}
+
+/** The inverse, shared by sRGB and Display P3, which use the same curve. */
+function decodeSrgb(encoded: number): number {
+  const sign = encoded < 0 ? -1 : 1;
+  const value = Math.abs(encoded);
+  return sign * (value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4));
+}
+
+/**
+ * `oklab()` and `oklch()`, converted to sRGB and clipped to it: the
+ * canvas draws in sRGB, so a colour outside it lands on its nearest
+ * channel values rather than painting nothing.
+ */
+function parseOklabColor(source: string): UiColor | undefined {
+  const parts = functionArguments(source);
+  if (parts === undefined || parts.length < 3) {
+    return undefined;
+  }
+  const lightness = amount(parts[0]!, 1);
+  let a: number;
+  let b: number;
+  if (source.startsWith('oklch')) {
+    const chroma = amount(parts[1]!, 0.4);
+    const hue = (hueOf(parts[2]!) * Math.PI) / 180;
+    a = chroma * Math.cos(hue);
+    b = chroma * Math.sin(hue);
+  } else {
+    a = amount(parts[1]!, 0.4);
+    b = amount(parts[2]!, 0.4);
+  }
+  // Björn Ottosson's matrices, OKLab to LMS to linear sRGB.
+  const l = Math.pow(lightness + 0.3963377774 * a + 0.2158037573 * b, 3);
+  const m = Math.pow(lightness - 0.1055613458 * a - 0.0638541728 * b, 3);
+  const s = Math.pow(lightness - 0.0894841775 * a - 1.291485548 * b, 3);
+  return finiteColor(
+    encodeSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    encodeSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    encodeSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+    alphaOf(parts[3])
+  );
+}
+
+/**
+ * `color(srgb ...)` and `color(display-p3 ...)`. A Display P3 colour is
+ * converted to sRGB and clipped to it, for the reason `oklch()` is.
+ */
+function parseColorFunction(source: string): UiColor | undefined {
+  const parts = functionArguments(source);
+  if (parts === undefined || parts.length < 4) {
+    return undefined;
+  }
+  const [space, ...rest] = parts;
+  const r = amount(rest[0]!, 1);
+  const g = amount(rest[1]!, 1);
+  const b = amount(rest[2]!, 1);
+  const alpha = alphaOf(rest[3]);
+  if (space === 'srgb') {
+    return finiteColor(r, g, b, alpha);
+  }
+  if (space !== 'display-p3') {
+    return undefined;
+  }
+  const lr = decodeSrgb(r);
+  const lg = decodeSrgb(g);
+  const lb = decodeSrgb(b);
+  // Linear Display P3 to linear sRGB, through XYZ D65 (CSS Color 4).
+  return finiteColor(
+    encodeSrgb(1.2249401763 * lr - 0.2249401763 * lg),
+    encodeSrgb(-0.0420569547 * lr + 1.0420569547 * lg),
+    encodeSrgb(-0.0196375546 * lr - 0.0786360456 * lg + 1.0982736002 * lb),
+    alpha
+  );
 }
 
 /**
