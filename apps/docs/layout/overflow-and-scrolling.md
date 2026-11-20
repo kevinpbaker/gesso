@@ -111,6 +111,34 @@ ends to do it, so content above that shrinks at the top of a list still
 moves what is below. The offset is written to `scrollY`, as a wheel
 writes it.
 
+A node that keeps what it draws still by itself opts out with
+`overflowAnchor: 'none'`, as in CSS. The case: a canvas that grows up
+or left while it has the keyboard. Its box moves up by what it grew,
+and it draws its content that much lower in the box, so the content
+stays where it was on screen. Held by the anchor, the container would
+scroll by the move and carry the content down the screen.
+
+```tsx
+<box focusable overflowAnchor="none" top={top} height={height}>
+  {/* draws its shapes `grownAbove` lower, so they keep their place */}
+</box>
+```
+
+Set it where it reads best. CSS reads it in the same places:
+
+| Where                               | What it opts out                    |
+| ----------------------------------- | ----------------------------------- |
+| The focused node                    | That node                           |
+| A node between it and its container | Every focused node inside that node |
+| The scroll container                | Every focused node it scrolls       |
+
+On a node it is the narrowest choice, and the one to prefer: the rest
+of the container still holds its fields still. CSS would then anchor
+on another node; the runtime anchors the focused node only, so with
+`'none'` nothing is anchored for that layout. `ScrollService.keepInPlace`
+is not affected: a node held by name is held whatever `overflowAnchor`
+says.
+
 Revealing and holding go by where a node is drawn, not where it is laid
 out. Content under a `transform` (a page laid out at full size and drawn
 zoomed, inside a box as big as the zoomed page) has its records where it

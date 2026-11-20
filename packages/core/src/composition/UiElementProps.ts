@@ -213,6 +213,7 @@ export type InteractionProps = PropsOf<
   | 'selectable'
   | 'editingGroup'
   | 'textInput'
+  | 'overflowAnchor'
 >;
 
 /**

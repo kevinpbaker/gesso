@@ -268,6 +268,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Overflow and scrolling',
     note: 'What happens to a wheel delta this node cannot use: chain it to an ancestor, or keep it.'
   },
+  overflowAnchor: {
+    group: 'Overflow and scrolling',
+    note: '`none` on the focused node, a node above it or its scroll container: a layout that moves it does not scroll to hold it still.'
+  },
 
   // Paint
   backgroundColor: { group: 'Paint', note: 'Fill behind the content. Takes a theme token as well as a colour.' },
