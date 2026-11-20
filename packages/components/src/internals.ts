@@ -266,7 +266,15 @@ export function followedChildren(
   children: InputCell<UiChild | undefined>,
   fallback: () => UiChild
 ): Observable<UiChild[]> {
-  return children.pipe(map(child => [child ?? fallback()]));
+  // A child that is an Observable, as `Show` is, arrives here as what it
+  // last sent: a list. It is spread, not nested, or the list's
+  // reconcile finds an array where it looks for an element.
+  return children.pipe(
+    map(child => {
+      const sent = child as UiChild | readonly UiChild[] | undefined;
+      return sent === undefined ? [fallback()] : Array.isArray(sent) ? [...sent] : [sent as UiChild];
+    })
+  );
 }
 
 /**

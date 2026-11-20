@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BehaviorSubject } from 'rxjs';
 
-import { createComponent } from 'gesso-framework';
+import { createComponent, Show } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import { Box, Column, Text } from 'gesso-core';
 import { InspectorRow, InspectorSection, UnitField, parseQuantity, sharedValue, type NudgePhase } from './Inspector';
@@ -186,6 +186,26 @@ describe('InspectorSection and InspectorRow', () => {
     ui.fireEvent.keyDown('Enter');
     ui.frame();
     expect(ui.getByText('Beam 1')).toBeDefined();
+  });
+
+  it('folds a Show it is given, its rows coming and going as the Show sends them', () => {
+    // A Show is an Observable of a list; it arrived here as a list held in a list, and opening threw in the reconcile.
+    const open = new BehaviorSubject(false);
+    const ui = renderTest(
+      createComponent(InspectorSection, {
+        title: 'Add shapes',
+        open,
+        onOpenChange: (on: boolean) => open.next(on),
+        children: Show({ when: open, children: () => Text({ text: '+ pin' }) })
+      }),
+      { width: 300, height: 200 }
+    );
+    ui.fireEvent.click(ui.getByRole('button'));
+    ui.frame();
+    expect(ui.getByText('+ pin')).toBeDefined();
+    ui.fireEvent.click(ui.getByRole('button'));
+    ui.frame();
+    expect(ui.queryByText('+ pin')).toBeNull();
   });
 
   it('says when its heading takes and loses focus', () => {
