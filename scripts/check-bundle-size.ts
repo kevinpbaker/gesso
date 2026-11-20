@@ -12,7 +12,7 @@
  * meant one module graph, and a bundler cannot know which half of it a
  * given call reaches — so the engine was in every shell whether or not
  * anything called it. The measurement then: 169.3 kB gzipped. Now:
- * around twelve.
+ * about eighteen and a half.
  *
  * Two assertions, because the number alone is the weaker one.
  *
@@ -38,7 +38,7 @@ const at = (path: string): string => fileURLToPath(new URL(path, import.meta.url
 /**
  * The ceiling for a worker application's main thread, gzipped.
  *
- * Twelve and a bit kilobytes today. The headroom is for the shell
+ * About eighteen and a half kilobytes today. The headroom is for the shell
  * growing a feature, not for the engine coming back: the engine is a
  * hundred and fifty, so this fails by an order of magnitude on the one
  * regression it exists to catch.

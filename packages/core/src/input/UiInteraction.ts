@@ -1,5 +1,6 @@
 import { UiNodeType } from '../graph/UiNodeType';
 import { linkHoverOf } from '../selection/UiTextLinks';
+import { selectableTextOf } from '../selection/UiSelectable';
 import type { UiNode } from '../graph/UiNode';
 
 /**
@@ -178,6 +179,12 @@ export function resolveCursor(node: UiNode | null): string | null {
       // textarea does.
       return 'text';
     }
+  }
+  // Text the person can select shows the I-beam too, as a browser shows
+  // it over a paragraph, and only when nothing above set a cursor: a
+  // card whose whole surface presses keeps its pointer over its words.
+  if (node !== null && node.type === UiNodeType.Text && selectableTextOf(node) !== undefined) {
+    return 'text';
   }
   return null;
 }
