@@ -273,6 +273,16 @@ the canvas and the plumbing, and its input job is small but not empty:
 - **Answer for the wheel from a cache**, which
   [overflow and scrolling](/layout/overflow-and-scrolling) covers in
   full.
+- **Answer for the scrolling keys from a cache.** The arrows, Page Up
+  and Down, Home, End and Space scroll the page around the canvas, so
+  Down in an open menu would move the highlight and the page under it.
+  The worker says ahead of time which of those keys it will use at its
+  focus (`GessoRuntime.onClaimedKeys`): the keys a handler on the
+  focused node's path is marked with, every `keymap` is; the keys a
+  role on that path owns, as a menu, a list, a grid or a slider owns
+  the arrows; and the keys the runtime's own scroller would move a pane
+  with. The shell cancels those, and a scrolling key the application
+  has no use for still scrolls the page.
 - **Mirror the cursor** onto the canvas element, since the runtime
   knows which node is hovered and only the DOM can show a cursor.
 - **Prepare the surface**: `touch-action`, `user-select` and two

@@ -67,6 +67,21 @@ and cannot be overridden by an application that needs a different
 binding. It is also why every component page here can carry an accurate
 `## Keyboard` section: the section is the table.
 
+The table also tells the shell which keys the control uses before any
+is pressed. A key that scrolls the page, an arrow, Page Up or Down,
+Home, End or Space, is cancelled in the page only when something on
+the focused path will use it, because a worker's answer comes too late
+to cancel it after the fact. A `keymap` handler carries its keys, and so
+does a node whose role owns them, such as a menu, a list, a grid or a
+slider. A handler written by hand on a node with no such role says so
+with `claimKeys` from `gesso-core`:
+
+```tsx
+onKeyDown={claimKeys(event => step(event), ['ArrowLeft', 'ArrowRight'])}
+```
+
+Without it, the page scrolls under the control as well, in a worker.
+
 ## One tab stop per widget
 
 Walking five tabs to get past a tab bar is worse than walking it with

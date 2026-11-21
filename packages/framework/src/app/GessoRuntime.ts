@@ -121,6 +121,8 @@ import {
   type WebGPUCanvasHost,
   UiScheduler,
   UiKeyboardScroller,
+  keysClaimedOnPath,
+  SCROLLING_KEYS,
   UiSelectionAutoScroller,
   UiTimerFrameClock,
   UiFrame,
@@ -480,6 +482,11 @@ export class GessoRuntime {
    * container at all would otherwise never send either.
    */
   private lastScrollsAnything: boolean | undefined = undefined;
+  private claimedKeysListener: ((keys: readonly string[]) => void) | null = null;
+  /** The claimed keys last sent, joined, so an unchanged set is not sent again. */
+  private lastClaimedKeys: string | null = null;
+  /** The keyboard's scroller, asked ahead of a key whether it would move a pane. */
+  private keyScroller: UiKeyboardScroller | null = null;
   private editingListener: ((state: EditingState | null) => void) | null = null;
   /**
    * The selection controller, reachable before `input` is assigned:
@@ -1667,6 +1674,68 @@ export class GessoRuntime {
   }
 
   /**
+   * Receives the keys that scroll a page (`SCROLLING_KEYS`) that the
+   * application will use at its current focus, whenever that set
+   * changes.
+   *
+   * The same problem `onScrollability` answers for the wheel: a shell a
+   * worker message away cannot wait to hear whether Down was used, and
+   * the browser scrolls the page around the canvas as its default. A
+   * key is claimed when a handler from the focused node up is marked
+   * with it (every `keymap` is), when a role on that path owns it (a
+   * menu, a list, a grid, a slider), or when the keyboard's own scroller
+   * would move a pane with it. The shell cancels those and leaves the
+   * rest to the page. At worst one frame stale.
+   */
+  onClaimedKeys(listener: ((keys: readonly string[]) => void) | null): void {
+    this.claimedKeysListener = listener;
+    this.lastClaimedKeys = null;
+    if (listener !== null) {
+      this.sendClaimedKeys();
+    }
+  }
+
+  /** The scrolling keys the application will use at its current focus. */
+  claimedKeys(): string[] {
+    const focused = this.focusManager.focusedNode;
+    const claimed = keysClaimedOnPath(
+      focused ?? this.appRoot ?? null,
+      node => this.graph.getEventBindingForType(node, UiEventType.KeyDown)?.listener
+    );
+    const scroller = this.keyScroller;
+    if (scroller !== null) {
+      for (const key of SCROLLING_KEYS) {
+        if (claimed.has(key)) {
+          continue;
+        }
+        // Space pages down, and up with Shift: claimed when either moves.
+        const plain = { shift: false, ctrl: false, alt: false, meta: false };
+        if (
+          scroller.wouldScroll(focused, key, plain) ||
+          (key === ' ' && scroller.wouldScroll(focused, key, { ...plain, shift: true }))
+        ) {
+          claimed.add(key);
+        }
+      }
+    }
+    return SCROLLING_KEYS.filter(key => claimed.has(key));
+  }
+
+  /** Hands the listener the claimed keys, when they changed. */
+  private sendClaimedKeys(): void {
+    if (this.claimedKeysListener === null) {
+      return;
+    }
+    const keys = this.claimedKeys();
+    const joined = keys.join('\n');
+    if (joined === this.lastClaimedKeys) {
+      return;
+    }
+    this.lastClaimedKeys = joined;
+    this.claimedKeysListener(keys);
+  }
+
+  /**
    * Receives the focused editable's text, selection and caret box after
    * any frame that changed them, and null when no editable has focus.
    * The shell's editing proxy mirrors it; see `EditingProxy`.
@@ -2429,6 +2498,7 @@ export class GessoRuntime {
     this.devtoolsListener = null;
     this.cursorListener = null;
     this.scrollabilityListener = null;
+    this.claimedKeysListener = null;
     this.rendererErrorListener = null;
     this.frameErrorListener = null;
     this.scheduler.stop();
@@ -2657,7 +2727,7 @@ export class GessoRuntime {
         // With nothing focused, a menu from the keyboard is about the
         // text selected on the canvas, as a right-click over it is.
         contextMenu: { menuAt: node => this.keyboardMenuAt(node, editing), unfocused: () => selection.endNode },
-        scroll: new UiKeyboardScroller(scrollSink)
+        scroll: (this.keyScroller = new UiKeyboardScroller(scrollSink))
       }),
       // Listens at the root, so a pan reaches it only when nothing
       // between the pressed node and here claimed the gesture. That is
@@ -4339,6 +4409,9 @@ export class GessoRuntime {
     // The same is true of the scroll chain — a container that reached
     // its end, or content that grew under a still cursor.
     this.sendScrollability();
+    // And of the keys the application will use: focus moved, a menu
+    // opened, a pane reached its end.
+    this.sendClaimedKeys();
     const metrics: FrameMetrics = {
       frame: frame.id,
       durationMs: elapsed,

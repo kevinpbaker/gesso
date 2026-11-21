@@ -27,6 +27,7 @@ export { FocusNotifier } from './FocusNotifier';
 export { UiPointerController } from './UiPointerController';
 export type { PointerControllerOptions } from './UiPointerController';
 export { isContextMenuKey, UiKeyboardController } from './UiKeyboardController';
+export { claimKeys, claimedKeysOf, isScrollingKey, keysClaimedOnPath, SCROLLING_KEYS } from './UiKeyClaims';
 export type { KeyboardControllerOptions } from './UiKeyboardController';
 export { isScrollContainer, UiWheelController } from './UiWheelController';
 export { KEY_SCROLL_STEP, UiKeyboardScroller } from './UiKeyboardScroller';

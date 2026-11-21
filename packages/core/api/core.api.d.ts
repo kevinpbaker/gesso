@@ -2578,11 +2578,17 @@ declare class UiKeyboardController {
   keyDown(key: string, modifiers?: UiKeyModifiers, textFollows?: boolean, code?: string): UiKeyboardEvent;
   keyUp(key: string, modifiers?: UiKeyModifiers, code?: string): UiKeyboardEvent;
 }
+declare const SCROLLING_KEYS: readonly string[];
+declare function isScrollingKey(key: string, modifiers: UiKeyModifiers): boolean;
+declare function claimKeys<T extends object>(handler: T, keys: Iterable<string>): T;
+declare function claimedKeysOf(handler: unknown): readonly string[];
+declare function keysClaimedOnPath(focused: UiNode | null, keyHandlerOf: (node: UiNode) => unknown): Set<string>;
 declare const KEY_SCROLL_STEP = 40;
 declare class UiKeyboardScroller {
   private readonly sink;
   constructor(sink: ScrollSink);
   handleKey(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean;
+  wouldScroll(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean;
   private around;
   private largest;
 }
@@ -4890,6 +4896,8 @@ export {
   caretRectFor,
   caretVisibleAt,
   ChildrenBindingId,
+  claimedKeysOf,
+  claimKeys,
   clearFontStacks,
   clearLinkHover,
   clearMatchRanges,
@@ -5094,6 +5102,7 @@ export {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isScrollingKey,
   isSubtreeInert,
   isSvgSource,
   isTypographyRole,
@@ -5105,6 +5114,7 @@ export {
   isWebGPUAvailable,
   KEY_SCROLL_STEP,
   KeyboardControllerOptions,
+  keysClaimedOnPath,
   labelNode,
   LayerCanvasFactory,
   LayoutEngine,
@@ -5329,6 +5339,7 @@ export {
   scrollBounds,
   ScrollBounds,
   ScrollContainerState,
+  SCROLLING_KEYS,
   ScrollLayerStats,
   scrollLeaderOf,
   ScrollOffset,
@@ -5874,6 +5885,8 @@ import {
   caretRectFor,
   caretVisibleAt,
   ChildrenBindingId,
+  claimedKeysOf,
+  claimKeys,
   clearFontStacks,
   clearLinkHover,
   clearMatchRanges,
@@ -6078,6 +6091,7 @@ import {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isScrollingKey,
   isSubtreeInert,
   isSvgSource,
   isTypographyRole,
@@ -6089,6 +6103,7 @@ import {
   isWebGPUAvailable,
   KEY_SCROLL_STEP,
   KeyboardControllerOptions,
+  keysClaimedOnPath,
   labelNode,
   LayerCanvasFactory,
   LayoutEngine,
@@ -6313,6 +6328,7 @@ import {
   scrollBounds,
   ScrollBounds,
   ScrollContainerState,
+  SCROLLING_KEYS,
   ScrollLayerStats,
   scrollLeaderOf,
   ScrollOffset,
@@ -6679,6 +6695,8 @@ export {
   caretRectFor,
   caretVisibleAt,
   CharacterCountTextMeasurer,
+  claimedKeysOf,
+  claimKeys,
   clampSize,
   clearFontStacks,
   clearLinkHover,
@@ -6852,6 +6870,7 @@ export {
   isPrintable,
   isReadOnly,
   isScrollContainer,
+  isScrollingKey,
   isShapeName,
   isSubtreeInert,
   isSvgSource,
@@ -6864,6 +6883,7 @@ export {
   isVideoSurface,
   isWebGPUAvailable,
   KEY_SCROLL_STEP,
+  keysClaimedOnPath,
   LABEL_PADDING_X,
   labelNode,
   labelOrigin,
@@ -7020,6 +7040,7 @@ export {
   scrollbarThumbs,
   scrollbarZoneAt,
   scrollBounds,
+  SCROLLING_KEYS,
   scrollLeaderOf,
   scrollPosition,
   scrollRange,

@@ -403,6 +403,13 @@ export type RuntimeToShellMessage =
    */
   | { type: 'scrollability'; scrollability: UiScrollability; scrollsAnything: boolean }
   /**
+   * The keys that scroll a page which the application will use at its
+   * focus, for the shell to cancel the page's own scroll on the spot:
+   * the wheel's `scrollability`, for the keyboard. See
+   * `GessoRuntime.onClaimedKeys`.
+   */
+  | { type: 'claimedKeys'; keys: readonly string[] }
+  /**
    * The focused editable's text, selection and caret box for the
    * editing proxy to mirror; null when no editable has focus.
    */

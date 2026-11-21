@@ -16,6 +16,7 @@ import {
   capturePointer,
   isContextMenuKey,
   isImeKey,
+  isScrollingKey,
   observeViewportInsets,
   pointerDeviceOf,
   prepareInputSurface,
@@ -451,6 +452,12 @@ export class WorkerApp {
    * scrolling.
    */
   private scrollability: UiScrollability = { up: false, down: false, left: false, right: false };
+  /**
+   * The keys that scroll a page which the application will use at its
+   * focus, as the worker last said. Down in an open menu is cancelled
+   * here, so it moves the highlight and not the page as well.
+   */
+  private claimedKeys: ReadonlySet<string> = new Set();
   private history: ShellHistory | null = null;
   /** True only when the history was made here from options; see `resolveShellHistory`. */
   private ownsHistory = false;
@@ -765,7 +772,14 @@ export class WorkerApp {
     if ((takeFind && isFind(event)) || this.options.interceptKey?.(event) === true) {
       event.preventDefault();
     }
-    if (event.key === 'Tab' || isSelectAll(event) || isContextMenuKey(event.key, modifiersFrom(event))) {
+    const modifiers = modifiersFrom(event);
+    if (isScrollingKey(event.key, modifiers) && this.claimedKeys.has(event.key)) {
+      // A key the application said it will use: the page must not
+      // scroll under it as well. A scrolling key it has no use for is
+      // left alone, and the page scrolls, as it would around any canvas.
+      event.preventDefault();
+    }
+    if (event.key === 'Tab' || isSelectAll(event) || isContextMenuKey(event.key, modifiers)) {
       // The worker's answer cannot come back in time to cancel a
       // default, so the shell cancels the ones that would be wrong
       // whatever it is: Tab moving focus out of the canvas, Ctrl/Cmd+A
@@ -1075,6 +1089,11 @@ export class WorkerApp {
       if (this.canvas !== undefined) {
         this.canvas.style.cursor = message.cursor ?? '';
       }
+      return;
+    }
+    if (message.type === 'claimedKeys') {
+      // Cached, as the scrollability is: read when a key arrives.
+      this.claimedKeys = new Set(message.keys);
       return;
     }
     if (message.type === 'scrollability') {

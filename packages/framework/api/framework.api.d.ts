@@ -1660,6 +1660,9 @@ declare class GessoRuntime {
   private scrollabilityListener;
   private lastScrollability;
   private lastScrollsAnything;
+  private claimedKeysListener;
+  private lastClaimedKeys;
+  private keyScroller;
   private editingListener;
   private selectionController;
   private findController;
@@ -1740,6 +1743,9 @@ declare class GessoRuntime {
   get cursor(): string | null;
   onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
   get scrollability(): UiScrollability;
+  onClaimedKeys(listener: ((keys: readonly string[]) => void) | null): void;
+  claimedKeys(): string[];
+  private sendClaimedKeys;
   onEditingState(listener: ((state: EditingState | null) => void) | null): void;
   get editingState(): EditingState | null;
   private toShell;
@@ -2124,6 +2130,10 @@ type RuntimeToShellMessage = {
   scrollsAnything: boolean;
 } |
 {
+  type: 'claimedKeys';
+  keys: readonly string[];
+} |
+{
   type: 'editing';
   state: EditingState | null;
 } |
@@ -2412,6 +2422,7 @@ declare class WorkerApp {
   private mirror;
   private audio;
   private scrollability;
+  private claimedKeys;
   private history;
   private ownsHistory;
   private ready;

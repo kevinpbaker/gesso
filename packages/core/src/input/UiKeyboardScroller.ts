@@ -114,6 +114,19 @@ export class UiKeyboardScroller {
     return true;
   }
 
+  /**
+   * Whether `handleKey` would scroll something for the key, without
+   * scrolling it: what the shell is told ahead of the key, so it cancels
+   * the page's own scroll only when a pane here will move instead.
+   */
+  wouldScroll(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean {
+    const scroll = readKey(key, modifiers);
+    if (scroll === null || (focused !== null && focused.type === UiNodeType.EditableText)) {
+      return false;
+    }
+    return (focused === null ? this.largest(scroll) : this.around(focused, scroll)) !== null;
+  }
+
   private around(start: UiNode, scroll: KeyScroll): { node: UiNode; state: ScrollContainerState } | null {
     for (let node: UiNode | null = start; node !== null; node = node.parent) {
       if (!isScrollContainer(node)) {

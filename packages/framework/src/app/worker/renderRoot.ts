@@ -780,6 +780,9 @@ export class RenderWorkerApp {
     this.runtime.onScrollability((scrollability, scrollsAnything) => {
       this.host.postMessage({ type: 'scrollability', scrollability, scrollsAnything });
     });
+    this.runtime.onClaimedKeys(keys => {
+      this.host.postMessage({ type: 'claimedKeys', keys });
+    });
     this.runtime.onEditingState(state => {
       this.host.postMessage({ type: 'editing', state });
     });

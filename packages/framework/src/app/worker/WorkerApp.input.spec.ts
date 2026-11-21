@@ -517,6 +517,44 @@ describe('hover coalescing', () => {
   });
 
   /**
+   * Down in an open menu moved the highlight and scrolled the page under
+   * the canvas, because the worker's answer comes too late to cancel the
+   * browser's default. The worker says ahead of time which scrolling
+   * keys it will use, and the shell cancels those and no others.
+   */
+  it('cancels the scrolling keys the worker claimed, and leaves the rest to the page', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    const prevented: string[] = [];
+    const press = (name: string, ctrlKey = false) =>
+      ({
+        ...key(),
+        key: name,
+        ctrlKey,
+        preventDefault: () => prevented.push(`${ctrlKey ? 'Ctrl+' : ''}${name}`)
+      }) as unknown as KeyboardEvent;
+    const claim = (keys: string[]): void =>
+      shell.internals.handleWorkerMessage({
+        data: { type: 'claimedKeys', keys }
+      } as unknown as MessageEvent<RuntimeToShellMessage>);
+
+    // Before the worker has said anything, the page keeps every key.
+    shell.canvas.dispatch('keydown', press('ArrowDown'));
+    claim(['ArrowDown', ' ']);
+    shell.canvas.dispatch('keydown', press('ArrowDown'));
+    shell.canvas.dispatch('keydown', press('ArrowUp'));
+    shell.canvas.dispatch('keydown', press(' '));
+    // With Ctrl it is the browser's shortcut, not a scroll.
+    shell.canvas.dispatch('keydown', press('ArrowDown', true));
+    claim([]);
+    shell.canvas.dispatch('keydown', press('ArrowDown'));
+
+    expect(prevented).toEqual(['ArrowDown', ' ']);
+    // Every one still reaches the application.
+    expect(shell.posts.filter(message => message.type === 'keyDown')).toHaveLength(6);
+  });
+
+  /**
    * The Menu key and Shift+F10 ask the focused node for its menu, in
    * the worker; the browser would open its own for the canvas or the
    * hidden field first, so the shell cancels them on the spot.

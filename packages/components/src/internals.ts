@@ -2,6 +2,7 @@ import { map, type Observable } from 'rxjs';
 
 import type { InputCell, Inputs } from 'gesso-framework';
 import {
+  claimKeys,
   type DecorationShape,
   type UiKeyboardEvent,
   type UiLength,
@@ -114,7 +115,9 @@ export function foregroundToken(disabled: Observable<boolean>): Observable<strin
 export type Keymap = Readonly<Record<string, (event: UiKeyboardEvent) => void>>;
 
 export function keymap(bindings: Keymap): (event: UiKeyboardEvent) => void {
-  return event => {
+  // Marked with its keys, so the runtime can tell the shell ahead of a
+  // key which of the ones that scroll the page this control will use.
+  return claimKeys((event: UiKeyboardEvent) => {
     const handler = bindings[event.key];
     if (handler === undefined) {
       return;
@@ -122,7 +125,7 @@ export function keymap(bindings: Keymap): (event: UiKeyboardEvent) => void {
     handler(event);
     event.preventDefault();
     event.stopPropagation();
-  };
+  }, Object.keys(bindings));
 }
 
 /** Clamps to a range and snaps to a step, for the range controls. */
