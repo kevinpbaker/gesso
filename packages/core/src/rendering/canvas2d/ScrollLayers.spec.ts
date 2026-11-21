@@ -307,6 +307,28 @@ describe('scroll layers', () => {
     expect(callArgs(layers[0]!.context, 'rect')).toEqual([[0, 12, 200, 46]]);
   });
 
+  it('repaints a changed item once on a frame that walks the container twice', () => {
+    // Rows 0 and 3 are -10..20 and 80..110 of the viewport at a scroll
+    // of 10: far enough apart that the frame is walked once for each,
+    // and each walk copies the layer. Only the first paints into it;
+    // painting again in the second cost a repaint, and left pixels at a
+    // rounded clip's edge off what a whole frame draws.
+    scrollTo(10);
+    set(rows[0], 'backgroundColor', '#abcdef');
+    set(rows[3], 'backgroundColor', '#fedcba');
+    frame();
+
+    expect(composites().length).toBe(2);
+    expect(renderer.scrollLayerStats.dropped).toBe(0);
+    // Each changed row and the row its walk reaches a spill into.
+    expect(callArgs(layers[0]!.context, 'fillRect')).toEqual([
+      [0, 0, 200, 30],
+      [0, 30, 200, 30],
+      [0, 60, 200, 30],
+      [0, 90, 200, 30]
+    ]);
+  });
+
   it('keeps the layer when the runtime asks for a frame at the root', () => {
     // An inspector outline or a kept subtree settling marks the root for
     // paint and nothing else: nothing inside the container changed.

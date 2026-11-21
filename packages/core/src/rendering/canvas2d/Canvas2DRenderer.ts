@@ -1499,7 +1499,15 @@ export class Canvas2DRenderer implements UiRenderer {
       }
       layer = created;
       this.paintLayer(layer, null, node, rec, context);
-    } else {
+    } else if (!layer.used) {
+      // Brought up to date once a frame. A frame drawn in part walks
+      // once per group of its rectangles, and every walk that crosses the
+      // container reaches it here; the frame's changes, which `damage`
+      // reads, name the same items each time. Painting them again in each
+      // walk cost a repaint per walk, and a layer painted between two
+      // copies of it in one frame left the antialiased pixels at a data
+      // table's rounded corner up to 3 levels off what a whole frame
+      // draws (Chrome). A layer the frame copied already is right for it.
       const strips = layers.shift(layer, rec);
       if (strips === null) {
         layers.drop(node);

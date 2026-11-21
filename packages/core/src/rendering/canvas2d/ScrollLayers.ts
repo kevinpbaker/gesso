@@ -165,6 +165,12 @@ export interface ScrollLayer {
    */
   scrollX: number;
   scrollY: number;
+  /**
+   * Copied onto the surface on the frame being drawn, and so already
+   * right for it: a frame drawn in part reaches the container once per
+   * group of its rectangles, and only the first brings the layer up to
+   * date. Cleared by `endFrame`.
+   */
   used: boolean;
   /**
    * Where each of the container's items (its children, through any
