@@ -2422,6 +2422,7 @@ declare class WorkerApp {
   private stopDevicePixels;
   private detachInput;
   private files;
+  private pickers;
   private proxy;
   private mirror;
   private audio;

@@ -27,6 +27,7 @@ import {
 import type { AudioSink } from '../AudioSink';
 import { attachFileDrop } from '../fileDrop';
 import type { ShellFiles } from '../shellFiles';
+import { openPicker, type ShellPickers, windowPickers } from '../shellPicker';
 import { setLeaveWarning } from '../shellLeaveWarning';
 import { redirectWith } from '../shellRedirect';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
@@ -453,6 +454,8 @@ export class WorkerApp {
   private detachInput: (() => void) | null = null;
   /** Pickers and remembered handles, made on the first file request. */
   private files: ShellFiles | null = null;
+  /** The window's pickers, opened as a request arrives; see `shellPicker.ts`. */
+  private pickers: ShellPickers | null = null;
   private proxy: EditingProxy | null = null;
   private mirror: SemanticsMirror | null = null;
   /** The one audio element, behind `AudioService`; see `AudioSink`. Made on the first audio request. */
@@ -463,8 +466,12 @@ export class WorkerApp {
    * about a sixth of what this thread parses before it can, which is the
    * one cost the shell is budgeted on (`check-bundle-size.ts`). Each is
    * asked for on an idle callback after mount, so by the time a request
-   * comes the module is in hand and awaiting it costs a microtask: a
-   * file picker still opens inside the click that asked for it.
+   * comes the module is usually in hand and awaiting it costs a
+   * microtask. Not always: on a slow connection a click can land first,
+   * and a picker shown after the module arrived was refused once the
+   * click was five seconds old. So a file request opens its picker
+   * before waiting on anything (`shellPicker.ts`, which is loaded with
+   * the shell), and only what follows the picker waits for the module.
    */
   private filesModule: Promise<typeof import('../shellFiles')> | null = null;
   private audioModule: Promise<typeof import('../AudioSink')> | null = null;
@@ -1236,13 +1243,17 @@ export class WorkerApp {
       return;
     }
     if (message.type === 'file') {
-      // Pickers, handles and IndexedDB are all the window's. The answer
-      // is posted on every path — `perform` never rejects — and a file
-      // read goes back with its buffer moved rather than copied.
+      // Pickers, handles and IndexedDB are all the window's. The picker
+      // is shown now, in the task this message arrived in, and not after
+      // the module below has loaded: a browser shows one only while the
+      // click that asked is fresh. The answer is posted on every path —
+      // `perform` never rejects — and a file read goes back with its
+      // buffer moved rather than copied.
+      const opened = openPicker((this.pickers ??= windowPickers(window)), message.request);
       void this.loadFiles().then(({ ShellFiles, browserFilesHost, fileResultTransfer }) => {
         this.files ??= new ShellFiles(browserFilesHost(window));
         return this.files
-          .perform(message.request)
+          .perform(message.request, opened)
           .then(result => this.post({ type: 'fileResult', id: message.id, result }, fileResultTransfer(result)));
       });
       return;

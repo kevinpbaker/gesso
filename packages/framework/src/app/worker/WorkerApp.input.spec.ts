@@ -603,6 +603,53 @@ describe('hover coalescing', () => {
   });
 
   /**
+   * File support is loaded after mount too, but a picker cannot wait for
+   * it: a browser shows one only while the click that asked is fresh,
+   * and on a slow connection the module arrived after Chrome had stopped
+   * counting the click. The picker is shown in the task the request
+   * arrived in, and what follows it waits for the module.
+   */
+  it('shows a picker as the request arrives, before the file module has loaded', async () => {
+    const shell = setup();
+    const scope = globalThis as unknown as { window: Record<string, unknown> };
+    const shown: unknown[] = [];
+    scope.window.showOpenFilePicker = (options: unknown) => {
+      shown.push(options);
+      return Promise.resolve([{ name: 'notes.txt', getFile: () => Promise.resolve(new File(['hello'], 'notes.txt')) }]);
+    };
+    shell.internals.handleWorkerMessage({
+      data: { type: 'file', id: 7, request: { op: 'open', accept: [], multiple: false } }
+    } as unknown as MessageEvent<RuntimeToShellMessage>);
+
+    // Synchronously: nothing has been awaited, the module included.
+    expect(shown).toEqual([{ multiple: false }]);
+
+    await vi.dynamicImportSettled();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const answer = shell.posts.find(message => message.type === 'fileResult');
+    expect(answer).toMatchObject({ id: 7, result: { outcome: 'ok', files: [{ name: 'notes.txt', handle: 1 }] } });
+  });
+
+  it('answers a refused picker as denied, though it was refused before the module loaded', async () => {
+    const shell = setup();
+    const scope = globalThis as unknown as { window: Record<string, unknown> };
+    scope.window.showOpenFilePicker = () =>
+      Promise.reject(Object.assign(new Error('Must be handling a user gesture'), { name: 'SecurityError' }));
+    shell.internals.handleWorkerMessage({
+      data: { type: 'file', id: 8, request: { op: 'open', accept: [], multiple: false } }
+    } as unknown as MessageEvent<RuntimeToShellMessage>);
+
+    await vi.dynamicImportSettled();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(shell.posts.find(message => message.type === 'fileResult')).toMatchObject({
+      id: 8,
+      result: { outcome: 'denied' }
+    });
+  });
+
+  /**
    * Down in an open menu moved the highlight and scrolled the page under
    * the canvas, because the worker's answer comes too late to cancel the
    * browser's default. The worker says ahead of time which scrolling

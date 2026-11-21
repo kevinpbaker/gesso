@@ -1,5 +1,6 @@
-import type { ShellFile, ShellFileRequest, ShellFileResult, ShellFileType, ShellRecentFile } from './ShellService';
+import type { ShellFile, ShellFileRequest, ShellFileResult, ShellRecentFile } from './ShellService';
 import { shellFilesUnsupported } from './ShellService';
+import { type OpenedPicker, openPicker, type ShellPickers, windowPickers } from './shellPicker';
 
 /**
  * The shell's half of a file request: pickers, handles, and the files
@@ -76,22 +77,12 @@ export interface ShellHandleStore {
   delete(id: number): Promise<void>;
 }
 
-/** What the shell can reach. Every member optional but the store and the clock. */
-export interface ShellFilesHost {
+/** What the shell can reach: its pickers, and every member optional but the store and the clock. */
+export interface ShellFilesHost extends ShellPickers {
   readonly store: ShellHandleStore;
   now(): number;
-  showOpenFilePicker?(options: PickerOptions & { multiple: boolean }): Promise<ShellFileHandle[]>;
-  showSaveFilePicker?(options: PickerOptions & { suggestedName: string }): Promise<ShellFileHandle>;
-  showDirectoryPicker?(options: { mode: 'read' | 'readwrite' }): Promise<ShellDirectoryHandle>;
-  /** A file input, clicked. Null when it was dismissed. */
-  pickWithInput?(accept: string, multiple: boolean): Promise<File[] | null>;
   /** Hands a file to the browser's downloads. */
   download?(name: string, blob: Blob): void;
-}
-
-interface PickerOptions {
-  types?: { description: string; accept: Record<string, string[]> }[];
-  excludeAcceptAllOption?: boolean;
 }
 
 /** How many files are remembered before the oldest is let go. */
@@ -104,18 +95,26 @@ export class ShellFiles {
    * Performs one request. Never rejects: every path, including a
    * browser throwing something nobody predicted, is an answer, because
    * a promise on the other side of the barrier is waiting for one.
+   *
+   * `opened` is the picker the request needs, when one is already
+   * showing; see `shellPicker.ts` for why a host opens it before this
+   * module has loaded. Left out, it is opened here, from the host's own
+   * pickers.
    */
-  async perform(request: ShellFileRequest): Promise<ShellFileResult> {
+  async perform(
+    request: ShellFileRequest,
+    opened: OpenedPicker | null = openPicker(this.host, request)
+  ): Promise<ShellFileResult> {
     try {
       switch (request.op) {
         case 'open':
-          return await this.open(request.accept, request.multiple);
+          return await this.open(opened);
         case 'reopen':
           return await this.reopen(request.handle, request.mode ?? 'read');
         case 'openDirectory':
-          return await this.openDirectory(request.mode);
+          return await this.openDirectory(opened);
         case 'save':
-          return await this.save(request);
+          return await this.save(request, opened);
         case 'recent':
           return ok({ recent: await this.recent() });
         case 'forget':
@@ -127,9 +126,9 @@ export class ShellFiles {
     }
   }
 
-  private async open(accept: readonly ShellFileType[], multiple: boolean): Promise<ShellFileResult> {
-    if (this.host.showOpenFilePicker !== undefined) {
-      const handles = await this.host.showOpenFilePicker({ ...pickerTypes(accept), multiple });
+  private async open(opened: OpenedPicker | null): Promise<ShellFileResult> {
+    if (opened?.via === 'open') {
+      const handles = await opened.handles;
       const files: ShellFile[] = [];
       for (const handle of handles) {
         const id = await this.rememberIfPossible(handle);
@@ -137,8 +136,8 @@ export class ShellFiles {
       }
       return ok({ files });
     }
-    if (this.host.pickWithInput !== undefined) {
-      const picked = await this.host.pickWithInput(inputAccept(accept), multiple);
+    if (opened?.via === 'input') {
+      const picked = await opened.files;
       if (picked === null) {
         return cancelled();
       }
@@ -147,11 +146,11 @@ export class ShellFiles {
     return shellFilesUnsupported('This browser cannot open files.');
   }
 
-  private async openDirectory(mode: 'read' | 'readwrite'): Promise<ShellFileResult> {
-    if (this.host.showDirectoryPicker === undefined) {
+  private async openDirectory(opened: OpenedPicker | null): Promise<ShellFileResult> {
+    if (opened?.via !== 'directory') {
       return shellFilesUnsupported('This browser cannot open folders.');
     }
-    const handle = await this.host.showDirectoryPicker({ mode });
+    const handle = await opened.handle;
     // Not `rememberIfPossible`: a folder is only reachable by the number
     // it is remembered under, so a folder that cannot be remembered
     // cannot be opened, and that is a failure.
@@ -176,7 +175,10 @@ export class ShellFiles {
     return ok({ files: [await read(file, id)] });
   }
 
-  private async save(request: Extract<ShellFileRequest, { op: 'save' }>): Promise<ShellFileResult> {
+  private async save(
+    request: Extract<ShellFileRequest, { op: 'save' }>,
+    opened: OpenedPicker | null
+  ): Promise<ShellFileResult> {
     if (request.handle !== undefined) {
       const entry = await this.find(request.handle);
       if (entry === null) {
@@ -192,11 +194,8 @@ export class ShellFiles {
       await this.touch(entry);
       return ok({ saved: { name: entry.handle.name, handle: entry.id, via: 'file' } });
     }
-    if (this.host.showSaveFilePicker !== undefined) {
-      const handle = await this.host.showSaveFilePicker({
-        ...pickerTypes(request.accept),
-        suggestedName: request.name
-      });
+    if (opened?.via === 'save') {
+      const handle = await opened.handle;
       await write(handle, request.bytes ?? request.text);
       const id = request.remember === false ? null : await this.rememberIfPossible(handle);
       return ok({ saved: { name: handle.name, handle: id, via: 'file' } });
@@ -313,20 +312,6 @@ async function permitted(handle: AnyHandle, mode: 'read' | 'readwrite'): Promise
     return true;
   }
   return handle.requestPermission !== undefined && (await handle.requestPermission({ mode })) === 'granted';
-}
-
-function pickerTypes(accept: readonly ShellFileType[]): PickerOptions {
-  if (accept.length === 0) {
-    return {};
-  }
-  return {
-    types: accept.map(type => ({ description: type.description, accept: { [type.mediaType]: [...type.extensions] } })),
-    excludeAcceptAllOption: false
-  };
-}
-
-function inputAccept(accept: readonly ShellFileType[]): string {
-  return accept.flatMap(type => [...type.extensions, type.mediaType]).join(',');
 }
 
 function ok(fields: Partial<Pick<ShellFileResult, 'files' | 'directory' | 'saved' | 'recent'>>): ShellFileResult {
@@ -452,37 +437,11 @@ export class MemoryHandleStore implements ShellHandleStore {
  * input and a download where it does not.
  */
 export function browserFilesHost(view: Window & typeof globalThis): ShellFilesHost {
-  const pickers = view as unknown as {
-    showOpenFilePicker?: ShellFilesHost['showOpenFilePicker'];
-    showSaveFilePicker?: ShellFilesHost['showSaveFilePicker'];
-    showDirectoryPicker?: ShellFilesHost['showDirectoryPicker'];
-  };
   const document = view.document;
   return {
     store: view.indexedDB === undefined ? new MemoryHandleStore() : new IndexedDbHandleStore(view.indexedDB),
     now: () => Date.now(),
-    ...(pickers.showOpenFilePicker === undefined
-      ? {}
-      : { showOpenFilePicker: options => pickers.showOpenFilePicker!.call(view, options) }),
-    ...(pickers.showSaveFilePicker === undefined
-      ? {}
-      : { showSaveFilePicker: options => pickers.showSaveFilePicker!.call(view, options) }),
-    ...(pickers.showDirectoryPicker === undefined
-      ? {}
-      : { showDirectoryPicker: options => pickers.showDirectoryPicker!.call(view, options) }),
-    pickWithInput: (accept, multiple) =>
-      new Promise(resolve => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = accept;
-        input.multiple = multiple;
-        input.addEventListener('change', () => resolve(Array.from(input.files ?? [])), { once: true });
-        // `cancel` is what a dismissed picker fires, where the browser
-        // fires anything at all; without it a dismissal is a promise
-        // that waits, which is what every file input has always done.
-        input.addEventListener('cancel', () => resolve(null), { once: true });
-        input.click();
-      }),
+    ...windowPickers(view),
     download: (name, blob) => {
       const url = view.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
