@@ -210,7 +210,9 @@ describe('kept subtrees (rasterize)', () => {
     set(swatches[1]!, 'backgroundColor', '#00ff00');
     frame();
     expect(keptFills()).toBe(2);
-    expect(copies()).toBe(2);
+    // Only the changed frame is copied: the other lies outside what the
+    // frame drew again (\`FrameDamage.ts\`) and is left as it is.
+    expect(copies()).toBe(1);
   });
 
   it('draws again when an ancestor changes what it passes down', () => {

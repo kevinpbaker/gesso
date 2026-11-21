@@ -45,6 +45,7 @@ import type { Canvas2DContext, Canvas2DGradient } from '../packages/core/src/ren
 import type { CanvasHost } from '../packages/core/src/rendering/canvas2d/CanvasSurface.ts';
 import type { UiChild } from '../packages/core/src/composition/UiDefinition.ts';
 import type { UiNode } from '../packages/core/src/graph/UiNode.ts';
+import type { RenderChanges } from '../packages/core/src/rendering/RenderContext.ts';
 
 const ROWS = Number(process.env.BENCH_ROWS ?? '1000');
 const ITERATIONS = Number(process.env.BENCH_ITERATIONS ?? '20');
@@ -333,7 +334,35 @@ function renderSection(): void {
     measure(culled ? 'canvas2d walk, mostly culled' : 'canvas2d walk, nothing culled', ITERATIONS, () => {
       renderer.render(root, context);
     });
+    // A caret blinking: one small node marked for paint and nothing
+    // else, told to the renderer as the runtime tells it. Canvas2D
+    // redraws the node's rectangle and walks only what reaches it.
+    const blinking = titles(root)[Math.min(5, ROWS - 1)]!;
+    const blink = (): RenderChanges => ({
+      frame: new UiFrame(0, 0, new Map([[blinking, DirtyFlags.Paint]])),
+      geometryVersion: engine.geometryVersion
+    });
+    renderer.render(root, { ...context, changes: blink() });
+    measure(culled ? 'one node repainted, mostly culled' : 'one node repainted, nothing culled', ITERATIONS, () => {
+      renderer.render(root, { ...context, changes: blink() });
+    });
   }
+}
+
+/** The rows' title nodes, in order. */
+function titles(root: UiNode): UiNode[] {
+  const found: UiNode[] = [];
+  const visit = (node: UiNode): void => {
+    if (node.properties.get('text') !== undefined) {
+      found.push(node);
+      return;
+    }
+    for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+      visit(child);
+    }
+  };
+  visit(root);
+  return found;
 }
 
 function inputSection(): void {

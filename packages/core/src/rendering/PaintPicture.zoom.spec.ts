@@ -173,6 +173,8 @@ describe('painted pictures under a zoom', () => {
     expect(paintPictures.stats.replayed).toBe(1);
     expect(callsOf(context, 'stroke')).toHaveLength(1);
 
+    // Drawn again: a frame with nothing changed draws nothing at all.
+    graph.markDirty(picture, DirtyFlags.Paint);
     frame();
     expect(canvases.bitmaps).toHaveLength(0);
     expect(paintPictures.stats.replayed).toBe(2);

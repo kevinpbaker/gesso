@@ -1,0 +1,312 @@
+import { DirtyFlags } from '../../graph/DirtyFlags';
+import type { UiNode } from '../../graph/UiNode';
+import { UiNodeType } from '../../graph/UiNodeType';
+import { parseTransform } from '../../properties/UiTransform';
+import type { RenderContext } from '../RenderContext';
+import { snapScroll } from '../ScrollSnap';
+import { SPILL, type LayerRect } from './ScrollLayers';
+
+/**
+ * Dirty rectangles: the parts of the surface a frame has to draw again.
+ *
+ * **Why.** Canvas2D cleared the surface and drew every visible node on
+ * every frame, so a caret blinking in one field paid for the whole
+ * screen: the walk, and the raster of every draw call. A 2D canvas
+ * keeps its pixels between frames, so the only part that has to be
+ * drawn again is the part that changed. Everything else is already
+ * right.
+ *
+ * **What is damaged.** Each node the frame dirtied, where its subtree
+ * paints: its record's extent (which takes in its outer shadows and
+ * anything that reaches past a box that does not clip), a `SPILL`
+ * wider for a focus ring or a glyph's overhang, carried out to the
+ * surface through its ancestors' scroll offsets, sticky shifts and
+ * transforms, and cut by the clips that hold it in. A node scrolled is
+ * one of them: its box is its viewport, which is everything a scroll
+ * moves. Added to that, whatever the last frame drew that follows the
+ * clock rather than a property (a video, a picture stretched while its
+ * scale moves, a caret): drawn again, so it is never left a frame
+ * behind.
+ *
+ * Its own box and no more is enough because nothing moved: a frame in
+ * which any box moved (`RenderChanges.geometryVersion`) is drawn whole,
+ * so the box a node has now is the box it had when it was last drawn.
+ *
+ * **When the whole surface is drawn instead.** Whenever the damage is
+ * not something this can name, which is:
+ *
+ *   - no `changes` (a caller drawing frames of its own), or the last
+ *     frame threw part way through;
+ *   - the first frame, a resize, a new device pixel ratio, a restored
+ *     surface or a font that loaded (`invalidate`);
+ *   - any box moved, including a transform changing, a sticky node
+ *     shifting, a node added or removed;
+ *   - the root itself was dirtied, which is how the runtime asks for a
+ *     repaint that nothing else describes (a scrollbar fading, a kept
+ *     subtree drawn sharp, the inspector) and how a theme changes;
+ *   - a turn, a flip or a zero scale above a dirty node, which this
+ *     does not carry a box through;
+ *   - the inspector's overlay, this frame or the last;
+ *   - a lifted node drawn on a recent frame: it is drawn wherever its
+ *     anchor puts it, outside every clip, and a walk culled to a
+ *     rectangle does not reach it from an ancestor the rectangle misses;
+ *   - something drawn by the clock inside a layer, a kept subtree or an
+ *     opacity group, where where it landed on the surface is not known;
+ *   - damage over half the surface, which one walk draws for less.
+ *
+ * WebGPU draws every frame whole. It would need its own kept texture
+ * and a copy of it, which this does not attempt.
+ */
+export class FrameDamage {
+  private forced = true;
+  private open = false;
+  private dpr = 0;
+  private width = 0;
+  private height = 0;
+  private geometry = Number.NaN;
+  private overlaid = false;
+  /** A lifted node was drawn on the last frame, so the next is drawn whole. */
+  private lifted = false;
+  /** Where the last frame drew something that follows the clock, in device pixels. */
+  private volatile: LayerRect[] = [];
+  private readonly nextVolatile: LayerRect[] = [];
+  /** The last frame drew something by the clock somewhere it could not place. */
+  private unplaced = false;
+  private nextUnplaced = false;
+  readonly stats: FrameDamageStats = { whole: 0, partial: 0, rects: 0, pixels: 0 };
+
+  /** The next frame is drawn whole: the surface was cleared or resized, or what it holds was drawn wrong. */
+  invalidate(): void {
+    this.forced = true;
+  }
+
+  resetStats(): void {
+    this.stats.whole = 0;
+    this.stats.partial = 0;
+    this.stats.rects = 0;
+    this.stats.pixels = 0;
+  }
+
+  /**
+   * What this frame has to draw, in device pixels: null for all of it,
+   * otherwise the rectangles (none at all when nothing changed).
+   */
+  begin(root: UiNode, context: RenderContext, dpr: number, width: number, height: number): LayerRect[] | null {
+    const interrupted = this.open;
+    this.open = true;
+    this.nextVolatile.length = 0;
+    this.nextUnplaced = false;
+    const changes = context.changes;
+    const overlaid = context.overlay !== undefined && context.overlay.length > 0;
+    const whole =
+      this.forced ||
+      interrupted ||
+      changes === undefined ||
+      dpr !== this.dpr ||
+      width !== this.width ||
+      height !== this.height ||
+      changes.geometryVersion !== this.geometry ||
+      overlaid ||
+      this.overlaid ||
+      this.lifted ||
+      this.unplaced;
+    this.forced = false;
+    this.dpr = dpr;
+    this.width = width;
+    this.height = height;
+    this.geometry = changes?.geometryVersion ?? Number.NaN;
+    this.overlaid = overlaid;
+    const rects = whole ? null : this.collect(root, context, changes!);
+    if (rects === null) {
+      this.stats.whole++;
+      return null;
+    }
+    this.stats.partial++;
+    this.stats.rects += rects.length;
+    for (const rect of rects) {
+      this.stats.pixels += rect.width * rect.height;
+    }
+    return rects;
+  }
+
+  /**
+   * Notes where something that follows the clock was drawn, so the next
+   * frame draws it again. A device-pixel box, or null where the draw
+   * went somewhere other than the surface.
+   */
+  noteVolatile(rect: LayerRect | null): void {
+    if (rect === null) {
+      this.nextUnplaced = true;
+    } else if (rect.width > 0 && rect.height > 0) {
+      this.nextVolatile.push(rect);
+    }
+  }
+
+  /** The frame finished. `lifted` says whether it drew a lifted node. */
+  end(lifted: boolean): void {
+    this.open = false;
+    this.lifted = lifted;
+    this.unplaced = this.nextUnplaced;
+    this.volatile = this.nextVolatile.slice();
+  }
+
+  private collect(
+    root: UiNode,
+    context: RenderContext,
+    changes: NonNullable<RenderContext['changes']>
+  ): LayerRect[] | null {
+    const rects: LayerRect[] = [];
+    let area = 0;
+    const add = (rect: LayerRect): void => {
+      if (!rects.some(other => covers(other, rect))) {
+        rects.push(rect);
+        area += rect.width * rect.height;
+      }
+    };
+    for (const rect of this.volatile) {
+      add(rect);
+    }
+    for (const [node, flags] of changes.frame.entries()) {
+      // What a node means is not how it looks.
+      if ((flags & ~DirtyFlags.Semantics) === 0) {
+        continue;
+      }
+      if (node === root) {
+        return null;
+      }
+      const rect = this.surfaceRect(node, root, context);
+      if (rect === null) {
+        return null;
+      }
+      if (rect !== undefined) {
+        add(rect);
+      }
+    }
+    return area > this.width * this.height * MOSTLY ? null : rects;
+  }
+
+  /**
+   * Where a node's subtree paints on the surface, in whole device
+   * pixels: undefined where it paints nothing that shows (no record, out
+   * of the tree, clipped away), null where this cannot say.
+   */
+  private surfaceRect(node: UiNode, root: UiNode, context: RenderContext): LayerRect | null | undefined {
+    const layout = context.layout;
+    const rec = layout.recordFor(node);
+    if (rec === undefined) {
+      // A fragment has no box, and its children paint; anything else
+      // without a record is not drawn.
+      return node.type === UiNodeType.Fragment ? null : undefined;
+    }
+    box.left = rec.extentMinX - SPILL;
+    box.top = rec.extentMinY - SPILL;
+    box.right = rec.extentMaxX + SPILL;
+    box.bottom = rec.extentMaxY + SPILL;
+    if (!placeThrough(node, rec, box)) {
+      return null;
+    }
+    // A lifted node is drawn outside every clip above it.
+    let unclipped = rec.lifted;
+    let reached = node === root;
+    for (let ancestor = node.parent; ancestor !== null; ancestor = ancestor.parent) {
+      if (ancestor === root) {
+        reached = true;
+      }
+      const above = layout.recordFor(ancestor);
+      if (above === undefined) {
+        continue;
+      }
+      if (above.scrollable) {
+        const dx = snapScroll(above.scrollX, this.dpr);
+        const dy = snapScroll(above.scrollY, this.dpr);
+        box.left -= dx;
+        box.right -= dx;
+        box.top -= dy;
+        box.bottom -= dy;
+      }
+      if (above.clips && !unclipped) {
+        // A pixel wider than the box, for the device pixel its edges
+        // are snapped out to.
+        box.left = Math.max(box.left, above.x - 1);
+        box.top = Math.max(box.top, above.y - 1);
+        box.right = Math.min(box.right, above.x + above.width + 1);
+        box.bottom = Math.min(box.bottom, above.y + above.height + 1);
+        if (box.right <= box.left || box.bottom <= box.top) {
+          return undefined;
+        }
+      }
+      if (!placeThrough(ancestor, above, box)) {
+        return null;
+      }
+      if (above.lifted) {
+        unclipped = true;
+      }
+    }
+    if (!reached) {
+      return undefined;
+    }
+    const dpr = this.dpr;
+    const left = Math.max(0, Math.floor(box.left * dpr));
+    const top = Math.max(0, Math.floor(box.top * dpr));
+    const right = Math.min(this.width, Math.ceil(box.right * dpr));
+    const bottom = Math.min(this.height, Math.ceil(box.bottom * dpr));
+    return right > left && bottom > top ? { x: left, y: top, width: right - left, height: bottom - top } : undefined;
+  }
+}
+
+/** What the damage did, for the specs and the benchmark. */
+export interface FrameDamageStats {
+  /** Frames drawn whole. */
+  whole: number;
+  /** Frames that drew only their damage, including those with none. */
+  partial: number;
+  /** Rectangles drawn across the partial frames. */
+  rects: number;
+  /** Device pixels in them. */
+  pixels: number;
+}
+
+/** Damage over this share of the surface draws all of it in one walk. */
+const MOSTLY = 0.5;
+
+/** The box being carried out to the surface; one, since a frame places one at a time. */
+const box = { left: 0, top: 0, right: 0, bottom: 0 };
+
+/**
+ * Carries the box out through a node's own sticky shift and transform,
+ * as `renderNode` applies them: drawn at shift + translate + origin +
+ * scale·(p − origin). False for a turn, a flip or a zero scale.
+ */
+function placeThrough(
+  node: UiNode,
+  rec: { x: number; y: number; stickyOffsetX: number; stickyOffsetY: number },
+  into: typeof box
+): boolean {
+  const raw = node.properties.get('transform');
+  const transform = raw === undefined ? undefined : parseTransform(raw);
+  if (transform !== undefined) {
+    if (transform.rotation !== 0 || !(transform.scaleX > 0) || !(transform.scaleY > 0)) {
+      return false;
+    }
+    const originX = rec.x + transform.x;
+    const originY = rec.y + transform.y;
+    into.left = transform.translateX + originX + transform.scaleX * (into.left - originX);
+    into.right = transform.translateX + originX + transform.scaleX * (into.right - originX);
+    into.top = transform.translateY + originY + transform.scaleY * (into.top - originY);
+    into.bottom = transform.translateY + originY + transform.scaleY * (into.bottom - originY);
+  }
+  into.left += rec.stickyOffsetX;
+  into.right += rec.stickyOffsetX;
+  into.top += rec.stickyOffsetY;
+  into.bottom += rec.stickyOffsetY;
+  return true;
+}
+
+function covers(outer: LayerRect, inner: LayerRect): boolean {
+  return (
+    outer.x <= inner.x &&
+    outer.y <= inner.y &&
+    outer.x + outer.width >= inner.x + inner.width &&
+    outer.y + outer.height >= inner.y + inner.height
+  );
+}

@@ -150,26 +150,37 @@ capability.
 
 ## Where they differ
 
-| What               | Canvas2D                                                  | WebGPU                                                                                                                                                |
-| ------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Glyphs             | `fillText` per line, through the browser's own text stack | Clusters rasterised into a shared atlas, one instanced quad each, consecutive glyphs sharing a page drawn in one call                                 |
-| Ligatures          | Formed by the font                                        | Not formed: clusters are drawn one at a time at prefix widths, so `fi` is an f and an i at the positions the ligature would have taken                |
-| Sub-pixel text     | Whatever the platform does                                | Three phases per glyph baked into the atlas, and a run's origin snapped to a physical pixel, so spacing error stays under a third of a physical pixel |
-| Text anti-aliasing | Drawn straight into the target                            | Sampled from a texture, so glyph edges never match at the sub-pixel level                                                                             |
-| Start-up           | Immediate                                                 | Asynchronous: an adapter and a device, with frames before them skipped                                                                                |
-| Failure            | Nothing to lose                                           | A device can be lost, and the runtime falls back on the next frame                                                                                    |
-| Stage timings      | None: `render` is one number                              | `FrameMetrics.gpu` splits prepare, upload and encode                                                                                                  |
-| Shadow blur        | The browser's blur, an approximation of the Gaussian      | The Gaussian evaluated analytically, so a soft edge's falloff can differ by a few percent of the shadow's colour                                      |
+| What               | Canvas2D                                                       | WebGPU                                                                                                                                                |
+| ------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Glyphs             | `fillText` per line, through the browser's own text stack      | Clusters rasterised into a shared atlas, one instanced quad each, consecutive glyphs sharing a page drawn in one call                                 |
+| Ligatures          | Formed by the font                                             | Not formed: clusters are drawn one at a time at prefix widths, so `fi` is an f and an i at the positions the ligature would have taken                |
+| Sub-pixel text     | Whatever the platform does                                     | Three phases per glyph baked into the atlas, and a run's origin snapped to a physical pixel, so spacing error stays under a third of a physical pixel |
+| Text anti-aliasing | Drawn straight into the target                                 | Sampled from a texture, so glyph edges never match at the sub-pixel level                                                                             |
+| Start-up           | Immediate                                                      | Asynchronous: an adapter and a device, with frames before them skipped                                                                                |
+| Failure            | Nothing to lose                                                | A device can be lost, and the runtime falls back on the next frame                                                                                    |
+| Stage timings      | None: `render` is one number                                   | `FrameMetrics.gpu` splits prepare, upload and encode                                                                                                  |
+| Shadow blur        | The browser's blur, an approximation of the Gaussian           | The Gaussian evaluated analytically, so a soft edge's falloff can differ by a few percent of the shadow's colour                                      |
+| Partial redraws    | Only the rectangles a frame's changes cover, when no box moved | None: every frame is drawn whole                                                                                                                      |
+
+Canvas2D draws a frame in part when it can. A 2D canvas keeps its
+pixels between frames, so on a frame where no box moved, Canvas2D
+clears and draws again only the rectangles the changed nodes cover: a
+caret blink or a hover tint costs one control, not the screen. Any
+change it cannot hold in a rectangle (a resize, a theme, a box that
+moved, a turn above the change) draws the whole frame.
+`Canvas2DRendererOptions.dirtyRects: false` turns this off. WebGPU draws
+every frame whole: it would need a kept texture of its own to do the
+same.
 
 Two things are the same on both and are worth stating because a reader
 looking for a difference will otherwise assume one:
 
-- **Neither redraws partially.** Both clear and redraw the whole scene
-  every frame, and both cull subtrees outside the visible region first,
-  so cost follows what is on screen rather than what exists. A subtree
-  is culled by where it may paint, not by its box: that takes in
-  children that reach past a parent that doesn't clip, and each node's
-  outer shadows, so a card just off screen still casts its shadow on.
+- **Both cull before they draw.** Both skip subtrees outside the
+  region they draw, so cost follows what is on screen rather than what
+  exists. A subtree is culled by where it may paint, not by its box:
+  that takes in children that reach past a parent that doesn't clip,
+  and each node's outer shadows, so a card just off screen still casts
+  its shadow on.
 - **Both place a row a hundred million pixels down on its pixel.** The
   GPU keeps positions in 32-bit floats and so does Skia, under Canvas2D,
   and either alone would round a row of a five-million-row list to the

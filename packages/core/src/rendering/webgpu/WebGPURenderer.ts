@@ -103,6 +103,12 @@ export interface DrawStats {
  * reused across frames; per-frame instance data is uploaded to two
  * growable vertex buffers, one per pipeline, and the frame's command
  * list is walked in paint order switching pipelines as it goes.
+ *
+ * Every frame is drawn whole. Canvas2D draws only the rectangles a
+ * frame's changes touch (`FrameDamage.ts`), because a 2D canvas keeps
+ * its pixels between frames; a WebGPU swap chain hands back a texture
+ * that holds nothing known, so the same here would need a kept texture
+ * of its own, drawn into in part and copied to the screen every frame.
  */
 export class WebGPURenderer implements UiRenderer {
   readonly backend: RendererBackend = 'webgpu';

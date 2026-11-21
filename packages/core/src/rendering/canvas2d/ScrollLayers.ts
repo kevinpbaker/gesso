@@ -294,16 +294,39 @@ export class ScrollLayerCache {
     }
   }
 
-  /** Drops the layers the frame did not composite: their container was culled, removed, or drawn directly. */
-  endFrame(): void {
+  /**
+   * Drops the layers the frame did not composite: their container was
+   * culled, removed, or drawn directly. A frame drawn in part
+   * (\`FrameDamage.ts\`) walked only what its damage reached, so it
+   * keeps a layer it did not use as long as nothing in, at or above its
+   * container changed: then the walk had no reason to reach it, and
+   * what it holds is still what the surface shows. One the frame did
+   * have reason to reach and did not use was hidden, or drawn inside
+   * another layer's walk, and is dropped as on any other frame.
+   */
+  endFrame(partial = false): void {
     this.open = false;
     for (const [node, layer] of this.layers) {
-      if (!layer.used) {
+      if (!layer.used && !(partial && !this.touched(node))) {
         this.drop(node);
       } else {
         layer.used = false;
       }
     }
+  }
+
+  /** Whether the frame dirtied the container, anything inside it, or anything above it. */
+  private touched(container: UiNode): boolean {
+    const frame = this.frame;
+    if (frame === null) {
+      return true;
+    }
+    for (const [node] of frame.entries()) {
+      if (node === container || contains(node, container) || contains(container, node)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   get(node: UiNode): ScrollLayer | undefined {

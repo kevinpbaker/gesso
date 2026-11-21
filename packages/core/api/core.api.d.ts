@@ -3795,6 +3795,12 @@ declare class RasterCache {
   private make;
   private drop;
 }
+interface FrameDamageStats {
+  whole: number;
+  partial: number;
+  rects: number;
+  pixels: number;
+}
 interface Canvas2DRendererOptions {
   surface: CanvasSurface;
   scrollLayers?: boolean;
@@ -3803,6 +3809,7 @@ interface Canvas2DRendererOptions {
   scrollLayerSettleFrames?: number;
   rasterCache?: boolean;
   rasterSettleMs?: number;
+  dirtyRects?: boolean;
 }
 declare class Canvas2DRenderer implements UiRenderer {
   private readonly options;
@@ -3824,6 +3831,8 @@ declare class Canvas2DRenderer implements UiRenderer {
   private readonly layers;
   private layerDepth;
   private volatileDraws;
+  private readonly damage;
+  private liftedDrawn;
   private readonly groups;
   private groupDepth;
   constructor(options: Canvas2DRendererOptions);
@@ -3832,6 +3841,8 @@ declare class Canvas2DRenderer implements UiRenderer {
   private boundsWidth;
   private boundsHeight;
   get rasterCacheStats(): RasterCache['stats'] | null;
+  get damageStats(): FrameDamageStats;
+  resetDamageStats(): void;
   nextRepaint(): number | undefined;
   private readonly textCache;
   get textCacheStats(): TextRasterCache['stats'] | null;
@@ -3845,6 +3856,9 @@ declare class Canvas2DRenderer implements UiRenderer {
   fontsChanged(): void;
   dispose(): void;
   render(root: UiNode, context: RenderContext): void;
+  private walk;
+  private walkDamage;
+  private noteVolatile;
   private resolvePaint;
   private beginFrame;
   private renderNode;
@@ -4983,6 +4997,7 @@ export {
   formatExplanation,
   formatShortcut,
   fr,
+  FrameDamageStats,
   FrLength,
   GestureInput,
   GestureRecognizerOptions,
@@ -5965,6 +5980,7 @@ import {
   formatExplanation,
   formatShortcut,
   fr,
+  FrameDamageStats,
   FrLength,
   GestureInput,
   GestureRecognizerOptions,
@@ -7120,6 +7136,7 @@ export {
   type FocusRingOptions,
   type FocusSource,
   type FontMetrics,
+  type FrameDamageStats,
   type FrLength,
   type GestureInput,
   type GestureRecognizerOptions,

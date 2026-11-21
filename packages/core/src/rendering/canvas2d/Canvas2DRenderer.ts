@@ -45,6 +45,7 @@ import { PreciseContext } from './PreciseContext';
 import { offscreenLayerCanvas, placeLayer, ScrollLayerCache, SPILL } from './ScrollLayers';
 import { TextRasterCache } from './TextRasterCache';
 import { RasterCache } from './RasterCache';
+import { FrameDamage, type FrameDamageStats } from './FrameDamage';
 import { layerRegion, opacityNeedsLayer } from '../GroupOpacity';
 import { parseTransform } from '../../properties/UiTransform';
 import type { LayerCanvasFactory, LayerRect, ScrollLayer, ScrollLayerStats } from './ScrollLayers';
@@ -98,6 +99,12 @@ export interface Canvas2DRendererOptions {
    * drawn again, sharp. Defaults to \`SETTLE_MS\`; a spec passes 0.
    */
   rasterSettleMs?: number;
+  /**
+   * Whether a frame whose changes the caller vouched for draws only the
+   * parts of the surface they touch. Defaults to true; false clears and
+   * draws every frame whole, as before. See `FrameDamage.ts`.
+   */
+  dirtyRects?: boolean;
 }
 
 /** An opacity group's canvas; see `Canvas2DRenderer.groups`. */
@@ -143,12 +150,16 @@ interface GroupLayer {
  * fields (fillStyle, font, lineWidth, ...) are assigned before each
  * draw and cannot leak between nodes.
  *
- * The frame strategy is a full clear + full traversal. Off-screen
- * subtrees are culled (while no ancestor transform is active) so
- * scrolling large lists only issues draws for the visible window.
- * The one exception is a scroll container's content on a frame that
- * only scrolled it, which is copied from the last frame's pixels and
- * has only the strip that came into view drawn (`ScrollLayers.ts`).
+ * The frame strategy is a full clear + full traversal whenever what
+ * changed is not known or not local. Off-screen subtrees are culled
+ * (while no ancestor transform is active) so scrolling large lists
+ * only issues draws for the visible window. A frame the runtime
+ * vouched for, in which no box moved, clears and draws only the
+ * rectangles its dirty nodes cover, and walks only what reaches them;
+ * the rest of the surface keeps the last frame's pixels
+ * (`FrameDamage.ts`). And a scroll container's content on a frame that
+ * only scrolled it is copied from the last frame's pixels and has only
+ * the strip that came into view drawn (`ScrollLayers.ts`).
  */
 export class Canvas2DRenderer implements UiRenderer {
   /** The box `snappedBox` last wrote, and the device scale it was snapped at. */
@@ -219,6 +230,10 @@ export class Canvas2DRenderer implements UiRenderer {
    * not keep what it drew if it moved.
    */
   private volatileDraws = 0;
+  /** What each frame draws again; see `FrameDamage.ts`. */
+  private readonly damage = new FrameDamage();
+  /** Whether this frame drew a lifted node, which the next frame cannot redraw in part. */
+  private liftedDrawn = false;
   /**
    * The canvases opacity groups are drawn in, one per depth of nesting,
    * so a group inside a group never draws over what holds it. Each
@@ -256,6 +271,15 @@ export class Canvas2DRenderer implements UiRenderer {
   /** What the raster cache did since the last reset, or null with it off. For budget specs. */
   get rasterCacheStats(): RasterCache['stats'] | null {
     return this.rasters?.stats ?? null;
+  }
+
+  /** How many frames were drawn whole and in part, and how much of them. */
+  get damageStats(): FrameDamageStats {
+    return this.damage.stats;
+  }
+
+  resetDamageStats(): void {
+    this.damage.resetStats();
   }
 
   /** When a frame is wanted though nothing changes: a zoom settling, whose kept pixels are then drawn sharp. */
@@ -298,6 +322,7 @@ export class Canvas2DRenderer implements UiRenderer {
   resize(width: number, height: number, dpr: number): void {
     this.surface.setLogicalSize(width, height, dpr);
     this.layers.dropAll();
+    this.damage.invalidate();
   }
 
   /** A restored scroll layer reads as healthy and holds nothing. */
@@ -306,11 +331,13 @@ export class Canvas2DRenderer implements UiRenderer {
     this.textCache?.dropAll();
     this.rasters?.dropAll();
     this.groups.length = 0;
+    this.damage.invalidate();
   }
 
-  /** Kept subtrees were drawn with the fallback face. */
+  /** Kept subtrees, and everything on the surface, were drawn with the fallback face. */
   fontsChanged(): void {
     this.rasters?.dropAll();
+    this.damage.invalidate();
   }
 
   dispose(): void {
@@ -328,12 +355,68 @@ export class Canvas2DRenderer implements UiRenderer {
     // on its pixel; see `PreciseContext`.
     const raw = this.surface.getContext2D();
     const ctx = this.precise === null ? (this.precise = new PreciseContext(raw)) : this.precise.reset(raw);
-    this.beginFrame(ctx);
+    const dpr = this.surface.dpr;
+    const width = this.surface.physicalWidth;
+    const height = this.surface.physicalHeight;
+    // Null draws the whole surface; otherwise only these rectangles,
+    // which may be none at all. Turned off, every frame is drawn whole.
+    if (this.options.dirtyRects === false) {
+      this.damage.invalidate();
+    }
+    const damage = this.damage.begin(root, context, dpr, width, height);
+    this.liftedDrawn = false;
+    // Counted on every frame, those drawn in part too: how many frames
+    // text has been still decides whether it is copied or drawn
+    // directly, and the two differ by a shade in a glyph's edge. Counting
+    // only whole frames left text drawn one way after a run of partial
+    // frames where a whole frame would have drawn it the other.
+    this.textCache?.beginFrame();
+    this.boundsWidth = width;
+    this.boundsHeight = height;
+    this.rasters?.beginFrame(context.changes, width * height);
+    paintPictures.beginFrame(width * height);
+    this.layers.beginFrame(this.options.scrollLayers === false ? undefined : context.changes, dpr, width, height);
+    if (damage === null) {
+      this.beginFrame(ctx);
+      this.walk(root, context, ctx, 0, 0, this.surface.logicalWidth, this.surface.logicalHeight);
+      if (context.overlay !== undefined && context.overlay.length > 0) {
+        drawOverlayShapes(ctx, context.overlay);
+      }
+    } else {
+      // Rectangles far apart are walked apart, as a layer's strips are:
+      // one walk over both would visit everything between them.
+      for (const group of walkGroups(damage, 2 * SPILL * dpr)) {
+        this.walkDamage(group, root, context, ctx);
+      }
+    }
+    // A layer not reached by a frame drawn in part was not drawn over
+    // either, so it still holds what is on the surface.
+    this.layers.endFrame(damage !== null);
+    // Text kept for a node not drawn lately is let go, and a frame drawn
+    // in part draws only a little of it, so only a whole frame lets go.
+    if (damage === null) {
+      this.textCache?.endFrame();
+    }
+    this.rasters?.endFrame();
+    paintPictures.endFrame();
+    this.damage.end(this.liftedDrawn);
+  }
+
+  /** One walk of the tree from the root, culled to a region in layout-root pixels. */
+  private walk(
+    root: UiNode,
+    context: RenderContext,
+    ctx: Canvas2DContext,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): void {
     this.cullStack.length = 0;
-    this.cullX = 0;
-    this.cullY = 0;
-    this.cullWidth = this.surface.logicalWidth;
-    this.cullHeight = this.surface.logicalHeight;
+    this.cullX = x;
+    this.cullY = y;
+    this.cullWidth = width;
+    this.cullHeight = height;
     this.liftedPass.length = 0;
     // A property the scratch folded last frame may have changed since,
     // so ownership does not carry across frames. Nothing observes it
@@ -343,27 +426,81 @@ export class Canvas2DRenderer implements UiRenderer {
     this.paintOwner = null;
     this.layerDepth = 0;
     this.groupDepth = 0;
-    this.textCache?.beginFrame();
     this.rasterDepth = 0;
-    this.boundsWidth = this.surface.physicalWidth;
-    this.boundsHeight = this.surface.physicalHeight;
-    this.rasters?.beginFrame(context.changes, this.surface.physicalWidth * this.surface.physicalHeight);
-    paintPictures.beginFrame(this.surface.physicalWidth * this.surface.physicalHeight);
-    this.layers.beginFrame(
-      this.options.scrollLayers === false ? undefined : context.changes,
-      this.surface.dpr,
-      this.surface.physicalWidth,
-      this.surface.physicalHeight
-    );
     this.renderNode(root, context, ctx, true, false);
     this.renderLifted(context, ctx);
-    if (context.overlay !== undefined && context.overlay.length > 0) {
-      drawOverlayShapes(ctx, context.overlay);
+  }
+
+  /**
+   * Clears and draws again the damaged rectangles (device pixels), and
+   * only them: the walk is clipped to them and culled to what reaches
+   * them a \`SPILL\` away, as a scroll layer's strip is. Clipped rather
+   * than culled alone, because a node the walk reaches paints wherever
+   * it paints, and everything outside the rectangles is right already.
+   */
+  private walkDamage(rects: readonly LayerRect[], root: UiNode, context: RenderContext, ctx: Canvas2DContext): void {
+    const dpr = this.surface.dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.save();
+    ctx.beginPath();
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const rect of rects) {
+      ctx.rect(rect.x, rect.y, rect.width, rect.height);
+      left = Math.min(left, rect.x);
+      top = Math.min(top, rect.y);
+      right = Math.max(right, rect.x + rect.width);
+      bottom = Math.max(bottom, rect.y + rect.height);
     }
-    this.layers.endFrame();
-    this.textCache?.endFrame();
-    this.rasters?.endFrame();
-    paintPictures.endFrame();
+    ctx.clip();
+    for (const rect of rects) {
+      ctx.clearRect(rect.x, rect.y, rect.width, rect.height);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const x0 = Math.max(0, left / dpr - SPILL);
+    const y0 = Math.max(0, top / dpr - SPILL);
+    const x1 = Math.min(this.surface.logicalWidth, right / dpr + SPILL);
+    const y1 = Math.min(this.surface.logicalHeight, bottom / dpr + SPILL);
+    try {
+      this.walk(root, context, ctx, x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0));
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Something drawn now that follows the clock rather than a property:
+   * a scroll layer or a kept subtree will not keep it, and the next
+   * frame draws it again wherever it landed on the surface.
+   */
+  private noteVolatile(ctx: Canvas2DContext, rec: { x: number; y: number; width: number; height: number }): void {
+    this.volatileDraws++;
+    const m = this.layerDepth > 0 || this.groupDepth > 0 || this.rasterDepth > 0 ? undefined : ctx.getTransform?.();
+    if (m === undefined) {
+      this.damage.noteVolatile(null);
+      return;
+    }
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const px of [rec.x - SPILL, rec.x + rec.width + SPILL]) {
+      for (const py of [rec.y - SPILL, rec.y + rec.height + SPILL]) {
+        const x = m.a * px + m.c * py + m.e;
+        const y = m.b * px + m.d * py + m.f;
+        left = Math.min(left, x);
+        top = Math.min(top, y);
+        right = Math.max(right, x);
+        bottom = Math.max(bottom, y);
+      }
+    }
+    const x = Math.max(0, Math.floor(left));
+    const y = Math.max(0, Math.floor(top));
+    const width = Math.min(this.surface.physicalWidth, Math.ceil(right)) - x;
+    const height = Math.min(this.surface.physicalHeight, Math.ceil(bottom)) - y;
+    this.damage.noteVolatile({ x, y, width, height });
   }
 
   /**
@@ -713,6 +850,7 @@ export class Canvas2DRenderer implements UiRenderer {
     // lifted subtree is appended while this runs, and it belongs after
     // the one that carried it, as paint order says.
     const dpr = this.surface.dpr;
+    this.liftedDrawn = true;
     for (let i = from; i < this.liftedPass.length; i++) {
       const node = this.liftedPass[i]!;
       ctx.save();
@@ -923,7 +1061,7 @@ export class Canvas2DRenderer implements UiRenderer {
     if (video !== undefined) {
       // A new frame arrives on the same surface object, so nothing
       // about it is dirtied; see `UiVideo.ts`.
-      this.volatileDraws++;
+      this.noteVolatile(ctx, rec);
     }
     const size =
       video === undefined ? { width: paint.image!.width, height: paint.image!.height } : videoFrameSize(video);
@@ -986,7 +1124,7 @@ export class Canvas2DRenderer implements UiRenderer {
       this.rasterDepth > 0
     );
     if (stretched) {
-      this.volatileDraws++;
+      this.noteVolatile(ctx, rec);
     }
   }
 
@@ -1124,7 +1262,7 @@ export class Canvas2DRenderer implements UiRenderer {
       this.contentBox.width = Math.max(0, rec.width - rec.paddingLeft - rec.paddingRight);
       this.contentBox.height = Math.max(0, rec.height - rec.paddingTop - rec.paddingBottom);
       if (paint.editor !== undefined) {
-        this.paintEditable(ctx, paint, context);
+        this.paintEditable(ctx, rec, paint, context);
         return;
       }
       if (paint.textSelection !== undefined || paint.textMatches !== undefined) {
@@ -1185,11 +1323,12 @@ export class Canvas2DRenderer implements UiRenderer {
    * blink. The geometry is `EditableLayout`'s, the same the input
    * layer places the caret with.
    */
-  private paintEditable(ctx: Canvas2DContext, paint: PaintState, context: RenderContext): void {
+  private paintEditable(ctx: Canvas2DContext, rec: LayoutRecord, paint: PaintState, context: RenderContext): void {
     const model = paint.editor!;
     if (model.focused) {
-      // The caret blinks with the clock.
-      this.volatileDraws++;
+      // The caret blinks with the clock. Its field's box, which the
+      // field's own clip holds it in wherever its text has scrolled.
+      this.noteVolatile(ctx, rec);
     }
     const layout = new EditableLayout(model, this.contentBox, paint, context.text);
     // A run's own background goes under the selection, as a CSS inline
@@ -1543,7 +1682,7 @@ export class Canvas2DRenderer implements UiRenderer {
       return;
     }
     // It fades with the clock, and nothing is dirtied as it does.
-    this.volatileDraws++;
+    this.noteVolatile(ctx, rec);
     const alpha = Math.min(1, remaining / SCROLLBAR_FADE_MS) * 0.55;
     ctx.fillStyle = `rgba(128,128,128,${alpha.toFixed(3)})`;
     const { vertical, horizontal } = scrollbarThumbs(rec);

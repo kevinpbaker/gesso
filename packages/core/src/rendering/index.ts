@@ -2,6 +2,7 @@ export { Canvas2DRenderer, traceRoundedRect } from './canvas2d/Canvas2DRenderer'
 export type { Canvas2DRendererOptions } from './canvas2d/Canvas2DRenderer';
 export type { Canvas2DContext } from './canvas2d/Canvas2DContext';
 export type { LayerCanvasFactory, ScrollLayerStats } from './canvas2d/ScrollLayers';
+export type { FrameDamageStats } from './canvas2d/FrameDamage';
 export { CanvasSurface, createCanvasSurface } from './canvas2d/CanvasSurface';
 export type { CanvasHost } from './canvas2d/CanvasSurface';
 export { CanvasTextMeasurer } from './canvas2d/CanvasTextMeasurer';
