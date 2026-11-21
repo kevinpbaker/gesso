@@ -202,8 +202,11 @@ const NOT_GATED: Record<string, string> = {
  * thumb's 1.55 s. `QUIESCE_MIN_HOLD_MS` outlasts the thumb, so it is
  * always captured faded now and no longer eats into the budget.
  *
- * `example-transitions` and `transitions-app` sit at 0.076% and 0.077%
- * of the same budget, with 30 gross pixels each against 129.
+ * `example-transitions` and `transitions-app` used to sit at 0.076% and
+ * 0.077% of the same budget, and failed outright when a play count
+ * changed: their worker asked Audius for the live playlists and the
+ * curators' pictures. In still mode it shows the committed snapshot with
+ * an initial for each curator and asks nothing, and both measure 0.000%.
  */
 
 /*

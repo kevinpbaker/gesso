@@ -25,6 +25,31 @@ export const CURATED: readonly CuratedCard[] = [
   { id: '3', audiusId: 'LKpEw', query: 'classical guitar' }
 ];
 
+/** The playlists and their tracks, in the shape the snapshot has. */
+export type CatalogueData = typeof SNAPSHOT;
+
+/**
+ * The snapshot with every picture taken out, for the playground's still
+ * mode.
+ *
+ * The screenshot gate photographs this example, and a picture is a
+ * request to whichever Audius mirror answers. That mirror can be slow,
+ * can be gone, and can be unreachable where the gate runs, so a curator
+ * is drawn as an initial instead, which is the app's own shape for a
+ * curator with no picture. The titles, play counts and durations stay,
+ * because they are committed text.
+ */
+export function withoutPictures(data: CatalogueData): CatalogueData {
+  const tracks: Record<string, readonly TrackView[]> = {};
+  for (const [id, list] of Object.entries(data.tracks)) {
+    tracks[id] = list.map(track => ({ ...track, art: [] }));
+  }
+  return {
+    playlists: data.playlists.map(playlist => ({ ...playlist, curator: { ...playlist.curator, avatar: [] } })),
+    tracks
+  };
+}
+
 /**
  * The three playlists, from Audius when it answers and from the
  * committed snapshot when it does not.
@@ -36,20 +61,25 @@ export const CURATED: readonly CuratedCard[] = [
  * `live` if any card came from the network and `offline` if none did.
  */
 export class Catalogue {
-  private readonly playlistsSubject = new BehaviorSubject<readonly PlaylistView[]>(SNAPSHOT.playlists);
-  private readonly tracksSubject = new BehaviorSubject<Readonly<Record<string, readonly TrackView[]>>>(SNAPSHOT.tracks);
+  private readonly playlistsSubject: BehaviorSubject<readonly PlaylistView[]>;
+  private readonly tracksSubject: BehaviorSubject<Readonly<Record<string, readonly TrackView[]>>>;
   private readonly sourceSubject = new BehaviorSubject<CatalogueSource>('snapshot');
   private readonly api: AudiusApi;
   private readonly cards: readonly CuratedCard[];
   private loading: Promise<void> | null = null;
 
-  readonly playlists: Observable<readonly PlaylistView[]> = this.playlistsSubject.asObservable();
-  readonly tracks: Observable<Readonly<Record<string, readonly TrackView[]>>> = this.tracksSubject.asObservable();
+  readonly playlists: Observable<readonly PlaylistView[]>;
+  readonly tracks: Observable<Readonly<Record<string, readonly TrackView[]>>>;
   readonly source: Observable<CatalogueSource> = this.sourceSubject.asObservable();
 
-  constructor(api: AudiusApi, cards: readonly CuratedCard[] = CURATED) {
+  /** `start` is what the screen shows until a load answers: the snapshot, unless told otherwise. */
+  constructor(api: AudiusApi, cards: readonly CuratedCard[] = CURATED, start: CatalogueData = SNAPSHOT) {
     this.api = api;
     this.cards = cards;
+    this.playlistsSubject = new BehaviorSubject(start.playlists);
+    this.tracksSubject = new BehaviorSubject(start.tracks);
+    this.playlists = this.playlistsSubject.asObservable();
+    this.tracks = this.tracksSubject.asObservable();
   }
 
   /** The tracks a card has right now, for the queue, which builds an order from them. */

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AudiusApi, AudiusPlaylistResult } from './AudiusApi';
-import { Catalogue, type CuratedCard } from './Catalogue';
+import { Catalogue, withoutPictures, type CuratedCard } from './Catalogue';
 import { SNAPSHOT } from './snapshot';
 import type { PlaylistView, TrackView } from './TransitionsContract';
 
@@ -131,5 +131,32 @@ describe('Catalogue', () => {
     await Promise.all([catalogue.load(), catalogue.load()]);
 
     expect(api.playlist).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts on what it is given, and asks nothing until told to load', () => {
+    const api = fakeApi(async (_audiusId, cardId) => result(cardId, 'Live'));
+    const start = withoutPictures(SNAPSHOT);
+    const catalogue = new Catalogue(api, CARDS, start);
+
+    expect(latest(catalogue.playlists)).toBe(start.playlists);
+    expect(latest(catalogue.tracks)).toBe(start.tracks);
+    expect(latest(catalogue.source)).toBe('snapshot');
+    expect(api.playlist).not.toHaveBeenCalled();
+  });
+});
+
+describe('withoutPictures', () => {
+  it('takes out every avatar and every track picture, and keeps the text', () => {
+    const still = withoutPictures(SNAPSHOT);
+
+    expect(still.playlists.map(playlist => playlist.curator.avatar)).toEqual(SNAPSHOT.playlists.map(() => []));
+    expect(Object.values(still.tracks).flatMap(list => list.map(track => track.art))).toEqual(
+      Object.values(SNAPSHOT.tracks).flatMap(list => list.map(() => []))
+    );
+    expect(still.playlists.map(playlist => [playlist.title, playlist.plays, playlist.curator.name])).toEqual(
+      SNAPSHOT.playlists.map(playlist => [playlist.title, playlist.plays, playlist.curator.name])
+    );
+    // The committed snapshot itself is left alone.
+    expect(SNAPSHOT.playlists[0]?.curator.avatar.length).toBeGreaterThan(0);
   });
 });
