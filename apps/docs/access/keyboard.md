@@ -116,6 +116,7 @@ component page repeats its own table with the details.
 | `Select`, closed        | `Enter`, `Space`, `Down` and `Up` open it; a printed character chooses by first letter                                         |
 | `Select`, open          | Arrows walk, `Home` and `End` jump, `Enter` or `Space` chooses, `Escape` closes without choosing                               |
 | `Menu`                  | Arrows walk, `Home` and `End` jump, `Enter` or `Space` chooses, `Escape` closes                                                |
+| `ContextMenus`          | The `Menu` key or `Shift+F10` opens the menu for the focused field or link, or for selected text                               |
 | `Tree`                  | `Up` and `Down` walk the open rows, `Right` opens a node, `Left` closes it or goes to its parent, `Enter` and `Space` activate |
 | `LazyList`, `DataTable` | `Up`, `Down`, `PageUp`, `PageDown`, `Home` and `End` walk the rows; `Enter` and `Space` activate                               |
 | `SplitPane`             | Arrows move the divider; `Home` and `End` take it to its limits                                                                |

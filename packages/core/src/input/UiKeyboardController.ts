@@ -47,6 +47,18 @@ export interface KeyboardControllerOptions {
    */
   activation?: { clickAt(node: UiNode): { x: number; y: number } };
   /**
+   * A menu asked for from the keyboard: the Menu key or Shift+F10.
+   * `menuAt` is where it opens from: under the caret of a focused field,
+   * or at the node's lower left; without it the request is at the point
+   * `activation` gives, or the origin. `unfocused` is the node it is
+   * asked of when nothing has focus (the end of a text selection);
+   * without one, or when it gives none, the keys' own target.
+   */
+  contextMenu?: {
+    menuAt(node: UiNode): { x: number; y: number };
+    unfocused?(): UiNode | null;
+  };
+  /**
    * Default keyboard scrolling: the arrows, Page Up and Page Down,
    * Space and Home and End move the scroll container around the focused
    * node, or the largest one on screen when nothing is focused. Runs
@@ -70,7 +82,8 @@ export interface KeyboardControllerOptions {
  * chosen root is left out.
  *
  * Default behaviour (cancelled by preventDefault on the KeyDown), in
- * order: the focused editable's editing keys, then find's open/close,
+ * order: the Menu key or Shift+F10 asking the focused node for its
+ * context menu, then the focused editable's editing keys, then find's open/close,
  * then the canvas text selection's copy / select-all / clear, then
  * Enter or Space pressing a focused button (a `Button`, or a node whose
  * role is `button` or `link`) as a click, then the scroll keys moving
@@ -85,12 +98,25 @@ export interface KeyboardControllerOptions {
  */
 const MODIFIER_KEYS: ReadonlySet<string> = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
 
+/**
+ * The keys that ask for a context menu: the Menu key, and Shift+F10 with
+ * no other modifier, which is the same request on a keyboard without
+ * one. A browser opens its own menu for either; a shell that cannot wait
+ * for the application's answer cancels them by this test.
+ */
+export function isContextMenuKey(key: string, modifiers: UiKeyModifiers): boolean {
+  return (
+    key === 'ContextMenu' || (key === 'F10' && modifiers.shift && !modifiers.ctrl && !modifiers.alt && !modifiers.meta)
+  );
+}
+
 export class UiKeyboardController {
   private readonly tabNavigation: boolean;
   private readonly editing: KeyboardControllerOptions['editing'];
   private readonly selection: KeyboardControllerOptions['selection'];
   private readonly find: KeyboardControllerOptions['find'];
   private readonly activation: KeyboardControllerOptions['activation'];
+  private readonly contextMenu: KeyboardControllerOptions['contextMenu'];
   private readonly scroll: KeyboardControllerOptions['scroll'];
 
   private readonly root: () => UiNode;
@@ -107,6 +133,7 @@ export class UiKeyboardController {
     this.selection = options.selection;
     this.find = options.find;
     this.activation = options.activation;
+    this.contextMenu = options.contextMenu;
     this.scroll = options.scroll;
   }
 
@@ -137,6 +164,19 @@ export class UiKeyboardController {
     // worker the shell cannot wait to hear whether it was, so the text
     // arrives regardless, and is dropped here instead.
     this.editing?.noteKey?.(follows && event.defaultPrevented);
+    if (!event.defaultPrevented && isContextMenuKey(key, modifiers)) {
+      // The request a right-click makes, from the keyboard: the same
+      // event, so a node's `contextMenu` and `ContextMenus` answer
+      // both without asking which. Sent to the focused node, or with
+      // nothing focused to what the host names (a selection's end), and
+      // with no buttons and no modifiers, so Shift+F10 does not read as
+      // a Shift-click.
+      const asked = focused ?? this.contextMenu?.unfocused?.() ?? target;
+      const at = this.contextMenu?.menuAt(asked) ?? this.activation?.clickAt(asked) ?? { x: 0, y: 0 };
+      this.dispatcher.dispatch(new UiPointerEvent(UiEventType.ContextMenu, at.x, at.y, 0), asked);
+      event.preventDefault();
+      return event;
+    }
     if (
       !event.defaultPrevented &&
       focused !== null &&

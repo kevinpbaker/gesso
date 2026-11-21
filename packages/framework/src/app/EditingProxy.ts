@@ -569,6 +569,10 @@ export class EditingProxy {
     textarea.addEventListener('keydown', onKeyDown);
     textarea.addEventListener('keyup', onKeyUp);
     textarea.addEventListener('blur', onBlur);
+    // The field holds the page's focus while the app's field is edited,
+    // so the Menu key or Shift+F10 asks the browser for the menu of a
+    // hidden textarea. The app opens its own for the same key.
+    textarea.addEventListener('contextmenu', suppressMenu);
 
     return () => {
       textarea.removeEventListener('beforeinput', onBeforeInput);
@@ -581,6 +585,7 @@ export class EditingProxy {
       textarea.removeEventListener('keydown', onKeyDown);
       textarea.removeEventListener('keyup', onKeyUp);
       textarea.removeEventListener('blur', onBlur);
+      textarea.removeEventListener('contextmenu', suppressMenu);
     };
   }
 
@@ -722,4 +727,9 @@ function setOrClear(element: HTMLElement, attribute: string, value: string | und
   } else {
     element.setAttribute(attribute, value);
   }
+}
+
+/** Keeps the browser's menu for a stand-in element out of the way of the app's own. */
+function suppressMenu(event: Event): void {
+  event.preventDefault();
 }

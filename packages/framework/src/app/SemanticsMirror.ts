@@ -701,6 +701,7 @@ export class SemanticsMirror {
     };
     const onKeyDown = (event: KeyboardEvent): void => this.sink.keyDown?.(event);
     const onKeyUp = (event: KeyboardEvent): void => this.sink.keyUp?.(event);
+    const onContextMenu = (event: Event): void => event.preventDefault();
     const onPaste = (event: ClipboardEvent): void => {
       const text = event.clipboardData?.getData('text/plain') ?? '';
       const html = event.clipboardData?.getData('text/html') ?? '';
@@ -715,12 +716,18 @@ export class SemanticsMirror {
     this.container.addEventListener('keydown', onKeyDown);
     this.container.addEventListener('keyup', onKeyUp);
     this.container.addEventListener('paste', onPaste);
+    // A mirror element holds the page's focus under a screen reader, so
+    // the Menu key or Shift+F10 would open the browser's menu for it.
+    // The key reaches the app through `keyDown` above, which opens the
+    // focused node's own.
+    this.container.addEventListener('contextmenu', onContextMenu);
     return () => {
       this.container.removeEventListener('click', onClick);
       this.container.removeEventListener('focusin', onFocusIn);
       this.container.removeEventListener('keydown', onKeyDown);
       this.container.removeEventListener('keyup', onKeyUp);
       this.container.removeEventListener('paste', onPaste);
+      this.container.removeEventListener('contextmenu', onContextMenu);
     };
   }
 

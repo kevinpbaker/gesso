@@ -98,6 +98,11 @@ onClick={(event: UiPointerEvent) => {
 Write the point before writing `open`, since both are read when the
 menu opens and cells are written synchronously.
 
+For a menu asked for the way a browser asks, a right-click, a held
+finger, the Menu key or Shift+F10, the `contextMenu` modifier gives the
+point. [ContextMenus](/components/context-menus) covers it, and puts
+back the menus a browser opens over fields, selected text and links.
+
 ## Placement
 
 An anchored menu is placed by the layout engine, not by this component.

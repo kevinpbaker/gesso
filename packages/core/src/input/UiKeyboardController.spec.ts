@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
-import { UiEventType } from './UiInputEvent';
+import { UiEventType, type UiPointerEvent } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
 import { UiFocusManager } from './UiFocusManager';
-import { UiKeyboardController } from './UiKeyboardController';
+import { isContextMenuKey, UiKeyboardController } from './UiKeyboardController';
 
 function setup(): {
   h: InputTestHarness;
@@ -166,5 +166,88 @@ describe('UiKeyboardController', () => {
     keyboard.keyDown('Tab');
 
     expect(focusManager.focusedNode).toBe(btn1);
+  });
+
+  describe('context menu keys', () => {
+    const SHIFT = { shift: true, ctrl: false, alt: false, meta: false };
+
+    function menus(menuAt?: (node: UiNode) => { x: number; y: number }) {
+      const { h, btn1, focusManager } = setup();
+      const keyboard = new UiKeyboardController(
+        h.dispatcher,
+        focusManager,
+        h.root,
+        menuAt === undefined ? {} : { contextMenu: { menuAt } }
+      );
+      const opened: UiPointerEvent[] = [];
+      h.dispatcher.addEventListener(h.root, UiEventType.ContextMenu, event => opened.push(event as UiPointerEvent));
+      return { h, btn1, focusManager, keyboard, opened };
+    }
+
+    it('asks the focused node for its menu on the Menu key and on Shift+F10, where the host says', () => {
+      const { btn1, focusManager, keyboard, opened } = menus(node => ({ x: node.id.length, y: 30 }));
+      focusManager.focus(btn1);
+
+      expect(keyboard.keyDown('ContextMenu').defaultPrevented).toBe(true);
+      expect(keyboard.keyDown('F10', SHIFT).defaultPrevented).toBe(true);
+
+      expect(opened.map(event => [event.target, event.x, event.y])).toEqual([
+        [btn1, 4, 30],
+        [btn1, 4, 30]
+      ]);
+      // A request, not a press: no buttons, and Shift+F10's Shift is not
+      // a Shift-click.
+      expect(opened.map(event => [event.buttons, event.modifiers.shift])).toEqual([
+        [0, false],
+        [0, false]
+      ]);
+    });
+
+    it('asks nothing for F10 alone or with other modifiers', () => {
+      const { btn1, focusManager, keyboard, opened } = menus();
+      focusManager.focus(btn1);
+
+      keyboard.keyDown('F10');
+      keyboard.keyDown('F10', { ...SHIFT, ctrl: true });
+      keyboard.keyDown('F10', { ...SHIFT, alt: true });
+      keyboard.keyDown('F10', { ...SHIFT, meta: true });
+
+      expect(opened).toEqual([]);
+      expect(isContextMenuKey('F10', SHIFT)).toBe(true);
+      expect(isContextMenuKey('ContextMenu', { shift: false, ctrl: true, alt: false, meta: false })).toBe(true);
+    });
+
+    it('asks nothing when a key listener took the key', () => {
+      const { h, btn1, focusManager, keyboard, opened } = menus();
+      focusManager.focus(btn1);
+      h.dispatcher.addEventListener(btn1, UiEventType.KeyDown, event => event.preventDefault());
+
+      keyboard.keyDown('ContextMenu');
+
+      expect(opened).toEqual([]);
+    });
+
+    it('asks the node the host names when nothing is focused, and the focused node otherwise', () => {
+      const { h, btn1, btn2, focusManager } = setup();
+      const keyboard = new UiKeyboardController(h.dispatcher, focusManager, h.root, {
+        contextMenu: { menuAt: () => ({ x: 1, y: 2 }), unfocused: () => btn2 }
+      });
+      const targets: (UiNode | null)[] = [];
+      h.dispatcher.addEventListener(h.root, UiEventType.ContextMenu, event => targets.push(event.target));
+
+      keyboard.keyDown('ContextMenu');
+      focusManager.focus(btn1);
+      keyboard.keyDown('ContextMenu');
+
+      expect(targets).toEqual([btn2, btn1]);
+    });
+
+    it('asks the root when nothing is focused, at the origin when the host gives no point', () => {
+      const { h, keyboard, opened } = menus();
+
+      keyboard.keyDown('ContextMenu');
+
+      expect(opened.map(event => [event.target, event.x, event.y])).toEqual([[h.root, 0, 0]]);
+    });
   });
 });

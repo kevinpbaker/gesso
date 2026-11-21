@@ -187,12 +187,17 @@ partway down the tree hears nothing.
 After the application's listeners, and only if none of them called
 `preventDefault()`, the runtime applies its own defaults in this order:
 
-1. The focused editable's editing keys. See
+1. The Menu key or Shift+F10 asks the focused node for its context
+   menu, as a right-click does. See
+   [ContextMenus](/components/context-menus#how-a-menu-is-asked-for).
+2. The focused editable's editing keys. See
    [text editing and IME](/interaction/text-editing-and-ime).
-2. Find: the platform's find shortcut opens a session and Escape closes
+3. Find: the platform's find shortcut opens a session and Escape closes
    one.
-3. The canvas text selection: copy, select all, or clear.
-4. Tab moves focus to the next focusable node, Shift+Tab to the
+4. The canvas text selection: copy, select all, or clear.
+5. Enter or Space presses a focused button, as a click.
+6. The scroll keys move the scroll container around the focused node.
+7. Tab moves focus to the next focusable node, Shift+Tab to the
    previous.
 
 A key one of those handles is marked default-prevented, which is how
@@ -257,10 +262,11 @@ the canvas and the plumbing, and its input job is small but not empty:
   that leaves the canvas is still delivered. A finger captures
   implicitly and a mouse does not; capturing both makes them behave
   alike.
-- **Cancel the two defaults that are always wrong.** Tab must not move
-  focus out of the canvas, and the select-all shortcut must not select
-  the page around an app selecting its own text. Both have to be
-  cancelled synchronously, and the worker's answer cannot arrive in
+- **Cancel the defaults that are always wrong.** Tab must not move
+  focus out of the canvas, the select-all shortcut must not select the
+  page around an app selecting its own text, and the Menu key and
+  Shift+F10 must not open the browser's menu over the app's. All of
+  them have to be cancelled synchronously, and the worker's answer cannot arrive in
   time, so the shell cancels them itself. The find shortcut is the same
   problem and is a flag, off by default: taking it from an app with no
   find of its own would leave the person with neither.

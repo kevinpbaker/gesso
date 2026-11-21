@@ -191,6 +191,11 @@ describe('EditingProxy', () => {
     expect(textarea.attributes.get('autocomplete')).toBe('off');
   });
 
+  it('holds back the browser menu the Menu key would open over the hidden textarea', () => {
+    const { textarea } = setup();
+    expect(textarea.dispatch('contextmenu').defaultPrevented).toBe(true);
+  });
+
   it('takes focus from the canvas, mirrors the text and selection, and sits at the caret', () => {
     const { doc, proxy, textarea, state } = setup();
     proxy.update(state());

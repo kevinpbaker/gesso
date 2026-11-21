@@ -517,6 +517,33 @@ describe('hover coalescing', () => {
   });
 
   /**
+   * The Menu key and Shift+F10 ask the focused node for its menu, in
+   * the worker; the browser would open its own for the canvas or the
+   * hidden field first, so the shell cancels them on the spot.
+   */
+  it('cancels the browser default for the Menu key and Shift+F10, and forwards them', () => {
+    const shell = setup();
+    shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+    const prevented: string[] = [];
+    const press = (name: string, shiftKey: boolean, ctrlKey = false) =>
+      ({
+        ...key(),
+        key: name,
+        shiftKey,
+        ctrlKey,
+        preventDefault: () => prevented.push(`${shiftKey ? 'Shift+' : ''}${ctrlKey ? 'Ctrl+' : ''}${name}`)
+      }) as unknown as KeyboardEvent;
+
+    shell.canvas.dispatch('keydown', press('ContextMenu', false));
+    shell.canvas.dispatch('keydown', press('F10', true));
+    shell.canvas.dispatch('keydown', press('F10', false));
+    shell.canvas.dispatch('keydown', press('F10', true, true));
+
+    expect(prevented).toEqual(['ContextMenu', 'Shift+F10']);
+    expect(shell.posts.filter(message => message.type === 'keyDown')).toHaveLength(4);
+  });
+
+  /**
    * Ctrl/Cmd+F belongs to the app while it has a find bar and to the
    * browser while it has none, which only the worker knows; it says so
    * as the bar mounts and unmounts.

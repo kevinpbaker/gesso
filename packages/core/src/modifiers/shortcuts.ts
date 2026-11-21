@@ -117,9 +117,10 @@ export function shortcut(options: ShortcutOptions): UiModifier<ShortcutOptions> 
 
 export interface ContextMenuOptions {
   /**
-   * A menu was asked for on this node: the right button, or a finger
-   * held on it. The point is where the pointer was, which is what a
-   * `Menu`'s `at` prop takes.
+   * A menu was asked for on this node: the right button, a finger held
+   * on it, or the Menu key or Shift+F10 while it has focus. The point is
+   * where the pointer was, or for a key, under the caret of a field or
+   * at the node's lower left; it is what a `Menu`'s `at` prop takes.
    */
   readonly onOpen: (at: { readonly x: number; readonly y: number }) => void;
   /** Whether the request also stops here. Default true. */
@@ -135,7 +136,8 @@ export interface ContextMenuOptions {
  * should not care which". Two of those three existed. This is the
  * third, and it is a modifier rather than a component because the thing
  * that needs the trigger is whatever the person right-clicked, not the
- * menu.
+ * menu. The keyboard asks the same way: the Menu key or Shift+F10 sends
+ * the focused node the event a right-click would.
  *
  * The request stops here by default, so a row inside a list gets its
  * own menu rather than the list's; a node that wants both lets it

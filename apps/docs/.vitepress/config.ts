@@ -167,6 +167,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Dialog', link: '/components/dialog' },
       { text: 'Drawer', link: '/components/drawer' },
       { text: 'Menu', link: '/components/menu' },
+      { text: 'ContextMenus', link: '/components/context-menus' },
       { text: 'Select', link: '/components/select' },
       { text: 'Combobox', link: '/components/combobox' },
       { text: 'DatePicker', link: '/components/date-picker' },

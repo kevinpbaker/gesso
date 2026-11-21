@@ -2192,6 +2192,7 @@ declare class UiSelectionController {
   private hoveredLink;
   constructor(host: SelectionHost, hitTester: HitTester, options?: SelectionControllerOptions);
   get hasSelection(): boolean;
+  get endNode(): UiNode | null;
   isSelectable(node: UiNode): boolean;
   pointerDown(node: UiNode | null, x: number, y: number, modifiers: UiKeyModifiers): boolean;
   pointerMove(x: number, y: number): void;
@@ -2550,10 +2551,18 @@ interface KeyboardControllerOptions {
       y: number;
     };
   };
+  contextMenu?: {
+    menuAt(node: UiNode): {
+      x: number;
+      y: number;
+    };
+    unfocused?(): UiNode | null;
+  };
   scroll?: {
     handleKey(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean;
   };
 }
+declare function isContextMenuKey(key: string, modifiers: UiKeyModifiers): boolean;
 declare class UiKeyboardController {
   private readonly dispatcher;
   private readonly focusManager;
@@ -2562,6 +2571,7 @@ declare class UiKeyboardController {
   private readonly selection;
   private readonly find;
   private readonly activation;
+  private readonly contextMenu;
   private readonly scroll;
   private readonly root;
   constructor(dispatcher: UiInputDispatcher, focusManager: UiFocusManager, root: UiNode | (() => UiNode), options?: KeyboardControllerOptions);
@@ -5065,6 +5075,7 @@ export {
   InteractiveOptions,
   isAutoLength,
   isComponentLikeElement,
+  isContextMenuKey,
   isEditableNode,
   isFrLength,
   isImeKey,
@@ -6048,6 +6059,7 @@ import {
   InteractiveOptions,
   isAutoLength,
   isComponentLikeElement,
+  isContextMenuKey,
   isEditableNode,
   isFrLength,
   isImeKey,
@@ -6821,6 +6833,7 @@ export {
   interpolatorFor,
   isAutoLength,
   isComponentLikeElement,
+  isContextMenuKey,
   isEditableNode,
   isFrLength,
   isImeKey,

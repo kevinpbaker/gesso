@@ -182,12 +182,17 @@ class FakeEvent {
   target: FakeElement | null = null;
   relatedTarget: FakeElement | null = null;
   key = '';
+  defaultPrevented = false;
 
   constructor(
     readonly type: string,
     init: Partial<FakeEvent>
   ) {
     Object.assign(this, init);
+  }
+
+  preventDefault(): void {
+    this.defaultPrevented = true;
   }
 }
 
@@ -549,6 +554,14 @@ describe('SemanticsMirror', () => {
     elementFor('n1').dispatch('keyup', { key: 'Enter' });
 
     expect(keys).toEqual(['down:Enter', 'up:Enter']);
+  });
+
+  it('holds back the browser menu for a mirrored element, and sends no action for it', () => {
+    const { elementFor, actions, apply } = setup();
+    apply({ patches: [{ op: 'add', node: record('n1', { role: 'button', label: 'Save' }) }] });
+
+    expect(elementFor('n1').dispatch('contextmenu').defaultPrevented).toBe(true);
+    expect(actions).toEqual([]);
   });
 
   it('leaves a focused editable to the editing proxy, and describes it there', () => {

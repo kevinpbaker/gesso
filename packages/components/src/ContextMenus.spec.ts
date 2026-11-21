@@ -16,12 +16,17 @@ function field(props: Record<string, unknown> = {}): UiNode {
   return node;
 }
 
-const labels = (rows: ReturnType<typeof menuFor>) => rows.filter(row => !row.separator).map(row => row.label);
+const labels = (rows: ReturnType<typeof menuFor>) => rows.map(row => row.label);
+/** The labels that start a group, with a rule drawn above them. */
+const groups = (rows: ReturnType<typeof menuFor>) => rows.filter(row => row.separator === true).map(row => row.label);
 const disabled = (rows: ReturnType<typeof menuFor>) => rows.filter(row => row.disabled === true).map(row => row.label);
 
 describe('menuFor', () => {
   it('offers a field Cut, Copy, Paste and Select All, cutting and copying only a selection', () => {
     expect(labels(menuFor(field(), null, 'hi'))).toEqual(['Cut', 'Copy', 'Paste', 'Select All']);
+    // The rule is drawn above Select All, by the item; there is no blank
+    // row for it, which the arrows would stop on.
+    expect(groups(menuFor(field(), null, 'hi'))).toEqual(['Select All']);
     expect(disabled(menuFor(field(), null, ''))).toEqual(['Cut', 'Copy']);
   });
 
@@ -35,6 +40,17 @@ describe('menuFor', () => {
     const route = { openElsewhere: () => {} };
     expect(labels(menuFor(null, outbound, ''))).toEqual(['Open Link in New Tab', 'Copy Link']);
     expect(labels(menuFor(null, route, ''))).toEqual(['Open Link in New Tab']);
+    // A field or a selection inside the link starts a group of its own.
+    expect(labels(menuFor(field(), outbound, ''))).toEqual([
+      'Open Link in New Tab',
+      'Copy Link',
+      'Cut',
+      'Copy',
+      'Paste',
+      'Select All'
+    ]);
+    expect(groups(menuFor(field(), outbound, ''))).toEqual(['Cut', 'Select All']);
+    expect(groups(menuFor(null, outbound, 'the cat'))).toEqual(['Copy']);
   });
 
   it('offers Copy over selected text, and nothing over anything else', () => {
@@ -97,5 +113,43 @@ describe('ContextMenus', () => {
     const { ui } = mount();
     rightClick(ui, ui.getByText('plain words'));
     expect(ui.queryByRole('menu')).toBeNull();
+  });
+
+  it('opens from the Menu key on a focused field, under its caret', () => {
+    const { ui, input } = mount();
+    ui.runtime.input.focus.focus(input());
+    ui.frame();
+    ui.fireEvent.keyDown('ContextMenu');
+    ui.frame();
+
+    const menu = ui.getByRole('menu');
+    expect(ui.getByRole('menuitem', { name: 'Select All' })).toBeTruthy();
+    // From the bottom of the caret, not the field's centre, where a
+    // press would land, or the canvas's corner.
+    const field = ui.getLayout(input());
+    const caret = ui.runtime.input.editing.caretRectOf(input())!;
+    const box = ui.getLayout(menu);
+    expect([box.x, box.y]).toEqual([field.x + caret.x, field.y + caret.y + caret.height]);
+    expect(ui.runtime.input.focus.focusedNode).not.toBe(input());
+
+    // Escape closes it, and the field has its focus back.
+    ui.fireEvent.keyDown('Escape');
+    ui.frame();
+    expect(ui.queryByRole('menu')).toBeNull();
+    expect(ui.runtime.input.focus.focusedNode).toBe(input());
+  });
+
+  it('opens a focused link’s menu from Shift+F10', () => {
+    const { ui } = mount();
+    const link = ui.getByRole('link', { name: 'Docs' });
+    ui.runtime.input.focus.focus(link);
+    ui.frame();
+    ui.fireEvent.keyDown('F10', { shift: true });
+    ui.frame();
+    expect(ui.getByRole('menuitem', { name: 'Copy Link' })).toBeTruthy();
+    // From the link's lower left, as a list drops from its control.
+    const at = ui.getLayout(link);
+    const box = ui.getLayout(ui.getByRole('menu'));
+    expect([box.x, box.y]).toEqual([at.x, at.y + at.height]);
   });
 });

@@ -39,8 +39,8 @@ export interface ContextMenusProps extends ControlLayoutProps {
 }
 
 /**
- * The menus a browser shows on a right-click, for the canvas, which
- * shows none: Cut, Copy, Paste and Select All on a text field, Copy on
+ * The menus a browser shows on a right-click, or on the Menu key or
+ * Shift+F10, for the canvas, which shows none: Cut, Copy, Paste and Select All on a text field, Copy on
  * selected text, and Open Link in New Tab and Copy Link on a link.
  *
  * The browser's own menu is held back over the canvas (it would offer
@@ -48,6 +48,8 @@ export interface ContextMenusProps extends ControlLayoutProps {
  * place. Wrap the app's root in it once. It answers only what nothing
  * inside answered: a node with its own `contextMenu` stops the request
  * before it gets here, and a right-click on anything else opens nothing.
+ * From the keyboard the request is the focused node's, so a focused
+ * field gets its menu under the caret.
  * Fills its parent unless given a size.
  */
 export function ContextMenus(inputs: Inputs<ContextMenusProps>, ctx: ComponentContext): UiChild {
@@ -135,25 +137,22 @@ export function menuFor(field: UiNode | null, link: LinkMenuEntry | null, select
       rows.push({ value: 'copyLink', label: 'Copy Link' });
     }
   }
+  // A rule is drawn above the item that carries `separator`, so the
+  // group after a link's rows starts on its first item. An item of its
+  // own for the rule was a blank row the arrows stopped on.
+  const grouped = rows.length > 0;
   if (field !== null) {
     const editable = !isReadOnly(field);
     const secret = field.properties.get('secret') === true;
     const hasSelection = selected.length > 0;
-    if (rows.length > 0) {
-      rows.push({ value: 'linkSeparator', label: '', separator: true });
-    }
     rows.push(
-      { value: 'cut', label: 'Cut', disabled: !editable || secret || !hasSelection },
+      { value: 'cut', label: 'Cut', disabled: !editable || secret || !hasSelection, separator: grouped },
       { value: 'copy', label: 'Copy', disabled: secret || !hasSelection },
       { value: 'paste', label: 'Paste', disabled: !editable },
-      { value: 'separator', label: '', separator: true },
-      { value: 'selectAll', label: 'Select All' }
+      { value: 'selectAll', label: 'Select All', separator: true }
     );
   } else if (selected.length > 0) {
-    if (rows.length > 0) {
-      rows.push({ value: 'linkSeparator', label: '', separator: true });
-    }
-    rows.push({ value: 'copy', label: 'Copy' });
+    rows.push({ value: 'copy', label: 'Copy', separator: grouped });
   }
   return rows;
 }

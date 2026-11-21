@@ -163,7 +163,10 @@ application is about to receive.
 ```
 
 `Menu` has taken an `at` point and left the trigger to the caller since
-it was written. This is the trigger.
+it was written. This is the trigger. The keyboard asks the same way:
+the Menu key or Shift+F10 sends the focused node this event, which
+[ContextMenus](/components/context-menus#how-a-menu-is-asked-for)
+covers.
 
 ## The end of a gesture carries its speed
 

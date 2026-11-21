@@ -14,6 +14,7 @@ import {
 } from './RenderWorkerProtocol';
 import {
   capturePointer,
+  isContextMenuKey,
   isImeKey,
   observeViewportInsets,
   pointerDeviceOf,
@@ -764,12 +765,13 @@ export class WorkerApp {
     if ((takeFind && isFind(event)) || this.options.interceptKey?.(event) === true) {
       event.preventDefault();
     }
-    if (event.key === 'Tab' || isSelectAll(event)) {
+    if (event.key === 'Tab' || isSelectAll(event) || isContextMenuKey(event.key, modifiersFrom(event))) {
       // The worker's answer cannot come back in time to cancel a
-      // default, so the shell cancels the two that would be wrong
-      // whatever it is: Tab moving focus out of the canvas, and
-      // Ctrl/Cmd+A selecting the page around it while the app selects
-      // its own text.
+      // default, so the shell cancels the ones that would be wrong
+      // whatever it is: Tab moving focus out of the canvas, Ctrl/Cmd+A
+      // selecting the page around it while the app selects its own
+      // text, and the Menu key or Shift+F10 opening the browser's menu
+      // over the one the app opens for the focused node.
       event.preventDefault();
     }
     this.post({

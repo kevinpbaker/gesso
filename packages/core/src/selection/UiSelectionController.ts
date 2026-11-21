@@ -120,6 +120,15 @@ export class UiSelectionController {
     return this.painted.length > 0;
   }
 
+  /**
+   * The text node the selection ends in, where the pointer let go: what a
+   * menu asked for from the keyboard is about when nothing has focus.
+   * Null when nothing is selected.
+   */
+  get endNode(): UiNode | null {
+    return this.hasSelection ? (this.focus?.node ?? null) : null;
+  }
+
   /** Whether a press on this node would start a selection. */
   isSelectable(node: UiNode): boolean {
     return selectableTextOf(node) !== undefined;

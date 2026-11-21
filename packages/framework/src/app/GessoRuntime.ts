@@ -2654,12 +2654,35 @@ export class GessoRuntime {
             return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
           }
         },
+        // With nothing focused, a menu from the keyboard is about the
+        // text selected on the canvas, as a right-click over it is.
+        contextMenu: { menuAt: node => this.keyboardMenuAt(node, editing), unfocused: () => selection.endNode },
         scroll: new UiKeyboardScroller(scrollSink)
       }),
       // Listens at the root, so a pan reaches it only when nothing
       // between the pressed node and here claimed the gesture. That is
       // the opt-out a `Slider` or a `SplitPane` already relies on.
       touchScroll: new UiTouchScroller(this.dispatcher, root, scrollSink)
+    };
+  }
+
+  /**
+   * Where a menu asked for from the keyboard opens from, in canvas
+   * space: under the caret of a field, so the menu is about what is
+   * being edited, and otherwise at the node's lower left, so it drops
+   * from the control as a list's does. Held inside the canvas, because
+   * a focused node can be taller than the screen (a whole list, a
+   * document) and a menu placed past its bottom would open off it.
+   */
+  private keyboardMenuAt(node: UiNode, editing: UiEditingController): { x: number; y: number } {
+    const caret = editing.caretRectOf(node);
+    const box =
+      caret === null
+        ? this.engine.screenBox(node)
+        : this.engine.screenBox(node, { x: caret.x, y: caret.y, width: 1, height: caret.height });
+    return {
+      x: Math.min(Math.max(box.x, 0), this.width),
+      y: Math.min(Math.max(box.y + box.height, 0), this.height)
     };
   }
 

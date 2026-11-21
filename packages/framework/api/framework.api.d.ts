@@ -1799,6 +1799,7 @@ declare class GessoRuntime {
   private buildRoot;
   private resolveRootElement;
   private createInput;
+  private keyboardMenuAt;
   onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
   focusedNodeId(): string | null;
   semanticsTree(): UiSemanticsMap;
