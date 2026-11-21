@@ -3773,13 +3773,15 @@ declare class TextRasterCache {
   private readonly entries;
   private frame;
   private pixels;
+  private readonly direct;
+  private readonly leaving;
   readonly stats: {
     copied: number;
     drawn: number;
     direct: number;
   };
   constructor(createCanvas: LayerCanvasFactory);
-  beginFrame(): void;
+  beginFrame(): readonly UiNode[];
   endFrame(): void;
   dropAll(): void;
   resetStats(): void;

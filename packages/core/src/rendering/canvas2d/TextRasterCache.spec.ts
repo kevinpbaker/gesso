@@ -115,6 +115,48 @@ describe('TextRasterCache', () => {
     expect(glyphsDrawn() + drawnDirectly).toBeLessThanOrEqual(10);
   });
 
+  it('names text whose direct drawing ends, once, on the frame it ends', () => {
+    // Changed on every frame until the cache gives up keeping it.
+    let k = 0;
+    while (drawFrame()) {
+      paint.text = `frame ${k++}`;
+    }
+    // Frames that do not reach it: a frame drawn in part elsewhere.
+    const named: number[] = [];
+    for (let frame = 1; frame <= 100; frame++) {
+      const leaving = cache.beginFrame();
+      if (leaving.includes(node)) named.push(frame);
+      cache.endFrame();
+    }
+    // Once, and late enough that it had a run of direct draws.
+    expect(named).toHaveLength(1);
+    expect(named[0]).toBeGreaterThan(10);
+    // Drawn on that frame, it is copied: the cache holds it again.
+    paint.text = `frame ${k}`;
+    expect(drawFrame()).toBe(true);
+  });
+
+  it('names nothing for text it never drew directly', () => {
+    drawFrame();
+    for (let frame = 0; frame < 300; frame++) {
+      expect(cache.beginFrame()).toEqual([]);
+      cache.endFrame();
+    }
+  });
+
+  it('names nothing for text drawn directly that it has let go of', () => {
+    let k = 0;
+    while (drawFrame()) {
+      paint.text = `frame ${k++}`;
+    }
+    // A restored surface or a loaded font: the next frame is drawn whole.
+    cache.dropAll();
+    for (let frame = 0; frame < 100; frame++) {
+      expect(cache.beginFrame()).toEqual([]);
+      cache.endFrame();
+    }
+  });
+
   it('declines a context that rotates, which a copy cannot follow', () => {
     cache.beginFrame();
     frame.setTransform(0, 1, -1, 0, 0, 0);

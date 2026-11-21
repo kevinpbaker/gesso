@@ -46,6 +46,8 @@ import { offscreenLayerCanvas, placeLayer, ScrollLayerCache, SPILL } from './Scr
 import { TextRasterCache } from './TextRasterCache';
 import { RasterCache } from './RasterCache';
 import { FrameDamage, type FrameDamageStats } from './FrameDamage';
+import { UiFrame } from '../../scheduler/UiFrame';
+import { DirtyFlags } from '../../graph/DirtyFlags';
 import { layerRegion, opacityNeedsLayer } from '../GroupOpacity';
 import { parseTransform } from '../../properties/UiTransform';
 import type { LayerCanvasFactory, LayerRect, ScrollLayer, ScrollLayerStats } from './ScrollLayers';
@@ -383,31 +385,35 @@ export class Canvas2DRenderer implements UiRenderer {
     if (this.options.dirtyRects === false) {
       this.damage.invalidate();
     }
-    const damage = this.damage.begin(root, context, dpr, width, height);
-    this.liftedDrawn = [];
-    this.boundaryLiftedDrawn = false;
     // Counted on every frame, those drawn in part too: how many frames
     // text has been still decides whether it is copied or drawn
     // directly, and the two differ by a shade in a glyph's edge. Counting
     // only whole frames left text drawn one way after a run of partial
-    // frames where a whole frame would have drawn it the other.
-    this.textCache?.beginFrame();
+    // frames where a whole frame would have drawn it the other. Text
+    // whose direct drawing ends now is counted as repainted, before the
+    // damage and the layers read the changes: what the surface or a
+    // layer kept of it is a direct draw, which a whole frame would now
+    // draw as a copy (see `TextRasterCache`).
+    const frameContext = withRepainted(context, this.textCache?.beginFrame());
+    const damage = this.damage.begin(root, frameContext, dpr, width, height);
+    this.liftedDrawn = [];
+    this.boundaryLiftedDrawn = false;
     this.boundsWidth = width;
     this.boundsHeight = height;
-    this.rasters?.beginFrame(context.changes, width * height);
+    this.rasters?.beginFrame(frameContext.changes, width * height);
     paintPictures.beginFrame(width * height);
-    this.layers.beginFrame(this.scrollLayersOn ? context.changes : undefined, dpr, width, height);
+    this.layers.beginFrame(this.scrollLayersOn ? frameContext.changes : undefined, dpr, width, height);
     if (damage === null) {
       this.beginFrame(ctx);
-      this.walk(root, context, ctx, 0, 0, this.surface.logicalWidth, this.surface.logicalHeight, false);
-      if (context.overlay !== undefined && context.overlay.length > 0) {
-        drawOverlayShapes(ctx, context.overlay);
+      this.walk(root, frameContext, ctx, 0, 0, this.surface.logicalWidth, this.surface.logicalHeight, false);
+      if (frameContext.overlay !== undefined && frameContext.overlay.length > 0) {
+        drawOverlayShapes(ctx, frameContext.overlay);
       }
     } else {
       // Rectangles far apart are walked apart, as a layer's strips are:
       // one walk over both would visit everything between them.
       for (const group of walkGroups(damage, 2 * SPILL * dpr)) {
-        this.walkDamage(group, root, context, ctx);
+        this.walkDamage(group, root, frameContext, ctx);
       }
     }
     // A layer not reached by a frame drawn in part was not drawn over
@@ -1863,6 +1869,25 @@ function traceFrame(ctx: Canvas2DContext, x: number, y: number, width: number, h
   ctx.lineTo(x + width, y + height);
   ctx.lineTo(x + width, y);
   ctx.closePath();
+}
+
+/**
+ * The frame's context with `nodes` counted as repainted: drawn again
+ * by the damage, and by a scroll layer or a kept subtree that holds
+ * them, as a node whose paint changed is. The context itself when
+ * there are none, or no changes to add them to (a frame drawn whole).
+ */
+function withRepainted(context: RenderContext, nodes: readonly UiNode[] | undefined): RenderContext {
+  const changes = context.changes;
+  if (nodes === undefined || nodes.length === 0 || changes === undefined) {
+    return context;
+  }
+  const repainted = new Map<UiNode, DirtyFlags>();
+  for (const node of nodes) {
+    repainted.set(node, DirtyFlags.Paint);
+  }
+  const frame = changes.frame.merged(new UiFrame(changes.frame.id, changes.frame.time, repainted));
+  return { ...context, changes: { ...changes, frame } };
 }
 
 /**

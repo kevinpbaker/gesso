@@ -20,9 +20,18 @@ import type { LayerCanvasFactory } from './ScrollLayers';
  * **What is kept.** What `drawText` draws for one node, drawn once into
  * a canvas of its own at the device scale and fraction of a pixel it
  * lands on, and copied onto the frame from then on. The copy lands on
- * whole device pixels, so the pixels are the ones a direct draw at that
- * fraction would have made, and a scroll, which moves by whole device
- * pixels, keeps the fraction.
+ * whole device pixels, and a scroll, which moves by whole device pixels,
+ * keeps the fraction.
+ *
+ * **Not quite a direct draw's pixels.** On a clear surface the copy is
+ * the pixels a direct draw at that fraction makes. Over anything already
+ * painted it can be a level lighter or darker in a channel, in the
+ * glyphs' soft edges: the cache's canvas is see-through, so it keeps each
+ * edge pixel as a color premultiplied by its coverage and rounded to 8
+ * bits, and copying it blends that rounded value, where a direct draw
+ * blends the exact coverage in one step. Smoothing and the fraction play
+ * no part; an opaque canvas would match, but the cache cannot know what
+ * is under the text. No one sees a level; a comparison of pixels does.
  *
  * **When it is drawn again.** When anything `drawText` reads changes:
  * the text, its runs, its font, its colour, its box, the scale, or the
@@ -34,18 +43,48 @@ import type { LayerCanvasFactory } from './ScrollLayers';
  * counter, an animated colour) would be drawn twice a frame, into the
  * cache and out of it. A node redrawn on most of its recent frames is
  * drawn directly instead, until it has been still for a while.
+ *
+ * **When direct drawing ends.** The frame it ends on draws the node again
+ * through the cache, whether or not anything about it changed:
+ * `beginFrame` names it, and the renderer counts it as repainted that
+ * frame. A frame drawn in part (`FrameDamage.ts`), or a scroll layer,
+ * keeps the pixels the node last drew, and those were a direct draw's;
+ * a whole frame would now draw the copy, a level apart. Drawn again,
+ * the screen is what a whole frame would leave. It costs one more draw
+ * of the node, once, as part of that frame's damage; it never asks for
+ * a frame of its own.
  */
 export class TextRasterCache {
   private readonly entries = new Map<UiNode, TextRaster>();
   private frame = 0;
   private pixels = 0;
+  /** Nodes being drawn directly; see `beginFrame`. */
+  private readonly direct = new Set<UiNode>();
+  private readonly leaving: UiNode[] = [];
   /** Draws served from the cache and drawn into it, since the last reset. For budget specs. */
   readonly stats = { copied: 0, drawn: 0, direct: 0 };
 
   constructor(private readonly createCanvas: LayerCanvasFactory) {}
 
-  beginFrame(): void {
+  /**
+   * Starts a frame, and returns the nodes whose direct drawing ends on
+   * it: drawn directly when last drawn, copied from now on. The caller
+   * draws them again this frame (see the class comment). The array is
+   * reused by the next call.
+   */
+  beginFrame(): readonly UiNode[] {
     this.frame++;
+    this.leaving.length = 0;
+    for (const node of this.direct) {
+      const entry = this.entries.get(node);
+      if (entry === undefined || entry.directUntil <= this.frame) {
+        this.direct.delete(node);
+        if (entry !== undefined) {
+          this.leaving.push(node);
+        }
+      }
+    }
+    return this.leaving;
   }
 
   /** Lets go of text not drawn lately: removed, scrolled far away, or hidden. */
@@ -151,6 +190,7 @@ export class TextRasterCache {
         entry.churn = 0;
         entry.directUntil = this.frame + DIRECT_FRAMES;
         entry.used = this.frame;
+        this.direct.add(node);
         this.stats.direct++;
         return null;
       }
@@ -207,6 +247,7 @@ export class TextRasterCache {
 
   private drop(node: UiNode, entry: TextRaster): void {
     this.entries.delete(node);
+    this.direct.delete(node);
     this.pixels -= entry.canvasWidth * entry.canvasHeight;
     // A canvas's pixels are freed with it; shrinking it first frees them now.
     entry.canvas.width = 0;

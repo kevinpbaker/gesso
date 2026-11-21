@@ -14,6 +14,12 @@ import {
 import { Canvas2DRenderer } from './Canvas2DRenderer';
 import { CanvasSurface } from './CanvasSurface';
 import { boxShadow } from '../../properties/UiBoxShadow';
+import { DirtyFlags } from '../../graph/DirtyFlags';
+import { UiGraph } from '../../graph/UiGraph';
+import { LayoutEngine } from '../../layout/LayoutEngine';
+import { CharacterCountTextMeasurer } from '../../layout/TextMeasurer';
+import { propertyEffects } from '../../properties/UiPropertyRegistry';
+import { UiFrame } from '../../scheduler/UiFrame';
 
 function box(harness: RenderHarness, id: string, props: Record<string, unknown>): UiNode {
   const node = harness.createNode(id, UiNodeType.Box);
@@ -1086,5 +1092,109 @@ describe('Canvas2DRenderer after a frame that threw', () => {
     expect(firstClip).toBeGreaterThan(-1);
     const between = names.slice(firstClip, secondClear);
     expect(between.filter(name => name === 'restore').length).toBe(between.filter(name => name === 'save').length + 1);
+  });
+});
+
+describe('Canvas2DRenderer text whose direct drawing ends', () => {
+  /**
+   * A label changed on every frame for a while, then left alone while
+   * frames drawn in part change something else. The cache drew the label
+   * directly while it changed; a whole frame would now copy it, a level
+   * apart in its glyphs' edges, so the frame its direct drawing ends on
+   * draws it again.
+   */
+  function run(): { copied: number; drawn: number; whole: number; labelFrames: number[] } {
+    const graph = new UiGraph();
+    const measurer = new CharacterCountTextMeasurer();
+    const engine = new LayoutEngine(measurer);
+    const constraints = Constraints.tight(400, 300);
+    const context = new RecordingCanvasContext({ transform: true });
+    const surface = new CanvasSurface(new FakeCanvasHost(context));
+    surface.setLogicalSize(400, 300, 1);
+    const renderer = new Canvas2DRenderer({
+      surface,
+      scrollLayers: false,
+      createLayerCanvas: (width, height) => {
+        const host = new FakeCanvasHost(new RecordingCanvasContext({ transform: true }));
+        host.width = width;
+        host.height = height;
+        return host;
+      }
+    });
+    const root = graph.createNode('app', UiNodeType.Column);
+    root.setProperty('alignItems', 'start');
+    // Far enough apart that damage to one does not reach the other.
+    root.setProperty('gap', 100);
+    const label = graph.createNode('label', UiNodeType.Text);
+    label.setProperty('text', 'count 0');
+    const other = graph.createNode('other', UiNodeType.Box);
+    for (const [key, value] of Object.entries({ width: 100, height: 40, flexShrink: 0, backgroundColor: '#ff0000' })) {
+      other.setProperty(key, value);
+    }
+    graph.appendChild(root, label);
+    graph.appendChild(root, other);
+    engine.layout(root, constraints);
+    let id = 1;
+    const frame = (): void => {
+      graph.processEnvironmentDirty();
+      const dirty = new Map<UiNode, DirtyFlags>();
+      for (const node of graph.getDirtyNodes().take()) {
+        dirty.set(node, node.dirtyFlags);
+        node.dirtyFlags = DirtyFlags.None;
+      }
+      const collected = new UiFrame(id++, 0, dirty);
+      engine.layoutForFrame(collected, constraints, root);
+      context.calls.length = 0;
+      renderer.render(root, {
+        layout: engine,
+        text: measurer,
+        now: Number.MAX_SAFE_INTEGER,
+        changes: { frame: collected, geometryVersion: engine.geometryVersion }
+      });
+    };
+    const set = (node: UiNode, property: string, value: unknown): void => {
+      node.setProperty(property, value);
+      graph.markDirty(node, propertyEffects(property));
+    };
+
+    frame();
+    // The same length every time, so no box moves and no frame is whole for it.
+    for (let k = 1; k <= 6; k++) {
+      set(label, 'text', `count ${k}`);
+      frame();
+    }
+    const stats = renderer.textCacheStats!;
+    expect(stats.direct).toBeGreaterThan(0);
+    const copied = stats.copied;
+    const drawn = stats.drawn;
+    renderer.resetDamageStats();
+    // Frames that change only `other`. The label's text is the only
+    // thing on the surface drawn as an image or as glyphs.
+    const labelFrames: number[] = [];
+    for (let k = 0; k < 120; k++) {
+      set(other, 'backgroundColor', k % 2 === 0 ? '#00ff00' : '#ff0000');
+      frame();
+      if (callArgs(context, 'drawImage').length > 0 || callArgs(context, 'fillText').length > 0) {
+        labelFrames.push(k);
+      }
+    }
+    return {
+      copied: stats.copied - copied,
+      drawn: stats.drawn - drawn,
+      whole: renderer.damageStats.whole,
+      labelFrames
+    };
+  }
+
+  it('draws it again once, as a copy, on a frame drawn in part', () => {
+    const result = run();
+    // Once, and not on the first quiet frame: after its run of direct draws.
+    expect(result.labelFrames).toHaveLength(1);
+    expect(result.labelFrames[0]).toBeGreaterThan(0);
+    // Drawn into the cache (it changed since the cache last held it) and copied out.
+    expect(result.copied).toBe(1);
+    expect(result.drawn).toBe(1);
+    // No frame was drawn whole for it.
+    expect(result.whole).toBe(0);
   });
 });
