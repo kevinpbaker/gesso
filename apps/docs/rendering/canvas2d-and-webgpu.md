@@ -164,6 +164,7 @@ capability.
 | Ligatures          | Formed by the font                                             | Not formed: clusters are drawn one at a time at prefix widths, so `fi` is an f and an i at the positions the ligature would have taken                |
 | Sub-pixel text     | Whatever the platform does                                     | Three phases per glyph baked into the atlas, and a run's origin snapped to a physical pixel, so spacing error stays under a third of a physical pixel |
 | Text anti-aliasing | Drawn straight into the target                                 | Sampled from a texture, so glyph edges never match at the sub-pixel level                                                                             |
+| Subpixel text      | With `opaqueCanvas`, where the system draws it                 | Never: glyphs come from a grayscale atlas                                                                                                             |
 | Start-up           | Immediate                                                      | Asynchronous: an adapter and a device, with frames before them skipped                                                                                |
 | Failure            | Nothing to lose                                                | A device can be lost, and the runtime falls back on the next frame                                                                                    |
 | Stage timings      | None: `render` is one number                                   | `FrameMetrics.gpu` splits prepare, upload and encode                                                                                                  |
@@ -201,6 +202,37 @@ looking for a difference will otherwise assume one:
   before the call reaches the canvas, so what the canvas is given is the
   small number the two cancel to. Below a million pixels it changes
   nothing.
+
+## Subpixel text
+
+A browser draws a page's text with subpixel (LCD) antialiasing on
+Windows and Linux, which uses each pixel's red, green and blue parts as
+three thinner pixels. It draws text into a 2D canvas that way only when
+the canvas is opaque. Gesso's canvas is see-through by default, so its
+text is grayscale there, and a little lighter than the page's. macOS
+has drawn no subpixel text since 10.14, so there the two look the same.
+
+`createApp({ opaqueCanvas: true })`, or `.opaqueCanvas()` on
+`createSyncApp`, asks for the canvas opaque. Measured in Chrome on Linux,
+the same black-on-white line had 1,539 colour-fringed pixels of 1,794
+inked ones as page text, on an opaque canvas, and on an opaque canvas a
+worker draws into; on a see-through canvas it had none.
+
+It costs three things:
+
+- **What nothing paints is black,** not the page behind the canvas.
+  The application's root should paint a background.
+- **Text is drawn every frame.** Text that has not changed is normally
+  copied from a canvas it is kept in, and scrolled content from a layer.
+  Those canvases are see-through, so a copy from one is grayscale. On
+  an opaque canvas Canvas2D keeps neither and draws the glyphs instead.
+  Scrolling a list of 300 lines in Chrome on macOS, about 25 of them on
+  screen, the render phase took a median of 0.9 ms a frame see-through
+  and 1.0 to 1.2 ms opaque.
+- **Some text is still grayscale.** Text inside an opacity group, or in
+  a subtree kept with `rasterize`, is drawn into a see-through canvas
+  first. WebGPU draws every glyph from a grayscale atlas, so the option
+  changes nothing there.
 
 ## What parity means, and how it is checked
 

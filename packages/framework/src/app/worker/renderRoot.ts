@@ -506,7 +506,8 @@ export class RenderWorkerApp {
         message.dpr,
         message.renderer,
         message.accessibility !== false,
-        message.url
+        message.url,
+        message.opaqueCanvas === true
       );
       this.runtime!.setTextInputSource(message.textInput ?? 'keys');
       return;
@@ -720,7 +721,8 @@ export class RenderWorkerApp {
     dpr: number,
     renderer: RendererChoice | undefined,
     accessibility: boolean,
-    url: string | undefined
+    url: string | undefined,
+    opaqueCanvas = false
   ): void {
     this.runtime?.dispose();
     this.channels?.dispose();
@@ -751,6 +753,7 @@ export class RenderWorkerApp {
       fonts: this.fonts,
       canvas,
       renderer,
+      opaqueCanvas,
       channels: this.channels.registry,
       // A worker has no requestAnimationFrame tied to the compositor,
       // so the shell forwards the display's own refresh and this clock

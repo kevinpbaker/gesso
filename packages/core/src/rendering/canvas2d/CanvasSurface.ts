@@ -10,7 +10,21 @@ import type { Canvas2DContext } from './Canvas2DContext';
 export interface CanvasHost {
   width: number;
   height: number;
-  getContext(contextId: '2d'): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+  getContext(
+    contextId: '2d',
+    options?: CanvasRenderingContext2DSettings
+  ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+}
+
+export interface CanvasSurfaceOptions {
+  /**
+   * An opaque canvas: its context is asked for with `alpha: false`, so
+   * what nothing paints is black rather than see-through, and the
+   * browser may draw text with subpixel (LCD) antialiasing, which it
+   * draws only onto opaque pixels. See `Canvas2DRendererOptions` and
+   * `createApp`'s `opaqueCanvas` for what else that changes.
+   */
+  readonly opaque?: boolean;
 }
 
 /**
@@ -28,7 +42,15 @@ export class CanvasSurface {
   private pixelRatio = 1;
   private context: Canvas2DContext | null = null;
 
-  constructor(private readonly canvas: CanvasHost) {}
+  /** Whether the context is opaque; see `CanvasSurfaceOptions.opaque`. */
+  readonly opaque: boolean;
+
+  constructor(
+    private readonly canvas: CanvasHost,
+    options: CanvasSurfaceOptions = {}
+  ) {
+    this.opaque = options.opaque === true;
+  }
 
   get logicalWidth(): number {
     return this.logicalW;
@@ -63,7 +85,9 @@ export class CanvasSurface {
   private acquireContext(): Canvas2DContext {
     // The two real context types are structurally compatible with
     // Canvas2DContext; the widening lives at this boundary only.
-    const context = this.canvas.getContext('2d') as unknown as Canvas2DContext;
+    const context = (this.opaque
+      ? this.canvas.getContext('2d', { alpha: false })
+      : this.canvas.getContext('2d')) as unknown as Canvas2DContext;
     if (context === null) {
       throw new Error('CanvasSurface: canvas 2D context is unavailable.');
     }
@@ -101,6 +125,6 @@ export class CanvasSurface {
  * Wraps any canvas host (HTMLCanvasElement, OffscreenCanvas, or a
  * test double) in the logical/physical viewport bookkeeping.
  */
-export function createCanvasSurface(host: CanvasHost): CanvasSurface {
-  return new CanvasSurface(host);
+export function createCanvasSurface(host: CanvasHost, options: CanvasSurfaceOptions = {}): CanvasSurface {
+  return new CanvasSurface(host, options);
 }

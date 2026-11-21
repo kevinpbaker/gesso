@@ -62,7 +62,10 @@ export interface Canvas2DRendererOptions {
   surface: CanvasSurface;
   /**
    * Whether a scroll container's content is kept as pixels across
-   * frames that only scroll it. Defaults to true.
+   * frames that only scroll it. Defaults to true, and to false on an
+   * opaque surface: a layer is a transparent canvas, and text copied
+   * from one is grayscale where the surface would have drawn it with
+   * subpixel antialiasing.
    *
    * It only ever acts on a frame whose `RenderContext.changes` says
    * what changed, which only the runtime supplies, so a caller drawing
@@ -79,8 +82,9 @@ export interface Canvas2DRendererOptions {
   createLayerCanvas?: LayerCanvasFactory;
   /**
    * Whether text is kept as pixels across frames and copied rather than
-   * drawn again while it has not changed. Defaults to true; false draws
-   * every glyph every frame, as before. See `TextRasterCache.ts`.
+   * drawn again while it has not changed. Defaults to true, and to false
+   * on an opaque surface, for the reason `scrollLayers` gives; false
+   * draws every glyph every frame. See `TextRasterCache.ts`.
    */
   textCache?: boolean;
   /**
@@ -251,13 +255,21 @@ export class Canvas2DRenderer implements UiRenderer {
   /** How many groups the walk is inside. */
   private groupDepth = 0;
 
+  /** Whether scroll containers are kept as layers; see `Canvas2DRendererOptions.scrollLayers`. */
+  private readonly scrollLayersOn: boolean;
+
   constructor(private readonly options: Canvas2DRendererOptions) {
     this.layers = new ScrollLayerCache(
       options.createLayerCanvas ?? offscreenLayerCanvas,
       options.scrollLayerSettleFrames
     );
+    // On an opaque surface text is drawn straight onto it, where the
+    // browser may give it subpixel antialiasing; a copy from a kept
+    // canvas, which is transparent, would be grayscale.
+    const opaque = options.surface.opaque === true;
+    this.scrollLayersOn = options.scrollLayers ?? !opaque;
     this.textCache =
-      options.textCache === false ? null : new TextRasterCache(options.createLayerCanvas ?? offscreenLayerCanvas);
+      (options.textCache ?? !opaque) ? new TextRasterCache(options.createLayerCanvas ?? offscreenLayerCanvas) : null;
     this.rasters =
       options.rasterCache === false
         ? null
@@ -384,7 +396,7 @@ export class Canvas2DRenderer implements UiRenderer {
     this.boundsHeight = height;
     this.rasters?.beginFrame(context.changes, width * height);
     paintPictures.beginFrame(width * height);
-    this.layers.beginFrame(this.options.scrollLayers === false ? undefined : context.changes, dpr, width, height);
+    this.layers.beginFrame(this.scrollLayersOn ? context.changes : undefined, dpr, width, height);
     if (damage === null) {
       this.beginFrame(ctx);
       this.walk(root, context, ctx, 0, 0, this.surface.logicalWidth, this.surface.logicalHeight, false);

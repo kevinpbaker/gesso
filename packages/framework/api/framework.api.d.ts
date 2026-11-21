@@ -1588,6 +1588,7 @@ interface GessoRuntimeOptions {
   root: FrameworkChild;
   canvas: CanvasHost;
   renderer?: RendererChoice;
+  opaqueCanvas?: boolean;
   measureCanvas?: CanvasHost;
   textMeasurer?: TextMeasurer;
   media?: MediaOptions;
@@ -1622,6 +1623,7 @@ declare class GessoRuntime {
   private readonly dispatcher;
   private width;
   private height;
+  private readonly opaqueCanvas;
   private root;
   private appRoot;
   private viewportInsetValue;
@@ -1896,6 +1898,7 @@ type ShellToRuntimeMessage = {
   height: number;
   dpr: number;
   renderer?: RendererChoice;
+  opaqueCanvas?: boolean;
   textInput?: 'proxy' | 'keys';
   appPort?: MessagePort;
   accessibility?: boolean;
@@ -2383,6 +2386,7 @@ interface AppLogicEndpoint {
 interface WorkerAppOptions {
   renderWorker: (() => Worker) | URL | string;
   renderer?: RendererChoice;
+  opaqueCanvas?: boolean;
   onFrame?: (metrics: FrameMetrics) => void;
   appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
   onOpenUrl?: (url: string) => void;
@@ -2494,6 +2498,7 @@ declare class GessoAppBuilder {
   private devtoolsListener;
   private errorListener;
   private rendererChoice;
+  private opaque;
   private routes;
   private historyOptions;
   private mediaOptions;
@@ -2516,6 +2521,7 @@ declare class GessoAppBuilder {
   useFonts(families: readonly FontFamilyDeclaration[]): this;
   useHistory(history: ShellHistoryOptions | ShellHistory): this;
   renderer(choice: RendererChoice): this;
+  opaqueCanvas(on?: boolean): this;
   onFrame(listener: (metrics: FrameMetrics) => void): this;
   onInspect(listener: (report: UiNodeReport | null) => void): this;
   onError(listener: (message: string, stack: string | undefined, source: 'renderer' | 'listener') => void): this;
@@ -2541,6 +2547,7 @@ interface GessoAppOptions {
   onOpenRoute?: (url: string) => void;
   canvas?: CanvasHost;
   renderer?: RendererChoice;
+  opaqueCanvas?: boolean;
   clock?: UiFrameClockFactory;
   input?: boolean;
   accessibility?: boolean;

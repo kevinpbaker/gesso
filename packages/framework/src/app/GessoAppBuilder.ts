@@ -44,6 +44,7 @@ export class GessoAppBuilder {
     | ((message: string, stack: string | undefined, source: 'renderer' | 'listener') => void)
     | undefined;
   private rendererChoice: RendererChoice | undefined;
+  private opaque = false;
   private routes: RouterRoutes | undefined;
   private historyOptions: ShellHistoryOptions | ShellHistory | undefined;
   private mediaOptions: MediaOptions | undefined;
@@ -157,6 +158,16 @@ export class GessoAppBuilder {
    */
   renderer(choice: RendererChoice): this {
     this.rendererChoice = choice;
+    return this;
+  }
+
+  /**
+   * An opaque canvas, so the browser may draw text with subpixel (LCD)
+   * antialiasing; the same as `createApp`'s `opaqueCanvas`, whose note
+   * says what it costs. The root should paint a background.
+   */
+  opaqueCanvas(on = true): this {
+    this.opaque = on;
     return this;
   }
 
@@ -275,6 +286,7 @@ export class GessoAppBuilder {
       fonts: this.fontDeclarations,
       history: this.historyOptions,
       renderer: this.rendererChoice,
+      opaqueCanvas: this.opaque,
       colorScheme: this.colorSchemePreference,
       textSize: this.textSizeMode
     });

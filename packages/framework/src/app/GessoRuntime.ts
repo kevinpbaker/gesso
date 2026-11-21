@@ -261,6 +261,11 @@ export interface GessoRuntimeOptions {
   /** The rendering backend. Defaults to `canvas2d`; see RendererChoice. */
   renderer?: RendererChoice;
   /**
+   * Draw on an opaque Canvas2D context, so text may get subpixel (LCD)
+   * antialiasing; see `createApp`'s `opaqueCanvas`. Off by default.
+   */
+  opaqueCanvas?: boolean;
+  /**
    * A canvas for text measurement when the draw canvas is WebGPU's — a
    * canvas holds one context, so the measurer needs its own. Defaults
    * to a 1×1 OffscreenCanvas; tests pass a double.
@@ -403,6 +408,8 @@ export class GessoRuntime {
   private readonly dispatcher = new UiInputDispatcher();
   private width: number;
   private height: number;
+  /** Whether a Canvas2D context is asked for opaque; see `GessoRuntimeOptions.opaqueCanvas`. */
+  private readonly opaqueCanvas: boolean;
 
   /** The layout root: a stack holding the app root and the overlay layer. */
   private root: UiNode | undefined;
@@ -620,10 +627,11 @@ export class GessoRuntime {
     // fallback to unwind. Only `webgpu` asked for by name goes to the
     // GPU path on an engine that has no entry point, so that it can
     // report what it could not have.
+    this.opaqueCanvas = options.opaqueCanvas === true;
     const choice = options.renderer ?? 'canvas2d';
     const drawWithWebGPU = choice === 'webgpu' || (choice === 'auto' && isWebGPUAvailable());
     if (!drawWithWebGPU) {
-      this.canvasSurface = createCanvasSurface(options.canvas);
+      this.canvasSurface = createCanvasSurface(options.canvas, { opaque: this.opaqueCanvas });
       this.textMeasurer = options.textMeasurer ?? new CanvasTextMeasurer(this.canvasSurface.getContext2D());
       this.renderer = new Canvas2DRenderer({ surface: this.canvasSurface });
       this.rendererState = 'canvas2d';
@@ -1128,7 +1136,7 @@ export class GessoRuntime {
       return;
     }
     failed.dispose();
-    this.canvasSurface = createCanvasSurface(this.canvas);
+    this.canvasSurface = createCanvasSurface(this.canvas, { opaque: this.opaqueCanvas });
     this.renderer = new Canvas2DRenderer({ surface: this.canvasSurface });
     this.rendererState = 'canvas2d';
     this.renderer.resize(this.width, this.height, this.pixelRatio);

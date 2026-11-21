@@ -33,6 +33,8 @@ export type ShellToRuntimeMessage =
       height: number;
       dpr: number;
       renderer?: RendererChoice;
+      /** Ask for the canvas's 2D context opaque; see `WorkerAppOptions.opaqueCanvas`. */
+      opaqueCanvas?: boolean;
       /**
        * How typed text reaches the runtime: `proxy` when the shell has
        * an editing proxy that sends `beforeInput` and composition (then

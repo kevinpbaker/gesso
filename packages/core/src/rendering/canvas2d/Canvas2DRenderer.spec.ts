@@ -3,7 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { UiNodeType } from '../../graph/UiNodeType';
 import type { UiNode } from '../../graph/UiNode';
 import { Constraints } from '../../layout/LayoutTypes';
-import { callArgs, callNames, RenderHarness, savedDepth } from '../RenderTestUtils';
+import {
+  callArgs,
+  callNames,
+  FakeCanvasHost,
+  RecordingCanvasContext,
+  RenderHarness,
+  savedDepth
+} from '../RenderTestUtils';
+import { Canvas2DRenderer } from './Canvas2DRenderer';
+import { CanvasSurface } from './CanvasSurface';
 import { boxShadow } from '../../properties/UiBoxShadow';
 
 function box(harness: RenderHarness, id: string, props: Record<string, unknown>): UiNode {
@@ -801,6 +810,51 @@ describe('Canvas2DRenderer culling', () => {
     h.layout(root);
     h.render(root);
     expect(callArgs(h.context, 'fillRect')).toEqual([]);
+  });
+});
+
+/**
+ * An opaque surface: the browser draws subpixel (LCD) text only onto
+ * opaque pixels, and a copy from a transparent canvas the text was kept
+ * in is grayscale, so on one the renderer draws text every frame and
+ * keeps nothing in transparent canvases.
+ */
+describe('Canvas2DRenderer on an opaque surface', () => {
+  function drawText(opaque: boolean): { fills: number; layers: number } {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const text = h.createNode('text', UiNodeType.Text);
+    text.setProperty('text', 'Hello');
+    h.append(root, text);
+    h.layout(root);
+    // A context that says where it draws, which the text cache needs.
+    const context = new RecordingCanvasContext({ transform: true });
+    const surface = new CanvasSurface(new FakeCanvasHost(context), { opaque });
+    let layers = 0;
+    const renderer = new Canvas2DRenderer({
+      surface,
+      createLayerCanvas: (width, height) => {
+        layers++;
+        const host = new FakeCanvasHost(new RecordingCanvasContext({ transform: true }));
+        host.width = width;
+        host.height = height;
+        return host;
+      }
+    });
+    surface.setLogicalSize(800, 600, 1);
+    for (let frame = 0; frame < 3; frame++) {
+      renderer.render(root, { layout: h.engine, text: h.measurer, now: Number.MAX_SAFE_INTEGER });
+    }
+    return { fills: callArgs(context, 'fillText').length, layers };
+  }
+
+  it('draws text onto the surface every frame, and keeps it in no transparent canvas', () => {
+    // The control: on a see-through surface the text is kept and copied.
+    expect(drawText(false).layers).toBeGreaterThan(0);
+
+    const opaque = drawText(true);
+    expect(opaque.layers).toBe(0);
+    expect(opaque.fills).toBe(3);
   });
 });
 

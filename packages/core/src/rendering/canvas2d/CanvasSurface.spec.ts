@@ -92,4 +92,16 @@ describe('CanvasSurface integration', () => {
     expect(pixel[2]).toBe(0);
     expect(pixel[3]).toBe(255);
   });
+
+  it('asks for an opaque context only when told to', () => {
+    const plain = new FakeCanvasHost(new RecordingCanvasContext());
+    new CanvasSurface(plain).getContext2D();
+    const opaque = new FakeCanvasHost(new RecordingCanvasContext());
+    const surface = new CanvasSurface(opaque, { opaque: true });
+    surface.getContext2D();
+
+    expect(plain.contextSettings).toEqual([undefined]);
+    expect(opaque.contextSettings).toEqual([{ alpha: false }]);
+    expect(surface.opaque).toBe(true);
+  });
 });

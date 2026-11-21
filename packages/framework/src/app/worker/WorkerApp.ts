@@ -116,6 +116,22 @@ export interface WorkerAppOptions {
    */
   renderer?: RendererChoice;
   /**
+   * An opaque canvas, so the browser may draw text with subpixel (LCD)
+   * antialiasing, as it draws a page's own text. Off by default.
+   *
+   * A 2D canvas draws subpixel text only onto opaque pixels, so a
+   * see-through canvas gets grayscale text, lighter than the browser's
+   * on Windows and Linux. Opaque, what the application does not paint
+   * is black, so its root should paint a background. Text is then drawn
+   * onto the canvas every time rather than copied from the canvases it
+   * is kept in, and scroll containers are drawn rather than kept as
+   * layers, since a copy from a see-through canvas is grayscale: more
+   * work on a text-heavy screen. Canvas2D only; WebGPU draws grayscale
+   * text from its atlas either way. macOS draws no subpixel text at all,
+   * so there it changes nothing but the cost.
+   */
+  opaqueCanvas?: boolean;
+  /**
    * Receives frame timings reported by the render worker.
    *
    * `FrameMetrics` itself rather than a structural copy of it: the
@@ -633,6 +649,7 @@ export class WorkerApp {
         height,
         dpr: window.devicePixelRatio || 1,
         renderer: this.options.renderer,
+        ...(this.options.opaqueCanvas === true ? { opaqueCanvas: true } : {}),
         // Text comes through the editing proxy below, IME and all.
         textInput: 'proxy',
         accessibility: this.options.accessibility !== false,

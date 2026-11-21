@@ -25,6 +25,8 @@ export interface MockCanvas
   extends CanvasHost, Pick<EventTarget, 'addEventListener' | 'removeEventListener' | 'dispatchEvent'> {
   /** The context every `getContext` call returns, for asserting draws. */
   readonly ctx: MockContext;
+  /** The settings each `getContext` was given, in order. */
+  readonly contextSettings: readonly (CanvasRenderingContext2DSettings | undefined)[];
 }
 
 /**
@@ -84,11 +86,16 @@ export function mockCanvas(width = 800, height = 600): MockCanvas {
   // An event target as both real canvases are, so a spec can hand the
   // runtime a `contextrestored`.
   const events = new EventTarget();
+  const contextSettings: (CanvasRenderingContext2DSettings | undefined)[] = [];
   return {
     width,
     height,
     ctx,
-    getContext: () => ctx as unknown as CanvasRenderingContext2D,
+    contextSettings,
+    getContext: (_id: '2d', settings?: CanvasRenderingContext2DSettings) => {
+      contextSettings.push(settings);
+      return ctx as unknown as CanvasRenderingContext2D;
+    },
     addEventListener: events.addEventListener.bind(events),
     removeEventListener: events.removeEventListener.bind(events),
     dispatchEvent: events.dispatchEvent.bind(events)

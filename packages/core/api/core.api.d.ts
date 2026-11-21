@@ -3738,7 +3738,10 @@ declare function resolveBoolean(node: UiNode, name: string): boolean | undefined
 interface CanvasHost {
   width: number;
   height: number;
-  getContext(contextId: '2d'): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+  getContext(contextId: '2d', options?: CanvasRenderingContext2DSettings): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+}
+interface CanvasSurfaceOptions {
+  readonly opaque?: boolean;
 }
 declare class CanvasSurface {
   private readonly canvas;
@@ -3746,7 +3749,8 @@ declare class CanvasSurface {
   private logicalH;
   private pixelRatio;
   private context;
-  constructor(canvas: CanvasHost);
+  readonly opaque: boolean;
+  constructor(canvas: CanvasHost, options?: CanvasSurfaceOptions);
   get logicalWidth(): number;
   get logicalHeight(): number;
   get dpr(): number;
@@ -3756,7 +3760,7 @@ declare class CanvasSurface {
   private acquireContext;
   setLogicalSize(width: number, height: number, dpr?: number): void;
 }
-declare function createCanvasSurface(host: CanvasHost): CanvasSurface;
+declare function createCanvasSurface(host: CanvasHost, options?: CanvasSurfaceOptions): CanvasSurface;
 type LayerCanvasFactory = (width: number, height: number) => CanvasHost | null;
 interface ScrollLayerStats {
   built: number;
@@ -3854,6 +3858,7 @@ declare class Canvas2DRenderer implements UiRenderer {
   private boundaryLiftedDrawn;
   private readonly groups;
   private groupDepth;
+  private readonly scrollLayersOn;
   constructor(options: Canvas2DRendererOptions);
   private readonly rasters;
   private rasterDepth;
@@ -4887,6 +4892,7 @@ export {
   CanvasHost,
   CanvasPlatformSurface,
   CanvasSurface,
+  CanvasSurfaceOptions,
   CanvasTextMeasurer,
   CanvasTextStyle,
   capturePointer,
@@ -5876,6 +5882,7 @@ import {
   CanvasHost,
   CanvasPlatformSurface,
   CanvasSurface,
+  CanvasSurfaceOptions,
   CanvasTextMeasurer,
   CanvasTextStyle,
   capturePointer,
@@ -7130,6 +7137,7 @@ export {
   type Canvas2DContext,
   type Canvas2DRendererOptions,
   type CanvasHost,
+  type CanvasSurfaceOptions,
   type CanvasTextStyle,
   type CapturedFrame,
   type CaretRect,
@@ -7861,8 +7869,9 @@ declare class FakeCanvasHost implements CanvasHost {
   width: number;
   height: number;
   private contextRequests;
+  readonly contextSettings: (CanvasRenderingContext2DSettings | undefined)[];
   constructor(context: Canvas2DContext | null, label?: string | undefined);
-  getContext(_contextId: '2d'): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+  getContext(_contextId: '2d', settings?: CanvasRenderingContext2DSettings): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
   get contextRequestCount(): number;
 }
 declare class RenderHarness {

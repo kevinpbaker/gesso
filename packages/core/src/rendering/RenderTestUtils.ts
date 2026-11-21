@@ -625,6 +625,8 @@ export class FakeCanvasHost implements CanvasHost {
   width = 0;
   height = 0;
   private contextRequests = 0;
+  /** The settings each `getContext` was given, in order. */
+  readonly contextSettings: (CanvasRenderingContext2DSettings | undefined)[] = [];
 
   /** `label` names the host for a spec that meets it again as a `drawImage` source. */
   constructor(
@@ -632,8 +634,12 @@ export class FakeCanvasHost implements CanvasHost {
     readonly label?: string
   ) {}
 
-  getContext(_contextId: '2d'): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null {
+  getContext(
+    _contextId: '2d',
+    settings?: CanvasRenderingContext2DSettings
+  ): CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null {
     this.contextRequests++;
+    this.contextSettings.push(settings);
     return this.context as unknown as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   }
 
