@@ -51,9 +51,12 @@ describe('scroll layers', () => {
   let root: UiNode;
   let scroll: UiNode;
   let rows: UiNode[];
+  let wrapper: UiNode | null;
   const constraints = Constraints.tight(400, 300);
 
-  function setup(options: { dpr?: number; scrollLayers?: boolean; left?: number; settle?: number } = {}): void {
+  function setup(
+    options: { dpr?: number; scrollLayers?: boolean; left?: number; settle?: number; wrap?: boolean } = {}
+  ): void {
     graph = new UiGraph();
     const measurer = new CharacterCountTextMeasurer();
     engine = new LayoutEngine(measurer);
@@ -90,13 +93,22 @@ describe('scroll layers', () => {
     scroll.setProperty('height', 100);
     scroll.setProperty('backgroundColor', '#fff');
     graph.appendChild(root, scroll);
+    // As a lazy grid's Grid does: one child holding every row, as tall
+    // as all of them whichever are mounted.
+    wrapper = null;
+    if (options.wrap === true) {
+      wrapper = graph.createNode('wrapper', UiNodeType.Column);
+      wrapper.setProperty('height', 600);
+      wrapper.setProperty('flexShrink', 0);
+      graph.appendChild(scroll, wrapper);
+    }
     rows = [];
     for (let i = 0; i < ROWS; i++) {
       const row = graph.createNode(`row${i}`, UiNodeType.Box);
       row.setProperty('height', ROW);
       row.setProperty('flexShrink', 0);
       row.setProperty('backgroundColor', `#${(i + 1).toString(16).padStart(6, '0')}`);
-      graph.appendChild(scroll, row);
+      graph.appendChild(wrapper ?? scroll, row);
       rows.push(row);
     }
     engine.layout(root, constraints);
@@ -327,6 +339,74 @@ describe('scroll layers', () => {
       [0, 60, 200, 30],
       [0, 90, 200, 30]
     ]);
+  });
+
+  describe('through a lone child that holds the rows', () => {
+    beforeEach(() => setup({ wrap: true }));
+
+    it('repaints only the row that changed', () => {
+      scrollTo(10);
+      set(rows[1], 'backgroundColor', '#abcdef');
+      frame();
+
+      expect(renderer.scrollLayerStats.dropped).toBe(0);
+      expect(composites().length).toBe(1);
+      // As without the wrapper: row 1 alone, not the whole layer.
+      expect(callArgs(layers[0]!.context, 'rect')).toEqual([[0, 12, 200, 46]]);
+    });
+
+    it('repaints where a row was added, not under the rows that stayed', () => {
+      scrollTo(10);
+      const row = graph.createNode('added', UiNodeType.Box);
+      row.setProperty('height', ROW);
+      row.setProperty('flexShrink', 0);
+      row.setProperty('backgroundColor', '#abcdef');
+      // Inserted before row 3: rows 3 and on move down a row.
+      graph.insertBefore(wrapper!, row, rows[3]!);
+      graph.markDirty(wrapper!, DirtyFlags.Children | DirtyFlags.Layout);
+      frame();
+
+      const painted = callArgs(layers[0]!.context, 'rect') as number[][];
+      expect(painted.length).toBeGreaterThan(0);
+      // Rows 0..2 (-10..80 of the viewport) are left as they were.
+      expect(Math.min(...painted.map(([, y]) => y!))).toBeGreaterThanOrEqual(80 - 8);
+    });
+
+    it('repaints a change in a sticky header where it sticks', () => {
+      // A data table's header: at a scroll of 50 its box is above the
+      // viewport (-50..-40), and it is drawn at 0..10. Judged by its box,
+      // the change was off the layer and nothing was painted.
+      set(rows[0], 'position', 'sticky');
+      set(rows[0], 'top', 0);
+      set(rows[0], 'height', 10);
+      frame();
+      scrollTo(10);
+      scrollTo(50);
+      set(rows[0], 'backgroundColor', '#abcdef');
+      frame();
+
+      expect(renderer.scrollLayerStats.dropped).toBe(0);
+      expect(callArgs(layers[0]!.context, 'rect').concat(callArgs(layers[1]!.context, 'rect'))).toEqual([
+        [0, 0, 200, 18]
+      ]);
+    });
+
+    it('repaints the whole layer when the wrapper itself changes', () => {
+      scrollTo(10);
+      set(wrapper!, 'backgroundColor', '#abcdef');
+      frame();
+
+      expect(callArgs(layers[0]!.context, 'rect')).toEqual([[0, 0, 200, 100]]);
+    });
+
+    it('judges by the wrapper when it moves its rows', () => {
+      scrollTo(10);
+      set(wrapper!, 'transform', { translateX: 4 });
+      set(rows[1], 'backgroundColor', '#abcdef');
+      frame();
+
+      expect(callArgs(layers[0]!.context, 'rect')).toEqual([[0, 0, 200, 100]]);
+    });
   });
 
   it('keeps the layer when the runtime asks for a frame at the root', () => {

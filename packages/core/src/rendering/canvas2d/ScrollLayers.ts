@@ -486,15 +486,41 @@ export class ScrollLayerCache {
    * everything on screen: the rows it mounts and unmounts are in its
    * overscan, and the spacers that stand for the rest only grow and
    * shrink off the top and bottom.
+   *
+   * A container with one child that only holds the rest (a lazy grid's
+   * Grid, which holds its header, spacers and rows) is judged by that
+   * child's children instead; see \`itemsIn\`. Judged by the one child,
+   * any change inside was the whole layer.
    */
   damage(layer: ScrollLayer, container: UiNode, layout: LayoutReader): LayerRect[] | 'all' {
     const frame = this.frame;
     if (frame === null) {
       return 'all';
     }
+    const { items, wrappers } = itemsIn(container, layout);
+    const stuck = stuckIn(container, layout);
+    if (stuck === null) {
+      return 'all';
+    }
     const boxes: ItemBox[] = [];
     // Changed inside an item: wrong where the item was and is.
     for (const [node, flags] of frame.entries()) {
+      if (wrappers.has(node)) {
+        // Its own paint covers its box. A row mounted below it, or a
+        // layout that moved its children, is marked on it too; those
+        // are its children's and its own box's, compared below.
+        if ((flags & ~WRAPPER_QUIET) !== 0) {
+          const was = layer.items.get(node);
+          const now = boxOf(layout, node);
+          if (was !== undefined) {
+            boxes.push(was);
+          }
+          if (now !== undefined) {
+            boxes.push(now);
+          }
+        }
+        continue;
+      }
       if (node === container) {
         // Its own paint is drawn outside the layer, its children are
         // compared below and its size is \`fits\`'s; but inherited style
@@ -504,7 +530,7 @@ export class ScrollLayerCache {
         }
         continue;
       }
-      const item = itemHolding(container, node);
+      const item = itemHolding(container, node, wrappers);
       if (item === null) {
         continue;
       }
@@ -516,10 +542,27 @@ export class ScrollLayerCache {
       if (now !== undefined && (was === undefined || !sameBox(was, now))) {
         boxes.push(now);
       }
+      // A sticky node is drawn where it sticks, which its box does not
+      // say: a table's header, once the rows scroll under it, has its box
+      // above the viewport. What changed inside one is wrong where the
+      // node was drawn and is drawn.
+      for (let current: UiNode | null = node; current !== null; current = current.parent) {
+        const drawn = stuck.get(current);
+        const drawnWas = layer.stuck.get(current);
+        if (drawn !== undefined) {
+          boxes.push(drawn);
+        }
+        if (drawnWas !== undefined && (drawn === undefined || !sameBox(drawnWas, drawn))) {
+          boxes.push(drawnWas);
+        }
+        if (current === item) {
+          break;
+        }
+      }
     }
     // Added, removed or moved: wrong where it was and where it is.
     const seen = new Set<UiNode>();
-    for (const item of itemsOf(container)) {
+    for (const item of [...wrappers, ...items]) {
       seen.add(item);
       const now = boxOf(layout, item);
       const was = layer.items.get(item);
@@ -539,10 +582,6 @@ export class ScrollLayerCache {
     }
     // Stuck or let go, or scrolled while stuck: wrong where it was drawn
     // and where it is drawn now.
-    const stuck = stuckIn(container, layout);
-    if (stuck === null) {
-      return 'all';
-    }
     for (const [node, now] of stuck) {
       const was = layer.stuck.get(node);
       if (was === undefined) {
@@ -572,7 +611,8 @@ export class ScrollLayerCache {
   /** Notes where the container's items are, for the next frame's \`damage\`. */
   remember(layer: ScrollLayer, container: UiNode, layout: LayoutReader): void {
     layer.items.clear();
-    for (const item of itemsOf(container)) {
+    const { items, wrappers } = itemsIn(container, layout);
+    for (const item of [...wrappers, ...items]) {
       const box = boxOf(layout, item);
       if (box !== undefined) {
         layer.items.set(item, box);
@@ -679,11 +719,51 @@ function itemsOf(container: UiNode): UiNode[] {
   return items;
 }
 
-/** The item of a container that holds a node, the node itself if it is one, or null outside the container or above its items. */
-function itemHolding(container: UiNode, node: UiNode): UiNode | null {
+/** Dirt on a wrapper (see \`itemsIn\`) that changes nothing it paints itself. */
+const WRAPPER_QUIET = DirtyFlags.Layout | DirtyFlags.SubtreeLayout | DirtyFlags.Children | DirtyFlags.Semantics;
+
+/**
+ * The items a layer's damage is judged by, and the wrappers they hang
+ * from. The items are the container's (see \`itemsOf\`), unless there is
+ * one, which holds the rest and draws its children where their boxes
+ * say: then they are that one's, and so on down. Not through a wrapper
+ * that scrolls, turns or moves its children (a transform, a sticky
+ * shift), nor one with a child that has no box of its own to judge.
+ */
+function itemsIn(container: UiNode, layout: LayoutReader): { items: UiNode[]; wrappers: Set<UiNode> } {
+  const wrappers = new Set<UiNode>();
+  let items = itemsOf(container);
+  let sticky: ReadonlySet<UiNode> | undefined;
+  while (items.length === 1) {
+    const only = items[0]!;
+    const rec = layout.recordFor(only);
+    if (
+      only.firstChild === null ||
+      rec === undefined ||
+      rec.scrollable ||
+      only.properties.get('transform') !== undefined
+    ) {
+      break;
+    }
+    sticky ??= layout.allStickyNodes?.() ?? new Set();
+    if (sticky.has(only)) {
+      break;
+    }
+    const inside = itemsOf(only);
+    if (inside.some(item => layout.recordFor(item) === undefined)) {
+      break;
+    }
+    wrappers.add(only);
+    items = inside;
+  }
+  return { items, wrappers };
+}
+
+/** The item that holds a node, the node itself if it is one, or null outside the container or above its items. */
+function itemHolding(container: UiNode, node: UiNode, wrappers: ReadonlySet<UiNode>): UiNode | null {
   let item: UiNode | null = null;
   for (let current: UiNode | null = node; current !== null; current = current.parent) {
-    if (current === container) {
+    if (current === container || wrappers.has(current)) {
       return item;
     }
     if (current.type !== UiNodeType.Fragment) {
