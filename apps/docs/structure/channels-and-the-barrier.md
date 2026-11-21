@@ -108,9 +108,10 @@ between it and the view.
 ## One differ, and what it costs
 
 Each view key is subscribed on the first sync request, so a channel
-nobody is watching costs nothing. When a key emits, its new value is
-compared against what the other side is known to hold and the
-difference is posted as patches.
+nobody is watching costs nothing. When a key emits, its newest value is
+compared against what the other side is known to hold, and the
+difference is posted as patches: when the command that made it returns,
+or else once the task it was made in is over.
 
 | Patch    | Says                                                      |
 | -------- | --------------------------------------------------------- |
@@ -139,8 +140,11 @@ above, toggling one task posts `set tasks[1].done` and not a resend of
 the list, and the derived summary's `set remaining` rides in the same
 message: keys are diffed one at a time, but everything one command
 publishes crosses together, as one message, when the command returns.
-A change made anywhere else (a timer, a fetch landing) is posted as it
-is made.
+A change made anywhere else (a timer, a fetch landing) waits for the
+end of the task it was made in, and crosses with every other key that
+changed in that task. That is why the panel's first line is one message
+holding the list and the summary together. A key that emits ten times
+in one task is diffed and posted once, with its last value.
 
 Patches are queued on arrival and applied in the frame's first phase.
 A chatty application thread can deliver many between two frames, and

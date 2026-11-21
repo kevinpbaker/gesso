@@ -63,6 +63,9 @@ describe('the docs barrier example', () => {
     expect(store.tasks.value[1]!.done).toBe(true);
 
     const traffic = wire();
+    // The first answer: the list and the summary were published in one
+    // task, outside any command, and cross together when it is over.
+    expect(traffic.slice(0, 2)).toEqual(['↑ sync', '↓ splice tasks, set remaining']);
     expect(traffic).toContain('↑ toggle("wrap")');
     // What came back is a patch at the path that changed, not a
     // resend of the list: one differ, and it trims what it can. Keys

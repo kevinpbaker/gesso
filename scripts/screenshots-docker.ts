@@ -21,6 +21,7 @@
  *   node scripts/screenshots-docker.ts --update           # recapture both
  *   node scripts/screenshots-docker.ts --only routes      # or docs
  *   node scripts/screenshots-docker.ts --route renderers-compare
+ *   node scripts/screenshots-docker.ts --page components/menu   # one docs page
  *   node scripts/screenshots-docker.ts --repo ../elsewhere   # another checkout
  *
  * On Apple silicon the container runs as x86-64 under emulation, because
@@ -41,10 +42,22 @@ interface Options {
   only: 'routes' | 'docs' | 'both';
   repo: string;
   passThrough: string[];
+  /**
+   * `--page`, for the docs script. Kept apart because each script reads
+   * only its own flags: a page handed to the route script was dropped,
+   * and `--update` then rewrote every docs baseline instead of one.
+   */
+  docsPassThrough: string[];
 }
 
 function parse(argv: readonly string[]): Options {
-  const options: Options = { update: false, only: 'both', repo: resolve(here, '..'), passThrough: [] };
+  const options: Options = {
+    update: false,
+    only: 'both',
+    repo: resolve(here, '..'),
+    passThrough: [],
+    docsPassThrough: []
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === '--update') {
@@ -57,6 +70,12 @@ function parse(argv: readonly string[]): Options {
       options.only = value;
     } else if (arg === '--repo') {
       options.repo = resolve(argv[++i] ?? '');
+    } else if (arg === '--page') {
+      const value = argv[++i];
+      if (value === undefined) {
+        throw new Error('--page takes a docs page, as in --page components/menu');
+      }
+      options.docsPassThrough.push(arg, value);
     } else {
       // --route and --app belong to the route script.
       options.passThrough.push(arg);
@@ -65,8 +84,17 @@ function parse(argv: readonly string[]): Options {
       }
     }
   }
+  if (options.passThrough.length > 0 && options.docsPassThrough.length > 0) {
+    throw new Error('--page is for the docs gate and --route for the routes gate; run them one at a time.');
+  }
   if (options.passThrough.length > 0 && options.only === 'both') {
     options.only = 'routes';
+  }
+  if (options.docsPassThrough.length > 0 && options.only === 'both') {
+    options.only = 'docs';
+  }
+  if (options.docsPassThrough.length > 0 && options.only === 'routes') {
+    throw new Error('--page is for the docs gate, not --only routes.');
   }
   return options;
 }
@@ -129,7 +157,7 @@ function main(): void {
   if (options.only !== 'routes') {
     gates.push({
       name: 'docs',
-      command: `node scripts/check-docs-screenshots.ts${update}`,
+      command: `node scripts/check-docs-screenshots.ts${update} ${options.docsPassThrough.map(shellQuote).join(' ')}`,
       screenshots: 'apps/docs/screenshots'
     });
   }
