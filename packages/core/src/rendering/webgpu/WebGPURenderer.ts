@@ -5,7 +5,9 @@ import type { RendererBackend, UiRenderer } from '../UiRenderer';
 import type { WebGPUSurface } from './WebGPUSurface';
 import { initializeWebGPU } from './WebGPUDevice';
 import { WebGPUError } from './WebGPUError';
+import { boundingRect, damageGroups, FrameDamage, SPILL, type FrameDamageStats } from '../FrameDamage';
 import {
+  createClearPipeline,
   createFrameBindGroupLayout,
   createPrimitivePipeline,
   createTexturedPipeline,
@@ -21,6 +23,8 @@ import {
   INSTANCE_STRIDE_BYTES,
   TEXTURED_STRIDE_BYTES,
   viewportScissor,
+  type PartialBuild,
+  type RenderList,
   type RenderTextCache,
   type ScissorRect
 } from './WebGPURenderData';
@@ -45,6 +49,12 @@ export interface WebGPURendererOptions {
    * from here until `recover()` brings a new device.
    */
   onLost?: () => void;
+  /**
+   * Whether a frame whose changes the caller vouched for draws only the
+   * parts of the surface they touch. Defaults to true; false clears and
+   * draws every frame whole, as before. See `FrameDamage.ts`.
+   */
+  dirtyRects?: boolean;
 }
 
 export interface RenderHooks {
@@ -62,6 +72,19 @@ const copyDstBufferUsage = typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsag
 const layerTextureUsage =
   (typeof GPUTextureUsage !== 'undefined' ? GPUTextureUsage.RENDER_ATTACHMENT : 0x10) |
   (typeof GPUTextureUsage !== 'undefined' ? GPUTextureUsage.TEXTURE_BINDING : 0x4);
+
+/** Damage is drawn under its one bounding box when the box adds no more than this share of the surface to it. */
+const ONE_BOX_EXTRA = 0.25;
+
+const keptTextureUsage =
+  (typeof GPUTextureUsage !== 'undefined' ? GPUTextureUsage.RENDER_ATTACHMENT : 0x10) |
+  (typeof GPUTextureUsage !== 'undefined' ? GPUTextureUsage.COPY_SRC : 0x1);
+
+/** The frame as last drawn, kept between frames; see `WebGPURenderer.keptFrame`. */
+interface KeptFrame {
+  texture: GPUTexture;
+  view: GPUTextureView;
+}
 
 /** An opacity group's layer: a texture the size of the surface, drawn into and then blended. */
 interface GroupLayer {
@@ -104,15 +127,18 @@ export interface DrawStats {
  * growable vertex buffers, one per pipeline, and the frame's command
  * list is walked in paint order switching pipelines as it goes.
  *
- * Every frame is drawn whole. Canvas2D draws only the rectangles a
- * frame's changes touch (`FrameDamage.ts`), because a 2D canvas keeps
- * its pixels between frames; a WebGPU swap chain hands back a texture
- * that holds nothing known, so the same here would need a kept texture
- * of its own, drawn into in part and copied to the screen every frame.
+ * A swap chain hands back a texture that holds nothing known, so the
+ * frame is drawn into a texture of the renderer's own, which keeps it,
+ * and copied to the swap chain's. A frame the runtime vouched for, in
+ * which no box moved, then clears and draws only the rectangles its
+ * changes cover, as Canvas2D does (`FrameDamage.ts`): the build is
+ * culled to them and every draw is cut to them by its scissor. A frame
+ * with nothing to draw does not touch the swap chain at all.
  */
 export class WebGPURenderer implements UiRenderer {
   readonly backend: RendererBackend = 'webgpu';
 
+  private readonly options: WebGPURendererOptions;
   private readonly surface: WebGPUSurface;
   private hooks: RenderHooks;
   private device: GPUDevice | null = null;
@@ -147,6 +173,20 @@ export class WebGPURenderer implements UiRenderer {
    * time a frame reaches that depth and again when the surface resizes.
    */
   private groupLayers: GroupLayer[] = [];
+  /** The frame as last drawn; see `keptFrame`. */
+  private kept: KeptFrame | null = null;
+  /** Clears a frame's damage before it is drawn again. */
+  private clearPipeline: GPURenderPipeline | null = null;
+  /** What each frame draws again; see `FrameDamage.ts`. */
+  private readonly damage = new FrameDamage();
+  /**
+   * The lifted nodes the last whole build met, in the order it met them:
+   * what a partial build draws over the rest, since its walk may not
+   * reach them itself.
+   */
+  private liftedTop: UiNode[] = [];
+  /** The frame's stages, summed over the lists a frame drawn in part draws. */
+  private readonly timing = { prepare: 0, upload: 0, encode: 0 };
   /** Draw calls of the most recent frame. */
   readonly lastDraws: DrawStats = { primitiveDraws: 0, texturedDraws: 0, texturedInstances: 0 };
   private pendingCapture: PendingCapture | null = null;
@@ -156,11 +196,21 @@ export class WebGPURenderer implements UiRenderer {
   private readonly onLost: () => void;
 
   constructor(options: WebGPURendererOptions) {
+    this.options = options;
     this.surface = options.surface;
     this.hooks = options.hooks ?? {};
     // eslint-disable-next-line no-console
     this.onError = options.onError ?? (message => console.error(message));
     this.onLost = options.onLost ?? (() => {});
+  }
+
+  /** How many frames were drawn whole and in part, and how much of them. */
+  get damageStats(): FrameDamageStats {
+    return this.damage.stats;
+  }
+
+  resetDamageStats(): void {
+    this.damage.resetStats();
   }
 
   /**
@@ -203,9 +253,11 @@ export class WebGPURenderer implements UiRenderer {
     this.frameLayout = createFrameBindGroupLayout(init.device);
     this.primitives = createPrimitivePipeline(init.device, init.format, this.frameLayout);
     this.textured = createTexturedPipeline(init.device, init.format, this.frameLayout);
+    this.clearPipeline = createClearPipeline(init.device, init.format);
     this.textures = new WebGPUTextureCache(init.device, this.textured);
     this.glyphPages = new WebGPUGlyphPages(init.device, this.textured, this.textCache.atlas);
     this.lost = false;
+    this.damage.invalidate();
   }
 
   /**
@@ -218,6 +270,7 @@ export class WebGPURenderer implements UiRenderer {
       this.format !== null &&
       this.primitives !== null &&
       this.textured !== null &&
+      this.clearPipeline !== null &&
       !this.lost &&
       !this.disposed
     );
@@ -259,14 +312,108 @@ export class WebGPURenderer implements UiRenderer {
       return;
     }
 
-    // Each stage samples its start clock when either of its hooks is
-    // set. Sampling only for the Start hook meant a caller that wants
-    // durations alone — which the benchmark route does — measured
-    // every stage from 0, so all three reported the absolute clock
-    // instead of an elapsed time, and looked identical to each other.
-    const prepareStart =
-      this.hooks.onPrepareStart !== undefined || this.hooks.onPrepareEnd !== undefined ? performance.now() : 0;
+    const device = this.device!;
+    const dpr = this.surface.dpr;
+    const width = this.surface.physicalWidth;
+    const height = this.surface.physicalHeight;
+    const kept = this.keptFrame(device, width, height);
+    // Null draws the whole surface; otherwise only these rectangles,
+    // which may be none at all. Turned off, every frame is drawn whole.
+    if (this.options.dirtyRects === false) {
+      this.damage.invalidate();
+    }
+    const damage = this.damage.begin(root, context, dpr, width, height);
+    this.timing.prepare = 0;
+    this.timing.upload = 0;
+    this.timing.encode = 0;
+    this.lastDraws.primitiveDraws = 0;
+    this.lastDraws.texturedDraws = 0;
+    this.lastDraws.texturedInstances = 0;
+    // Counted on every frame, those drawn in part too, as Canvas2D's text
+    // cache is: a page's last use decides which page is let go first.
     this.textCache.atlas.beginFrame();
+    // A frame drawn in part builds, uploads and encodes once per group of
+    // its damage, so each stage's end hook is given the frame's total.
+    this.hooks.onPrepareStart?.();
+    this.hooks.onUploadStart?.();
+    this.hooks.onEncodeStart?.();
+    const liftedNodes: UiNode[] = [];
+    let boundaryLifted = false;
+    const drawn = (list: RenderList): void => {
+      for (const rect of list.volatile) {
+        this.damage.noteVolatile(rect);
+      }
+      for (const node of list.liftedNodes) {
+        if (!liftedNodes.includes(node)) {
+          liftedNodes.push(node);
+        }
+      }
+      boundaryLifted ||= list.boundaryLifted;
+    };
+    if (damage === null) {
+      const list = this.build(root, context, null);
+      // What the next partial frames draw over their walks; see
+      // `PartialBuild`. Unchanged by a partial frame, which no box moved in.
+      this.liftedTop = list.lifted;
+      this.draw(device, list, kept, null);
+      drawn(list);
+    } else {
+      // Each group of rectangles is drawn under the one scissor of its
+      // bounding box, which is cleared and drawn whole: rectangles may
+      // overlap, and a scissor each would blend what they share twice.
+      // One box over all of them is one build, one walk from the root;
+      // rectangles far apart are drawn apart instead, since one build
+      // over both draws everything between them, and their groups' boxes
+      // never overlap. Which is cheaper is how much the one box adds.
+      // Measured on the bench, two rows damaged: 0.14 ms in one box and
+      // 0.24 ms apart when it adds an eighth of the surface; 3.1 ms and
+      // 0.23 ms when it adds nearly half.
+      const logicalWidth = this.surface.logicalWidth;
+      const logicalHeight = this.surface.logicalHeight;
+      const groups = oneBox(damage, width * height) ? [damage] : damageGroups(damage, 2 * SPILL * dpr);
+      for (const group of groups) {
+        if (group.length === 0) {
+          continue;
+        }
+        const box = boundingRect(group);
+        const x0 = Math.max(0, box.x / dpr - SPILL);
+        const y0 = Math.max(0, box.y / dpr - SPILL);
+        const x1 = Math.min(logicalWidth, (box.x + box.width) / dpr + SPILL);
+        const y1 = Math.min(logicalHeight, (box.y + box.height) / dpr + SPILL);
+        const list = this.build(root, context, {
+          cull: { x: x0, y: y0, width: Math.max(0, x1 - x0), height: Math.max(0, y1 - y0) },
+          lifted: this.liftedTop
+        });
+        this.draw(device, list, kept, box);
+        drawn(list);
+      }
+    }
+
+    // The kept frame goes to the screen. A frame that drew nothing does
+    // not ask for the swap chain's texture at all, so the canvas goes on
+    // showing the last one, which is what it would have been sent again.
+    const encodeStart = performance.now();
+    const capture = this.pendingCapture;
+    if (damage === null || damage.length > 0 || capture !== null) {
+      const encoder = device.createCommandEncoder();
+      if (damage === null || damage.length > 0) {
+        const texture = this.surface.getCurrentTexture();
+        encoder.copyTextureToTexture({ texture: kept.texture }, { texture }, [width, height]);
+      }
+      const mapCapture = this.takeCapture(device, encoder, kept.texture);
+      device.queue.submit([encoder.finish()]);
+      mapCapture?.();
+    }
+    this.timing.encode += performance.now() - encodeStart;
+    this.damage.end(liftedNodes, boundaryLifted);
+    this.hooks.onPrepareEnd?.(this.timing.prepare);
+    this.hooks.onUploadEnd?.(this.timing.upload);
+    this.hooks.onEncodeEnd?.(this.timing.encode);
+  }
+
+  /** One render list: the whole tree, or what reaches part of the surface. */
+  private build(root: UiNode, context: RenderContext, partial: PartialBuild | null): RenderList {
+    const start = performance.now();
     const list = buildRenderList(
       root,
       context.layout,
@@ -275,24 +422,32 @@ export class WebGPURenderer implements UiRenderer {
       this.surface.logicalHeight,
       this.surface.dpr,
       context.now,
-      context.overlay ?? [],
-      this.textCache
+      partial === null ? (context.overlay ?? []) : [],
+      this.textCache,
+      partial
     );
-    if (this.hooks.onPrepareEnd !== undefined) {
-      this.hooks.onPrepareEnd(performance.now() - prepareStart);
-    }
+    // The build allocated atlas cells; fill the new ones before the
+    // pass that samples them.
+    this.glyphPages!.flush();
+    this.timing.prepare += performance.now() - start;
+    return list;
+  }
 
-    const device = this.device!;
+  /**
+   * Uploads a list and draws it into the kept frame, and submits it: a
+   * frame drawn in part draws one list per group of its damage, and each
+   * list is built in the same scratch, so each goes to the GPU before
+   * the next is built. `clip` null clears and draws the whole frame;
+   * otherwise only that box of device pixels is cleared, and every draw
+   * is cut to it.
+   */
+  private draw(device: GPUDevice, list: RenderList, kept: KeptFrame, clip: ScissorRect | null): void {
     const primitives = this.primitives!;
     const textured = this.textured!;
     const textures = this.textures!;
     const glyphPages = this.glyphPages!;
-    // The build allocated atlas cells; fill the new ones before the
-    // pass that samples them.
-    glyphPages.flush();
 
-    const uploadStart =
-      this.hooks.onUploadStart !== undefined || this.hooks.onUploadEnd !== undefined ? performance.now() : 0;
+    const uploadStart = performance.now();
     if (list.instanceCount > 0) {
       const buffer = this.ensureBuffer(this.instanceBuffer, list.instanceData.byteLength, INSTANCE_STRIDE_BYTES);
       if (buffer !== this.instanceBuffer) {
@@ -344,20 +499,19 @@ export class WebGPURenderer implements UiRenderer {
     view[2] = this.surface.dpr || 1;
     device.queue.writeBuffer(primitives.uniformBuffer, 0, view);
     device.queue.writeBuffer(textured.uniformBuffer, 0, view);
-    if (this.hooks.onUploadEnd !== undefined) {
-      this.hooks.onUploadEnd(performance.now() - uploadStart);
-    }
+    this.timing.upload += performance.now() - uploadStart;
 
-    const encodeStart =
-      this.hooks.onEncodeStart !== undefined || this.hooks.onEncodeEnd !== undefined ? performance.now() : 0;
+    const encodeStart = performance.now();
     const commandEncoder = device.createCommandEncoder();
-    const texture = this.surface.getCurrentTexture();
-    // What the commands are drawing into: the frame, then a layer for
-    // each opacity group open. A group ends one pass and begins another.
-    const targets: GPUTextureView[] = [texture.createView()];
+    // What the commands are drawing into: the kept frame, then a layer
+    // for each opacity group open. A group ends one pass and begins
+    // another.
+    const targets: GPUTextureView[] = [kept.view];
     let pass = commandEncoder.beginRenderPass({
       colorAttachments: [
-        { view: targets[0], clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }
+        clip === null
+          ? { view: targets[0], clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }
+          : { view: targets[0], loadOp: 'load', storeOp: 'store' }
       ]
     });
 
@@ -365,13 +519,17 @@ export class WebGPURenderer implements UiRenderer {
     // command has to restore the full viewport rather than skip the
     // call: skipping left it drawing under whichever clip the
     // preceding command happened to install.
-    const viewport = viewportScissor(this.surface.logicalWidth, this.surface.logicalHeight, this.surface.dpr);
+    const viewport = clip ?? viewportScissor(this.surface.logicalWidth, this.surface.logicalHeight, this.surface.dpr);
     let currentScissor: ScissorRect | null = null;
     let currentKind: CommandKind | null = null;
+    if (clip !== null) {
+      // Only the damage is cleared: everything else is the last frame's,
+      // and right.
+      pass.setPipeline(this.clearPipeline!);
+      currentScissor = setScissor(pass, currentScissor, clip);
+      pass.draw(3);
+    }
     pass.setBindGroup(1, this.frameBindGroup!);
-    this.lastDraws.primitiveDraws = 0;
-    this.lastDraws.texturedDraws = 0;
-    this.lastDraws.texturedInstances = 0;
 
     const commands = list.commands;
     for (let i = 0; i < commands.length; i++) {
@@ -381,7 +539,7 @@ export class WebGPURenderer implements UiRenderer {
         const depth = targets.length - 1;
         let layer: GroupLayer;
         if (command.kind === CommandKind.BeginLayer) {
-          layer = this.groupLayer(device, depth, texture.width, texture.height);
+          layer = this.groupLayer(device, depth, kept.texture.width, kept.texture.height);
           targets.push(layer.view);
         } else {
           layer = this.groupLayers[depth - 1]!;
@@ -402,7 +560,7 @@ export class WebGPURenderer implements UiRenderer {
         if (command.kind === CommandKind.BeginLayer) {
           continue;
         }
-        const blendScissor = command.scissor ?? viewport;
+        const blendScissor = cut(command.scissor ?? viewport, clip);
         if (command.instance === null || blendScissor.width <= 0 || blendScissor.height <= 0) {
           continue;
         }
@@ -417,7 +575,7 @@ export class WebGPURenderer implements UiRenderer {
         this.lastDraws.texturedInstances++;
         continue;
       }
-      const scissor = command.scissor ?? viewport;
+      const scissor = cut(command.scissor ?? viewport, clip);
       if (scissor.width <= 0 || scissor.height <= 0) {
         // Everything under this clip is off screen; a zero scissor
         // draws nothing and some validators reject it.
@@ -475,12 +633,25 @@ export class WebGPURenderer implements UiRenderer {
     }
 
     pass.end();
-    const capture = this.takeCapture(device, commandEncoder, texture);
     device.queue.submit([commandEncoder.finish()]);
-    capture?.();
-    if (this.hooks.onEncodeEnd !== undefined) {
-      this.hooks.onEncodeEnd(performance.now() - encodeStart);
+    this.timing.encode += performance.now() - encodeStart;
+  }
+
+  /**
+   * The texture the frame is drawn into and kept in between frames, at
+   * the surface's size: made or remade when that changes, and the frame
+   * after it is drawn whole, since a new texture holds nothing known.
+   */
+  private keptFrame(device: GPUDevice, width: number, height: number): KeptFrame {
+    const existing = this.kept;
+    if (existing !== null && existing.texture.width === width && existing.texture.height === height) {
+      return existing;
     }
+    existing?.texture.destroy();
+    const texture = device.createTexture({ size: [width, height], format: this.format!, usage: keptTextureUsage });
+    this.kept = { texture, view: texture.createView() };
+    this.damage.invalidate();
+    return this.kept;
   }
 
   /** The layer for an opacity group at `depth`, made or remade at the surface's size. */
@@ -550,6 +721,8 @@ export class WebGPURenderer implements UiRenderer {
    * Clears the surface when there is nothing else to draw.
    */
   private clearFrame(): void {
+    // What the kept frame holds is not what is on the screen now.
+    this.damage.invalidate();
     const device = this.device!;
     const commandEncoder = device.createCommandEncoder();
     const texture = this.surface.getCurrentTexture();
@@ -574,6 +747,7 @@ export class WebGPURenderer implements UiRenderer {
     if (changed && this.device !== null && this.format !== null) {
       this.surface.configure(this.device, this.format);
     }
+    this.damage.invalidate();
   }
 
   /**
@@ -583,6 +757,8 @@ export class WebGPURenderer implements UiRenderer {
    * page index would otherwise be reused over stale pixels.
    */
   fontsChanged(): void {
+    // Everything on the surface was drawn with the fallback face.
+    this.damage.invalidate();
     this.textCache.shaper.clear();
     this.textCache.atlas.reset();
     this.glyphPages?.dispose();
@@ -635,6 +811,10 @@ export class WebGPURenderer implements UiRenderer {
       layer.texture.destroy();
     }
     this.groupLayers = [];
+    this.kept?.texture.destroy();
+    this.kept = null;
+    this.clearPipeline = null;
+    this.liftedTop = [];
     this.frameBindGroup = null;
     this.frameLayout = null;
     this.primitives = null;
@@ -677,6 +857,31 @@ export class WebGPURenderer implements UiRenderer {
     const size = Math.max(Math.ceil((byteLength * 1.5) / stride) * stride, stride * 16);
     return this.device!.createBuffer({ size, usage: usage | copyDstBufferUsage });
   }
+}
+
+/** Whether a frame's damage is drawn under its one bounding box rather than in groups; see `render`. */
+function oneBox(damage: readonly ScissorRect[], surface: number): boolean {
+  if (damage.length <= 1) {
+    return true;
+  }
+  const box = boundingRect(damage);
+  let area = 0;
+  for (const rect of damage) {
+    area += rect.width * rect.height;
+  }
+  return box.width * box.height - area <= surface * ONE_BOX_EXTRA;
+}
+
+/** A command's scissor cut to the damage being drawn, when a frame is drawn in part. */
+function cut(scissor: ScissorRect, clip: ScissorRect | null): ScissorRect {
+  if (clip === null) {
+    return scissor;
+  }
+  const x = Math.max(scissor.x, clip.x);
+  const y = Math.max(scissor.y, clip.y);
+  const right = Math.min(scissor.x + scissor.width, clip.x + clip.width);
+  const bottom = Math.min(scissor.y + scissor.height, clip.y + clip.height);
+  return { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) };
 }
 
 function setScissor(pass: GPURenderPassEncoder, current: ScissorRect | null, next: ScissorRect): ScissorRect {

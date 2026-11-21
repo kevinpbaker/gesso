@@ -1,20 +1,38 @@
-import { DirtyFlags } from '../../graph/DirtyFlags';
-import type { UiNode } from '../../graph/UiNode';
-import { UiNodeType } from '../../graph/UiNodeType';
-import { parseTransform } from '../../properties/UiTransform';
-import type { RenderContext } from '../RenderContext';
-import { snapScroll } from '../ScrollSnap';
-import { SPILL, type LayerRect } from './ScrollLayers';
+import { DirtyFlags } from '../graph/DirtyFlags';
+import type { UiNode } from '../graph/UiNode';
+import { UiNodeType } from '../graph/UiNodeType';
+import { parseTransform } from '../properties/UiTransform';
+import type { RenderContext } from './RenderContext';
+import { snapScroll } from './ScrollSnap';
+
+/**
+ * How far past its box, in layout pixels, a node may paint: a focus
+ * ring, a shadow, a glyph's overhang. What a damaged node is widened by,
+ * and how far past a rectangle the walk that paints it looks. Canvas2D's
+ * scroll layers widen their strips by the same.
+ */
+export const SPILL = 8;
+
+/** A rectangle of device pixels. */
+export interface DamageRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+type LayerRect = DamageRect;
 
 /**
  * Dirty rectangles: the parts of the surface a frame has to draw again.
  *
- * **Why.** Canvas2D cleared the surface and drew every visible node on
- * every frame, so a caret blinking in one field paid for the whole
- * screen: the walk, and the raster of every draw call. A 2D canvas
- * keeps its pixels between frames, so the only part that has to be
- * drawn again is the part that changed. Everything else is already
- * right.
+ * **Why.** Both renderers cleared the surface and drew every visible
+ * node on every frame, so a caret blinking in one field paid for the
+ * whole screen: the walk, and the raster of every draw call. When the
+ * last frame's pixels are kept, the only part that has to be drawn
+ * again is the part that changed. Everything else is already right. A
+ * 2D canvas keeps its pixels; WebGPU keeps them in a texture of its own
+ * and copies it to the swap chain's texture, which holds nothing known.
  *
  * **What is damaged.** Each node the frame dirtied, where its subtree
  * paints: its record's extent (which takes in its outer shadows and
@@ -58,14 +76,14 @@ import { SPILL, type LayerRect } from './ScrollLayers';
  * **Lifted nodes.** A popover, a menu, a dialog is drawn over everything
  * else and wherever its anchor puts it, so a walk culled to a rectangle
  * may never reach it from its ancestors. The renderer draws the lifted
- * nodes the last frame drew over every partial walk, clipped to its
- * rectangles like everything else (\`Canvas2DRenderer.walk\`), and a
- * change to a lifted node's ancestor (an opacity, a colour passed down)
- * damages the lifted node where it is drawn as well as where the
- * ancestor is.
+ * nodes the last whole frame drew over every partial walk, clipped to
+ * its rectangles like everything else (\`Canvas2DRenderer.walk\`, the
+ * \`lifted\` a WebGPU build is given), and a change to a lifted node's
+ * ancestor (an opacity, a colour passed down) damages the lifted node
+ * where it is drawn as well as where the ancestor is.
  *
- * WebGPU draws every frame whole. It would need its own kept texture
- * and a copy of it, which this does not attempt.
+ * Shared by both renderers: each tells this what it drew by the clock
+ * and which lifted nodes it drew, and draws what this hands back.
  */
 export class FrameDamage {
   private forced = true;
@@ -345,6 +363,73 @@ function isAncestor(ancestor: UiNode, node: UiNode): boolean {
     }
   }
   return false;
+}
+
+/**
+ * Rectangles grouped so that each group is one walk: a layer's strips
+ * on Canvas2D, a frame's damage on either renderer.
+ *
+ * Two rectangles share a group when less than `reach` separates them,
+ * which is when their walks, each a spill wider than its rectangles,
+ * would meet. Rectangles in different groups therefore never overlap,
+ * and nor do the groups' bounding boxes, so nothing is painted twice. A
+ * group keeps its rectangles in the order they came, and the groups go
+ * in the order of their first rectangle.
+ *
+ * Merged by repeated passes rather than one: joining two rectangles can
+ * bring the group within reach of a third that neither was near alone.
+ * A frame has a handful of rectangles, so the passes cost nothing.
+ */
+export function damageGroups(strips: readonly LayerRect[], reach: number): LayerRect[][] {
+  const groups = strips.map(strip => ({ strips: [strip], box: { ...strip } }));
+  let merged = true;
+  while (merged) {
+    merged = false;
+    for (let i = 0; i < groups.length && !merged; i++) {
+      for (let j = i + 1; j < groups.length; j++) {
+        const a = groups[i].box;
+        const b = groups[j].box;
+        const apart =
+          b.x - (a.x + a.width) >= reach ||
+          a.x - (b.x + b.width) >= reach ||
+          b.y - (a.y + a.height) >= reach ||
+          a.y - (b.y + b.height) >= reach;
+        if (apart) {
+          continue;
+        }
+        const x = Math.min(a.x, b.x);
+        const y = Math.min(a.y, b.y);
+        groups[i] = {
+          strips: [...groups[i].strips, ...groups[j].strips],
+          box: {
+            x,
+            y,
+            width: Math.max(a.x + a.width, b.x + b.width) - x,
+            height: Math.max(a.y + a.height, b.y + b.height) - y
+          }
+        };
+        groups.splice(j, 1);
+        merged = true;
+        break;
+      }
+    }
+  }
+  return groups.map(group => group.strips);
+}
+
+/** The smallest rectangle holding every one of \`rects\`, which is not empty. */
+export function boundingRect(rects: readonly LayerRect[]): LayerRect {
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const rect of rects) {
+    left = Math.min(left, rect.x);
+    top = Math.min(top, rect.y);
+    right = Math.max(right, rect.x + rect.width);
+    bottom = Math.max(bottom, rect.y + rect.height);
+  }
+  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 function covers(outer: LayerRect, inner: LayerRect): boolean {

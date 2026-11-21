@@ -52,6 +52,35 @@ export interface TexturedPipeline {
   layerPipeline: GPURenderPipeline;
 }
 
+/**
+ * Clears what it is drawn over to transparent: one triangle over the
+ * whole target, written without blending, so a scissor makes it the
+ * clear of one rectangle that a render pass's `loadOp` cannot be.
+ */
+const CLEAR_SHADER = /* wgsl */ `
+@vertex
+fn vs(@builtin(vertex_index) index: u32) -> @builtin(position) vec4f {
+  let corners = array(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  return vec4f(corners[index], 0.0, 1.0);
+}
+
+@fragment
+fn fs() -> @location(0) vec4f {
+  return vec4f(0.0);
+}
+`;
+
+/** The pipeline that clears a frame's damage before it is drawn again; three vertices, no buffers. */
+export function createClearPipeline(device: GPUDevice, format: GPUTextureFormat): GPURenderPipeline {
+  const module = device.createShaderModule({ code: CLEAR_SHADER });
+  return device.createRenderPipeline({
+    layout: 'auto',
+    vertex: { module, entryPoint: 'vs', buffers: [] },
+    fragment: { module, entryPoint: 'fs', targets: [{ format }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' }
+  });
+}
+
 const QUAD_VERTICES = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
 const QUAD_INDICES = new Uint16Array([0, 1, 2, 2, 1, 3]);
 

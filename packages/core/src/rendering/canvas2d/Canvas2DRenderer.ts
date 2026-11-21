@@ -42,10 +42,10 @@ import { ScaledImageCache } from '../ScaledImageCache';
 import { paintPictures } from '../PaintPicture';
 import type { PaintContext2D } from '../PaintTarget';
 import { PreciseContext } from './PreciseContext';
-import { offscreenLayerCanvas, placeLayer, ScrollLayerCache, SPILL } from './ScrollLayers';
+import { offscreenLayerCanvas, placeLayer, ScrollLayerCache } from './ScrollLayers';
 import { TextRasterCache } from './TextRasterCache';
 import { RasterCache } from './RasterCache';
-import { FrameDamage, type FrameDamageStats } from './FrameDamage';
+import { damageGroups, FrameDamage, SPILL, type FrameDamageStats } from '../FrameDamage';
 import { UiFrame } from '../../scheduler/UiFrame';
 import { DirtyFlags } from '../../graph/DirtyFlags';
 import { layerRegion, opacityNeedsLayer } from '../GroupOpacity';
@@ -412,7 +412,7 @@ export class Canvas2DRenderer implements UiRenderer {
     } else {
       // Rectangles far apart are walked apart, as a layer's strips are:
       // one walk over both would visit everything between them.
-      for (const group of walkGroups(damage, 2 * SPILL * dpr)) {
+      for (const group of damageGroups(damage, 2 * SPILL * dpr)) {
         this.walkDamage(group, root, frameContext, ctx);
       }
     }
@@ -1574,7 +1574,7 @@ export class Canvas2DRenderer implements UiRenderer {
       this.walkLayer(layer, null, node, rec, context);
       return;
     }
-    for (const group of walkGroups(strips, 2 * SPILL * layer.dpr)) {
+    for (const group of damageGroups(strips, 2 * SPILL * layer.dpr)) {
       this.walkLayer(layer, group, node, rec, context);
     }
   }
@@ -1888,56 +1888,6 @@ function withRepainted(context: RenderContext, nodes: readonly UiNode[] | undefi
   }
   const frame = changes.frame.merged(new UiFrame(changes.frame.id, changes.frame.time, repainted));
   return { ...context, changes: { ...changes, frame } };
-}
-
-/**
- * Strips grouped so that each group is one walk of a layer.
- *
- * Two strips share a group when less than `reach` separates them, which
- * is when their walks, each a spill wider than its strips, would meet.
- * Strips in different groups therefore never overlap, and nothing is
- * painted twice. A group keeps its strips in the order they came, and
- * the groups go in the order of their first strip.
- *
- * Merged by repeated passes rather than one: joining two strips can
- * bring the group within reach of a third that neither was near alone.
- * A frame has a handful of strips, so the passes cost nothing.
- */
-function walkGroups(strips: readonly LayerRect[], reach: number): LayerRect[][] {
-  const groups = strips.map(strip => ({ strips: [strip], box: { ...strip } }));
-  let merged = true;
-  while (merged) {
-    merged = false;
-    for (let i = 0; i < groups.length && !merged; i++) {
-      for (let j = i + 1; j < groups.length; j++) {
-        const a = groups[i].box;
-        const b = groups[j].box;
-        const apart =
-          b.x - (a.x + a.width) >= reach ||
-          a.x - (b.x + b.width) >= reach ||
-          b.y - (a.y + a.height) >= reach ||
-          a.y - (b.y + b.height) >= reach;
-        if (apart) {
-          continue;
-        }
-        const x = Math.min(a.x, b.x);
-        const y = Math.min(a.y, b.y);
-        groups[i] = {
-          strips: [...groups[i].strips, ...groups[j].strips],
-          box: {
-            x,
-            y,
-            width: Math.max(a.x + a.width, b.x + b.width) - x,
-            height: Math.max(a.y + a.height, b.y + b.height) - y
-          }
-        };
-        groups.splice(j, 1);
-        merged = true;
-        break;
-      }
-    }
-  }
-  return groups.map(group => group.strips);
 }
 
 /**

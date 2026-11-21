@@ -1,6 +1,7 @@
 import type { UiNode } from '../../graph/UiNode';
 import { snapBorderWidth, snapBox, snapsUnder, type SnapBox } from '../PixelSnap';
 import { snapScroll } from '../ScrollSnap';
+import { SPILL, type DamageRect } from '../FrameDamage';
 import { UiNodeType } from '../../graph/UiNodeType';
 import { SCROLLBAR_FADE_MS } from '../../layout/LayoutEngine';
 import { SCROLLBAR_THICKNESS, scrollbarThumbs } from '../../layout/Scrollbars';
@@ -285,6 +286,43 @@ export interface RenderList {
   commands: RenderCommand[];
   /** The lines of text the frame drew, in paint order. */
   textRuns: TextRunDraw[];
+  /**
+   * Where the frame drew something that follows the clock rather than a
+   * property (a video, a caret's field, a scrollbar's thumb), in device
+   * pixels: what the next frame draws again. See `FrameDamage.ts`.
+   */
+  volatile: DamageRect[];
+  /**
+   * The lifted nodes the walk met and drew over the frame, in the order
+   * it met them: what a build culled to part of the surface is given,
+   * since its walk may not meet them. Nested ones are not here; they are
+   * met again under these.
+   */
+  lifted: UiNode[];
+  /** Every lifted node drawn over the frame, nested ones too. */
+  liftedNodes: UiNode[];
+  /** Whether a lifted node was drawn at a lift boundary rather than over the frame. */
+  boundaryLifted: boolean;
+}
+
+/** A lifted node held for the top layer, with the opacity and transform it keeps of its ancestors. */
+interface LiftedEntry {
+  node: UiNode;
+  opacity: number;
+  ctm: Affine;
+}
+
+/**
+ * A build of part of the surface, for a frame that draws only its
+ * damage (`FrameDamage.ts`): the walk is culled to `cull` rather than to
+ * the surface, and `lifted` is drawn over it instead of the lifted nodes
+ * it meets, which a culled walk may not reach.
+ */
+export interface PartialBuild {
+  /** What the walk visits, in logical pixels: the damage a `SPILL` wider. */
+  cull: CullRect;
+  /** The lifted nodes the last whole build drew over the frame (`RenderList.lifted`). */
+  lifted: readonly UiNode[];
 }
 
 interface CullRect {
@@ -418,7 +456,8 @@ export function buildRenderList(
   dpr: number,
   now: number = typeof performance !== 'undefined' ? performance.now() : Date.now(),
   overlay: readonly OverlayShape[] = [],
-  textCache: RenderTextCache = createTextCache()
+  textCache: RenderTextCache = createTextCache(),
+  partial: PartialBuild | null = null
 ): RenderList {
   const instanceData = instanceScratch;
   const texturedData = texturedScratch;
@@ -441,7 +480,7 @@ export function buildRenderList(
     ctm: [...IDENTITY] as Affine,
     clip: null,
     rounded: NO_CLIP_INDEX,
-    cull: { x: 0, y: 0, width: logicalWidth, height: logicalHeight }
+    cull: partial === null ? { x: 0, y: 0, width: logicalWidth, height: logicalHeight } : { ...partial.cull }
   };
 
   /**
@@ -450,7 +489,10 @@ export function buildRenderList(
    * layer `state.opacity` counts from the layer, and a lifted node is
    * drawn outside the layers it was met in.
    */
-  const liftedPass: { node: UiNode; opacity: number; ctm: Affine }[] = [];
+  const liftedPass: LiftedEntry[] = [];
+  const liftedNodes: UiNode[] = [];
+  let boundaryLifted = false;
+  const volatile: DamageRect[] = [];
 
   /**
    * The opacity each open layer will be blended at, multiplied out from
@@ -460,6 +502,37 @@ export function buildRenderList(
   const layerOpacities: number[] = [1];
   const physicalWidth = toPhysicalPixels(logicalWidth, dpr);
   const physicalHeight = toPhysicalPixels(logicalHeight, dpr);
+
+  /**
+   * Something drawn now that follows the clock: noted where it lands on
+   * the surface, a `SPILL` wider, so the next frame draws it again.
+   * Always placed, since every instance here carries its transform to
+   * the surface, an opacity group's layer included: the layer is the
+   * surface's size and drawn at the surface's coordinates.
+   */
+  function noteVolatile(box: LayoutBox, ctm: Affine): void {
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const px of [box.x - SPILL, box.x + box.width + SPILL]) {
+      for (const py of [box.y - SPILL, box.y + box.height + SPILL]) {
+        const x = (px * ctm[0] + py * ctm[2] + ctm[4]) * dpr;
+        const y = (px * ctm[1] + py * ctm[3] + ctm[5]) * dpr;
+        left = Math.min(left, x);
+        top = Math.min(top, y);
+        right = Math.max(right, x);
+        bottom = Math.max(bottom, y);
+      }
+    }
+    const x = Math.max(0, Math.floor(left));
+    const y = Math.max(0, Math.floor(top));
+    const width = Math.min(physicalWidth, Math.ceil(right)) - x;
+    const height = Math.min(physicalHeight, Math.ceil(bottom)) - y;
+    if (width > 0 && height > 0) {
+      volatile.push({ x, y, width, height });
+    }
+  }
 
   function closePrimitives(): void {
     const end = instanceData.length / INSTANCE_STRIDE_FLOATS;
@@ -873,6 +946,11 @@ export function buildRenderList(
     // clip, same textured quad — and wins on a node that has both.
     const textureSource: TextureSource | undefined =
       paint.video !== undefined && paint.video.frame !== null ? paint.video : paint.image;
+    if (paint.video !== undefined) {
+      // A new frame arrives on the same surface object, so nothing
+      // about it is dirtied; see `UiVideo.ts`.
+      noteVolatile(rec, nodeCtm);
+    }
     if (textureSource !== undefined) {
       const sourceSize =
         paint.video !== undefined && paint.video.frame !== null
@@ -1168,6 +1246,11 @@ export function buildRenderList(
         // An editable, in the order Canvas2D paints it: selection, text
         // or placeholder, composition underline, caret.
         const model = text.editor;
+        if (model.focused) {
+          // The caret blinks with the clock. Its field's box, which the
+          // field's own clip holds it in wherever its text has scrolled.
+          noteVolatile(rec, nodeCtm);
+        }
         const editable = new EditableLayout(model, contentBox, text, measurer);
         // A run's own background goes under the selection, the same
         // order Canvas2D paints it in.
@@ -1243,12 +1326,15 @@ export function buildRenderList(
     if (rec.liftBoundary) {
       // Inside this node's own clip, over everything under it, and
       // still under whatever comes after this node.
-      drawLifted(liftedFrom, nextClip, nextRounded);
+      drawLifted(liftedFrom, nextClip, nextRounded, true);
     }
 
     if (rec.scrollable || rec.textScrollbars) {
       beginPrimitives(ownScissor);
-      pushScrollbars(instanceData, rec, effectiveOpacity, nodeCtm, ownRounded, now);
+      // They fade with the clock, and nothing is dirtied as they do: each
+      // thumb is noted where it is drawn, and the next frame draws it
+      // again there and nothing else of the container.
+      pushScrollbars(instanceData, rec, effectiveOpacity, nodeCtm, ownRounded, now, noteVolatile);
     }
 
     if (region !== null) {
@@ -1287,7 +1373,12 @@ export function buildRenderList(
    * than iterated, so a lifted node inside a lifted subtree lands
    * after the one that carried it, as paint order says it should.
    */
-  function drawLifted(from = 0, clip: ScissorRect | null = null, rounded: number = NO_CLIP_INDEX): void {
+  function drawLifted(
+    from = 0,
+    clip: ScissorRect | null = null,
+    rounded: number = NO_CLIP_INDEX,
+    boundary = false
+  ): void {
     if (liftedPass.length <= from) {
       return;
     }
@@ -1300,6 +1391,11 @@ export function buildRenderList(
     };
     for (let i = from; i < liftedPass.length; i++) {
       const entry = liftedPass[i]!;
+      if (boundary) {
+        boundaryLifted = true;
+      } else if (!liftedNodes.includes(entry.node)) {
+        liftedNodes.push(entry.node);
+      }
       state.opacity = entry.opacity / layerOpacities[layerOpacities.length - 1];
       state.ctm = entry.ctm;
       // The boundary's own clip still applies; everything inside it
@@ -1317,7 +1413,68 @@ export function buildRenderList(
     state.cull = saved.cull;
   }
 
+  /**
+   * What a lifted node keeps of its ancestors, worked out from them as
+   * the walk would carry it down: their opacity, their sticky shifts,
+   * transforms and scroll offsets. Undefined where the walk would not
+   * draw it: the node or an ancestor hidden, or no longer under the root.
+   */
+  function liftedEntryFor(node: UiNode): LiftedEntry | undefined {
+    const chain: UiNode[] = [];
+    let reached = false;
+    for (let ancestor = node.parent; ancestor !== null; ancestor = ancestor.parent) {
+      chain.push(ancestor);
+      if (ancestor === root) {
+        reached = true;
+        break;
+      }
+    }
+    if (!reached || layout.recordFor(node) === undefined) {
+      return undefined;
+    }
+    let opacity = 1;
+    let ctm: Affine = [...IDENTITY] as Affine;
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const ancestor = chain[i]!;
+      const rec = layout.recordFor(ancestor);
+      if (rec === undefined) {
+        // A fragment: no box, no transform, nothing to apply.
+        continue;
+      }
+      if (!isPaintVisible(ancestor)) {
+        return undefined;
+      }
+      const paint = paintStateOf(ancestor);
+      opacity *= paint.opacity;
+      if (rec.stickyOffsetX !== 0 || rec.stickyOffsetY !== 0) {
+        ctm = translateTransform(ctm, rec.stickyOffsetX, rec.stickyOffsetY);
+      }
+      if (paint.hasTransform) {
+        ctm = multiplyTransform(ctm, buildOwnTransform(rec, paint.transform));
+      }
+      if (rec.scrollable) {
+        ctm = translateTransform(ctm, -snapScroll(rec.scrollX, dpr), -snapScroll(rec.scrollY, dpr));
+      }
+    }
+    return { node, opacity, ctm };
+  }
+
   visit(root);
+  if (partial !== null) {
+    // The lifted nodes the last whole build met, whether or not this
+    // walk reached them, in the same order: drawn over the rest and
+    // clipped to the damage like it, so a rectangle under a popover gets
+    // the popover back. Their ancestors are asked again, since an
+    // opacity above one may be what changed.
+    liftedPass.length = 0;
+    for (const node of partial.lifted) {
+      const entry = liftedEntryFor(node);
+      if (entry !== undefined) {
+        liftedPass.push(entry);
+      }
+    }
+  }
+  const lifted = liftedPass.map(entry => entry.node);
   drawLifted();
   closePrimitives();
 
@@ -1433,7 +1590,11 @@ export function buildRenderList(
     gradientData: gradientData.take(),
     gradientCount: gradientData.length / GRADIENT_STRIDE_FLOATS,
     commands,
-    textRuns
+    textRuns,
+    volatile,
+    lifted,
+    liftedNodes,
+    boundaryLifted
   };
 }
 
@@ -1471,7 +1632,8 @@ function pushScrollbars(
   opacity: number,
   transform: Affine,
   rounded: number,
-  now: number
+  now: number,
+  noteVolatile?: (box: LayoutBox, ctm: Affine) => void
 ): void {
   const remaining = rec.scrollbarVisibleUntil - now;
   if (remaining <= 0) {
@@ -1485,6 +1647,7 @@ function pushScrollbars(
       continue;
     }
     const { x, y, width, height } = bar.thumb;
+    noteVolatile?.(bar.thumb, transform);
     pushInstance(
       out,
       x,

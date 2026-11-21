@@ -34,7 +34,9 @@ function createMockDevice(): GPUDevice {
     }),
     createBindGroup: vi.fn(() => ({})),
     createSampler: vi.fn(() => ({})),
-    createTexture: vi.fn(() => ({
+    createTexture: vi.fn((descriptor: GPUTextureDescriptor) => ({
+      width: (descriptor.size as number[])[0],
+      height: (descriptor.size as number[])[1],
       createView: vi.fn(() => ({})),
       destroy: vi.fn()
     })),
@@ -46,9 +48,12 @@ function createMockDevice(): GPUDevice {
         setIndexBuffer: vi.fn(),
         setBindGroup: vi.fn(),
         setScissorRect: vi.fn(),
+        draw: vi.fn(),
         drawIndexed: vi.fn(),
         end: vi.fn()
       })),
+      copyTextureToTexture: vi.fn(),
+      copyTextureToBuffer: vi.fn(),
       finish: vi.fn(() => ({}))
     }))
   } as unknown as GPUDevice;

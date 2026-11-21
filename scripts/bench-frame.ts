@@ -12,7 +12,10 @@
  *                 renderer walk does before it draws anything
  *   render      — one Canvas2D walk of the tree, with the list scrolled
  *                 to the top so most of it is off screen, which is the
- *                 usual case and the one culling exists for
+ *                 usual case and the one culling exists for; and one
+ *                 WebGPU frame, on a device that does nothing, so what
+ *                 is timed is the CPU's half: the build, the upload
+ *                 calls and the encode
  *   input       — one hit test, the cost of a single pointer move
  *   reconcile   — rebuilding a list's children, keyed and unkeyed
  *
@@ -29,6 +32,8 @@
  * machine's.
  */
 import { Canvas2DRenderer } from '../packages/core/src/rendering/canvas2d/Canvas2DRenderer.ts';
+import { WebGPURenderer } from '../packages/core/src/rendering/webgpu/WebGPURenderer.ts';
+import { WebGPUSurface } from '../packages/core/src/rendering/webgpu/WebGPUSurface.ts';
 import { CanvasSurface } from '../packages/core/src/rendering/canvas2d/CanvasSurface.ts';
 import { CharacterCountTextMeasurer } from '../packages/core/src/layout/TextMeasurer.ts';
 import { Constraints } from '../packages/core/src/layout/LayoutTypes.ts';
@@ -316,7 +321,7 @@ function paintSection(): void {
  * the text. A change that helps one of these can easily do nothing for
  * the other, and reading only the first would have hidden that.
  */
-function renderSection(): void {
+async function renderSection(): Promise<void> {
   console.log('render');
   for (const culled of [true, false]) {
     const { root } = buildList(ROWS);
@@ -346,7 +351,100 @@ function renderSection(): void {
     measure(culled ? 'one node repainted, mostly culled' : 'one node repainted, nothing culled', ITERATIONS, () => {
       renderer.render(root, { ...context, changes: blink() });
     });
+
+    // The same two frames on WebGPU.
+    const gpu = await nullWebGPURenderer();
+    gpu.resize(VIEWPORT_WIDTH, height, 1);
+    measure(culled ? 'webgpu frame, mostly culled' : 'webgpu frame, nothing culled', ITERATIONS, () => {
+      gpu.render(root, context);
+    });
+    gpu.render(root, { ...context, changes: blink() });
+    measure(culled ? 'webgpu one node, mostly culled' : 'webgpu one node, nothing culled', ITERATIONS, () => {
+      gpu.render(root, { ...context, changes: blink() });
+    });
+    // Two rows damaged at once, near each other at a real viewport and
+    // at opposite ends of the list with nothing culled.
+    const far = titles(root)[culled ? Math.min(9, ROWS - 1) : Math.max(0, ROWS - 5)]!;
+    const two = (): RenderChanges => ({
+      frame: new UiFrame(
+        0,
+        0,
+        new Map([
+          [blinking, DirtyFlags.Paint],
+          [far, DirtyFlags.Paint]
+        ])
+      ),
+      geometryVersion: engine.geometryVersion
+    });
+    measure(culled ? 'webgpu two nodes, mostly culled' : 'webgpu two nodes, nothing culled', ITERATIONS, () => {
+      gpu.render(root, { ...context, changes: two() });
+    });
+    gpu.dispose();
   }
+}
+
+/**
+ * A WebGPU renderer on a device whose every call does nothing. Node has
+ * no GPU, so this times what the CPU does for a frame and nothing the
+ * GPU would: the GPU's half is checked in a browser.
+ */
+async function nullWebGPURenderer(): Promise<WebGPURenderer> {
+  const nothing = (): void => {};
+  const texture = (size?: { size?: [number, number] }): GPUTexture =>
+    ({
+      width: size?.size?.[0] ?? VIEWPORT_WIDTH,
+      height: size?.size?.[1] ?? VIEWPORT_HEIGHT,
+      createView: () => ({}),
+      destroy: nothing
+    }) as unknown as GPUTexture;
+  const pass = {
+    setPipeline: nothing,
+    setVertexBuffer: nothing,
+    setIndexBuffer: nothing,
+    setBindGroup: nothing,
+    setScissorRect: nothing,
+    setViewport: nothing,
+    draw: nothing,
+    drawIndexed: nothing,
+    end: nothing
+  };
+  const device = {
+    lost: new Promise(() => {}),
+    queue: { writeBuffer: nothing, submit: nothing, copyExternalImageToTexture: nothing, writeTexture: nothing },
+    createShaderModule: () => ({}),
+    createBindGroupLayout: () => ({}),
+    createPipelineLayout: () => ({}),
+    createRenderPipeline: () => ({}),
+    createBuffer: (descriptor: GPUBufferDescriptor) => ({
+      size: descriptor.size,
+      getMappedRange: () => new ArrayBuffer(descriptor.size),
+      unmap: nothing,
+      destroy: nothing
+    }),
+    createBindGroup: () => ({}),
+    createSampler: () => ({}),
+    createTexture: texture,
+    createCommandEncoder: () => ({
+      beginRenderPass: () => pass,
+      copyTextureToTexture: nothing,
+      copyTextureToBuffer: nothing,
+      finish: () => ({})
+    })
+  };
+  const context = { configure: nothing, unconfigure: nothing, getCurrentTexture: () => texture() };
+  Object.defineProperty(globalThis, 'navigator', {
+    value: {
+      gpu: {
+        requestAdapter: async () => ({ requestDevice: async () => device }),
+        getPreferredCanvasFormat: () => 'bgra8unorm'
+      }
+    },
+    configurable: true
+  });
+  const host = { width: 0, height: 0, getContext: () => context as unknown as GPUCanvasContext };
+  const renderer = new WebGPURenderer({ surface: new WebGPUSurface(host) });
+  await renderer.initialize();
+  return renderer;
 }
 
 /** The rows' title nodes, in order. */
@@ -397,7 +495,7 @@ function reconcileSection(): void {
   }
 }
 
-const sections: ReadonlyArray<[string, () => void]> = [
+const sections: ReadonlyArray<[string, () => void | Promise<void>]> = [
   ['layout', layoutSection],
   ['paint', paintSection],
   ['render', renderSection],
@@ -415,6 +513,6 @@ for (const [name, run] of sections) {
     continue;
   }
   console.log('');
-  run();
+  await run();
 }
 console.log('');

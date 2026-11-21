@@ -9,9 +9,11 @@ import {
   AnimatedCell,
   Canvas2DContext,
   Constraints,
+  DamageRect,
   DecorationShape,
   DirtyFlags,
   FontMetrics,
+  FrameDamageStats,
   LayoutBox,
   LayoutRecord,
   LayoutResult,
@@ -3818,12 +3820,6 @@ declare class RasterCache {
   private make;
   private drop;
 }
-interface FrameDamageStats {
-  whole: number;
-  partial: number;
-  rects: number;
-  pixels: number;
-}
 interface Canvas2DRendererOptions {
   surface: CanvasSurface;
   scrollLayers?: boolean;
@@ -4543,6 +4539,20 @@ interface RenderList {
   gradientCount: number;
   commands: RenderCommand[];
   textRuns: TextRunDraw[];
+  volatile: DamageRect[];
+  lifted: UiNode[];
+  liftedNodes: UiNode[];
+  boundaryLifted: boolean;
+}
+interface PartialBuild {
+  cull: CullRect;
+  lifted: readonly UiNode[];
+}
+interface CullRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 interface RenderTextCache {
   atlas: WebGPUGlyphAtlas;
@@ -4551,7 +4561,7 @@ interface RenderTextCache {
 declare function createTextCache(): RenderTextCache;
 declare function buildRenderList(root: UiNode, layout: {
   recordFor(node: UiNode): LayoutRecord | undefined;
-}, measurer: TextMeasurer, logicalWidth: number, logicalHeight: number, dpr: number, now?: number, overlay?: readonly OverlayShape[], textCache?: RenderTextCache): RenderList;
+}, measurer: TextMeasurer, logicalWidth: number, logicalHeight: number, dpr: number, now?: number, overlay?: readonly OverlayShape[], textCache?: RenderTextCache, partial?: PartialBuild | null): RenderList;
 declare function textRuns(list: RenderList): readonly TextRunDraw[];
 declare function glyphCount(list: RenderList): number;
 declare class WebGPUGlyphPages {
@@ -5028,7 +5038,6 @@ export {
   formatExplanation,
   formatShortcut,
   fr,
-  FrameDamageStats,
   FrLength,
   GestureInput,
   GestureRecognizerOptions,
@@ -5700,6 +5709,7 @@ import {
   fitBorderRadius,
   FixedMetricsOptions,
   FontMetrics,
+  FrameDamageStats,
   hasDecorationPhase,
   interpolateColor,
   interpolateNumber,
@@ -6018,7 +6028,6 @@ import {
   formatExplanation,
   formatShortcut,
   fr,
-  FrameDamageStats,
   FrLength,
   GestureInput,
   GestureRecognizerOptions,
@@ -9083,6 +9092,18 @@ interface UiRenderer {
   nextRepaint?(): number | undefined;
   dispose(): void;
 }
+interface DamageRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+interface FrameDamageStats {
+  whole: number;
+  partial: number;
+  rects: number;
+  pixels: number;
+}
 interface WebGPUCanvasHost {
   width: number;
   height: number;
@@ -9114,6 +9135,7 @@ interface WebGPURendererOptions {
   hooks?: RenderHooks;
   onError?: (message: string) => void;
   onLost?: () => void;
+  dirtyRects?: boolean;
 }
 interface RenderHooks {
   onPrepareStart?(): void;
@@ -9135,6 +9157,7 @@ interface DrawStats {
 }
 declare class WebGPURenderer implements UiRenderer {
   readonly backend: RendererBackend;
+  private readonly options;
   private readonly surface;
   private hooks;
   private device;
@@ -9154,6 +9177,11 @@ declare class WebGPURenderer implements UiRenderer {
   private cachedInstanceLength;
   private readonly viewUniform;
   private groupLayers;
+  private kept;
+  private clearPipeline;
+  private readonly damage;
+  private liftedTop;
+  private readonly timing;
   readonly lastDraws: DrawStats;
   private pendingCapture;
   private lost;
@@ -9161,12 +9189,17 @@ declare class WebGPURenderer implements UiRenderer {
   private readonly onError;
   private readonly onLost;
   constructor(options: WebGPURendererOptions);
+  get damageStats(): FrameDamageStats;
+  resetDamageStats(): void;
   setHooks(hooks: RenderHooks): void;
   initialize(): Promise<void>;
   get isReady(): boolean;
   get isLost(): boolean;
   capture(): Promise<CapturedFrame>;
   render(root: UiNode, context: RenderContext): void;
+  private build;
+  private draw;
+  private keptFrame;
   private groupLayer;
   private takeCapture;
   private clearFrame;
@@ -9203,6 +9236,7 @@ export {
   createTween,
   createWebGPUSurface,
   cubicBezier,
+  DamageRect,
   darkColors,
   decorationColor,
   DecorationFill,
@@ -9224,6 +9258,7 @@ export {
   fitBorderRadius,
   FixedMetricsOptions,
   FontMetrics,
+  FrameDamageStats,
   hasDecorationPhase,
   interpolateColor,
   interpolateNumber,

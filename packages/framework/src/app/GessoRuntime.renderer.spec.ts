@@ -99,9 +99,12 @@ function createMockDevice(): GPUDevice {
         setBindGroup: vi.fn(),
         setScissorRect: vi.fn(),
         executeBundles: vi.fn(),
+        draw: vi.fn(),
         drawIndexed: vi.fn(),
         end: vi.fn()
       })),
+      copyTextureToTexture: vi.fn(),
+      copyTextureToBuffer: vi.fn(),
       finish: vi.fn(() => ({}))
     }))
   } as unknown as GPUDevice;

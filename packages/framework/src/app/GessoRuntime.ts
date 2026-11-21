@@ -4363,8 +4363,8 @@ export class GessoRuntime {
 
     // Render is unconditional once the backend is ready: any frame that
     // got this far may change pixels, and the backend decides how much
-    // to draw. WebGPU draws the whole scene; Canvas2D draws only what
-    // the changes below touch when it can (\`FrameDamage.ts\`). Before
+    // to draw. Both draw only what the changes below touch when they can
+    // (\`FrameDamage.ts\`), WebGPU into a texture it keeps. Before
     // WebGPU has a device there is nothing to draw with; a lost device
     // is replaced, and the frame after it repaints.
     if (this.renderer.backend === 'webgpu' && (this.renderer as WebGPURenderer).isLost) {
@@ -4377,7 +4377,7 @@ export class GessoRuntime {
     const overlay = this.inspector.hasOverlay ? this.inspector.overlay(started) : null;
     this.gpuTimings = null;
     // What changed, for a renderer that keeps pixels across frames
-    // (Canvas2D's dirty rectangles and scroll layers). A node dirtied since the frame was
+    // (dirty rectangles, and Canvas2D's scroll layers). A node dirtied since the frame was
     // collected (by a layout listener, a focus settling, a scroll
     // listener writing a cell) may already show in what is drawn and is
     // not in \`frame\`, so it is added to what the renderer is told, with

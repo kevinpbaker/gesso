@@ -158,31 +158,40 @@ capability.
 
 ## Where they differ
 
-| What               | Canvas2D                                                       | WebGPU                                                                                                                                                |
-| ------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Glyphs             | `fillText` per line, through the browser's own text stack      | Clusters rasterised into a shared atlas, one instanced quad each, consecutive glyphs sharing a page drawn in one call                                 |
-| Ligatures          | Formed by the font                                             | Not formed: clusters are drawn one at a time at prefix widths, so `fi` is an f and an i at the positions the ligature would have taken                |
-| Sub-pixel text     | Whatever the platform does                                     | Three phases per glyph baked into the atlas, and a run's origin snapped to a physical pixel, so spacing error stays under a third of a physical pixel |
-| Text anti-aliasing | Drawn straight into the target                                 | Sampled from a texture, so glyph edges never match at the sub-pixel level                                                                             |
-| Subpixel text      | With `opaqueCanvas`, where the system draws it                 | Never: glyphs come from a grayscale atlas                                                                                                             |
-| Start-up           | Immediate                                                      | Asynchronous: an adapter and a device, with frames before them skipped                                                                                |
-| Failure            | Nothing to lose                                                | A device can be lost, and the runtime falls back on the next frame                                                                                    |
-| Stage timings      | None: `render` is one number                                   | `FrameMetrics.gpu` splits prepare, upload and encode                                                                                                  |
-| Shadow blur        | The browser's blur, an approximation of the Gaussian           | The Gaussian evaluated analytically, so a soft edge's falloff can differ by a few percent of the shadow's colour                                      |
-| Gradient banding   | Whatever the browser draws                                     | Gradients and shadows dithered by under half a level, so a long, subtle ramp does not step; a flat fill is left exact                                 |
-| Partial redraws    | Only the rectangles a frame's changes cover, when no box moved | None: every frame is drawn whole                                                                                                                      |
+| What               | Canvas2D                                                                             | WebGPU                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Glyphs             | `fillText` per line, through the browser's own text stack                            | Clusters rasterised into a shared atlas, one instanced quad each, consecutive glyphs sharing a page drawn in one call                                 |
+| Ligatures          | Formed by the font                                                                   | Not formed: clusters are drawn one at a time at prefix widths, so `fi` is an f and an i at the positions the ligature would have taken                |
+| Sub-pixel text     | Whatever the platform does                                                           | Three phases per glyph baked into the atlas, and a run's origin snapped to a physical pixel, so spacing error stays under a third of a physical pixel |
+| Text anti-aliasing | Drawn straight into the target                                                       | Sampled from a texture, so glyph edges never match at the sub-pixel level                                                                             |
+| Subpixel text      | With `opaqueCanvas`, where the system draws it                                       | Never: glyphs come from a grayscale atlas                                                                                                             |
+| Start-up           | Immediate                                                                            | Asynchronous: an adapter and a device, with frames before them skipped                                                                                |
+| Failure            | Nothing to lose                                                                      | A device can be lost, and the runtime falls back on the next frame                                                                                    |
+| Stage timings      | None: `render` is one number                                                         | `FrameMetrics.gpu` splits prepare, upload and encode                                                                                                  |
+| Shadow blur        | The browser's blur, an approximation of the Gaussian                                 | The Gaussian evaluated analytically, so a soft edge's falloff can differ by a few percent of the shadow's colour                                      |
+| Gradient banding   | Whatever the browser draws                                                           | Gradients and shadows dithered by under half a level, so a long, subtle ramp does not step; a flat fill is left exact                                 |
+| Partial redraws    | The rectangles a frame's changes cover, when no box moved; the canvas keeps the rest | The same rectangles, drawn into a texture the renderer keeps, which is copied to the screen on every frame that draws                                 |
 
-Canvas2D draws a frame in part when it can. A 2D canvas keeps its
-pixels between frames, so on a frame where no box moved, Canvas2D
-clears and draws again only the rectangles the changed nodes cover: a
-caret blink, a hover tint or a fading scrollbar costs one control, not
-the screen. A node lifted over the page is drawn again over whatever
-it covers. Any change it cannot hold in a rectangle (a resize,
-a theme, a box that moved, a turn above the change) draws the whole
-frame.
-`Canvas2DRendererOptions.dirtyRects: false` turns this off. WebGPU draws
-every frame whole: it would need a kept texture of its own to do the
-same.
+Both draw a frame in part when they can. On a frame where no box moved,
+they clear and draw again only the rectangles the changed nodes cover:
+a caret blink, a hover tint or a fading scrollbar costs one control,
+not the screen. A node lifted over the page is drawn again over
+whatever it covers. Any change they cannot hold in a rectangle (a
+resize, a theme, a box that moved, a turn above the change) draws the
+whole frame. The rectangles are the same on both, worked out by one
+piece of code from the same changes.
+
+A 2D canvas keeps its pixels between frames, so Canvas2D draws over
+the last frame where it is. A WebGPU swap chain hands back a texture
+that holds nothing known, so WebGPU draws every frame into a texture of
+its own, which keeps it, and copies that to the screen: one copy of the
+whole surface on every frame that draws, a whole frame too. Changes far apart are drawn apart, each under the
+scissor of its own box, unless one box over all of them adds less than
+a quarter of the surface. A frame with nothing to draw does not touch
+the screen at all.
+
+`Canvas2DRendererOptions.dirtyRects: false` and
+`WebGPURendererOptions.dirtyRects: false` turn this off.
 
 Two things are the same on both and are worth stating because a reader
 looking for a difference will otherwise assume one:

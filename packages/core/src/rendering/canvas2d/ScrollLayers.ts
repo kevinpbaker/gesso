@@ -4,6 +4,7 @@ import { UiNodeType } from '../../graph/UiNodeType';
 import type { LayoutRecord } from '../../layout/LayoutRecord';
 import type { LayoutReader, RenderChanges } from '../RenderContext';
 import { snapScroll } from '../ScrollSnap';
+import { SPILL } from '../FrameDamage';
 import type { Canvas2DContext } from './Canvas2DContext';
 import type { CanvasHost } from './CanvasSurface';
 
@@ -733,12 +734,6 @@ function boxOf(layout: LayoutReader, node: UiNode): ItemBox | undefined {
   return rec === undefined ? undefined : { x: rec.x, y: rec.y, width: rec.width, height: rec.height };
 }
 
-/**
- * How far past its box, in layout pixels, an item may paint: a focus
- * ring, a shadow, a glyph's overhang. What a damaged item is widened by,
- * and how far past a strip the walk that paints it looks.
- */
-export const SPILL = 8;
 /** Damage over this share of a layer repaints all of it in one walk. */
 const MOSTLY = 0.5;
 
