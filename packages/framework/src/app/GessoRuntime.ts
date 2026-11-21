@@ -4439,12 +4439,25 @@ export class GessoRuntime {
     if (next === undefined || this.scrollbarTimer !== null) {
       return;
     }
+    const showing = this.engine.scrollbarsShowing(now);
     this.scrollbarTimer = setTimeout(
       () => {
         this.scrollbarTimer = null;
-        if (this.root !== undefined) {
-          this.graph.markDirty(this.root, DirtyFlags.Paint);
+        // A frame with nothing marked: a fade changes no property, only
+        // the thumbs, and a renderer that keeps its pixels draws again
+        // where it drew them by the clock last frame (see
+        // \`FrameDamage.ts\`). Marking the root, as this did, made
+        // Canvas2D draw the whole surface on every frame of every fade.
+        // A container whose bars have now gone is marked, once: that is
+        // what lets a scroll layer refused for holding a fading bar be
+        // built again.
+        const still = new Set(this.engine.scrollbarsShowing(currentTime()));
+        for (const node of showing) {
+          if (!still.has(node)) {
+            this.graph.markDirty(node, DirtyFlags.Paint);
+          }
         }
+        this.scheduler.repaint();
       },
       Math.max(16, next - now)
     );
@@ -4714,6 +4727,9 @@ export interface FrameMetrics {
 function now(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
+
+/** \`now\`, where a parameter of that name hides it. */
+const currentTime = now;
 
 /**
  * Converts a `now()` reading to the cross-thread epoch clock.

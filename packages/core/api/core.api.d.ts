@@ -3068,6 +3068,7 @@ declare class LayoutEngine {
   scrollContainers(): Iterable<UiNode>;
   private scrollbarNodes;
   nextScrollbarChange(now: number): number | undefined;
+  scrollbarsShowing(now: number): UiNode[];
   contentWindow(node: UiNode): LayoutBox;
   detachNode(node: UiNode): void;
   private measure;
@@ -3832,7 +3833,9 @@ declare class Canvas2DRenderer implements UiRenderer {
   private layerDepth;
   private volatileDraws;
   private readonly damage;
+  private liftedTop;
   private liftedDrawn;
+  private boundaryLiftedDrawn;
   private readonly groups;
   private groupDepth;
   constructor(options: Canvas2DRendererOptions);
@@ -4686,6 +4689,7 @@ declare class UiScheduler {
   private collecting;
   private frames;
   private readonly drained;
+  private repaintWanted;
   constructor(options: UiSchedulerOptions);
   notifyDirty(): void;
   wake(): void;
@@ -4695,6 +4699,7 @@ declare class UiScheduler {
   get running(): boolean;
   get framePending(): boolean;
   get frameCount(): number;
+  repaint(): void;
   flush(time: UiFrameTime): void;
   recollect(frame: UiFrame): UiFrame;
   private handleFrame;

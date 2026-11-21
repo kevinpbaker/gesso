@@ -119,6 +119,24 @@ describe('UiScheduler', () => {
       expect(clock.isPending).toBe(false);
     });
 
+    it('processes a frame asked for by repaint though nothing is dirty, and only that one', () => {
+      const { scheduler, clock, onFrame } = createScheduler();
+      scheduler.start();
+      scheduler.wake();
+      clock.tick(0);
+      // A wake with nothing written is no frame at all.
+      expect(onFrame).not.toHaveBeenCalled();
+
+      scheduler.repaint();
+      clock.tick(16);
+      expect(onFrame).toHaveBeenCalledTimes(1);
+      expect(onFrame.mock.calls[0]![0].size).toBe(0);
+
+      scheduler.wake();
+      clock.tick(32);
+      expect(onFrame).toHaveBeenCalledTimes(1);
+    });
+
     it('does not process synchronously', () => {
       const { scheduler, dirty, onFrame } = createScheduler();
       dirty.mark(createNode('a'));

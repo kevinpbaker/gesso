@@ -176,15 +176,51 @@ describe('dirty rectangles', () => {
     frame({ now: 0 });
     expect(cleared()).toEqual([LIST]);
 
-    // Nothing is dirtied as it fades, but it is drawn again.
+    // Nothing is dirtied as it fades, but the thumb is drawn again where
+    // it was, and nothing else of the list: 6 wide at 192 by 122..146 of
+    // the list's 120..220, a spill wider and doubled.
+    const THUMB = [368, 228, 44, 80];
     frame({ now: 100 });
-    expect(cleared()).toEqual([LIST]);
+    expect(cleared()).toEqual([THUMB]);
 
     // Faded: drawn once more without it, then left alone.
     frame();
-    expect(cleared()).toEqual([LIST]);
+    expect(cleared()).toEqual([THUMB]);
     frame();
     expect(cleared()).toEqual([]);
+  });
+
+  describe('lifted nodes', () => {
+    it('draws one lying over the damage again, over what is under it', () => {
+      // \`a\`, lifted and carried down over \`b\`.
+      set(a, 'lift', true);
+      set(a, 'transform', { translateY: 60 });
+      frame();
+      set(b, 'backgroundColor', '#00ff00');
+      frame();
+      expect(cleared()).toEqual([B]);
+      // \`b\`, then \`a\` over it: the walk culled to \`B\` never reaches \`a\`
+      // from the tree, where its box is still at the top.
+      expect(fills()).toEqual([
+        [0, 60, 100, 40],
+        [0, 0, 100, 40]
+      ]);
+      expect(renderer.damageStats).toMatchObject({ whole: 2, partial: 1 });
+    });
+
+    it('damages a lifted node where it is drawn when an ancestor changes', () => {
+      // A tip inside \`b\`, lifted and drawn 150 below it.
+      const tip = box('tip', 20, 20, '#ffff00');
+      set(tip, 'lift', true);
+      set(tip, 'transform', { translateY: 150 });
+      graph.appendChild(b, tip);
+      graph.markDirty(b, DirtyFlags.Children | DirtyFlags.Layout);
+      frame();
+      set(b, 'opacity', 0.5);
+      frame();
+      // \`b\` where it is, and the tip at 0..20 by 210..230, a spill wider.
+      expect(cleared()).toEqual([B, [0, 404, 56, 72]]);
+    });
   });
 
   describe('draws the whole surface', () => {
@@ -244,10 +280,13 @@ describe('dirty rectangles', () => {
       expect(cleared()).toEqual([]);
     });
 
-    it('after a frame that drew a lifted node', () => {
-      set(a, 'lift', true);
+    it('when a scroll moves a lifted node', () => {
+      const tip = box('tip', 20, 20, '#ffff00');
+      set(tip, 'lift', true);
+      graph.appendChild(list.firstChild!, tip);
+      graph.markDirty(list.firstChild!, DirtyFlags.Children | DirtyFlags.Layout);
       frame();
-      set(b, 'backgroundColor', '#00ff00');
+      set(list, 'scrollY', 30);
       frame();
       expectWhole();
     });

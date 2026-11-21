@@ -280,7 +280,8 @@ export class ScrollLayerCache {
     }
     // A refused container is tried again once anything in or above it
     // changes, which is how a caret or a fading scrollbar inside it ends:
-    // the blink or the fade timer marks the root.
+    // the blink timer marks the field, the fade timer the container whose
+    // bars are fading.
     for (const [node, flags] of frame.entries()) {
       // Its own scroll, or an ancestor's, changes nothing it holds.
       if (flags === DirtyFlags.Transform) {

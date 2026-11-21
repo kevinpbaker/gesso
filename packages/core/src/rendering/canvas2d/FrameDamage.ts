@@ -42,17 +42,27 @@ import { SPILL, type LayerRect } from './ScrollLayers';
  *   - any box moved, including a transform changing, a sticky node
  *     shifting, a node added or removed;
  *   - the root itself was dirtied, which is how the runtime asks for a
- *     repaint that nothing else describes (a scrollbar fading, a kept
- *     subtree drawn sharp, the inspector) and how a theme changes;
+ *     repaint that nothing else describes (a kept subtree drawn sharp,
+ *     the inspector) and how a theme changes;
  *   - a turn, a flip or a zero scale above a dirty node, which this
  *     does not carry a box through;
  *   - the inspector's overlay, this frame or the last;
- *   - a lifted node drawn on a recent frame: it is drawn wherever its
- *     anchor puts it, outside every clip, and a walk culled to a
- *     rectangle does not reach it from an ancestor the rectangle misses;
+ *   - a scroll above a lifted node, which carries it somewhere its old
+ *     pixels do not say; or a lifted node drawn at a lift boundary
+ *     rather than over everything, which a walk culled to a rectangle
+ *     does not reach from an ancestor the rectangle misses;
  *   - something drawn by the clock inside a layer, a kept subtree or an
  *     opacity group, where where it landed on the surface is not known;
  *   - damage over half the surface, which one walk draws for less.
+ *
+ * **Lifted nodes.** A popover, a menu, a dialog is drawn over everything
+ * else and wherever its anchor puts it, so a walk culled to a rectangle
+ * may never reach it from its ancestors. The renderer draws the lifted
+ * nodes the last frame drew over every partial walk, clipped to its
+ * rectangles like everything else (\`Canvas2DRenderer.walk\`), and a
+ * change to a lifted node's ancestor (an opacity, a colour passed down)
+ * damages the lifted node where it is drawn as well as where the
+ * ancestor is.
  *
  * WebGPU draws every frame whole. It would need its own kept texture
  * and a copy of it, which this does not attempt.
@@ -65,8 +75,10 @@ export class FrameDamage {
   private height = 0;
   private geometry = Number.NaN;
   private overlaid = false;
-  /** A lifted node was drawn on the last frame, so the next is drawn whole. */
-  private lifted = false;
+  /** The lifted nodes the last frame drew, nested ones included. */
+  private lifted: readonly UiNode[] = [];
+  /** The last frame drew a lifted node at a lift boundary, so the next is drawn whole. */
+  private boundaryLifted = false;
   /** Where the last frame drew something that follows the clock, in device pixels. */
   private volatile: LayerRect[] = [];
   private readonly nextVolatile: LayerRect[] = [];
@@ -108,7 +120,7 @@ export class FrameDamage {
       changes.geometryVersion !== this.geometry ||
       overlaid ||
       this.overlaid ||
-      this.lifted ||
+      this.boundaryLifted ||
       this.unplaced;
     this.forced = false;
     this.dpr = dpr;
@@ -142,10 +154,15 @@ export class FrameDamage {
     }
   }
 
-  /** The frame finished. `lifted` says whether it drew a lifted node. */
-  end(lifted: boolean): void {
+  /**
+   * The frame finished. \`lifted\` is every lifted node it drew over the
+   * rest of the frame; \`boundaryLifted\` whether it drew one at a lift
+   * boundary instead.
+   */
+  end(lifted: readonly UiNode[], boundaryLifted: boolean): void {
     this.open = false;
     this.lifted = lifted;
+    this.boundaryLifted = boundaryLifted;
     this.unplaced = this.nextUnplaced;
     this.volatile = this.nextVolatile.slice();
   }
@@ -180,6 +197,24 @@ export class FrameDamage {
       }
       if (rect !== undefined) {
         add(rect);
+      }
+      // What an ancestor changes (an opacity, a colour passed down)
+      // shows on a lifted node inside it, which is drawn elsewhere; a
+      // scroll moves it there, from where it was.
+      for (const lifted of this.lifted) {
+        if (lifted === node || !isAncestor(node, lifted)) {
+          continue;
+        }
+        if ((flags & DirtyFlags.Transform) !== 0) {
+          return null;
+        }
+        const reach = this.surfaceRect(lifted, root, context);
+        if (reach === null) {
+          return null;
+        }
+        if (reach !== undefined) {
+          add(reach);
+        }
       }
     }
     return area > this.width * this.height * MOSTLY ? null : rects;
@@ -300,6 +335,16 @@ function placeThrough(
   into.top += rec.stickyOffsetY;
   into.bottom += rec.stickyOffsetY;
   return true;
+}
+
+/** Whether \`ancestor\` is above \`node\` in the tree. */
+function isAncestor(ancestor: UiNode, node: UiNode): boolean {
+  for (let current = node.parent; current !== null; current = current.parent) {
+    if (current === ancestor) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function covers(outer: LayerRect, inner: LayerRect): boolean {

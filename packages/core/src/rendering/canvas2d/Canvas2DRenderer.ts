@@ -232,8 +232,16 @@ export class Canvas2DRenderer implements UiRenderer {
   private volatileDraws = 0;
   /** What each frame draws again; see `FrameDamage.ts`. */
   private readonly damage = new FrameDamage();
-  /** Whether this frame drew a lifted node, which the next frame cannot redraw in part. */
-  private liftedDrawn = false;
+  /**
+   * The lifted nodes the last whole walk met, in the order it met them:
+   * what a partial walk draws over the rest, since it may not reach them
+   * itself. Unchanged by a partial frame, which no box moved in.
+   */
+  private liftedTop: UiNode[] = [];
+  /** Every lifted node this frame drew over the rest, nested ones too; see \`FrameDamage\`. */
+  private liftedDrawn: UiNode[] = [];
+  /** Whether this frame drew a lifted node at a lift boundary, which a partial walk cannot. */
+  private boundaryLiftedDrawn = false;
   /**
    * The canvases opacity groups are drawn in, one per depth of nesting,
    * so a group inside a group never draws over what holds it. Each
@@ -364,7 +372,8 @@ export class Canvas2DRenderer implements UiRenderer {
       this.damage.invalidate();
     }
     const damage = this.damage.begin(root, context, dpr, width, height);
-    this.liftedDrawn = false;
+    this.liftedDrawn = [];
+    this.boundaryLiftedDrawn = false;
     // Counted on every frame, those drawn in part too: how many frames
     // text has been still decides whether it is copied or drawn
     // directly, and the two differ by a shade in a glyph's edge. Counting
@@ -378,7 +387,7 @@ export class Canvas2DRenderer implements UiRenderer {
     this.layers.beginFrame(this.options.scrollLayers === false ? undefined : context.changes, dpr, width, height);
     if (damage === null) {
       this.beginFrame(ctx);
-      this.walk(root, context, ctx, 0, 0, this.surface.logicalWidth, this.surface.logicalHeight);
+      this.walk(root, context, ctx, 0, 0, this.surface.logicalWidth, this.surface.logicalHeight, false);
       if (context.overlay !== undefined && context.overlay.length > 0) {
         drawOverlayShapes(ctx, context.overlay);
       }
@@ -399,7 +408,7 @@ export class Canvas2DRenderer implements UiRenderer {
     }
     this.rasters?.endFrame();
     paintPictures.endFrame();
-    this.damage.end(this.liftedDrawn);
+    this.damage.end(this.liftedDrawn, this.boundaryLiftedDrawn);
   }
 
   /** One walk of the tree from the root, culled to a region in layout-root pixels. */
@@ -410,7 +419,8 @@ export class Canvas2DRenderer implements UiRenderer {
     x: number,
     y: number,
     width: number,
-    height: number
+    height: number,
+    partial: boolean
   ): void {
     this.cullStack.length = 0;
     this.cullX = x;
@@ -428,6 +438,16 @@ export class Canvas2DRenderer implements UiRenderer {
     this.groupDepth = 0;
     this.rasterDepth = 0;
     this.renderNode(root, context, ctx, true, false);
+    if (partial) {
+      // The lifted nodes the last whole walk met, whether or not this one
+      // reached them, in the same order: drawn over the rest and clipped
+      // to the damage like it, so a rectangle under a popover gets the
+      // popover back.
+      this.liftedPass.length = 0;
+      this.liftedPass.push(...this.liftedTop);
+    } else {
+      this.liftedTop = this.liftedPass.slice();
+    }
     this.renderLifted(context, ctx);
   }
 
@@ -464,7 +484,7 @@ export class Canvas2DRenderer implements UiRenderer {
     const x1 = Math.min(this.surface.logicalWidth, right / dpr + SPILL);
     const y1 = Math.min(this.surface.logicalHeight, bottom / dpr + SPILL);
     try {
-      this.walk(root, context, ctx, x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0));
+      this.walk(root, context, ctx, x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0), true);
     } finally {
       ctx.restore();
     }
@@ -850,9 +870,13 @@ export class Canvas2DRenderer implements UiRenderer {
     // lifted subtree is appended while this runs, and it belongs after
     // the one that carried it, as paint order says.
     const dpr = this.surface.dpr;
-    this.liftedDrawn = true;
     for (let i = from; i < this.liftedPass.length; i++) {
       const node = this.liftedPass[i]!;
+      if (boundary !== null) {
+        this.boundaryLiftedDrawn = true;
+      } else if (!this.liftedDrawn.includes(node)) {
+        this.liftedDrawn.push(node);
+      }
       ctx.save();
       if (boundary === null) {
         // The frame's own base: every clip is unwound and the walk is
@@ -1681,8 +1705,9 @@ export class Canvas2DRenderer implements UiRenderer {
     if (remaining <= 0) {
       return;
     }
-    // It fades with the clock, and nothing is dirtied as it does.
-    this.noteVolatile(ctx, rec);
+    // It fades with the clock, and nothing is dirtied as it does: each
+    // thumb is noted where it is drawn, so the next frame draws it again
+    // there and nothing else of the container.
     const alpha = Math.min(1, remaining / SCROLLBAR_FADE_MS) * 0.55;
     ctx.fillStyle = `rgba(128,128,128,${alpha.toFixed(3)})`;
     const { vertical, horizontal } = scrollbarThumbs(rec);
@@ -1691,6 +1716,7 @@ export class Canvas2DRenderer implements UiRenderer {
         continue;
       }
       const { x, y, width, height } = bar.thumb;
+      this.noteVolatile(ctx, bar.thumb);
       traceRoundedRect(ctx, x, y, width, height, SCROLLBAR_THICKNESS / 2);
       ctx.fill();
     }

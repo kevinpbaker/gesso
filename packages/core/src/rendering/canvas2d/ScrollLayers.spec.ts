@@ -308,8 +308,8 @@ describe('scroll layers', () => {
   });
 
   it('keeps the layer when the runtime asks for a frame at the root', () => {
-    // A scrollbar fading or an inspector outline marks the root for paint
-    // and nothing else: nothing inside the container changed.
+    // An inspector outline or a kept subtree settling marks the root for
+    // paint and nothing else: nothing inside the container changed.
     scrollTo(10);
     graph.markDirty(root, DirtyFlags.Paint);
     frame();
@@ -485,8 +485,9 @@ describe('scroll layers', () => {
     expect(renderer.scrollLayerStats.built).toBe(0);
 
     // The scrollbar has faded, and the runtime's fade timer marked the
-    // root: the refusal is lifted and the next scroll builds again.
-    graph.markDirty(root, DirtyFlags.Paint);
+    // container whose bar it was: the refusal is lifted and the next
+    // scroll builds again.
+    graph.markDirty(inner, DirtyFlags.Paint);
     frame();
     scrollTo(30);
     expect(renderer.scrollLayerStats.built).toBe(1);

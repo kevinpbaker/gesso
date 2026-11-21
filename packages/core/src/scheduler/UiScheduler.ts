@@ -95,6 +95,8 @@ export class UiScheduler {
    * nothing outside collectFrame ever sees the array.
    */
   private readonly drained: UiNode[] = [];
+  /** A frame was asked for by \`repaint\`, to be processed though nothing is dirty. */
+  private repaintWanted = false;
 
   constructor(options: UiSchedulerOptions) {
     this.dirty = options.dirty;
@@ -207,6 +209,23 @@ export class UiScheduler {
    * the backing store — where waiting for the clock would present the
    * cleared surface for a frame.
    */
+  /**
+   * Arms a frame that runs even if nothing is dirty by the time it is
+   * collected: a frame for the renderer alone.
+   *
+   * \`wake\` arms a frame that does nothing unless \`beforeCollect\` writes
+   * something, which is right for an animation and wrong for what
+   * changes with the clock and no property at all. A scrollbar fading
+   * is the case: marking a node to get its frame told the renderer that
+   * node changed, and a renderer that draws only what changed drew all
+   * of it. A renderer that keeps its pixels knows what it drew by the
+   * clock and draws that again; this gives it the frame to do it in.
+   */
+  repaint(): void {
+    this.repaintWanted = true;
+    this.wake();
+  }
+
   flush(time: UiFrameTime): void {
     if (this.disposed || !this.active) {
       return;
@@ -284,12 +303,14 @@ export class UiScheduler {
       } finally {
         this.collecting = false;
       }
+      const repaint = this.repaintWanted;
+      this.repaintWanted = false;
       let processed = 0;
       if (measuring) {
         processed = markNow();
         measureSpan('collect', collected, processed);
       }
-      if (frame.size > 0) {
+      if (frame.size > 0 || repaint) {
         this.onFrame(frame);
       }
       if (measuring) {

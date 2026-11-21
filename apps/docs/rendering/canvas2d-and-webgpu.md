@@ -165,9 +165,11 @@ capability.
 Canvas2D draws a frame in part when it can. A 2D canvas keeps its
 pixels between frames, so on a frame where no box moved, Canvas2D
 clears and draws again only the rectangles the changed nodes cover: a
-caret blink or a hover tint costs one control, not the screen. Any
-change it cannot hold in a rectangle (a resize, a theme, a box that
-moved, a turn above the change) draws the whole frame.
+caret blink, a hover tint or a fading scrollbar costs one control, not
+the screen. A node lifted over the page is drawn again over whatever
+it covers. Any change it cannot hold in a rectangle (a resize,
+a theme, a box that moved, a turn above the change) draws the whole
+frame.
 `Canvas2DRendererOptions.dirtyRects: false` turns this off. WebGPU draws
 every frame whole: it would need a kept texture of its own to do the
 same.

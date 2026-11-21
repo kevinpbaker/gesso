@@ -1879,6 +1879,27 @@ export class LayoutEngine {
   }
 
   /**
+   * The nodes whose scrollbars are showing at \`now\`: what the next
+   * fade or disappearance redraws, and nothing else. A host marks these
+   * for its repaint rather than the root, so a renderer that draws only
+   * what changed draws only them.
+   */
+  scrollbarsShowing(now: number): UiNode[] {
+    const showing: UiNode[] = [];
+    for (const node of this.scrollbarNodes()) {
+      const rec = this.records.get(node);
+      if (rec === undefined || !(rec.scrollable || rec.textScrollbars) || rec.scrollbarVisibleUntil <= now) {
+        continue;
+      }
+      if (rec.contentWidth <= rec.width && rec.contentHeight <= rec.height) {
+        continue;
+      }
+      showing.push(node);
+    }
+    return showing;
+  }
+
+  /**
    * The visible window of a scroll container over its content,
    * in content coordinates.
    */
