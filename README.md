@@ -29,6 +29,8 @@ playing Pong, that you can open up and rewire while it plays without the game or
 
 The web has a document toolkit. Gesso is an application toolkit: the kind of thing SwiftUI is on the Mac and Compose is on Android, written in TypeScript and running in any modern browser.
 
+[![Gesso on StartupScores](https://startupscores.com/badge/gesso.svg?style=shield&v=combo&theme=dark)](https://startupscores.com/open-source/gesso)
+
 You describe a screen as a tree of components. Stacks are `row` and `column`, sizes and alignment are typed props, and colour comes from the theme. There is no DOM underneath, no stylesheet and no virtual DOM. The engine lays the tree out with flex and grid semantics checked against Chrome, sets text in every script, and paints through Canvas2D or WebGPU.
 
 ## Why it stays fast
