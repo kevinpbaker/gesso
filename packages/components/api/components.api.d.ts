@@ -293,6 +293,7 @@ interface SliderProps extends ControlLayoutProps {
   labelHidden?: boolean;
   trackAlign?: 'center' | 'start';
   thumb?: boolean;
+  paintedFill?: boolean;
 }
 declare function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiChild;
 interface RangeSliderProps extends ControlLayoutProps {

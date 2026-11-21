@@ -24,7 +24,17 @@ import {
   type ControlLayoutProps,
   modifiersOf
 } from './internals';
-import { fractionOf, pageStep, readsRightToLeft, snap, thumbLayer, trackFill, valueAt } from './sliderTrack';
+import {
+  fractionOf,
+  pageStep,
+  paintedFill,
+  paintedThumb,
+  readsRightToLeft,
+  snap,
+  thumbLayer,
+  trackFill,
+  valueAt
+} from './sliderTrack';
 
 /**
  * A value chosen from a range.
@@ -74,6 +84,25 @@ export interface SliderProps extends ControlLayoutProps {
    * says so, and it is a bigger target than a six pixel line.
    */
   thumb?: boolean;
+  /**
+   * Draw the fill and the thumb at the value, rather than lay them out
+   * there.
+   *
+   * For a value that moves on its own, many times a second: a playing
+   * clip's position. Laid out, every step of it is a layout change, and
+   * a frame in which a box moved is drawn whole on both renderers, so a
+   * playing clip drew the whole surface several times a second for a
+   * line a few pixels longer. Drawn, a step is a repaint of the track
+   * and nothing else, and the frame draws only the part that changed.
+   *
+   * It looks the same and is hit the same: the boxes are still there,
+   * the full width of the track, and the presses, keys and value
+   * spoken are all the slider's own, none of them the fill's. Off by
+   * default, because a value a person moves changes too seldom for its
+   * layout to cost anything, and a laid-out fill is a box a test or an
+   * inspector can read.
+   */
+  paintedFill?: boolean;
 }
 
 /**
@@ -85,6 +114,10 @@ export interface SliderProps extends ControlLayoutProps {
  * the control's own box may clip.
  */
 const THUMB = 12;
+
+/** The fill's height, centred in the track, and the radius of its corners. */
+const FILL_HEIGHT = 4;
+const FILL_RADIUS = 2;
 
 export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiChild {
   const label = input(inputs.label, '');
@@ -144,6 +177,10 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
   );
 
   const labelHidden = input(inputs.labelHidden, false);
+  // Read once, like `thumb`: which boxes the track is made of is decided
+  // when it is built.
+  const painted = inputs.paintedFill.value === true;
+  const shown = combineLatest([labelHidden, spoken]).pipe(map(([hidden, text]) => (hidden ? '' : text)));
 
   return Column(
     {
@@ -186,7 +223,11 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
         overflow: 'hidden'
       },
       Text({ text: label, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false }),
-      Text({ text: spoken, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })
+      // Nothing while hidden. The value is spoken from the slider's own
+      // `valueText`, not from here, and new text is laid out even in a
+      // row of no height: a seek bar's clock changing every second drew
+      // a whole frame every second for a label nobody sees.
+      Text({ text: shown, color: foregroundToken(disabled), textStyle: 'bodySmall', selectable: false })
     ),
     // The filled part is a percentage of the track, so the thumb's
     // position is layout rather than an offset computed per frame.
@@ -230,16 +271,24 @@ export function Slider(inputs: Inputs<SliderProps>, ctx: ComponentContext): UiCh
           x: 'start',
           y: 'center'
         },
-        Box({
-          height: 4,
-          width: fraction.pipe(map(part => percent(part * 100))),
-          borderRadius: 2,
-          backgroundColor: trackFill(disabled)
-        })
+        painted
+          ? paintedFill(fraction, trackFill(disabled), FILL_HEIGHT, FILL_RADIUS)
+          : Box({
+              height: FILL_HEIGHT,
+              width: fraction.pipe(map(part => percent(part * 100))),
+              borderRadius: FILL_RADIUS,
+              backgroundColor: trackFill(disabled)
+            })
       ),
       // A second layer over the track, measured from the same fraction
       // the fill is, so the two cannot disagree about where the value is.
-      ...(inputs.thumb.value !== true ? [] : [thumbLayer(fraction, THUMB, { backgroundColor: trackFill(disabled) })])
+      ...(inputs.thumb.value !== true
+        ? []
+        : [
+            painted
+              ? paintedThumb(fraction, THUMB, trackFill(disabled))
+              : thumbLayer(fraction, THUMB, { backgroundColor: trackFill(disabled) })
+          ])
     )
   );
 }

@@ -1,5 +1,18 @@
-import { map, type Observable } from 'rxjs';
-import { Box, Row, percent, resolveString, type BoxProps, type LayoutBox, type UiChild, type UiNode } from 'gesso-core';
+import { combineLatest, map, type Observable } from 'rxjs';
+import {
+  Box,
+  Paint,
+  Row,
+  percent,
+  resolveString,
+  type BoxProps,
+  type LayoutBox,
+  type PaintBox,
+  type PaintSurface,
+  type UiChild,
+  type UiNode,
+  type UiPaint
+} from 'gesso-core';
 
 import { quantize } from './internals';
 
@@ -112,6 +125,105 @@ export function thumbLayer(fraction: Observable<number>, diameter: number, props
       flexShrink: 0,
       borderRadius: diameter / 2,
       marginStart: -diameter / 2
+    })
+  );
+}
+
+/**
+ * A span's start and length with each end on its nearest device pixel,
+ * which is where the renderers paint a laid-out box's edges
+ * (`PixelSnap`'s rule). A painted fill and thumb at a fraction of the
+ * track would otherwise have a soft edge where the laid-out ones have a
+ * sharp one. A picture is itself placed on whole device pixels, so its
+ * own coordinates snap at its own scale.
+ */
+function snapped(start: number, length: number, scale: number): [number, number] {
+  const from = Math.round(start * scale);
+  const to = Math.round((start + length) * scale);
+  return [from / scale, (to - from) / scale];
+}
+
+/**
+ * The fill, drawn at `fraction` of a box the full width of the track
+ * rather than laid out that wide: see `SliderProps.paintedFill`.
+ *
+ * The same rounded bar the laid-out fill is, in the same place: the box
+ * is where the laid-out fill starts and as tall, and the bar is drawn
+ * `fraction` of its width from the side the track starts at. The
+ * picture is made again when the fraction or the colour changes, and,
+ * because a reading direction is carried in the node's environment and
+ * a new environment makes a picture again, when the direction does.
+ */
+export function paintedFill(
+  fraction: Observable<number>,
+  color: Observable<string>,
+  height: number,
+  radius: number
+): UiChild {
+  let node: UiNode | null = null;
+  const draw = (surface: PaintSurface, box: PaintBox, part: number, fill: string): void => {
+    const length = part * box.width;
+    const [x, width] = snapped(readsRightToLeft(node) ? box.width - length : 0, length, box.scale);
+    if (width <= 0) {
+      return;
+    }
+    surface.fillColor(fill);
+    surface.beginPath();
+    surface.roundRect(x, 0, width, height, radius);
+    surface.fill();
+  };
+  return Paint({
+    ref: (at: UiNode | null) => (node = at),
+    width: percent(100),
+    height,
+    hitTestable: false,
+    paint: combineLatest([fraction, color]).pipe(
+      map(([part, fill]): UiPaint => ({
+        draw: (surface, box) => draw(surface, box, part, fill),
+        inputs: [part, fill]
+      }))
+    )
+  });
+}
+
+/**
+ * The thumb, drawn centred on `fraction` of the track rather than laid
+ * out there: see `SliderProps.paintedFill`.
+ *
+ * Over the track in a layer of its own, as `thumbLayer`'s is, and in the
+ * same place. The painted box overhangs the track by half the thumb on
+ * each side and is the thumb's height, so a thumb at either end, which
+ * hangs half off the track, is inside the box it is drawn in: a picture
+ * is cut to its box, and the box is what a frame draws again when the
+ * picture changes.
+ */
+export function paintedThumb(fraction: Observable<number>, diameter: number, color: Observable<string>): UiChild {
+  const half = diameter / 2;
+  let node: UiNode | null = null;
+  const draw = (surface: PaintSurface, box: PaintBox, part: number, fill: string): void => {
+    const along = readsRightToLeft(node) ? 1 - part : part;
+    const [x, width] = snapped(along * (box.width - diameter), diameter, box.scale);
+    surface.fillColor(fill);
+    surface.beginPath();
+    surface.roundRect(x, 0, width, diameter, half);
+    surface.fill();
+  };
+  return Box(
+    { width: percent(100), height: 6, y: 'center', hitTestable: false, position: 'relative' },
+    Paint({
+      ref: (at: UiNode | null) => (node = at),
+      position: 'absolute',
+      left: -half,
+      right: -half,
+      top: 3 - half,
+      height: diameter,
+      hitTestable: false,
+      paint: combineLatest([fraction, color]).pipe(
+        map(([part, fill]): UiPaint => ({
+          draw: (surface, box) => draw(surface, box, part, fill),
+          inputs: [part, fill]
+        }))
+      )
     })
   );
 }

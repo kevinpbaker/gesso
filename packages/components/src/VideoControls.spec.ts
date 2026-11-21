@@ -9,9 +9,17 @@ import {
   type Inputs
 } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
-import { Box, Column, type UiChild, type VideoTransport } from 'gesso-core';
+import {
+  Box,
+  Canvas2DRenderer,
+  Column,
+  DirtyFlags,
+  type RenderContext,
+  type UiChild,
+  type VideoTransport
+} from 'gesso-core';
 
-import { followTransport, type VideoReadout } from './VideoControls';
+import { followTransport, VideoControls, type VideoReadout } from './VideoControls';
 
 /**
  * `followTransport`, the readout under the bar and under a player's
@@ -130,5 +138,67 @@ describe('followTransport', () => {
     transport.value = new FakeTransport();
     expect(animate).not.toHaveBeenCalled();
     expect(animations().animationFor(readout().position)).toBeUndefined();
+  });
+});
+
+/**
+ * A playing clip's progress is a repaint of the seek bar and nothing
+ * else.
+ *
+ * Its fill and thumb used to be laid out at the position, so every step
+ * of the readout was a layout change, and a frame in which a box moved
+ * is drawn whole on both renderers: a playing clip drew the whole
+ * surface ten times a second for a line a pixel or two longer. The time
+ * label is left out of the window on purpose: it changes once a second,
+ * and new text is laid out.
+ */
+describe('VideoControls, playing', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('moves the seek bar without laying anything out, so its frames are drawn in part', () => {
+    // The readout steps ten times a second on a timer, not a held frame.
+    vi.useFakeTimers();
+    const render = vi.spyOn(Canvas2DRenderer.prototype, 'render');
+    const clip = new FakeTransport();
+    // Just past a second, so the clock reads 0:10 for the whole window.
+    clip.position = 10.05;
+    const ui = renderTest(createComponent(VideoControls, { transport: clip, visible: true }), {
+      width: 480,
+      height: 120
+    });
+    let time = 16;
+    const step = (): void => {
+      vi.advanceTimersByTime(16);
+      ui.frame((time += 16));
+    };
+    for (let i = 0; i < 10; i++) {
+      step();
+    }
+    const renderer = render.mock.contexts.at(-1) as Canvas2DRenderer;
+    const seek = ui.getByRole('slider', { name: 'Seek' });
+    const before = seek.properties.get('valueNow') as number;
+    const stats = { ...renderer.damageStats };
+    render.mockClear();
+
+    // Most of a second at 60 frames a second: eight or nine steps of the
+    // readout, and the frames between them.
+    for (let i = 0; i < 50; i++) {
+      step();
+    }
+
+    expect(seek.properties.get('valueNow') as number).toBeGreaterThan(before + 0.5);
+    const laidOut: string[] = [];
+    for (const call of render.mock.calls) {
+      for (const [node, flags] of (call[1] as RenderContext).changes?.frame.entries() ?? []) {
+        if ((flags & DirtyFlags.Layout) !== 0) {
+          laidOut.push(`${node.type} ${String(node.properties.get('role') ?? '')}`);
+        }
+      }
+    }
+    expect(laidOut).toEqual([]);
+    expect(renderer.damageStats.whole - stats.whole).toBe(0);
+    expect(renderer.damageStats.partial - stats.partial).toBeGreaterThan(0);
   });
 });

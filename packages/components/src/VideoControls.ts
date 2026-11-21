@@ -311,6 +311,10 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
           // is the part you are allowed to be imprecise about.
           trackAlign: 'start',
           thumb: options.thumb !== false,
+          // The position moves on its own while the clip plays, ten
+          // times a second: drawn, each step is a repaint of the track
+          // rather than a layout change that draws the whole surface.
+          paintedFill: true,
           min: 0,
           // A clip whose length is not known yet would otherwise be a
           // slider from zero to zero, which reads as broken.
