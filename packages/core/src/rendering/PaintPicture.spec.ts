@@ -8,7 +8,7 @@ import { Constraints } from '../layout/LayoutTypes';
 import { percent } from '../layout/UiLength';
 import { PaintPictureCache } from './PaintPicture';
 import type { PaintSurface, UiPaint, UiPath } from './PaintSurface';
-import { FakePaintCanvases, RenderHarness } from './RenderTestUtils';
+import { FakePaintCanvases, RecordingPaintContext, RenderHarness } from './RenderTestUtils';
 
 /**
  * The picture cache: what a painted node draws, when it draws it, and
@@ -238,6 +238,82 @@ describe('PaintPictureCache', () => {
     const none = new PaintPictureCache(() => null);
     const node = paintNode({ width: 40, height: 40, paint: stroke });
     expect(none.pictureFor(node, h.record(node), 1)).toBeUndefined();
+  });
+
+  it('replays onto the frame from the state a bitmap starts in, not the state the frame was left in', () => {
+    // A painter that strokes and fills without saying how. Rasterised,
+    // it starts from a fresh canvas: black, 1 wide, butt caps, miter
+    // joins, no dash. Replayed onto the frame on a frame it changes, it
+    // started from whatever the frame's last border or ring left there.
+    const bare = (input: number): UiPaint => ({
+      draw(surface: PaintSurface, box) {
+        surface.beginPath();
+        surface.moveTo(0, box.height);
+        surface.lineTo(box.width / 2, 0);
+        surface.lineTo(box.width, box.height);
+        surface.stroke();
+        surface.fill();
+      },
+      inputs: [input]
+    });
+    const at = (ctx: RecordingPaintContext): unknown => ({
+      fillStyle: ctx.fillStyle,
+      strokeStyle: ctx.strokeStyle,
+      lineWidth: ctx.lineWidth,
+      lineCap: ctx.lineCap,
+      lineJoin: ctx.lineJoin,
+      miterLimit: ctx.miterLimit,
+      lineDashOffset: ctx.lineDashOffset,
+      dash: ctx.calls.filter(call => call.name === 'setLineDash').at(-1)?.args[0] ?? []
+    });
+    const snapshot = (ctx: RecordingPaintContext): unknown[] => {
+      const seen: unknown[] = [];
+      const stroke = ctx.stroke.bind(ctx);
+      const fill = ctx.fill.bind(ctx);
+      ctx.stroke = () => {
+        seen.push(at(ctx));
+        stroke();
+      };
+      ctx.fill = rule => {
+        seen.push(at(ctx));
+        fill(rule);
+      };
+      return seen;
+    };
+
+    const frame = new RecordingPaintContext();
+    const node = paintNode({ width: 40, height: 40, paint: bare(1) });
+    // First seen: rasterised, into a fresh canvas that keeps the state
+    // its stroke and fill ran under.
+    pictures.draw(node, h.record(node), 1, frame);
+    expect(pictures.stats.rasterized).toBe(1);
+    const rasterised = at(canvases.last);
+    expect(rasterised).toEqual({
+      fillStyle: '#000',
+      strokeStyle: '#000',
+      lineWidth: 1,
+      lineCap: 'butt',
+      lineJoin: 'miter',
+      miterLimit: 10,
+      lineDashOffset: 0,
+      dash: []
+    });
+
+    // What a frame leaves behind: a ring's colour, width and join.
+    frame.strokeStyle = '#123456';
+    frame.fillStyle = '#654321';
+    frame.lineWidth = 7;
+    frame.lineCap = 'square';
+    frame.lineJoin = 'round';
+    frame.miterLimit = 3;
+    frame.setLineDash([4, 4]);
+    frame.lineDashOffset = 2;
+    const replayed = snapshot(frame);
+    node.setProperty('paint', bare(2));
+    pictures.draw(node, h.record(node), 1, frame);
+
+    expect(pictures.stats.direct).toBe(1);
+    expect(replayed).toEqual([rasterised, rasterised]);
   });
 
   it('keeps the recording a picture was made from, for the gate and the inspector', () => {

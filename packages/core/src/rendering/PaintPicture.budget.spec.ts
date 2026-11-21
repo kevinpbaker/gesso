@@ -139,12 +139,15 @@ describe('paint budgets', () => {
     h.render(root);
     const names = h.context.calls.map(call => call.name);
     const start = names.indexOf('translate');
-    // Moved to the box's corner, clipped to its size, then the painter's
-    // own calls in its own coordinates, and restored.
+    // Moved to the box's corner, clipped to its size, the line and paint
+    // state a fresh canvas has, then the painter's own calls in its own
+    // coordinates, and restored.
     expect(h.context.calls[start]!.args).toEqual([10, 10]);
     expect(names.slice(start + 1, start + 4)).toEqual(['beginPath', 'rect', 'clip']);
     expect(h.context.calls[start + 2]!.args).toEqual([0, 0, 120, 24]);
-    expect(names.slice(start + 4, start + 7)).toEqual(['beginPath', 'moveTo', 'lineTo']);
+    const own = names.indexOf('moveTo', start) - 1;
+    expect(names.slice(start + 4, own).every(name => name.startsWith('set'))).toBe(true);
+    expect(names.slice(own, own + 3)).toEqual(['beginPath', 'moveTo', 'lineTo']);
     expect(names).toContain('restore');
     expect(callsOf(h.context, 'drawImage')).toEqual([]);
 

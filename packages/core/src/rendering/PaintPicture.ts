@@ -472,6 +472,7 @@ export class PaintPictureCache {
     ctx.beginPath();
     ctx.rect(0, 0, rec.width, rec.height);
     ctx.clip();
+    freshStroke(ctx);
     // A masked layer is cut to the box on the frame, as the bitmap would be.
     const m = ctx.getTransform?.();
     const layers =
@@ -609,6 +610,30 @@ export class PaintPictureCache {
     );
     return canvas.take();
   }
+}
+
+/**
+ * Puts the line and paint state a painter can leave unsaid back to what
+ * a fresh canvas has, so a picture replayed onto the frame draws what
+ * its bitmap draws. Replayed, it inherited what the frame was left
+ * with, which is whatever the last border, ring or scrollbar set: a
+ * painter that stroked without naming its join drew round joins on the
+ * frame it changed and miter ones once rasterised a few frames later,
+ * and one that never named its colour drew in the last border's.
+ *
+ * Opacity, a filter and the transform are the node's, and a bitmap is
+ * drawn under them too, so they stay. Text sets its own font and
+ * alignment.
+ */
+function freshStroke(ctx: PaintContext2D): void {
+  ctx.fillStyle = '#000';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 10;
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
 }
 
 /**
