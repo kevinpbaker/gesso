@@ -1,4 +1,13 @@
-import type { UiSemanticsAction, UiSemanticsRecord, UiSemanticsUpdate } from 'gesso-core';
+import { isContextMenuKey, type UiSemanticsAction, type UiSemanticsRecord, type UiSemanticsUpdate } from 'gesso-core';
+
+/**
+ * How long after the Menu key or Shift+F10 a browser's `contextmenu` on
+ * a mirrored element is taken to be that key's, not a screen reader's
+ * request. A browser sends it in the same task as the key or the next;
+ * a second is far longer than that and far shorter than a person
+ * pressing the key and then asking the reader as well.
+ */
+const MENU_KEY_ECHO_MS = 1000;
 
 /**
  * Where the mirror sends what it hears.
@@ -230,6 +239,13 @@ export class SemanticsMirror {
   /** True while this class is the one moving DOM focus. */
   private applying = false;
   private focusedId: string | null = null;
+  /**
+   * When the Menu key or Shift+F10 last went down or up on a mirrored
+   * element, as the event's own time. The keys reach the app as keys,
+   * which ask for the focused node's menu; the browser follows them with
+   * a `contextmenu` of its own, which must not ask a second time.
+   */
+  private menuKeyAt = Number.NEGATIVE_INFINITY;
   private disposed = false;
   /**
    * Prefixes every element's DOM id, which `aria-activedescendant`
@@ -699,9 +715,36 @@ export class SemanticsMirror {
         this.sink.action({ id, action: 'focus' });
       }
     };
-    const onKeyDown = (event: KeyboardEvent): void => this.sink.keyDown?.(event);
-    const onKeyUp = (event: KeyboardEvent): void => this.sink.keyUp?.(event);
-    const onContextMenu = (event: Event): void => event.preventDefault();
+    const noteMenuKey = (event: KeyboardEvent): void => {
+      const modifiers = { shift: event.shiftKey, ctrl: event.ctrlKey, alt: event.altKey, meta: event.metaKey };
+      if (isContextMenuKey(event.key, modifiers)) {
+        this.menuKeyAt = event.timeStamp;
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent): void => {
+      noteMenuKey(event);
+      this.sink.keyDown?.(event);
+    };
+    const onKeyUp = (event: KeyboardEvent): void => {
+      // The Menu key's menu comes on its release on Windows.
+      noteMenuKey(event);
+      this.sink.keyUp?.(event);
+    };
+    const onContextMenu = (event: Event): void => {
+      // The browser's menu is for an element the person cannot see.
+      event.preventDefault();
+      if (event.timeStamp - this.menuKeyAt < MENU_KEY_ECHO_MS) {
+        // The echo of a key the app has already answered.
+        return;
+      }
+      // A screen reader's own command for a menu: VoiceOver's
+      // VO+Shift+M asks the element for one, and the browser hands the
+      // page that request as this event.
+      const id = this.idOf(event.target);
+      if (id !== null) {
+        this.sink.action({ id, action: 'showMenu' });
+      }
+    };
     const onPaste = (event: ClipboardEvent): void => {
       const text = event.clipboardData?.getData('text/plain') ?? '';
       const html = event.clipboardData?.getData('text/html') ?? '';

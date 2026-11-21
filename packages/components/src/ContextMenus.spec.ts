@@ -139,6 +139,38 @@ describe('ContextMenus', () => {
     expect(ui.runtime.input.focus.focusedNode).toBe(input());
   });
 
+  it('opens a field’s menu when a screen reader asks for it, under its caret', () => {
+    const { ui, input } = mount();
+    ui.runtime.input.focus.focus(input());
+    ui.frame();
+    // Found as a reader finds it: through the semantics tree, which an
+    // action has to name a record in.
+    const textbox = ui.getByRole('textbox', { name: 'Name' });
+    expect(textbox).toBe(input());
+
+    ui.runtime.applySemanticsAction({ id: textbox.id, action: 'showMenu' });
+    ui.frame();
+
+    expect(ui.getByRole('menuitem', { name: 'Select All' })).toBeTruthy();
+    const field = ui.getLayout(input());
+    const caret = ui.runtime.input.editing.caretRectOf(input())!;
+    const box = ui.getLayout(ui.getByRole('menu'));
+    expect([box.x, box.y]).toEqual([field.x + caret.x, field.y + caret.y + caret.height]);
+  });
+
+  it('opens a link’s menu when a screen reader asks for it, wherever the focus is', () => {
+    const { ui } = mount();
+    const link = ui.getByRole('link', { name: 'Docs' });
+
+    ui.runtime.applySemanticsAction({ id: link.id, action: 'showMenu' });
+    ui.frame();
+
+    expect(ui.getByRole('menuitem', { name: 'Copy Link' })).toBeTruthy();
+    const at = ui.getLayout(link);
+    const box = ui.getLayout(ui.getByRole('menu'));
+    expect([box.x, box.y]).toEqual([at.x, at.y + at.height]);
+  });
+
   it('opens a focused link’s menu from Shift+F10', () => {
     const { ui } = mount();
     const link = ui.getByRole('link', { name: 'Docs' });

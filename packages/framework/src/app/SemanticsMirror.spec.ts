@@ -182,6 +182,11 @@ class FakeEvent {
   target: FakeElement | null = null;
   relatedTarget: FakeElement | null = null;
   key = '';
+  shiftKey = false;
+  ctrlKey = false;
+  altKey = false;
+  metaKey = false;
+  timeStamp = 0;
   defaultPrevented = false;
 
   constructor(
@@ -556,12 +561,39 @@ describe('SemanticsMirror', () => {
     expect(keys).toEqual(['down:Enter', 'up:Enter']);
   });
 
-  it('holds back the browser menu for a mirrored element, and sends no action for it', () => {
+  /**
+   * VoiceOver's VO+Shift+M asks an element for its menu, and the browser
+   * hands the page that request as a `contextmenu`. The browser's own
+   * menu is for an element nobody can see, so it is held back, and the
+   * request goes to the node.
+   */
+  it('turns a screen reader asking for a menu into a showMenu action, and holds back the browser menu', () => {
     const { elementFor, actions, apply } = setup();
     apply({ patches: [{ op: 'add', node: record('n1', { role: 'button', label: 'Save' }) }] });
 
-    expect(elementFor('n1').dispatch('contextmenu').defaultPrevented).toBe(true);
+    expect(elementFor('n1').dispatch('contextmenu', { timeStamp: 5000 }).defaultPrevented).toBe(true);
+    expect(actions).toEqual([{ id: 'n1', action: 'showMenu' }]);
+  });
+
+  /**
+   * The Menu key and Shift+F10 reach the app as keys, which ask for the
+   * focused node's menu; the browser follows them with a `contextmenu`,
+   * which must not ask again.
+   */
+  it('asks nothing for the contextmenu a Menu key or Shift+F10 brings with it', () => {
+    const { elementFor, actions, keys, apply } = setup();
+    apply({ patches: [{ op: 'add', node: record('n1', { role: 'button', label: 'Save' }) }] });
+
+    elementFor('n1').dispatch('keydown', { key: 'F10', shiftKey: true, timeStamp: 1000 });
+    expect(elementFor('n1').dispatch('contextmenu', { timeStamp: 1010 }).defaultPrevented).toBe(true);
+    elementFor('n1').dispatch('keyup', { key: 'ContextMenu', timeStamp: 3000 });
+    elementFor('n1').dispatch('contextmenu', { timeStamp: 3005 });
     expect(actions).toEqual([]);
+    expect(keys).toEqual(['down:F10', 'up:ContextMenu']);
+
+    // A while later, the reader asks: that one goes through.
+    elementFor('n1').dispatch('contextmenu', { timeStamp: 6000 });
+    expect(actions).toEqual([{ id: 'n1', action: 'showMenu' }]);
   });
 
   it('leaves a focused editable to the editing proxy, and describes it there', () => {

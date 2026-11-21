@@ -46,14 +46,16 @@ export interface UiSemanticsUpdate {
  *
  * The names are the actions the platform APIs actually expose on a
  * generic element: a press ("do default action" on macOS, `Invoke` on
- * Windows), moving the keyboard focus, and setting a value. Everything
- * else an AT can do — walking, reading, describing — is answered by
- * the mirror itself and never reaches the runtime.
+ * Windows), moving the keyboard focus, setting a value, and asking for
+ * the element's context menu ("show menu" on macOS, VoiceOver's
+ * VO+Shift+M, which a browser hands the page as a `contextmenu` event).
+ * Everything else an AT can do — walking, reading, describing — is
+ * answered by the mirror itself and never reaches the runtime.
  */
 export interface UiSemanticsAction {
   /** The `UiNode.id` of the record the action was taken on. */
   readonly id: string;
-  readonly action: 'click' | 'focus' | 'setValue';
+  readonly action: 'click' | 'focus' | 'setValue' | 'showMenu';
   /** The new text, for `setValue`. */
   readonly value?: string;
 }

@@ -3100,6 +3100,7 @@ declare class SemanticsMirror {
   private stopTracking;
   private applying;
   private focusedId;
+  private menuKeyAt;
   private disposed;
   private readonly idPrefix;
   constructor(canvas: HTMLCanvasElement, sink: SemanticsMirrorSink, editing?: EditingMirrorTarget | null);

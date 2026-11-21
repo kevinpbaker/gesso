@@ -4835,7 +4835,7 @@ interface UiSemanticsUpdate {
 }
 interface UiSemanticsAction {
   readonly id: string;
-  readonly action: 'click' | 'focus' | 'setValue';
+  readonly action: 'click' | 'focus' | 'setValue' | 'showMenu';
   readonly value?: string;
 }
 export {

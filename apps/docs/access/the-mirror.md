@@ -118,8 +118,11 @@ An action taken on an element is turned back into ordinary input. It
 arrives as an id and an action, never as a coordinate, and it goes
 through the same controllers a pointer and a keyboard go through:
 `focus` through the focus manager, `click` as a press at the node's
-centre after focusing it, and `setValue` as a replacement edit through
-the editing controller.
+centre after focusing it, `setValue` as a replacement edit through
+the editing controller, and `showMenu`, a screen reader asking for the
+element's menu (VoiceOver's VO+Shift+M, which reaches the page as a
+`contextmenu` event), as the `ContextMenu` event the Menu key sends.
+See [ContextMenus](/components/context-menus#how-a-menu-is-asked-for).
 
 <<< @/src/examples/MirrorExample.spec.ts#actions
 

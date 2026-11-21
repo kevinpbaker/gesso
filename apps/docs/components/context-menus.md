@@ -86,12 +86,24 @@ Every way of asking dispatches the same `ContextMenu` event, so neither
 | A finger held down         | The node under it    | Where the finger was                                   |
 | The Menu key               | The focused node     | Under the caret in a field, else the node's lower left |
 | Shift+F10                  | The focused node     | The same                                               |
+| A screen reader's command  | The element it is on | The same                                               |
 
 With nothing focused, a key asks the text node the canvas selection
 ends in, so selected words can be copied from the keyboard as they can
 with a right-click. With no selection either, it asks the application's
 root. A key's point is kept inside the canvas, because a focused node
 can be taller than the screen.
+
+A screen reader asks for an element's menu with a command of its own:
+VoiceOver's VO+Shift+M. The browser hands that to the page as a
+`contextmenu` event on the element the reader is on, which here is an
+element of the [semantics mirror](/access/the-mirror). The mirror sends
+the runtime a `showMenu` action for that element's node, and the
+runtime dispatches the event the keys dispatch. Focus is left where it
+is, because the reader may be on text, which takes none. A
+`contextmenu` that arrives within a second of the Menu key or Shift+F10
+is the browser following the key, which has already asked, so it is
+not sent again.
 
 A key event's `buttons` is 0 and it carries no modifiers, so Shift+F10
 does not read as a Shift-click. A `KeyDown` listener that calls
@@ -128,9 +140,10 @@ arrows and Enter chose from them. Keys sent that way do not make Chrome
 fire its own menu event, so the shell holding the browser's menu back
 was not seen in a browser; it is a spec. The keys have not been pressed
 on a real keyboard on Windows or Linux, where the Menu key is common and
-Shift+F10 is the convention, nor with a screen reader running. A screen
-reader's own command for a menu (VoiceOver's VO+Shift+M) is not yet
-turned into a request.
+Shift+F10 is the convention, nor with a screen reader running. The
+screen reader's command is a spec at both ends, the mirror turning the
+event into an action and the runtime opening the menu from it, and has
+not been tried with VoiceOver itself.
 
 ## Next
 

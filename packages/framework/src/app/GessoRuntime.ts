@@ -2923,6 +2923,16 @@ export class GessoRuntime {
       // does hold it, another field than the one named.
       return this.focusManager.focus(node) && this.input.editing.replaceText(action.value ?? '');
     }
+    if (action.action === 'showMenu') {
+      // The request the Menu key makes, from where the screen reader is:
+      // the same event, from the same point, so `ContextMenus` and a
+      // node's `contextMenu` answer it without asking which. Focus is
+      // left where it is: the reader's cursor may be on text, which takes
+      // none, and a menu about selected text is still a menu.
+      const at = this.keyboardMenuAt(node, this.input.editing);
+      this.dispatcher.dispatch(new UiPointerEvent(UiEventType.ContextMenu, at.x, at.y, 0), node);
+      return true;
+    }
     this.focusManager.focus(node);
     // The centre the node is drawn at, which is where a pointer press
     // on it would land and so what its handlers expect: a click is in
@@ -2948,9 +2958,9 @@ export class GessoRuntime {
    * from the keyboard and a link opened with the pointer go through one
    * path rather than two.
    *
-   * `focus` and `setValue` are not answered. A run cannot hold focus,
-   * because focus is a node in `UiFocusManager`, and a run has no value
-   * to set. Returning true for them anyway is deliberate: the id did
+   * `focus`, `setValue` and `showMenu` are not answered. A run cannot
+   * hold focus, because focus is a node in `UiFocusManager`, a run has
+   * no value to set, and a menu is asked of a node. Returning true for them anyway is deliberate: the id did
    * name a run, so falling through to the node lookup would only find
    * nothing and read as a stale id.
    */
@@ -2959,7 +2969,7 @@ export class GessoRuntime {
     if (run === null) {
       return false;
     }
-    if (action.action === 'focus' || action.action === 'setValue') {
+    if (action.action !== 'click') {
       return true;
     }
     const node = this.graph.getNode(run.nodeId);
