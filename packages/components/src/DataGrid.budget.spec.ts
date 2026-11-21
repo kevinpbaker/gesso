@@ -21,13 +21,21 @@ import { DataGrid, type DataGridCell, type DataGridColumn } from './DataGrid';
  * The node count is the hard claim: a jump creates no cell nodes. The
  * timing is printed so a trend is visible, and is held to a ratio
  * rather than to milliseconds, as `UiVirtualWindow.budget.spec.ts`
- * holds its own: a jump against a move of the active cell by one row,
- * which is the cheapest frame that does anything. Before recycling a
- * jump was about 30 ms and fifteen moves; with it, about 11 ms and six.
- * A profile puts most of what is left in laying out and painting every
- * cell's new text, which a jump cannot avoid, and about a tenth in the
- * grid repointing its cells. The budget of nine leaves room for a
- * loaded machine without letting a rebuild back in.
+ * holds its own: a jump frame against building the same grid, which is
+ * what a jump cost before rows were recycled. Before recycling a jump
+ * was about 30 ms, a build and then some for the teardown; with it,
+ * about 11 ms against a build of 22 to 30, about half. A profile puts
+ * most of what is left in laying out and painting every cell's new
+ * text, which a jump cannot avoid, and about a tenth in the grid
+ * repointing its cells. The budget of eight tenths of a build lets a
+ * loaded machine through and stops a rebuild, which costs a whole build
+ * at least.
+ *
+ * It used to be held against a one-row move, the cheapest frame that
+ * does anything. That measured the wrong thing: when moves got cheaper,
+ * from about 1.8 ms to 1.15, the jump's ratio went from six to ten with
+ * no change in the jump, and the budget of nine failed on nearly every
+ * run.
  */
 
 let ui: Rendered | null = null;
@@ -151,7 +159,7 @@ describe('DataGrid budgets', () => {
     expect(tall).toBe(short);
   });
 
-  it('costs a jump a small multiple of a one-row move', () => {
+  it('costs a jump well under building the grid anew', () => {
     const { rendered, active } = big();
     const FRAMES = 30;
     // Once each first, so neither run pays for warming the code up.
@@ -164,15 +172,34 @@ describe('DataGrid budgets', () => {
         jump(rendered, active, ((frame * 7919) % 90) * 1000 + 500);
       }
     });
-    const settled = 90_000 + 500;
-    jump(rendered, active, settled);
-    const moves = timed(`${FRAMES} one-row moves`, () => {
-      for (let frame = 0; frame < FRAMES; frame++) {
-        jump(rendered, active, settled + (frame % 2));
-      }
-    });
+    // The same grid built anew, several times, and the middle reading
+    // kept: one build is a few dozen milliseconds, which a single pause
+    // of the machine can double.
+    const builds: number[] = [];
+    for (let build = 0; build < 5; build++) {
+      builds.push(
+        timed('a build of the same grid', () => {
+          const fresh = renderTest(
+            createComponent(DataGrid, {
+              label: 'Fresh',
+              columns: COLUMNS,
+              rowCount: ROWS,
+              getValue: (row: number, column: string) => `${column}r${row}`,
+              width: 1200,
+              height: 800
+            }),
+            { width: 1200, height: 800 }
+          );
+          fresh.frame();
+          fresh.frame();
+          fresh.unmount();
+        })
+      );
+    }
+    const build = [...builds].sort((a, b) => a - b)[2]!;
+    const jumpFrame = jumps / FRAMES;
     // eslint-disable-next-line no-console
-    console.info(`[data grid budget] a jump frame: ${(jumps / FRAMES).toFixed(2)} ms`);
-    expect(jumps).toBeLessThan(Math.max(moves, 5) * 9);
+    console.info(`[data grid budget] a jump frame: ${jumpFrame.toFixed(2)} ms, a build: ${build.toFixed(2)} ms`);
+    expect(jumpFrame).toBeLessThan(build * 0.8);
   });
 });
