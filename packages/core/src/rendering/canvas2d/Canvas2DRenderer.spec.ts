@@ -207,6 +207,21 @@ describe('Canvas2DRenderer colors and borders', () => {
     expect(edges.map(edge => Math.round(edge * 1.5))).toEqual([13, 13, 49, 49]);
   });
 
+  it('strokes a square decoration with square corners, a rounded one with round', () => {
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const node = box(h, 'box', { width: 20, height: 20, backgroundColor: '#f00' });
+    node.decorations = [
+      { kind: 'stroke', color: '#00f', lineWidth: 2 },
+      { kind: 'stroke', color: '#00f', lineWidth: 2, outset: 2 }
+    ];
+    h.append(root, node);
+    h.layout(root);
+    h.render(root);
+    expect(callArgs(h.context, 'set:lineJoin')).toEqual(['miter', 'round']);
+    expect(callArgs(h.context, 'strokeRect')).toEqual([[1, 1, 18, 18]]);
+  });
+
   it('leaves a box under its own scale where layout put it', () => {
     const h = new RenderHarness(800, 600, 1.5, { groups: true });
     const root = h.createNode('app', UiNodeType.Column);
@@ -247,6 +262,20 @@ describe('Canvas2DRenderer colors and borders', () => {
     expect(names).toContain('stroke');
     expect(callArgs(h.context, 'set:lineJoin')).toEqual(['round']);
     expect(callArgs(h.context, 'set:lineWidth')).toEqual([2]);
+  });
+
+  it('strokes a square border with square corners', () => {
+    // As CSS and the WebGPU band draw it. A round join cut each outer
+    // corner by half the width and left the corner pixel part covered,
+    // which Chrome's GPU canvas covers differently the first time.
+    const h = new RenderHarness();
+    const root = h.createNode('app', UiNodeType.Column);
+    const node = box(h, 'box', { width: 40, height: 20, borderWidth: 2, borderColor: '#000' });
+    h.append(root, node);
+    h.layout(root);
+    h.render(root);
+    expect(callArgs(h.context, 'set:lineJoin')).toEqual(['miter']);
+    expect(callArgs(h.context, 'strokeRect')).toEqual([[1, 1, 38, 18]]);
   });
 
   it('skips borders without a width', () => {

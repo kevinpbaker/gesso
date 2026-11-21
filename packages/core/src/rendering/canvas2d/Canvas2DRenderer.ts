@@ -1216,8 +1216,15 @@ export class Canvas2DRenderer implements UiRenderer {
     const height = Math.max(0, rec.height - borderWidth);
     ctx.strokeStyle = paint.borderColor !== undefined ? colorToCss(paint.borderColor) : '#000';
     ctx.lineWidth = borderWidth;
-    ctx.lineJoin = 'round';
-    if (!borderRadiusIsZero(paint.borderRadius)) {
+    const rounded = !borderRadiusIsZero(paint.borderRadius);
+    // Square corners on a square box, as CSS and the WebGPU band draw
+    // them. A round join cut the outer corner by half the width, which
+    // left that pixel part covered, and Chrome's GPU canvas covers it
+    // differently the first time a stroke is drawn than after: a cell's
+    // outline painted into a scroll layer on the frame it changed kept a
+    // corner 17 levels off what a whole frame drew.
+    ctx.lineJoin = rounded ? 'round' : 'miter';
+    if (rounded) {
       // The stroke's centre line: every corner pulled in by half the
       // width, after fitting to the box the border's outer edge is.
       const outer = fitBorderRadius(paint.borderRadius, rec.width, rec.height);
@@ -1281,7 +1288,8 @@ export class Canvas2DRenderer implements UiRenderer {
       const inset = lineWidth / 2;
       ctx.strokeStyle = colorToCss(color);
       ctx.lineWidth = lineWidth;
-      ctx.lineJoin = 'round';
+      // Square corners on a square box, as a border's (see `paintBorder`).
+      ctx.lineJoin = box.radius > 0 ? 'round' : 'miter';
       const x = box.x + inset;
       const y = box.y + inset;
       const width = Math.max(0, box.width - lineWidth);
