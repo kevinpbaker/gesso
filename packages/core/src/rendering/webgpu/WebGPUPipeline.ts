@@ -44,9 +44,10 @@ export interface TexturedPipeline {
   /** Linear sampling: images are scaled by objectFit. */
   imageSampler: GPUSampler;
   /**
-   * The same quads, blending a premultiplied opacity-group layer rather
-   * than a straight-alpha texture; bound with `textSampler`, since a
-   * layer is drawn one texel to a pixel.
+   * The same quads, blending premultiplied colour rather than a
+   * straight-alpha glyph page: an opacity group's layer, bound with
+   * `textSampler` since a layer is drawn one texel to a pixel, and a
+   * picture, uploaded premultiplied and bound with `imageSampler`.
    */
   layerPipeline: GPURenderPipeline;
 }

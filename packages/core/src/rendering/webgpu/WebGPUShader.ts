@@ -229,6 +229,20 @@ fn gradientColor(index: u32, local: vec2f) -> vec4f {
   return unpremultiply(previousColor);
 }
 
+// Less than half a level of noise, different at every pixel.
+//
+// A gradient or a soft shadow computes a smooth value and the target
+// keeps 8 bits of it, so a long, subtle ramp lands on the same level for
+// a run of pixels and steps to the next: bands. Noise under half a level
+// moves where each pixel rounds without moving any pixel off the level
+// it was nearest, so a run becomes a mix of its two neighbours, which
+// reads as the smooth ramp it was. Interleaved gradient noise: no
+// texture, no state, and no pattern the eye picks out at this amplitude.
+fn dither(pixel: vec2f) -> f32 {
+  let noise = fract(52.9829189 * fract(dot(pixel, vec2f(0.06711056, 0.00583715))));
+  return (noise - 0.5) / 255.0;
+}
+
 // PrimitiveKind: 0 fill, 1 border, 2 shadow, 3 inset shadow.
 const KIND_BORDER = 1u;
 const KIND_SHADOW = 2u;
@@ -408,8 +422,17 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
   var base = in.color;
   if (in.gradientIndex >= 0.0) {
     base = gradientColor(u32(in.gradientIndex), in.localPos);
+    // A ramp of colour: dithered, so it does not band. A flat fill is
+    // left exact, since its colour is already one of the levels.
+    base = vec4f(clamp(base.rgb + vec3f(dither(in.position.xy)), vec3f(0.0), vec3f(1.0)), base.a);
   }
-  return vec4f(base.rgb, base.a * in.radiusOpacityBorder.y * alpha);
+  var outAlpha = base.a * in.radiusOpacityBorder.y * alpha;
+  if (in.kind >= KIND_SHADOW) {
+    // A shadow's ramp is its alpha, blurred over many pixels: dithered
+    // for the same reason.
+    outAlpha = clamp(outAlpha + dither(in.position.xy), 0.0, 1.0);
+  }
+  return vec4f(base.rgb, outAlpha);
 }
 `;
 

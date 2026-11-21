@@ -102,3 +102,22 @@ describe('WebGPUTextureCache and the size a still is drawn at', () => {
     expect(created.length).toBe(before);
   });
 });
+
+/**
+ * A picture is sampled with linear filtering, which averages a texel
+ * with its neighbours. In straight alpha the colour of a transparent
+ * texel, black in most PNGs, was averaged into the edge beside it, and
+ * a transparent picture drawn at any scale but one had a dark fringe.
+ */
+describe('WebGPUTextureCache and transparent edges', () => {
+  it('uploads a picture with its colour premultiplied by its alpha', () => {
+    const { device, pipeline } = deviceDouble();
+    const cache = new WebGPUTextureCache(device, pipeline, surfaces());
+
+    cache.imageBindGroup(bitmap(64, 64));
+
+    const copy = device.queue.copyExternalImageToTexture as unknown as { mock: { calls: unknown[][] } };
+    expect(copy.mock.calls).toHaveLength(1);
+    expect(copy.mock.calls[0]![1]).toMatchObject({ premultipliedAlpha: true });
+  });
+});

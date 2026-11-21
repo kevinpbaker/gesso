@@ -137,12 +137,24 @@ export class WebGPUTextureCache {
     return entry;
   }
 
+  /**
+   * Copies a picture in with its colour premultiplied by its alpha.
+   *
+   * A picture is sampled with linear filtering, which averages a texel
+   * with its neighbours. Straight alpha averaged the colour of a fully
+   * transparent texel (black, in most PNGs) into the edge of whatever
+   * was beside it, so a transparent picture drawn at any scale but one
+   * had a dark fringe Canvas2D does not draw. Premultiplied, a
+   * transparent texel adds nothing. The picture is then drawn with the
+   * layer pipeline, which blends premultiplied colour.
+   */
   private copyInto(texture: GPUTexture, frame: ImageBitmap | VideoFrame, width: number, height: number): boolean {
     try {
-      this.device.queue.copyExternalImageToTexture({ source: frame as ImageBitmap }, { texture }, [
-        Math.max(1, Math.round(width)),
-        Math.max(1, Math.round(height))
-      ]);
+      this.device.queue.copyExternalImageToTexture(
+        { source: frame as ImageBitmap },
+        { texture, premultipliedAlpha: true },
+        [Math.max(1, Math.round(width)), Math.max(1, Math.round(height))]
+      );
       return true;
     } catch {
       return false;

@@ -448,14 +448,18 @@ export class WebGPURenderer implements UiRenderer {
       if (bindGroup === null) {
         continue;
       }
-      // Glyphs and images share one pipeline and one instance buffer;
-      // only the sampled texture and the UV rectangle differ.
-      if (currentKind !== CommandKind.Glyphs) {
-        pass.setPipeline(textured.pipeline);
+      // Glyphs and images share one instance buffer and the quad; they
+      // differ in the pipeline. A picture is uploaded premultiplied, so
+      // linear filtering does not draw a dark fringe at a transparent
+      // edge, and is blended as an opacity group's layer is. A glyph
+      // page is drawn one texel to a pixel, in straight alpha.
+      const kind = glyphs ? CommandKind.Glyphs : CommandKind.Image;
+      if (currentKind !== kind) {
+        pass.setPipeline(glyphs ? textured.pipeline : textured.layerPipeline);
         pass.setVertexBuffer(0, textured.vertexBuffer);
         pass.setVertexBuffer(1, this.texturedBuffer!);
         pass.setIndexBuffer(textured.indexBuffer, 'uint16');
-        currentKind = CommandKind.Glyphs;
+        currentKind = kind;
       }
       currentScissor = setScissor(pass, currentScissor, scissor);
       pass.setBindGroup(0, bindGroup);

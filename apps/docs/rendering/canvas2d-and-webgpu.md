@@ -160,6 +160,7 @@ capability.
 | Failure            | Nothing to lose                                                | A device can be lost, and the runtime falls back on the next frame                                                                                    |
 | Stage timings      | None: `render` is one number                                   | `FrameMetrics.gpu` splits prepare, upload and encode                                                                                                  |
 | Shadow blur        | The browser's blur, an approximation of the Gaussian           | The Gaussian evaluated analytically, so a soft edge's falloff can differ by a few percent of the shadow's colour                                      |
+| Gradient banding   | Whatever the browser draws                                     | Gradients and shadows dithered by under half a level, so a long, subtle ramp does not step; a flat fill is left exact                                 |
 | Partial redraws    | Only the rectangles a frame's changes cover, when no box moved | None: every frame is drawn whole                                                                                                                      |
 
 Canvas2D draws a frame in part when it can. A 2D canvas keeps its
