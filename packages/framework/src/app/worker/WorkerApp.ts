@@ -24,9 +24,9 @@ import {
   wheelDeltaYOf,
   type UiScrollability
 } from 'gesso-core';
-import { AudioSink } from '../AudioSink';
+import type { AudioSink } from '../AudioSink';
 import { attachFileDrop } from '../fileDrop';
-import { browserFilesHost, fileResultTransfer, ShellFiles } from '../shellFiles';
+import type { ShellFiles } from '../shellFiles';
 import { setLeaveWarning } from '../shellLeaveWarning';
 import { redirectWith } from '../shellRedirect';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
@@ -439,8 +439,25 @@ export class WorkerApp {
   private files: ShellFiles | null = null;
   private proxy: EditingProxy | null = null;
   private mirror: SemanticsMirror | null = null;
-  /** The one audio element, behind `AudioService`; see `AudioSink`. */
+  /** The one audio element, behind `AudioService`; see `AudioSink`. Made on the first audio request. */
   private audio: AudioSink | null = null;
+  /**
+   * Files and sound, loaded once the app is on screen rather than before
+   * it. Neither is needed to draw the first frame, and together they were
+   * about a sixth of what this thread parses before it can, which is the
+   * one cost the shell is budgeted on (`check-bundle-size.ts`). Each is
+   * asked for on an idle callback after mount, so by the time a request
+   * comes the module is in hand and awaiting it costs a microtask: a
+   * file picker still opens inside the click that asked for it.
+   */
+  private filesModule: Promise<typeof import('../shellFiles')> | null = null;
+  private audioModule: Promise<typeof import('../AudioSink')> | null = null;
+  private loadFiles(): Promise<typeof import('../shellFiles')> {
+    return (this.filesModule ??= import('../shellFiles'));
+  }
+  private loadAudio(): Promise<typeof import('../AudioSink')> {
+    return (this.audioModule ??= import('../AudioSink'));
+  }
   /**
    * Which way the runtime could scroll under the pointer, as of the
    * last frame the worker reported.
@@ -463,6 +480,8 @@ export class WorkerApp {
   private ownsHistory = false;
   /** True once the render worker has answered `ready` at least once. */
   private ready = false;
+  /** Set by `dispose`, for what finishes loading after it. */
+  private disposed = false;
   /** The running `requestAnimationFrame` handle, when ticks are wanted. */
   private frameHandle: number | null = null;
   /** Stops watching `prefers-color-scheme`; null while overridden. */
@@ -626,12 +645,18 @@ export class WorkerApp {
 
     this.observeResize(element);
     this.detachInput = this.attachInput(canvas);
-    // Sound. The element has to live here, and only here; the worker
-    // tells it what to do and hears what it did.
-    this.audio = new AudioSink({
-      sample: sample => this.post({ type: 'audioSample', sample }),
-      action: action => this.post({ type: 'audioAction', action })
-    });
+    // Files and sound, fetched once the app is up; see `filesModule`.
+    // Sound's element has to live here, and only here; the worker tells
+    // it what to do and hears what it did.
+    const prefetch = (): void => {
+      void this.loadFiles();
+      void this.loadAudio();
+    };
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(prefetch, { timeout: 2000 });
+    } else {
+      setTimeout(prefetch, 0);
+    }
     this.setColorScheme(this.colorSchemePreference);
     // The safe area and the soft keyboard, as four numbers. Read here
     // because `visualViewport` is the window's; what to do about them
@@ -970,6 +995,7 @@ export class WorkerApp {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.disconnectWebMcp?.();
     this.disconnectWebMcp = null;
     // An app that is gone has no work to lose.
@@ -1196,14 +1222,29 @@ export class WorkerApp {
       // Pickers, handles and IndexedDB are all the window's. The answer
       // is posted on every path — `perform` never rejects — and a file
       // read goes back with its buffer moved rather than copied.
-      this.files ??= new ShellFiles(browserFilesHost(window));
-      void this.files
-        .perform(message.request)
-        .then(result => this.post({ type: 'fileResult', id: message.id, result }, fileResultTransfer(result)));
+      void this.loadFiles().then(({ ShellFiles, browserFilesHost, fileResultTransfer }) => {
+        this.files ??= new ShellFiles(browserFilesHost(window));
+        return this.files
+          .perform(message.request)
+          .then(result => this.post({ type: 'fileResult', id: message.id, result }, fileResultTransfer(result)));
+      });
       return;
     }
     if (message.type === 'audio') {
-      this.audio?.handle(message.request);
+      // In the order they were sent: each waits on the same load, and
+      // its callbacks run in the order they were added.
+      const request = message.request;
+      void this.loadAudio().then(({ AudioSink }) => {
+        if (this.disposed) {
+          // Gone while the module loaded: no element to make.
+          return;
+        }
+        this.audio ??= new AudioSink({
+          sample: sample => this.post({ type: 'audioSample', sample }),
+          action: action => this.post({ type: 'audioAction', action })
+        });
+        this.audio.handle(request);
+      });
       return;
     }
     if (message.type === 'semantics') {

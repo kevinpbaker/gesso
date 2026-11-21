@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { claimedKeysOf, claimKeys, isScrollingKey } from './UiKeyClaims';
+import { claimedKeysOf, claimKeys } from './UiKeyClaims';
+import { isScrollingKey } from './UiShellKeys';
 
 const NONE = { shift: false, ctrl: false, alt: false, meta: false };
 

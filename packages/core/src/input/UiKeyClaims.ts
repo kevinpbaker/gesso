@@ -1,5 +1,5 @@
 import type { UiNode } from '../graph/UiNode';
-import type { UiKeyModifiers } from './UiInputEvent';
+import { SCROLLING_KEYS } from './UiShellKeys';
 
 /**
  * Which keys the application will use, said before they are pressed.
@@ -18,30 +18,7 @@ import type { UiKeyModifiers } from './UiInputEvent';
  * page a canvas is part of.
  */
 
-/** The keys whose browser default scrolls the page. */
-export const SCROLLING_KEYS: readonly string[] = Object.freeze([
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'PageUp',
-  'PageDown',
-  'Home',
-  'End',
-  ' '
-]);
-
 const SCROLLING = new Set(SCROLLING_KEYS);
-
-/**
- * Whether the key scrolls the page. Ctrl, Alt or Meta held makes it a
- * shortcut instead (a word jump, a history step), which is the
- * browser's and is never claimed; Shift is a direction, as Shift+Space
- * is a page up.
- */
-export function isScrollingKey(key: string, modifiers: UiKeyModifiers): boolean {
-  return !modifiers.ctrl && !modifiers.alt && !modifiers.meta && SCROLLING.has(key);
-}
 
 const claims = new WeakMap<object, readonly string[]>();
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { WorkerApp, type WorkerAppOptions } from './WorkerApp';
 import type { RuntimeToShellMessage, ShellToRuntimeMessage } from './RenderWorkerProtocol';
@@ -514,6 +514,92 @@ describe('hover coalescing', () => {
 
     expect(prevented).toEqual(['s']);
     expect(shell.posts.filter(message => message.type === 'keyDown')).toHaveLength(3);
+  });
+
+  /**
+   * Sound is loaded once the app is up, not before it, to keep it off the
+   * main thread's first parse. A request that comes before the module has
+   * arrived waits for it, and requests keep the order they were sent in.
+   */
+  it('plays audio requests sent before the sound module arrived, in order', async () => {
+    const made: { src: string; volume: number; loads: number }[] = [];
+    class FakeAudio {
+      src = '';
+      volume = 1;
+      loads = 0;
+      preload = '';
+      currentTime = 0;
+      duration = Number.NaN;
+      paused = true;
+      ended = false;
+      readyState = 0;
+      error = null;
+      buffered = { length: 0, start: () => 0, end: () => 0 };
+      constructor() {
+        made.push(this);
+      }
+      load(): void {
+        this.loads++;
+      }
+      play(): Promise<void> {
+        return Promise.resolve();
+      }
+      pause(): void {}
+      addEventListener(): void {}
+      removeEventListener(): void {}
+    }
+    vi.stubGlobal('Audio', FakeAudio);
+    try {
+      const shell = setup();
+      shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+      const send = (request: unknown): void =>
+        shell.internals.handleWorkerMessage({
+          data: { type: 'audio', request }
+        } as unknown as MessageEvent<RuntimeToShellMessage>);
+
+      send({ type: 'load', src: 'a.mp3', autoplay: false });
+      send({ type: 'volume', level: 0.5 });
+      // Nothing is made until the module is in hand.
+      expect(made).toHaveLength(0);
+
+      await vi.dynamicImportSettled();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // The sink's two elements, the playing one first.
+      expect(made.length).toBeGreaterThan(0);
+      expect([made[0]!.src, made[0]!.loads, made[0]!.volume]).toEqual(['a.mp3', 1, 0.5]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('makes no audio element for a request whose app was disposed while the module loaded', async () => {
+    let made = 0;
+    vi.stubGlobal(
+      'Audio',
+      class {
+        constructor() {
+          made++;
+        }
+      }
+    );
+    try {
+      const shell = setup();
+      shell.internals.attachInput(shell.canvas as unknown as HTMLCanvasElement);
+      shell.internals.handleWorkerMessage({
+        data: { type: 'audio', request: { type: 'play' } }
+      } as unknown as MessageEvent<RuntimeToShellMessage>);
+      // What `dispose` sets first; the rest of a dispose needs a worker
+      // this harness does not fake.
+      (shell.app as unknown as { disposed: boolean }).disposed = true;
+
+      await vi.dynamicImportSettled();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(made).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   /**

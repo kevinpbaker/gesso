@@ -2421,11 +2421,16 @@ declare class WorkerApp {
   private proxy;
   private mirror;
   private audio;
+  private filesModule;
+  private audioModule;
+  private loadFiles;
+  private loadAudio;
   private scrollability;
   private claimedKeys;
   private history;
   private ownsHistory;
   private ready;
+  private disposed;
   private frameHandle;
   private detachColorScheme;
   private detachViewportInsets;

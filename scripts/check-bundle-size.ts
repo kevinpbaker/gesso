@@ -38,10 +38,16 @@ const at = (path: string): string => fileURLToPath(new URL(path, import.meta.url
 /**
  * The ceiling for a worker application's main thread, gzipped.
  *
- * About eighteen and a half kilobytes today. The headroom is for the shell
- * growing a feature, not for the engine coming back: the engine is a
- * hundred and fifty, so this fails by an order of magnitude on the one
- * regression it exists to catch.
+ * About sixteen kilobytes today. The headroom is for the shell growing a
+ * feature, not for the engine coming back: the engine is a hundred and
+ * fifty, so this fails by an order of magnitude on the one regression it
+ * exists to catch.
+ *
+ * It reached 19.2 when the shell learned which keys to cancel and how to
+ * ask for a menu. File pickers and the audio element, about three of
+ * those kilobytes, now load on an idle callback after mount instead of
+ * before it (`WorkerApp.filesModule`): neither is needed to draw, and
+ * this counts only what the entry imports statically.
  */
 const SHELL_BUDGET = 20_000;
 

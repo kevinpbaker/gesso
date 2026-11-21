@@ -4,7 +4,8 @@ import type { UiNode } from '../graph/UiNode';
 import { UiEventType, type UiPointerEvent } from './UiInputEvent';
 import { InputTestHarness } from './UiInputTestUtils';
 import { UiFocusManager } from './UiFocusManager';
-import { isContextMenuKey, UiKeyboardController } from './UiKeyboardController';
+import { UiKeyboardController } from './UiKeyboardController';
+import { isContextMenuKey } from './UiShellKeys';
 
 function setup(): {
   h: InputTestHarness;

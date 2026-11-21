@@ -2562,7 +2562,6 @@ interface KeyboardControllerOptions {
     handleKey(focused: UiNode | null, key: string, modifiers: UiKeyModifiers): boolean;
   };
 }
-declare function isContextMenuKey(key: string, modifiers: UiKeyModifiers): boolean;
 declare class UiKeyboardController {
   private readonly dispatcher;
   private readonly focusManager;
@@ -2578,11 +2577,12 @@ declare class UiKeyboardController {
   keyDown(key: string, modifiers?: UiKeyModifiers, textFollows?: boolean, code?: string): UiKeyboardEvent;
   keyUp(key: string, modifiers?: UiKeyModifiers, code?: string): UiKeyboardEvent;
 }
-declare const SCROLLING_KEYS: readonly string[];
-declare function isScrollingKey(key: string, modifiers: UiKeyModifiers): boolean;
 declare function claimKeys<T extends object>(handler: T, keys: Iterable<string>): T;
 declare function claimedKeysOf(handler: unknown): readonly string[];
 declare function keysClaimedOnPath(focused: UiNode | null, keyHandlerOf: (node: UiNode) => unknown): Set<string>;
+declare const SCROLLING_KEYS: readonly string[];
+declare function isScrollingKey(key: string, modifiers: UiKeyModifiers): boolean;
+declare function isContextMenuKey(key: string, modifiers: UiKeyModifiers): boolean;
 declare const KEY_SCROLL_STEP = 40;
 declare class UiKeyboardScroller {
   private readonly sink;

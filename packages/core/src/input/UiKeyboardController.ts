@@ -1,6 +1,7 @@
 import type { UiNode } from '../graph/UiNode';
 import { noKeyModifiers, UiEventType, UiKeyboardEvent, UiPointerEvent, type UiKeyModifiers } from './UiInputEvent';
 import { isPressable } from './UiInteraction';
+import { isContextMenuKey } from './UiShellKeys';
 import type { UiInputDispatcher } from './UiInputDispatcher';
 import type { UiFocusManager } from './UiFocusManager';
 
@@ -97,18 +98,6 @@ export interface KeyboardControllerOptions {
  * to one and found it inert.
  */
 const MODIFIER_KEYS: ReadonlySet<string> = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
-
-/**
- * The keys that ask for a context menu: the Menu key, and Shift+F10 with
- * no other modifier, which is the same request on a keyboard without
- * one. A browser opens its own menu for either; a shell that cannot wait
- * for the application's answer cancels them by this test.
- */
-export function isContextMenuKey(key: string, modifiers: UiKeyModifiers): boolean {
-  return (
-    key === 'ContextMenu' || (key === 'F10' && modifiers.shift && !modifiers.ctrl && !modifiers.alt && !modifiers.meta)
-  );
-}
 
 export class UiKeyboardController {
   private readonly tabNavigation: boolean;
