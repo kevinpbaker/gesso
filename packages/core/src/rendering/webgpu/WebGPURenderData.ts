@@ -878,13 +878,18 @@ export function buildRenderList(
         paint.video !== undefined && paint.video.frame !== null
           ? videoFrameSize(paint.video)
           : { width: paint.image!.width, height: paint.image!.height };
-      const rect = computeObjectFitRect(paint.objectFit, sourceSize.width, sourceSize.height, rec);
-      if (rect.width > 0 && rect.height > 0) {
+      const fitted = computeObjectFitRect(paint.objectFit, sourceSize.width, sourceSize.height, rec);
+      if (fitted.width > 0 && fitted.height > 0) {
+        // Asked of layout, before the edges move, as Canvas2D asks it.
         const overflows =
-          rect.x < rec.x ||
-          rect.y < rec.y ||
-          rect.x + rect.width > rec.x + rec.width ||
-          rect.y + rect.height > rec.y + rec.height;
+          fitted.x < rec.x ||
+          fitted.y < rec.y ||
+          fitted.x + fitted.width > rec.x + rec.width ||
+          fitted.y + fitted.height > rec.y + rec.height;
+        // On whole device pixels, as the box is; see `PixelSnap.ts`.
+        const rect = snapped
+          ? snapBox(fitted, dpr, nodeCtm[4] * dpr, nodeCtm[5] * dpr, { x: 0, y: 0, width: 0, height: 0 })
+          : fitted;
         const rounded = !borderRadiusIsZero(paint.borderRadius);
         let imageScissor = ownScissor;
         let imageRounded = ownRounded;
@@ -1013,13 +1018,18 @@ export function buildRenderList(
         if (color === undefined) {
           continue;
         }
-        const rect = decorationRect(shape, rec, nodeRadius);
+        const laid = decorationRect(shape, rec, nodeRadius);
+        // On whole device pixels, as the box and its border are, and its
+        // band a whole number of them; the same rule Canvas2D follows.
+        const rect = snapped ? snapBox(laid, dpr, nodeCtm[4] * dpr, nodeCtm[5] * dpr, { ...laid }) : laid;
         if (rect.width <= 0 || rect.height <= 0) {
           continue;
         }
         if (shape.kind === 'stroke' && shape.lineWidth <= 0) {
           continue;
         }
+        const lineWidth =
+          shape.kind !== 'stroke' ? 0 : snapped ? snapBorderWidth(shape.lineWidth, dpr) : shape.lineWidth;
         beginPrimitives(ownScissor);
         pushInstance(
           instanceData,
@@ -1030,7 +1040,7 @@ export function buildRenderList(
           color,
           fitBorderRadius(rect.corners, rect.width, rect.height),
           effectiveOpacity,
-          shape.kind === 'stroke' ? shape.lineWidth : 0,
+          lineWidth,
           shape.kind === 'stroke' ? PrimitiveKind.Border : PrimitiveKind.Fill,
           nodeCtm,
           ownRounded

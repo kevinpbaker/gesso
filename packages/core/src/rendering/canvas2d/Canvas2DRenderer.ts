@@ -1089,15 +1089,24 @@ export class Canvas2DRenderer implements UiRenderer {
     }
     const size =
       video === undefined ? { width: paint.image!.width, height: paint.image!.height } : videoFrameSize(video);
-    const rect = computeObjectFitRect(paint.objectFit, size.width, size.height, rec);
-    if (rect.width <= 0 || rect.height <= 0) {
+    const fitted = computeObjectFitRect(paint.objectFit, size.width, size.height, rec);
+    if (fitted.width <= 0 || fitted.height <= 0) {
       return;
     }
+    // Whether it spills out of its box is a question about layout, asked
+    // before the edges move; snapped, a picture inside its box stays
+    // inside the box's snapped edges, since rounding keeps order.
     const overflows =
-      rect.x < rec.x ||
-      rect.y < rec.y ||
-      rect.x + rect.width > rec.x + rec.width ||
-      rect.y + rect.height > rec.y + rec.height;
+      fitted.x < rec.x ||
+      fitted.y < rec.y ||
+      fitted.x + fitted.width > rec.x + rec.width ||
+      fitted.y + fitted.height > rec.y + rec.height;
+    // On whole device pixels, as the box is: a picture shown at its own
+    // size that landed half a pixel off was resampled across two.
+    const m = ctx.getTransform?.();
+    const snaps = m !== undefined && snapsUnder(m.a, m.b, m.c, m.d, this.surface.dpr);
+    const rect = snaps ? snapBox(fitted, m.a, m.e, m.f, { x: 0, y: 0, width: 0, height: 0 }) : fitted;
+    const clipBox = snaps ? snapBox(rec, m.a, m.e, m.f, { x: 0, y: 0, width: 0, height: 0 }) : rec;
     const rounded = !borderRadiusIsZero(paint.borderRadius);
     // Only a still is worth a pre-scaled copy. A video's frame is a
     // different object every time, so a copy of one could never be
@@ -1110,7 +1119,7 @@ export class Canvas2DRenderer implements UiRenderer {
       return;
     }
     ctx.save();
-    traceRoundedRect(ctx, rec.x, rec.y, rec.width, rec.height, rounded ? paint.borderRadius : 0);
+    traceRoundedRect(ctx, clipBox.x, clipBox.y, clipBox.width, clipBox.height, rounded ? paint.borderRadius : 0);
     ctx.clip();
     ctx.drawImage(drawn, rect.x, rect.y, rect.width, rect.height);
     ctx.restore();
@@ -1217,6 +1226,10 @@ export class Canvas2DRenderer implements UiRenderer {
     after: boolean
   ): void {
     const nodeRadius = paint.borderRadius;
+    // On whole device pixels, as the box and its border are, so a ring
+    // drawn round a crisp border is as crisp; see `PixelSnap.ts`.
+    const m = ctx.getTransform?.();
+    const scale = m !== undefined && snapsUnder(m.a, m.b, m.c, m.d, this.surface.dpr) ? m.a : 0;
     for (const shape of shapes) {
       if ((shape.after === 'children') !== after) {
         continue;
@@ -1225,7 +1238,8 @@ export class Canvas2DRenderer implements UiRenderer {
       if (color === undefined) {
         continue;
       }
-      const box = decorationRect(shape, rec, nodeRadius);
+      const laid = decorationRect(shape, rec, nodeRadius);
+      const box = scale > 0 ? snapBox(laid, scale, m!.e, m!.f, { ...laid }) : laid;
       if (box.width <= 0 || box.height <= 0) {
         continue;
       }
@@ -1243,15 +1257,17 @@ export class Canvas2DRenderer implements UiRenderer {
         continue;
       }
       // The band lies inside the shape's box, as a border does: the
-      // stroke is centred on a path inset by half its width.
-      const inset = shape.lineWidth / 2;
+      // stroke is centred on a path inset by half its width, which is
+      // whole device pixels when the box is.
+      const lineWidth = scale > 0 ? snapBorderWidth(shape.lineWidth, scale) : shape.lineWidth;
+      const inset = lineWidth / 2;
       ctx.strokeStyle = colorToCss(color);
-      ctx.lineWidth = shape.lineWidth;
+      ctx.lineWidth = lineWidth;
       ctx.lineJoin = 'round';
       const x = box.x + inset;
       const y = box.y + inset;
-      const width = Math.max(0, box.width - shape.lineWidth);
-      const height = Math.max(0, box.height - shape.lineWidth);
+      const width = Math.max(0, box.width - lineWidth);
+      const height = Math.max(0, box.height - lineWidth);
       if (box.radius > 0) {
         traceRoundedRect(
           ctx,

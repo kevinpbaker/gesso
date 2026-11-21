@@ -134,6 +134,14 @@ is happens before either of them:
 - **One geometry for the parts an application does not draw itself**:
   scrollbar thumbs, `objectFit` rectangles, the focus and decoration
   shapes modifiers produce, and the inspector overlay.
+- **One snapping rule.** Layout keeps its fractions, as Chrome's does,
+  and what is painted lands on whole device pixels, as Chrome paints it:
+  a background, a border, a clip, a picture and its rounded clip, and a
+  decoration's box. A border's width, and a decoration ring's band,
+  round down to whole device pixels, never below one. Both backends
+  snap through `PixelSnap.ts`, and only under a plain translation: a
+  node that is scaling or turning is drawn where layout put it, so its
+  edges do not jump a pixel at a time.
 - **One paint order**: outer shadows, background, inset shadows, image,
   border, decorations, children, the node's own text, then the
   decorations marked to come after children, then its scrollbars.

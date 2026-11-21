@@ -32,15 +32,17 @@ export interface SnapBox {
  * Writes `box` snapped into `out`, given where layout coordinates land
  * in device pixels: `device = layout × scale + offset` on each axis.
  * Each edge goes to its nearest device pixel independently, so two
- * boxes that share an edge in layout share it in pixels too.
+ * boxes that share an edge in layout share it in pixels too. `out` may
+ * carry more than a box (a decoration's corners); only the four numbers
+ * are written.
  */
-export function snapBox(
+export function snapBox<T extends SnapBox>(
   box: Readonly<SnapBox>,
   scale: number,
   offsetX: number,
   offsetY: number,
-  out: SnapBox
-): SnapBox {
+  out: T
+): T {
   const left = Math.round(box.x * scale + offsetX);
   const right = Math.round((box.x + box.width) * scale + offsetX);
   const top = Math.round(box.y * scale + offsetY);

@@ -682,6 +682,46 @@ describe('buildRenderList images', () => {
   });
 });
 
+describe('buildRenderList on device pixels', () => {
+  /** A box at 10.4 by 10.4, 20.3 wide, at a device pixel ratio of 1.5. */
+  function fractional(props: Record<string, unknown>, decorate = false) {
+    const h = new RenderHarness(800, 600, 1.5);
+    const root = h.graph.root;
+    const column = h.createNode('column', UiNodeType.Column);
+    column.setProperty('padding', 10.4);
+    const node = box(h, 'node', { width: 20.3, height: 20, ...props });
+    if (decorate) {
+      node.decorations = [{ kind: 'stroke', color: '#00f', lineWidth: 1, outset: 2 }];
+    }
+    h.graph.appendChild(column, node);
+    h.graph.appendChild(root, column);
+    return layoutAndBuild(h, root);
+  }
+  const onPixels = (values: number[]): void => {
+    for (const value of values) {
+      expect(value * 1.5).toBeCloseTo(Math.round(value * 1.5));
+    }
+  };
+
+  it('puts a picture on device pixels, as Canvas2D does', () => {
+    const list = fractional({ image: { width: 40, height: 40 } as ImageBitmap, objectFit: 'fill' });
+    const command = list.commands.find(c => c.kind === CommandKind.Image) as ImageCommand;
+    const offset = command.instance * TEXTURED_STRIDE_FLOATS;
+    const [x, y, width, height] = Array.from(list.texturedData.slice(offset, offset + 4));
+    onPixels([x!, y!, x! + width!, y! + height!]);
+    expect([x! * 1.5, (x! + width!) * 1.5].map(Math.round)).toEqual([16, 46]);
+  });
+
+  it('puts a decoration ring on device pixels, with a band of whole device pixels', () => {
+    const list = fractional({ backgroundColor: '#f00' }, true);
+    const ring = readInstance(list, 1);
+    expect(ring.kind).toBe(PrimitiveKind.Border);
+    expect(ring.borderWidth * 1.5).toBeCloseTo(1);
+    onPixels([ring.x, ring.y, ring.x + ring.width, ring.y + ring.height]);
+    expect([ring.x * 1.5, (ring.x + ring.width) * 1.5].map(Math.round)).toEqual([13, 49]);
+  });
+});
+
 describe('buildRenderList culling', () => {
   it('skips subtrees entirely outside the viewport', () => {
     const h = new RenderHarness(200, 100);

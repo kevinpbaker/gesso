@@ -166,6 +166,32 @@ describe('Canvas2DRenderer colors and borders', () => {
     expect(Number(callArgs(h.context, 'set:lineWidth').at(-1)) * 1.5).toBeCloseTo(1);
   });
 
+  it('puts a decoration ring on device pixels, with a band of whole device pixels', () => {
+    // A ring 1px wide, 2px out from a box at 10.4: at 1.5x its edges and
+    // its band would each straddle two device pixels.
+    const h = new RenderHarness(800, 600, 1.5, { groups: true });
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 10.4);
+    const node = box(h, 'box', { width: 20.3, height: 20, backgroundColor: '#f00' });
+    node.decorations = [{ kind: 'stroke', color: '#00f', lineWidth: 1, outset: 2 }];
+    h.append(root, node);
+    h.layout(root);
+    h.render(root);
+    const lineWidth = Number(callArgs(h.context, 'set:lineWidth').at(-1));
+    expect(lineWidth * 1.5).toBeCloseTo(1);
+    // A ring 2px out has rounded corners, so it is a path. The stroke is
+    // centred half a band inside the ring's edge; put the half band back
+    // and the ring's edges are whole device pixels.
+    const corners = callArgs(h.context, 'arcTo') as number[][];
+    const [right, top] = corners[0]!;
+    const [left, bottom] = corners[2]!;
+    const edges = [left! - lineWidth / 2, top! - lineWidth / 2, right! + lineWidth / 2, bottom! + lineWidth / 2];
+    for (const edge of edges) {
+      expect(edge * 1.5).toBeCloseTo(Math.round(edge * 1.5));
+    }
+    expect(edges.map(edge => Math.round(edge * 1.5))).toEqual([13, 13, 49, 49]);
+  });
+
   it('leaves a box under its own scale where layout put it', () => {
     const h = new RenderHarness(800, 600, 1.5, { groups: true });
     const root = h.createNode('app', UiNodeType.Column);
@@ -791,6 +817,44 @@ describe('Canvas2DRenderer images', () => {
     expect(draws).toHaveLength(1);
     expect(draws[0][0]).toBe(image);
     expect(draws[0].slice(1)).toEqual([0, 25, 100, 50]);
+  });
+
+  it('puts a picture and its rounded clip on device pixels, as its box is', () => {
+    // 1.5x: a picture at 10.4 would cover device 15.6 to 46.05 and be
+    // resampled across both edges.
+    const h = new RenderHarness(800, 600, 1.5, { groups: true });
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 10.4);
+    const image = { width: 40, height: 40 } as ImageBitmap;
+    const node = box(h, 'node', { width: 20.3, height: 20, image, objectFit: 'fill', borderRadius: 4 });
+    h.append(root, node);
+    h.layout(root);
+    h.render(root);
+    const [, x, y, width, height] = callArgs(h.context, 'drawImage').at(-1)! as number[];
+    expect([x * 1.5, (x + width) * 1.5, y * 1.5, (y + height) * 1.5].map(Math.round)).toEqual([16, 46, 16, 46]);
+    expect(x * 1.5).toBeCloseTo(16);
+    expect((x + width) * 1.5).toBeCloseTo(46);
+    // The rounded clip starts at the snapped edge, where the background does.
+    const [clipX] = callArgs(h.context, 'moveTo').at(-1)! as number[];
+    expect((clipX! - 4) * 1.5).toBeCloseTo(16);
+  });
+
+  it('leaves a picture under its own scale where layout put it', () => {
+    const h = new RenderHarness(800, 600, 1.5, { groups: true });
+    const root = h.createNode('app', UiNodeType.Column);
+    root.setProperty('padding', 10.4);
+    const image = { width: 40, height: 40 } as ImageBitmap;
+    const node = box(h, 'node', {
+      width: 20.3,
+      height: 20,
+      image,
+      objectFit: 'fill',
+      transform: { scaleX: 1.1, scaleY: 1.1 }
+    });
+    h.append(root, node);
+    h.layout(root);
+    h.render(root);
+    expect((callArgs(h.context, 'drawImage').at(-1)! as unknown[]).slice(1)).toEqual([10.4, 10.4, 20.3, 20]);
   });
 
   it('draws nothing without an image', () => {
