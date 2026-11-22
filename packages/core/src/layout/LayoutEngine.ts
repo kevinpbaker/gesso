@@ -1138,6 +1138,29 @@ export class LayoutEngine {
    * changes skip layout entirely.
    */
   layoutForFrame(frame: UiFrame, constraints: Constraints, root?: UiNode): void {
+    // The containers this frame scrolled, before anything is laid out:
+    // a box written inside one of them is held in its clip (see
+    // `heldByScroll`), whichever order the frame lists them in.
+    this.scrolledThisFrame.clear();
+    for (const [node, flags] of frame.entries()) {
+      if (
+        (flags & DirtyFlags.Transform) !== 0 &&
+        node.type !== UiNodeType.EditableText &&
+        this.records.get(node)?.scrollable === true
+      ) {
+        this.scrolledThisFrame.add(node);
+      }
+    }
+    try {
+      this.layoutFrame(frame, constraints, root);
+    } finally {
+      // Only for this frame's pass: a box written after it, by an
+      // overlay or a later call, counts as it always did.
+      this.scrolledThisFrame.clear();
+    }
+  }
+
+  private layoutFrame(frame: UiFrame, constraints: Constraints, root?: UiNode): void {
     this.layoutPass++;
     if (root !== undefined) {
       this.layoutRoot = root;
@@ -1150,7 +1173,6 @@ export class LayoutEngine {
 
     this.resetStats();
     this.relayoutRoots.clear();
-    this.scrolledThisFrame.clear();
     if (this.boundsMoved.size + this.boundsShifted.size > this.wholeBoundsRefill()) {
       // Frames that nothing hit-tested between: past this many, the
       // next ask walks the whole tree anyway, and the nodes need not be
@@ -1165,7 +1187,7 @@ export class LayoutEngine {
     for (const [node, flags] of frame.entries()) {
       if ((flags & (DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout)) !== 0) {
         anyLayout = true;
-        if (!this.leafLaidOutAlone(node, flags)) {
+        if (!this.leafLaidOutAlone(node, flags) && !this.heldByScroll(node, flags)) {
           meaningMayChange = true;
         }
         // Its box may not move and still mean something new for its
@@ -1206,7 +1228,6 @@ export class LayoutEngine {
         } else if (rec.scrollable) {
           rec.transformDirty = true;
           this.scrollNodes.add(node);
-          this.scrolledThisFrame.add(node);
         }
         // A node that does not scroll had its transform changed, which
         // moves it on screen and nothing in the layout. Kept with the
@@ -4825,6 +4846,41 @@ export class LayoutEngine {
    * not in question.
    */
   /**
+   * Whether a change to `node` is held inside a scroll container that
+   * scrolled on this frame, so a renderer drawing that container again
+   * draws all of it.
+   *
+   * A scroll container clips everything under it, and a renderer that
+   * draws only what changed draws a scrolled container's whole
+   * viewport. A box moving inside it, a node added or taken away, a
+   * clip let go, all land inside that viewport. That is what a
+   * virtual list or grid does on every scroll: rows leave at one end
+   * and arrive, recycled, at the other, and each frame was drawn whole.
+   *
+   * Not for a lifted or anchored node on the way up, which is drawn
+   * outside every clip; and the container itself is held only for its
+   * children changing (`flags` without Layout), since its own box and
+   * clip are what the rest of the surface sees.
+   */
+  private heldByScroll(node: UiNode, flags = DirtyFlags.Layout): boolean {
+    if (this.scrolledThisFrame.size === 0) {
+      return false;
+    }
+    if (this.scrolledThisFrame.has(node)) {
+      return (flags & DirtyFlags.Layout) === 0 && this.records.get(node)?.lifted !== true;
+    }
+    for (let at: UiNode | null = node; at !== null; at = at.parent) {
+      if (at !== node && this.scrolledThisFrame.has(at)) {
+        return true;
+      }
+      if (this.records.get(at)?.lifted === true || this.anchoredNodes.has(at)) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Whether laying `node` out again can move nothing but boxes, each of
    * which says so as it is written (`assignBox`). True for a leaf whose
    * own layout properties changed, a text whose words did above all: a
@@ -5536,8 +5592,11 @@ export class LayoutEngine {
       // the one place that can promise they are never stale: a box
       // written after a pass has ended, by an overlay following the
       // anchor it hangs off, invalidates them just as one written
-      // inside the pass does.
-      this.layoutVersion++;
+      // inside the pass does. The version, which is a renderer's, is
+      // left alone for a box inside a container scrolled this frame.
+      if (!this.heldByScroll(node)) {
+        this.layoutVersion++;
+      }
       this.boundsMoved.add(node);
       // Anything anchored to this node was placed against the box it
       // had a moment ago and has to be placed again. A box that did not
@@ -5642,7 +5701,9 @@ export class LayoutEngine {
 
   private shiftSubtree(node: UiNode, dx: number, dy: number): void {
     this.stats.shifted++;
-    this.layoutVersion++;
+    if (!this.heldByScroll(node)) {
+      this.layoutVersion++;
+    }
     this.boundsShifted.add(node);
     // Absolute nodes left where they were, whose ancestors' extents just
     // moved away from them.

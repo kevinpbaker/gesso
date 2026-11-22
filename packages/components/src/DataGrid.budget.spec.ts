@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 
 import { createComponent } from 'gesso-framework';
 import { renderTest, type Rendered } from 'gesso-testing';
-import { UiGraph } from 'gesso-core';
+import { Canvas2DRenderer, UiGraph } from 'gesso-core';
 
 import { DataGrid, type DataGridCell, type DataGridColumn } from './DataGrid';
 
@@ -157,6 +157,40 @@ describe('DataGrid budgets', () => {
     const tall = writes(1600);
     expect(short).toBeGreaterThan(0);
     expect(tall).toBe(short);
+  });
+
+  it('scrolls without drawing a whole frame, rows recycled and all', () => {
+    // A grid a third of its page, so its viewport is not most of the
+    // surface, which would rightly be drawn whole.
+    const render = vi.spyOn(Canvas2DRenderer.prototype, 'render');
+    const rendered = renderTest(
+      createComponent(DataGrid, {
+        label: 'Small',
+        columns: COLUMNS.slice(0, 6),
+        rowCount: ROWS,
+        getValue: (row: number, column: string) => `${column}r${row}`,
+        width: 540,
+        height: 300
+      }),
+      { width: 1200, height: 900 }
+    );
+    ui = rendered;
+    let time = 0;
+    for (let i = 0; i < 4; i++) rendered.frame((time += 16));
+    const renderer = render.mock.contexts.at(-1) as Canvas2DRenderer;
+    const before = { ...renderer.damageStats };
+
+    // Twenty steps of the wheel: rows leave at the top and come back,
+    // recycled, at the bottom (the jump spec above holds that they are
+    // the same nodes).
+    for (let step = 0; step < 20; step++) {
+      rendered.fireEvent.wheel({ x: 200, y: 150, deltaY: 40 });
+      rendered.frame((time += 16));
+    }
+
+    expect(rendered.queryByRole('gridcell', { name: 'c0r0' })).toBeNull();
+    expect(renderer.damageStats.whole - before.whole).toBe(0);
+    expect(renderer.damageStats.partial - before.partial).toBeGreaterThanOrEqual(20);
   });
 
   it('costs a jump well under building the grid anew', () => {

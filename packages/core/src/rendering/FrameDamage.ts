@@ -192,14 +192,36 @@ export class FrameDamage {
   ): LayerRect[] | null {
     const rects: LayerRect[] = [];
     let area = 0;
+    // A rectangle inside one already here adds nothing; one that holds
+    // some already here takes their place. The frame lists nodes in no
+    // order, and a scrolled grid's cells often came before the grid: each
+    // was counted, then the grid over them, and the sum passed half the
+    // surface on a frame that drew a third of it.
     const add = (rect: LayerRect): void => {
-      if (!rects.some(other => covers(other, rect))) {
-        rects.push(rect);
-        area += rect.width * rect.height;
+      if (rects.some(other => covers(other, rect))) {
+        return;
       }
+      for (let index = rects.length - 1; index >= 0; index--) {
+        const other = rects[index]!;
+        if (covers(rect, other)) {
+          area -= other.width * other.height;
+          rects.splice(index, 1);
+        }
+      }
+      rects.push(rect);
+      area += rect.width * rect.height;
     };
     for (const rect of this.volatile) {
       add(rect);
+    }
+    // A lifted node the last whole frame drew that is no longer in the
+    // tree was drawn somewhere no node here says: a tooltip on a row a
+    // virtual list recycled, in a frame that is otherwise held inside
+    // the list (see `LayoutEngine.heldByScroll`).
+    for (const lifted of this.lifted) {
+      if (lifted !== root && !isAncestor(root, lifted)) {
+        return null;
+      }
     }
     for (const [node, flags] of changes.frame.entries()) {
       // What a node means is not how it looks.
@@ -247,9 +269,19 @@ export class FrameDamage {
     const layout = context.layout;
     const rec = layout.recordFor(node);
     if (rec === undefined) {
-      // A fragment has no box, and its children paint; anything else
-      // without a record is not drawn.
-      return node.type === UiNodeType.Fragment ? null : undefined;
+      // A fragment has no box, and its children paint, inside whatever
+      // the nearest ancestor with a box paints: a virtual list keeps
+      // its rows under one, and a scroll that recycled them named only
+      // the fragment. Anything else without a record is not drawn.
+      if (node.type !== UiNodeType.Fragment) {
+        return undefined;
+      }
+      for (let up = node.parent; up !== null; up = up.parent) {
+        if (layout.recordFor(up) !== undefined) {
+          return this.surfaceRect(up, root, context);
+        }
+      }
+      return null;
     }
     box.left = rec.extentMinX - SPILL;
     box.top = rec.extentMinY - SPILL;

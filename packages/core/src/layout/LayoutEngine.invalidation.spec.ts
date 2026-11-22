@@ -479,6 +479,67 @@ describe('LayoutEngine invalidation', () => {
       expect(h.engine.geometryVersion).toBe(before);
     });
 
+    /** A list of ten rows in a container 100 tall, the second row a ref. */
+    function scrolledRows(rowProps: Record<string, unknown> = {}) {
+      const h = createHarness();
+      h.root = h.builder.build(
+        Column(
+          { x: 'start' },
+          ScrollView(
+            { width: 100, height: 100 },
+            Column(
+              { x: 'start' },
+              ...Array.from({ length: 10 }, (_, index) =>
+                Box({ width: 80, height: 30, ...(index === 1 ? rowProps : {}) })
+              )
+            )
+          )
+        )
+      );
+      firstFrame(h);
+      const scroll = h.root.firstChild!;
+      let content = scroll.firstChild!;
+      while (content.firstChild !== null && content.firstChild.firstChild !== null) {
+        content = content.firstChild;
+      }
+      const row = content.firstChild!.nextSibling!;
+      return { h, scroll, row };
+    }
+
+    it('stays put for a box that moves inside a container scrolled on the same frame', () => {
+      const { h, scroll, row } = scrolledRows();
+      const before = h.engine.geometryVersion;
+
+      // What a virtual list does on a scroll: a row changes size, or is
+      // recycled to the other end, while the list scrolls. All of it is
+      // inside the list's clip, which the frame draws again anyway.
+      h.graph.updateProperty(row.id, 'height', 45, DirtyFlags.Layout);
+      h.graph.updateProperty(scroll.id, 'scrollY', 40, DirtyFlags.Transform);
+      h.clock.tick(0);
+      expect(h.engine.recordFor(row.nextSibling!)!.y).toBe(75);
+      expect(h.engine.geometryVersion).toBe(before);
+    });
+
+    it('moves for the same box when the container did not scroll', () => {
+      const { h, row } = scrolledRows();
+      const before = h.engine.geometryVersion;
+
+      h.graph.updateProperty(row.id, 'height', 45, DirtyFlags.Layout);
+      h.clock.tick(0);
+      expect(h.engine.geometryVersion).not.toBe(before);
+    });
+
+    it('moves for a lifted box inside the scrolled container, which is drawn outside its clip', () => {
+      const { h, scroll, row } = scrolledRows({ lift: true });
+      expect(h.engine.recordFor(row)!.lifted).toBe(true);
+      const before = h.engine.geometryVersion;
+
+      h.graph.updateProperty(row.id, 'height', 45, DirtyFlags.Layout);
+      h.graph.updateProperty(scroll.id, 'scrollY', 40, DirtyFlags.Transform);
+      h.clock.tick(0);
+      expect(h.engine.geometryVersion).not.toBe(before);
+    });
+
     it('moves for a sticky leaf laid out again', () => {
       const h = createHarness();
       h.root = h.builder.build(

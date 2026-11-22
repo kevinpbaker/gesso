@@ -3043,6 +3043,7 @@ declare class LayoutEngine {
   invalidateMeasurements(): void;
   layout(node: UiNode, constraints: Constraints): LayoutResult;
   layoutForFrame(frame: UiFrame, constraints: Constraints, root?: UiNode): void;
+  private layoutFrame;
   private relayout;
   private fullLayout;
   private relayoutAt;
@@ -3165,6 +3166,7 @@ declare class LayoutEngine {
   private placeStack;
   private stackAlignment;
   private stackOffset;
+  private heldByScroll;
   private leafLaidOutAlone;
   private markLayoutDirty;
   private applyScroll;

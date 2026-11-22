@@ -156,6 +156,54 @@ describe('dirty rectangles', () => {
     expect(cleared()).toEqual([LIST]);
   });
 
+  /**
+   * A virtual list on a scroll: rows inside it change, are added and
+   * recycled, on the frame the list scrolls. All of that is inside the
+   * list's clip, and the list is drawn again whole, so the frame is the
+   * list's rectangle and nothing more (see `LayoutEngine.heldByScroll`).
+   */
+  describe('a change inside a container scrolled on the same frame', () => {
+    it('is drawn as the container, though a box inside it moved', () => {
+      // The content first, so its rectangle is met before the list's,
+      // which holds it and takes its place.
+      set(list.firstChild!, 'height', 500);
+      set(list, 'scrollY', 30);
+      frame();
+      expect(cleared()).toEqual([LIST]);
+      expect(renderer.damageStats).toMatchObject({ whole: 1, partial: 1, rects: 1 });
+    });
+
+    it('is drawn as the container for rows added under a fragment, which has no box', () => {
+      const rows = graph.createNode('rows', UiNodeType.Fragment);
+      graph.appendChild(list.firstChild!, rows);
+      graph.appendChild(rows, box('row0', 200, 20, '#111111'));
+      graph.markDirty(list.firstChild!, DirtyFlags.Children | DirtyFlags.Layout);
+      frame();
+
+      graph.appendChild(rows, box('row1', 200, 20, '#222222'));
+      graph.markDirty(rows, DirtyFlags.Children);
+      set(list, 'scrollY', 30);
+      frame();
+      expect(cleared()).toEqual([LIST]);
+    });
+
+    it('is drawn whole when a lifted node drawn last frame is gone', () => {
+      const tip = box('tip', 60, 20, '#ff00ff');
+      tip.setProperty('lift', true);
+      graph.appendChild(list.firstChild!, tip);
+      graph.markDirty(list.firstChild!, DirtyFlags.Children | DirtyFlags.Layout);
+      frame();
+
+      // A tooltip on a row a scroll recycles: it was drawn outside the
+      // list's clip, where nothing in this frame says.
+      graph.removeNode(tip);
+      graph.markDirty(list.firstChild!, DirtyFlags.Children);
+      set(list, 'scrollY', 30);
+      frame();
+      expect(cleared()).toEqual([WHOLE]);
+    });
+  });
+
   it('draws nothing for a change scrolled out of its container', () => {
     const top = box('top', 200, 20, '#123456');
     graph.appendChild(list.firstChild!, top);
