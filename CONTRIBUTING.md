@@ -12,6 +12,82 @@ pnpm docs:dev            # the documentation site
 Node 24 or later. Several scripts run TypeScript through Node's own
 type stripping, which earlier versions do not do.
 
+## Scaffolding against this checkout
+
+```bash
+pnpm create:app ../my-app --local   # scaffold a project against this working tree
+```
+
+`--local` packs the packages out of this checkout and points the new project at the tarballs instead, which is what you want while you are changing them.
+
+## The playground
+
+One shell, switched by hash:
+
+| Route                | What you'll see                                                                   |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `#workbench`         | Every component in its states, to check by hand                                   |
+| `#examples`          | Small complete apps, below                                                        |
+| `#renderers/dom`     | One layout scene as DOM boxes: hover a node, read why it's that size              |
+| `#renderers/canvas`  | The same scene in Canvas2D across three threads: main, data worker, render worker |
+| `#renderers/webgpu`  | The same scene through the WebGPU renderer                                        |
+| `#renderers/compare` | Canvas2D and WebGPU side by side with a live pixel diff                           |
+| `#benchmark`         | WebGPU throughput. Not in the nav; it is a tool to run, not a page to browse      |
+
+The four renderer views are one page with a switch in the header. The routes they replaced (`#debug`, `#canvas`, `#webgpu`, `#compare`, `#framework-sync`, `#modifiers`) still work and redirect to where each now lives.
+
+| Example                  | What it demonstrates                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| `#example-signin`        | A passcode sign-in, written in JSX                                                              |
+| `#example-notes`         | Text editing and IME over a channel, persisted to OPFS from the app worker                      |
+| `#example-theme`         | Theming through the environment                                                                 |
+| `#example-live`          | A live feed bound straight to the canvas                                                        |
+| `#example-router`        | Nested routes, typed params and a guard, walked by the browser's Back button                    |
+| `#example-animation`     | A board that moves, and an idle app that does not                                               |
+| `#example-input`         | Gestures and shortcuts                                                                          |
+| `#example-layout`        | Layout an application can shape at runtime                                                      |
+| `#example-paint`         | Painting                                                                                        |
+| `#example-transitions`   | Shared elements morphing between routes, with video decoded by WebCodecs and audio on the shell |
+| `#example-modifiers`     | Behaviour attached to an element without a wrapper component                                    |
+| `#framework`             | One app on a render worker; stall the main thread and watch the heartbeat keep time             |
+| `#framework/main-thread` | The same app on the main thread, so the contrast is unmissable                                  |
+
+Each example is meant to be read as much as run. The card on the examples page names the source file.
+
+## Applications
+
+| App                        | Directory                 | What it is                                                                 |
+| -------------------------- | ------------------------- | -------------------------------------------------------------------------- |
+| `gesso-playground`         | `apps/playground`         | The demo harness: the routes above, and one shell.                         |
+| `gesso-docs`               | `apps/docs`               | The documentation site, VitePress, with live examples that are also specs. |
+| `gesso-devtools-extension` | `apps/devtools-extension` | The Gesso panel in Chrome devtools.                                        |
+
+## Scripts
+
+```bash
+pnpm dev               # Vite dev server with the playground
+pnpm docs:dev          # the documentation site
+pnpm build             # tsdown for the packages, then vite for the playground and the extension
+pnpm test              # vitest, watch mode
+pnpm test:run          # vitest, once
+pnpm lint              # oxlint
+pnpm format            # oxfmt
+pnpm typecheck         # tsc --noEmit
+pnpm check             # format, lint, types, tests, build, API reports and the docs gates, in CI's order
+pnpm api:check         # each package's public surface against its committed report
+pnpm api:update        # rewrite those reports after an intended change
+pnpm fixtures:layout   # re-render layout conformance cases in headless Chrome
+pnpm fixtures:text     # re-render text conformance paragraphs in real fonts
+pnpm parity:webgpu     # Canvas2D vs WebGPU pixel diff in headless Chrome (needs a WebGPU adapter)
+pnpm screenshots       # each covered route against its committed baseline
+pnpm screenshots:docker # the same, and the docs pages, in the baselines' own Linux environment
+pnpm check:a11y        # Chrome's computed accessibility tree against the committed reports
+pnpm check:install     # pack, install and run the packages in a fresh Vite project
+pnpm check:scaffold    # run the scaffold and drive the result in Chrome
+```
+
+Every Chrome-driven script runs with no browser-automation dependency: `--dump-dom` for fixtures, the DevTools protocol over Node's built-in `WebSocket` for the rest. Set `CHROME_BIN` to choose the binary. The full list is in `package.json`.
+
 ## The gates
 
 ```bash

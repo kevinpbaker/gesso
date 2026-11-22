@@ -4,22 +4,23 @@
 
 # Gesso
 
-### Native-grade apps, built on the web.
-
-Gesso is a declarative UI toolkit in the spirit of SwiftUI and Jetpack Compose: components that run once, a real layout engine with typed props, and a theme instead of CSS.<br>It draws the whole interface to a `<canvas>` from a worker, so the app stays fast however hard your code is working.
+### Fast apps your AI can drive. On the web and the desktop.
 
 [![npm](https://img.shields.io/npm/v/gesso-framework?label=npm&color=BE9A6E)](https://www.npmjs.com/package/gesso-framework)
 [![CI](https://github.com/kevinpbaker/gesso/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinpbaker/gesso/actions/workflows/ci.yml)
 [![MIT](https://img.shields.io/npm/l/gesso-framework?color=555)](LICENSE)
 
-**[Try it live](https://gesso-docs.vercel.app)** · **[A logic simulator built on it](https://gesso-logic.vercel.app/)** · **[A spreadsheet built on it](https://gesso-sheets.vercel.app/)**
+**Fast.** Gesso draws the whole interface from a worker, so your code can work as hard as it likes and the app never drops a frame.<br>
+**AI first.** Every Gesso app is an MCP server with nothing more written. Your users' own AI reads the screen and uses the app.<br>
+**Runs anywhere.** One codebase ships to any web host, or as a native app on Mac, Windows and Linux through Electrobun.
 
-[Built with Gesso](#built-with-gesso) · [Thirty seconds of code](#thirty-seconds-of-code) · [What you get](#what-you-get) · [Built for agents](#built-for-ai-agents) · [Is it for you?](#is-it-for-you) · [How it works](#how-it-works) · [Proof](#proof-not-promises) · [Get started](#get-started)
+```bash
+pnpm create gesso-app my-app
+```
+
+**[Try it live](https://gesso-docs.vercel.app)** · [Built with Gesso](#built-with-gesso) · [Fast](#fast) · [AI first](#ai-first) · [Runs anywhere](#runs-anywhere) · [The code](#thirty-seconds-of-code) · [Proof](#proof-not-promises)
 
 _gesso_ (**JESS**-oh): the primer coat that makes a raw canvas take paint.
-
-The logic simulator is the framework's own load-bearing example: an 8-bit CPU made of 8,559 gates,
-playing Pong, that you can open up and rewire while it plays without the game or the editor dropping a frame.
 
 </div>
 
@@ -37,40 +38,78 @@ Three applications, each drawn entirely by Gesso. Open any of them in a browser.
 
 [![Gesso Sheets: a sales dashboard of formulas, a line chart and a bar chart](brand/showcase/sheets.png)](https://gesso-sheets.vercel.app/)
 
-**[gessologic](https://gesso-logic.vercel.app/)**: a logic simulator. On screen, an 8-bit CPU of 8,559 gates plays Pong at 18 kHz while you edit it.
+**[gessologic](https://gesso-logic.vercel.app/)**: a logic simulator. On screen, an 8-bit CPU of 8,559 gates plays Pong at 18 kHz while you rewire it, and neither the game nor the editor drops a frame.
 
 [![gessologic: an 8-bit CPU wired to ROM, memory and a pixel display, running Pong](brand/showcase/logic.png)](https://gesso-logic.vercel.app/)
 
-## What it is
-
-The web has a document toolkit. Gesso is an application toolkit: the kind of thing SwiftUI is on the Mac and Compose is on Android, written in TypeScript and running in any modern browser.
-
-You describe a screen as a tree of components. Stacks are `row` and `column`, sizes and alignment are typed props, and colour comes from the theme. There is no DOM underneath, no stylesheet and no virtual DOM. The engine lays the tree out with flex and grid semantics checked against Chrome, sets text in every script, and paints through Canvas2D or WebGPU.
-
-## Why it stays fast
+## Fast
 
 Every web framework you have used shares one thread between your work and your interface. Parse a file, diff a document, simulate a system, sort a hundred thousand rows, and the person using the app watches the two take turns. The pointer sticks. The list stutters mid-scroll. The keystroke lands a beat late.
 
 The usual fix is to move the work into a worker and post the results back. By hand. Per feature. Forever.
 
-Gesso moves the **interface** instead, and moves it once. Layout is not the DOM's, so it can run anywhere; paint is a canvas, so it can be an `OffscreenCanvas`; input is raw pointer events, so the main thread's only job is to forward them. Your application gets its own worker and talks to the interface over a `MessageChannel` that never touches main. The result is a browser app whose frame rate does not depend on how busy your code is.
+Gesso moves the **interface** instead, and moves it once. Layout is its own, paint is an `OffscreenCanvas`, and the main thread's only job is to forward input. Your application gets a worker of its own and talks to the interface over a `MessageChannel` that never touches main. The frame rate does not depend on how busy your code is.
 
-### The receipt
-
-Two copies of the same component, one in a render worker and one on the main thread. Each ticks every 40 ms and remembers the longest gap it has ever seen. Block the main thread for three seconds:
+Two copies of the same component, one in a render worker and one on the main thread, each ticking every 40 ms. Block the main thread for three seconds:
 
 |                 | Worst gap between two ticks |
 | --------------- | --------------------------: |
 | **Main thread** |                    3,010 ms |
 | **Gesso**       |                       41 ms |
 
-The worker copy did not miss a tick. The demo, and the input-latency version of the same measurement, runs on [Why Gesso](https://gesso-docs.vercel.app/guide/why-gesso) in the docs. Press the button and watch which one cares.
+The worker copy did not miss a tick. Press the button yourself on [Why Gesso](https://gesso-docs.vercel.app/guide/why-gesso).
 
-## Thirty seconds of code
+- **An 18 kB main thread.** The shell is 18.5 kB gzipped against a <!-- proof:shell-budget-kb -->20<!-- /proof --> kB budget CI enforces, and CI greps its bytes for Canvas2D calls so the engine cannot creep back onto the thread it was moved off.
+- **Cost follows the change, not the tree.** A text edit deep in a 10k-node page re-measures fewer than 20 nodes. A scroll frame re-measures zero. Those are CI budgets, not hopes.
+- **A hundred thousand rows.** `LazyColumn` mounts the rows on screen plus an overscan band, and keeps the row under your eye still when estimates above it are corrected.
+- **Idle means idle.** An app with nothing moving reports `ticks 0.00` in its frame metrics.
+- **Canvas2D or WebGPU.** Two renderers read the same layout and are pixel-diffed against each other; the framework picks one at runtime.
+
+## AI first
+
+A Gesso app already declares what it holds and what it can be asked to do, as channels of plain data and typed commands, and already describes its screen as a semantics tree for assistive technology. Those are an AI agent's tools, so **every Gesso app is an MCP server with nothing more written.**
+
+```ts
+/** The notes the person has written. */
+export const Notes = defineChannel('notes', {
+  view: { rows: [] as readonly NoteRow[] },
+  commands: {} as {
+    /** Opens a note in the editor. @param id The note's id. */
+    open(id: string): void;
+    /** Deletes a note for good. @destructive @confirm */
+    remove(id: string): void;
+  }
+});
+```
+
+From that, an agent gets `notes_view`, `notes_open` and `notes_remove`, described from the JSDoc and checked against the types, and `remove` is put to the person before it is sent. For anything no channel covers, `ui_snapshot`, `ui_press`, `ui_type` and `ui_key` read and operate the screen the way a screen reader does.
+
+- **Bring your own AI.** Your app holds no model, no API key and no AI bill. The person connects the AI they already use, Claude, Codex, Gemini or any MCP client, and it works the app through the same channels your interface does.
+- **While you develop**, `pnpm dev` serves MCP at `/__gesso/mcp` and prints the lines to connect Claude Code, Codex or Gemini CLI.
+- **In the browser**, `createApp({ webmcp: true })` registers the same tools with WebMCP.
+- **On a server or a desktop**, `mcpHandler` from `gesso-framework/agent` serves them over HTTP.
+
+**Easy for an agent to write, too.** Every new project carries an `AGENTS.md`, the documentation is published as [llms.txt](https://gesso-docs.vercel.app/llms.txt), and most wrong guesses are type errors. To design with what the project already has, `library_search` and `library_get` list its own components with every input they take, `tokens_view` gives the theme's names, and `render_frame` draws a module at any width as a PNG the agent can look at. [Built for AI agents](https://gesso-docs.vercel.app/guide/built-for-agents) has the whole story.
+
+## Runs anywhere
+
+One codebase, two scaffolds:
 
 ```bash
-pnpm create gesso-app my-app
+pnpm create gesso-app my-app                          # the web
+pnpm create gesso-app my-app --template electrobun    # a native desktop app
 ```
+
+| Target      | How                                                                                           | Status                         |
+| ----------- | --------------------------------------------------------------------------------------------- | ------------------------------ |
+| **Web**     | `vite build` writes static files. Any host serves them: Vercel, Cloudflare, Netlify, a bucket | Shipping: the three apps above |
+| **macOS**   | [Electrobun](https://electrobun.dev), in the system's own WKWebView                           | Runs                           |
+| **Linux**   | Electrobun, in WebKitGTK                                                                      | Runs                           |
+| **Windows** | Electrobun, in WebView2                                                                       | Builds; not yet run            |
+
+A desktop app is the same components and the same channels. `gesso-electrobun` keeps the application's state in the main process, so every window shows the same state, a second window included. The window is the platform's own webview, not a bundled Chromium, so the app stays small. [Gesso on Electrobun](apps/docs/structure/gesso-on-electrobun.md) goes from nothing to a native window.
+
+## Thirty seconds of code
 
 A component is a function that runs **once**. State is a cell; a cell bound to a prop updates that prop, and nothing else re-runs:
 
@@ -91,43 +130,14 @@ function Counter(inputs: Inputs<{ label?: string }>) {
 
 Notice what isn't there. No re-render pass, so nothing to memoise and no dependency array to keep honest. No virtual DOM, because component identity _is_ node identity. No `useEffect`. No CSS: `gap` and `x` are typed props on a layout engine, and `y: 'middle'` is a compile error. No colour, because `Button` reads the theme. And the same function mounts in a worker, on the main thread, or in a vitest test with no browser at all.
 
-## What you get
+### Also in the box
 
-- **A real layout engine, checked against Chrome.** Flexbox in full and CSS Grid with typed tracks. <!-- proof:layout-cases -->260<!-- /proof --> generated conformance cases are rendered by headless Chrome and the engine must match every box within 0.1 px. <!-- proof:layout-pinned Words -->One<!-- /proof --> known divergence, pinned by name so a fix reports itself.
-- **Text in every script.** <!-- proof:text-paragraphs -->140<!-- /proof --> paragraphs in Latin, Japanese, Chinese, Korean, Arabic, Hebrew, Devanagari, Thai and colour emoji break on the same lines Chrome breaks them, with real baselines, `maxLines` and ellipsis. <!-- proof:text-pinned Words -->Nine<!-- /proof --> disagreements, each pinned.
-- **<!-- proof:components Words -->Fifty-seven<!-- /proof --> components under one contract.** Inputs, overlays, tables, trees and media. Controlled by default, themed through tokens with no colour props, operable from the keyboard, and announced to assistive technology from the day they were written.
-- **Layout you can interrogate.** `engine.explain(node)` says why a box is the size it is, in sentences, in the order the rules applied. A hover inspector paints the boxes and a heatmap of what the last frame re-measured.
-- **Cost follows the change, not the tree.** A text edit deep in a 10k-node page re-measures fewer than 20 nodes. A scroll frame re-measures zero. Those are CI budgets.
-- **Two renderers, one truth.** Canvas2D and WebGPU consume the same layout records and are pixel-diffed against each other in headless Chrome.
-- **An 18 kB main thread.** The shell bundle is 18.5 kB gzipped against a <!-- proof:shell-budget-kb -->20<!-- /proof --> kB budget CI enforces, and CI greps its bytes for Canvas2D calls so the engine cannot creep back onto the thread it was moved off.
-- **Tests without a browser.** `gesso-testing` mounts a tree on a manual clock and queries it through the same semantics tree a screen reader gets. A failing box assertion prints `explain`'s answer under it. <!-- proof:tests -->8,153<!-- /proof --> tests run in under thirty seconds with no browser.
-- **An MCP server in every app.** The channels you declared become an AI agent's tools, described from your JSDoc, and the screen is offered as the outline a screen reader hears. [Built for AI agents](#built-for-ai-agents).
-- **Routing, motion, editing, devtools.** Typed routes with guards. Springs, FLIP, and shared elements that morph across screens. A text editor with IME, undo and clipboard. A Chrome devtools panel with the tree, the frame profiler and the workers' consoles.
-
-## Built for AI agents
-
-A Gesso app already declares what it holds and what it can be asked to do, as channels of plain data and typed commands, and already describes its screen as a semantics tree for assistive technology. Those are an AI agent's tools, so every Gesso app is an MCP server with nothing more written.
-
-```ts
-/** The notes the person has written. */
-export const Notes = defineChannel('notes', {
-  view: { rows: [] as readonly NoteRow[] },
-  commands: {} as {
-    /** Opens a note in the editor. @param id The note's id. */
-    open(id: string): void;
-    /** Deletes a note for good. @destructive @confirm */
-    remove(id: string): void;
-  }
-});
-```
-
-From that, an agent gets `notes_view`, `notes_open` and `notes_remove`, described from the JSDoc and checked against the types, and `remove` is put to the person before it is sent. For anything no channel covers, `ui_snapshot`, `ui_press`, `ui_type` and `ui_key` read and operate the screen the way a screen reader does. And to design with what the project already has, `library_overview`, `library_search` and `library_get` list its own components with every input they take, `tokens_view` gives the theme's names, and `render_frame` draws a module at any width as a PNG the agent can look at.
-
-- **While you develop**, `pnpm dev` serves MCP at `/__gesso/mcp` and prints the lines to connect Claude Code, Codex or Gemini CLI; any MCP client connects to the same address.
-- **In the browser**, `createApp({ webmcp: true })` registers the same tools with WebMCP.
-- **On a server or a desktop**, `mcpHandler` from `gesso-framework/agent` serves them over HTTP.
-
-Gesso is easy for a coding agent to write, too: every new project carries an `AGENTS.md`, the documentation is published as [llms.txt](https://gesso-docs.vercel.app/llms.txt), and most wrong guesses are type errors. [Built for AI agents](https://gesso-docs.vercel.app/guide/built-for-agents) has the whole story.
+- **A real layout engine, checked against Chrome.** Flexbox in full and CSS Grid with typed tracks. <!-- proof:layout-cases -->260<!-- /proof --> generated conformance cases must match Chrome's boxes within 0.1 px.
+- **Text in every script.** <!-- proof:text-paragraphs -->140<!-- /proof --> paragraphs in Latin, CJK, Arabic, Hebrew, Devanagari, Thai and colour emoji break on the same lines Chrome breaks them.
+- **<!-- proof:components Words -->Fifty-seven<!-- /proof --> components under one contract.** Inputs, overlays, tables, trees and media: themed, operable from the keyboard, and announced to assistive technology.
+- **Layout you can interrogate.** `engine.explain(node)` says why a box is the size it is, in sentences.
+- **Tests without a browser.** `gesso-testing` queries a tree through the same semantics tree a screen reader gets. <!-- proof:tests -->8,153<!-- /proof --> tests run in under thirty seconds.
+- **Routing, motion, editing, devtools.** Typed routes with guards, springs and shared elements, a text editor with IME, and a Chrome devtools panel.
 
 ## Is it for you?
 
@@ -313,50 +323,7 @@ pnpm create gesso-app my-app                          # a browser project, from 
 pnpm create gesso-app my-app --template electrobun    # the same app in a native window
 ```
 
-Or work in this repository:
-
-```bash
-pnpm install
-pnpm dev                      # the playground; open the URL Vite prints
-pnpm docs:dev                 # the documentation site
-pnpm create:app ../my-app --local   # scaffold a project against this working tree
-```
-
-`--local` packs the packages out of this checkout and points the new project at the tarballs instead, which is what you want while you are changing them. [Installation](apps/docs/guide/installation.md) covers setting a project up by hand.
-
-### The playground
-
-One shell, switched by hash:
-
-| Route                | What you'll see                                                                   |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `#workbench`         | Every component in its states, to check by hand                                   |
-| `#examples`          | Small complete apps, below                                                        |
-| `#renderers/dom`     | One layout scene as DOM boxes: hover a node, read why it's that size              |
-| `#renderers/canvas`  | The same scene in Canvas2D across three threads: main, data worker, render worker |
-| `#renderers/webgpu`  | The same scene through the WebGPU renderer                                        |
-| `#renderers/compare` | Canvas2D and WebGPU side by side with a live pixel diff                           |
-| `#benchmark`         | WebGPU throughput. Not in the nav; it is a tool to run, not a page to browse      |
-
-The four renderer views are one page with a switch in the header. The routes they replaced (`#debug`, `#canvas`, `#webgpu`, `#compare`, `#framework-sync`, `#modifiers`) still work and redirect to where each now lives.
-
-| Example                  | What it demonstrates                                                                            |
-| ------------------------ | ----------------------------------------------------------------------------------------------- |
-| `#example-signin`        | A passcode sign-in, written in JSX                                                              |
-| `#example-notes`         | Text editing and IME over a channel, persisted to OPFS from the app worker                      |
-| `#example-theme`         | Theming through the environment                                                                 |
-| `#example-live`          | A live feed bound straight to the canvas                                                        |
-| `#example-router`        | Nested routes, typed params and a guard, walked by the browser's Back button                    |
-| `#example-animation`     | A board that moves, and an idle app that does not                                               |
-| `#example-input`         | Gestures and shortcuts                                                                          |
-| `#example-layout`        | Layout an application can shape at runtime                                                      |
-| `#example-paint`         | Painting                                                                                        |
-| `#example-transitions`   | Shared elements morphing between routes, with video decoded by WebCodecs and audio on the shell |
-| `#example-modifiers`     | Behaviour attached to an element without a wrapper component                                    |
-| `#framework`             | One app on a render worker; stall the main thread and watch the heartbeat keep time             |
-| `#framework/main-thread` | The same app on the main thread, so the contrast is unmissable                                  |
-
-Each example is meant to be read as much as run. The card on the examples page names the source file.
+[Installation](apps/docs/guide/installation.md) covers setting a project up by hand. To work on Gesso itself, the playground, the scripts and the gates are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Packages
 
@@ -372,40 +339,6 @@ Each example is meant to be read as much as run. The card on the examples page n
 | `create-gesso-app`  | `packages/create-gesso-app` | The scaffold. Two templates: a browser project and a native window.                                      |
 
 `gesso-core` and `gesso-framework` each carry a second entry, `./testing`, holding the doubles their own suites use; nothing an application builds against reaches through it. Cross-package imports go through a package's root entry, never a deep path, so the committed API reports review the whole surface.
-
-### Applications
-
-| App                        | Directory                 | What it is                                                                 |
-| -------------------------- | ------------------------- | -------------------------------------------------------------------------- |
-| `gesso-playground`         | `apps/playground`         | The demo harness: the routes above, and one shell.                         |
-| `gesso-docs`               | `apps/docs`               | The documentation site, VitePress, with live examples that are also specs. |
-| `gesso-devtools-extension` | `apps/devtools-extension` | The Gesso panel in Chrome devtools.                                        |
-
-### Scripts
-
-```bash
-pnpm dev               # Vite dev server with the playground
-pnpm docs:dev          # the documentation site
-pnpm build             # tsdown for the packages, then vite for the playground and the extension
-pnpm test              # vitest, watch mode
-pnpm test:run          # vitest, once
-pnpm lint              # oxlint
-pnpm format            # oxfmt
-pnpm typecheck         # tsc --noEmit
-pnpm check             # format, lint, types, tests, build, API reports and the docs gates, in CI's order
-pnpm api:check         # each package's public surface against its committed report
-pnpm api:update        # rewrite those reports after an intended change
-pnpm fixtures:layout   # re-render layout conformance cases in headless Chrome
-pnpm fixtures:text     # re-render text conformance paragraphs in real fonts
-pnpm parity:webgpu     # Canvas2D vs WebGPU pixel diff in headless Chrome (needs a WebGPU adapter)
-pnpm screenshots       # each covered route against its committed baseline
-pnpm screenshots:docker # the same, and the docs pages, in the baselines' own Linux environment
-pnpm check:a11y        # Chrome's computed accessibility tree against the committed reports
-pnpm check:install     # pack, install and run the packages in a fresh Vite project
-pnpm check:scaffold    # run the scaffold and drive the result in Chrome
-```
-
-Every Chrome-driven script runs with no browser-automation dependency: `--dump-dom` for fixtures, the DevTools protocol over Node's built-in `WebSocket` for the rest. Set `CHROME_BIN` to choose the binary. The full list is in `package.json`.
 
 ## Status & license
 
