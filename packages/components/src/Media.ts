@@ -1,4 +1,4 @@
-import { combineLatest, distinctUntilChanged, map, type Observable } from 'rxjs';
+import { combineLatest, distinctUntilChanged, map, of, type Observable } from 'rxjs';
 
 import {
   createComponent,
@@ -17,6 +17,8 @@ import {
   steps,
   Box,
   Paint,
+  type PaintBox,
+  type PaintSurface,
   type UiChild,
   type UiElement,
   type UiNode,
@@ -34,6 +36,7 @@ import {
 } from 'gesso-core';
 import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 import { useOverlay } from './overlay';
+import { paintedFill, snapped } from './sliderTrack';
 import { VideoControls, type VideoControlsOptions } from './VideoControls';
 
 /**
@@ -859,31 +862,39 @@ export function ProgressBar(inputs: Inputs<ProgressBarProps>, ctx: ComponentCont
       valueMax: combineLatest([indeterminate, max]).pipe(map(([on, high]) => (on ? undefined : high))),
       states: indeterminate.pipe(map(on => (on ? ['busy'] : []) as UiSemanticState[]))
     },
+    // Both are painted at a fraction of a box the track's size rather
+    // than laid out at it, as a slider's fill is (`paintedFill`): a
+    // step of the sweep, or a value arriving, is then a new picture of
+    // the same box and no layout, and a frame in which nothing moved is
+    // drawn in part. Laid out, each step drew the whole surface.
     show(
       indeterminate,
       () =>
-        // A sliver that sweeps the track. `left` is a percentage of the
-        // track, so the sweep is layout rather than a computed offset
-        // and it follows the track when the bar is resized.
-        Box({
+        // A quarter of the track that sweeps it left to right, cut at
+        // the far end by the track's clip.
+        Paint({
           position: 'absolute',
           top: 0,
-          left: step.pipe(map(current => percent((current / PROGRESS_STEPS) * 100))),
-          width: percent(100 / 4),
+          left: 0,
+          width: percent(100),
           height: thickness,
-          borderRadius: thickness / 2,
-          backgroundColor: 'controlAccent'
+          hitTestable: false,
+          paint: step.pipe(
+            map(current => ({
+              draw: (surface: PaintSurface, box: PaintBox) => {
+                const [x, width] = snapped((current / PROGRESS_STEPS) * box.width, box.width / 4, box.scale);
+                surface.fillColor('controlAccent');
+                surface.beginPath();
+                surface.roundRect(x, 0, width, thickness, thickness / 2);
+                surface.fill();
+              },
+              inputs: [current]
+            }))
+          )
         }),
-      () =>
-        // In flow rather than pinned to `left: 0`, so the track's own
-        // start alignment places it, and that mirrors under a
-        // right-to-left reading: progress fills the way the line reads.
-        Box({
-          width: fraction.pipe(map(part => percent(part * 100))),
-          height: thickness,
-          borderRadius: thickness / 2,
-          backgroundColor: 'controlAccent'
-        })
+      // From the side the line starts at, so under a right-to-left
+      // reading progress fills the way the line reads.
+      () => paintedFill(fraction, of('controlAccent'), thickness, thickness / 2)
     )
   );
 }

@@ -137,7 +137,7 @@ export function thumbLayer(fraction: Observable<number>, diameter: number, props
  * sharp one. A picture is itself placed on whole device pixels, so its
  * own coordinates snap at its own scale.
  */
-function snapped(start: number, length: number, scale: number): [number, number] {
+export function snapped(start: number, length: number, scale: number): [number, number] {
   const from = Math.round(start * scale);
   const to = Math.round((start + length) * scale);
   return [from / scale, (to - from) / scale];

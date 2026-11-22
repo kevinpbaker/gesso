@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { UiNodeType } from 'gesso-core';
+import { PaintRecorder, UiNodeType, type UiPaint } from 'gesso-core';
 import { createComponent } from 'gesso-framework';
 import { renderTest } from 'gesso-testing';
 import 'gesso-testing/matchers';
@@ -82,17 +82,34 @@ describe('the docs progress bar example', () => {
         throw new Error('The indeterminate bar has no sliver.');
       }
 
-      const first = sliver.properties.get('left');
+      // Painted at a fraction of a box the track's size, so a step of
+      // the sweep is a new picture rather than a layout change.
+      const at = (width: number): number => {
+        const recorder = new PaintRecorder();
+        (sliver!.properties.get('paint') as UiPaint).draw(recorder, {
+          width,
+          height: 6,
+          paddingTop: 0,
+          paddingRight: 0,
+          paddingBottom: 0,
+          paddingLeft: 0,
+          scale: 1
+        });
+        const shape = recorder.finish().ops.find(op => op.op === 'roundRect');
+        return shape !== undefined && shape.op === 'roundRect' ? shape.x : Number.NaN;
+      };
+      const first = at(240);
       // A step is 90 ms, and the runtime waits it out with a timer
       // rather than taking a frame it would draw nothing on.
       await vi.advanceTimersByTimeAsync(200);
       ui.frame(200);
 
-      const later = sliver.properties.get('left');
+      const later = at(240);
       expect(later).not.toEqual(first);
-      // A percentage of the track, so the sweep follows the bar when
-      // the bar is resized.
-      expect(later).toMatchObject({ unit: 'percent' });
+      // A fraction of the track, so the sweep follows the bar when the
+      // bar is resized.
+      expect(later).toBeGreaterThan(0);
+      expect(at(480)).toBeCloseTo(later * 2);
     } finally {
       vi.useRealTimers();
     }

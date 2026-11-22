@@ -24,7 +24,10 @@ import {
   type UiVideoSurface,
   type VideoPlayback,
   type VideoResolver,
-  type VideoTransport
+  type VideoTransport,
+  Canvas2DRenderer,
+  PaintRecorder,
+  type UiPaint
 } from 'gesso-core';
 import { Icon, Image, ProgressBar, Spinner, Video } from './Media';
 
@@ -1790,15 +1793,37 @@ describe('ProgressBar, followed', () => {
     );
     mounted.frame();
     const bar = (): UiNode => firstElement(host!);
-    /** The accent box inside the track: the fill, or the sweeping sliver. */
-    const fill = (): UiNode | undefined => {
+    /**
+     * Where the accent inside the track is drawn, the fill or the
+     * sweeping sliver: both are painted at a fraction of a box the
+     * track's size, so this is the shape the picture draws, on the
+     * surface.
+     */
+    const fill = (): { x: number; width: number } => {
       const stack: UiNode[] = [bar()];
       while (stack.length > 0) {
         const node = stack.pop()!;
-        if (node !== bar() && node.properties.get('backgroundColor') === 'controlAccent') return node;
+        const paint = node.properties.get('paint') as UiPaint | undefined;
+        if (node !== bar() && paint !== undefined) {
+          const box = mounted.getLayout(node)!;
+          const recorder = new PaintRecorder();
+          paint.draw(recorder, {
+            width: box.width,
+            height: box.height,
+            paddingTop: 0,
+            paddingRight: 0,
+            paddingBottom: 0,
+            paddingLeft: 0,
+            scale: 1
+          });
+          const shape = recorder.finish().ops.find(op => op.op === 'roundRect');
+          return shape === undefined || shape.op !== 'roundRect'
+            ? { x: box.x, width: 0 }
+            : { x: box.x + shape.x, width: shape.width };
+        }
         for (let child = node.firstChild; child !== null; child = child.nextSibling) stack.push(child);
       }
-      return undefined;
+      throw new Error('the bar draws no accent');
     };
     return { mounted, bar, fill };
   }
@@ -1817,19 +1842,19 @@ describe('ProgressBar, followed', () => {
       mounted.frame(400);
       expect(semanticsOf(bar())).toMatchObject({ valueNow: 0.6, states: [] });
       expect(bar().properties.get('valueMax')).toBe(1);
-      expect(mounted.getLayout(fill()!).width).toBeCloseTo(120);
+      expect(fill().width).toBeCloseTo(120);
       // Still: nothing is moving it now.
-      const at = mounted.getLayout(fill()!).x;
+      const at = fill().x;
       vi.advanceTimersByTime(400);
       mounted.frame(800);
-      expect(mounted.getLayout(fill()!).x).toBe(at);
+      expect(fill().x).toBe(at);
 
       // And back. A determinate bar whose value went away computed NaN.
       value.next(undefined);
       mounted.frame(900);
       expect(semanticsOf(bar())).toMatchObject({ valueNow: undefined, states: ['busy'] });
       expect(bar().properties.get('valueMax')).toBeUndefined();
-      const width = mounted.getLayout(fill()!).width;
+      const width = fill().width;
       expect(Number.isNaN(width)).toBe(false);
       expect(width).toBeCloseTo(50);
     } finally {
@@ -1837,14 +1862,51 @@ describe('ProgressBar, followed', () => {
     }
   });
 
+  it('sweeps, and takes a new value, without laying anything out, so no frame is drawn whole', () => {
+    vi.useFakeTimers();
+    const render = vi.spyOn(Canvas2DRenderer.prototype, 'render');
+    try {
+      const value = new BehaviorSubject<number | undefined>(undefined);
+      const { mounted, fill } = mountBar({ value });
+      let time = 0;
+      const step = (): void => {
+        vi.advanceTimersByTime(16);
+        mounted.frame((time += 16));
+      };
+      for (let i = 0; i < 10; i++) step();
+      const renderer = render.mock.contexts.at(-1) as Canvas2DRenderer;
+      const stats = { ...renderer.damageStats };
+      const from = fill().x;
+
+      // Most of a sweep, at ninety milliseconds a step.
+      for (let i = 0; i < 100; i++) step();
+      expect(fill().x).not.toBe(from);
+      expect(renderer.damageStats.whole - stats.whole).toBe(0);
+      expect(renderer.damageStats.partial - stats.partial).toBeGreaterThan(10);
+
+      // A value arriving swaps the sliver for the fill, which adds a
+      // node; after that, a value moving is a new picture.
+      value.next(0.2);
+      for (let i = 0; i < 4; i++) step();
+      const settled = { ...renderer.damageStats };
+      value.next(0.7);
+      step();
+      expect(fill().width).toBeCloseTo(140);
+      expect(renderer.damageStats.whole - settled.whole).toBe(0);
+    } finally {
+      render.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('follows a change to the range alone', () => {
     const max = new BehaviorSubject(1);
     const { mounted, fill } = mountBar({ value: 0.5, max });
-    expect(mounted.getLayout(fill()!).width).toBeCloseTo(100);
+    expect(fill().width).toBeCloseTo(100);
 
     max.next(2);
     mounted.frame();
-    expect(mounted.getLayout(fill()!).width).toBeCloseTo(50);
+    expect(fill().width).toBeCloseTo(50);
   });
 
   it('fills from the right when the reading runs right to left', () => {
@@ -1856,7 +1918,7 @@ describe('ProgressBar, followed', () => {
     };
     const { mounted, bar, fill } = mountBar({ value: 0.25 }, rtl);
     const track = mounted.getLayout(bar());
-    const part = mounted.getLayout(fill()!);
+    const part = fill();
     expect(part.width).toBeCloseTo(50);
     // Progress runs the way the reading does, as it does in a browser.
     expect(part.x + part.width).toBeCloseTo(track.x + track.width);
