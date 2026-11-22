@@ -1,4 +1,4 @@
-import { BehaviorSubject, map, skip, Subject, type Observable } from 'rxjs';
+import { BehaviorSubject, combineLatest, distinctUntilChanged, map, skip, Subject, type Observable } from 'rxjs';
 
 import {
   createComponent,
@@ -9,7 +9,9 @@ import {
   ScrollService
 } from 'gesso-framework';
 import {
+  autoFocus,
   Column,
+  EditableText,
   Row,
   Text,
   measureFlow,
@@ -18,9 +20,11 @@ import {
   type UiChild,
   type UiElement,
   type UiKeyboardEvent,
-  type UiNode
+  type UiNode,
+  type UiTextChangeEvent
 } from 'gesso-core';
-import { CONTROL_INTERACTION, keymap, menuBadge } from './internals';
+import { fuzzyMatch, matchSpans } from './fuzzy';
+import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, keymap, menuBadge } from './internals';
 import { useOverlay, type OverlayPlacement } from './overlay';
 
 export interface MenuItem {
@@ -53,6 +57,8 @@ export interface MenuItem {
    * and Left and Right trade places.
    */
   readonly items?: readonly MenuItem[];
+  /** Other words it answers to in a `searchable` menu: "erase" for Delete. */
+  readonly keywords?: readonly string[];
 }
 
 /**
@@ -84,6 +90,40 @@ export interface MenuProps {
   compact?: boolean;
   /** A submenu, opened from another menu's item: Left closes it, back to that item. Set by `Menu` itself. */
   submenu?: boolean;
+  /**
+   * A field above the items that narrows them as it is typed into, for
+   * a menu too long to read: forty labels, every person on a team. The
+   * field takes focus when the menu opens and keeps it; the arrows walk
+   * what matches and Enter chooses. Read once, when the menu mounts.
+   */
+  searchable?: boolean;
+  /** The search field's placeholder and name. Default "Search". */
+  searchPlaceholder?: string;
+  /** Shown in a searchable menu when nothing matches. Default "Nothing matches". */
+  emptyText?: string;
+}
+
+/** An item as a searchable menu lists it: what of its label matched, to draw strong. */
+interface Listed {
+  readonly item: MenuItem;
+  readonly positions: readonly number[];
+}
+
+const NO_POSITIONS: readonly number[] = [];
+
+/**
+ * The items `query` matches, best first and in their own order within
+ * a score, with what of each label matched: the fuzzy match
+ * `CommandPalette` uses, over each item's label and its keywords. An
+ * empty query lists them all, as they are.
+ */
+function search(items: readonly MenuItem[], query: string): readonly Listed[] {
+  if (query.trim() === '') return items.map(item => ({ item, positions: NO_POSITIONS }));
+  return items
+    .map((item, index) => ({ item, index, match: fuzzyMatch(item.label, item.keywords ?? [], query) }))
+    .filter(entry => entry.match !== null)
+    .sort((a, b) => b.match!.score - a.match!.score || a.index - b.index)
+    .map(entry => ({ item: entry.item, positions: entry.match!.positions }));
 }
 
 export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild {
@@ -93,6 +133,11 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   const scroll = ctx.inject(ScrollService);
   const overlay = useOverlay(ctx, 'menu');
   const compact = inputs.compact.value === true;
+  const searchable = inputs.searchable?.value === true;
+  const searchPlaceholder = input(inputs.searchPlaceholder, 'Search');
+  const emptyText = input(inputs.emptyText, 'Nothing matches');
+  /** What is typed in a searchable menu's field; always '' in one that isn't. */
+  const query = new BehaviorSubject('');
   const active = new BehaviorSubject(0);
   /** The submenu open, by its item's index, with the item's row to open beside; null for none. */
   const sub = new BehaviorSubject<{ readonly index: number; readonly node: UiNode; readonly item: MenuItem } | null>(
@@ -100,6 +145,26 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   );
   /** The rows' nodes, by index, so the highlighted one can be scrolled to. */
   const rows = new Map<number, UiNode>();
+  /** Told when `rows` changes, so the search field's `activeDescendant` follows a row that arrives late. */
+  const rowsChanged = new BehaviorSubject(0);
+
+  /**
+   * The items as they are listed now: all of them, or what a search
+   * matches. Every index below (`active`, a row's, a submenu's) is into
+   * this list, so a row compares itself with the highlight by the place
+   * it is drawn in. Remembered for the items and the query it was made
+   * from, since the keys ask for it on every press.
+   */
+  let listedFrom: { items: readonly MenuItem[]; query: string; list: readonly Listed[] } | null = null;
+  const listed = (): readonly Listed[] => {
+    const items = inputs.items.value;
+    const text = query.value;
+    if (listedFrom === null || listedFrom.items !== items || listedFrom.query !== text) {
+      listedFrom = { items, query: text, list: search(items, text) };
+    }
+    return listedFrom.list;
+  };
+  const listedItems = (): readonly MenuItem[] => listed().map(entry => entry.item);
   /** The scroller, whenever it is given a new box. */
   const scrollerBox = new Subject<LayoutBox>();
   /** The menu's node while focus is trapped in it. */
@@ -116,7 +181,7 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
    * disabled item anywhere but the end makes them disagree.
    */
   const seek = (from: number, delta: number): number => {
-    const items = inputs.items.value;
+    const items = listedItems();
     for (let moved = 0; moved < items.length; moved += 1) {
       const index = (((from + delta * moved) % items.length) + items.length) % items.length;
       if (items[index].disabled !== true) {
@@ -129,7 +194,7 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   /** The first item that can be chosen at or after `from`, wrapping, or -1. */
   const from = (start: number): number => seek(start, 1);
   /** The last one, walking backwards from the end. */
-  const last = (): number => seek(inputs.items.value.length - 1, -1);
+  const last = (): number => seek(listedItems().length - 1, -1);
 
   const release = (): void => {
     if (trapped !== null) {
@@ -164,13 +229,13 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
 
   /** The pointer on an item: the highlight follows it, as the keys move it, and its submenu opens (another's closes). */
   const pointAt = (index: number): void => {
-    if (inputs.items.value[index]?.disabled !== true) active.next(index);
+    if (listedItems()[index]?.disabled !== true) active.next(index);
     openSub(index);
   };
 
   /** Opens an item's submenu beside its row, or closes the one open (`index` -1). */
   const openSub = (index: number): void => {
-    const item = inputs.items.value[index];
+    const item = listedItems()[index];
     const node = rows.get(index);
     if (item?.items === undefined || item.disabled === true || node === undefined) {
       if (sub.value !== null) sub.next(null);
@@ -182,7 +247,7 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   };
 
   const choose = (value?: string): void => {
-    const items = inputs.items.value;
+    const items = listedItems();
     const item = value === undefined ? items[active.value] : items.find(entry => entry.value === value);
     // A disabled item is not a command: neither Enter on the highlight
     // nor a press on the row itself can choose one.
@@ -236,17 +301,40 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
       rows.set(index, node);
     } else if (rows.get(index) === node) {
       rows.delete(index);
+    } else {
+      return;
     }
+    rowsChanged.next(rowsChanged.value + 1);
   };
 
+  // A new search starts on its best match, with any submenu closed: the
+  // row it opened beside may be gone.
+  query.pipe(skip(1), distinctUntilChanged()).subscribe(() => {
+    if (sub.value !== null) sub.next(null);
+    active.next(from(0));
+  });
+
+  /**
+   * In a searchable menu the keys arrive from the field, which has the
+   * caret: Space is a space, and Home and End move the caret once
+   * something is typed. They walk the rows only while it is empty.
+   */
   const keys = keymap({
     ArrowDown: () => step(1),
     ArrowUp: () => step(-1),
-    Home: () => moveTo(from(0)),
-    End: () => moveTo(last()),
     Enter: () => choose(),
-    ' ': () => choose(),
-    Escape: close
+    Escape: close,
+    ...(searchable
+      ? {}
+      : {
+          Home: () => moveTo(from(0)),
+          End: () => moveTo(last()),
+          ' ': () => choose()
+        })
+  });
+  const ends = keymap({
+    Home: () => moveTo(from(0)),
+    End: () => moveTo(last())
   });
 
   /**
@@ -265,6 +353,10 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') {
       return false;
     }
+    // In a field with text the arrows move the caret, as they do anywhere.
+    if (query.value !== '') {
+      return true;
+    }
     const rtl = frame !== null && resolveString(frame, 'textDirection') === 'rtl';
     if ((event.key === 'ArrowRight') !== rtl) {
       openSub(active.value);
@@ -277,6 +369,38 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
     event.stopPropagation();
     return true;
   };
+
+  /** The highlighted row, which the search field names as its `activeDescendant`. */
+  const activeNode = combineLatest([active, rowsChanged]).pipe(
+    map(([at]) => rows.get(at) ?? null),
+    distinctUntilChanged()
+  );
+
+  /**
+   * A searchable menu's field. Focus moves into it as the menu opens
+   * and stays there: the rows are walked by a highlight it names as its
+   * `activeDescendant`, so a screen reader reads each as it is reached.
+   */
+  const field = (): UiElement =>
+    EditableText({
+      modifiers: [autoFocus(), CONTROL_FOCUS_RING],
+      value: query,
+      placeholder: searchPlaceholder,
+      textWrap: 'none',
+      color: 'controlForeground',
+      backgroundColor: 'controlBackground',
+      borderColor: 'controlBorder',
+      borderWidth: 1,
+      borderRadius: 4,
+      minWidth: 200,
+      marginBottom: 4,
+      flexShrink: 0,
+      ...(compact ? { textStyle: 'bodySmall', paddingX: 8, paddingY: 4 } : { padding: 8 }),
+      role: 'searchbox',
+      label: searchPlaceholder,
+      activeDescendant: activeNode,
+      onInput: (event: UiTextChangeEvent) => query.next(event.value)
+    });
 
   /**
    * A frame around a column that scrolls. The frame is the menu — its
@@ -307,15 +431,34 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
         role: 'menu',
         label: label.value,
         onKeyDown: (event: UiKeyboardEvent) => {
-          if (!sideways(event)) keys(event);
+          if (sideways(event)) return;
+          if (searchable && query.value === '') ends(event);
+          keys(event);
         }
       },
+      ...(searchable ? [field()] : []),
       Column(
         { overflow: 'auto', minHeight: 0, gap: compact ? 0 : 2, modifiers: [measureFlow(scrollerBox)] },
-        inputs.items.pipe(
-          map(items => {
+        combineLatest([inputs.items, query, emptyText]).pipe(
+          map(([items, text, nothing]) => {
+            const list = listed();
+            if (list.length === 0 && text !== '') {
+              return [
+                Text({
+                  key: '∅',
+                  text: nothing,
+                  color: 'textMuted',
+                  selectable: false,
+                  ...(compact ? { textStyle: 'bodySmall', padding: 6 } : { padding: 8 })
+                })
+              ];
+            }
+            // The check's room is kept for every row of a menu with settings, matched or not, so the labels stay put
+            // as the search narrows. A search ranks the rows, so their rules no longer mark groups.
             const checks = items.some(item => item.checked !== undefined);
-            return items.map((item, index) => row(item, index, active, sub, choose, pointAt, track, compact, checks));
+            return list.map((entry, index) =>
+              row(entry.item, index, active, sub, choose, pointAt, track, compact, checks, entry.positions, text === '')
+            );
           })
         )
       ),
@@ -378,6 +521,8 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
 
   inputs.open.subscribe(isOpen => {
     if (isOpen === true && !overlay.isOpen()) {
+      // Each opening starts with every item listed.
+      query.next('');
       // -1 when nothing can be chosen: no row is highlighted, rather
       // than the first one painted as Enter's when Enter would do nothing.
       active.next(from(0));
@@ -430,15 +575,19 @@ function row(
   pointAt: (index: number) => void,
   track: (index: number, node: UiNode, present: boolean) => void,
   compact: boolean,
-  checks: boolean
+  checks: boolean,
+  positions: readonly number[] = NO_POSITIONS,
+  rules = true
 ): UiElement {
   let mounted: UiNode | null = null;
   const nested = item.items !== undefined;
   const trailing = nested ? '›' : item.shortcut;
   const badge = item.badge ?? '';
+  const color =
+    item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground';
   const text = Text({
-    text: item.label,
-    color: item.disabled === true ? 'controlForegroundDisabled' : item.danger === true ? 'danger' : 'controlForeground',
+    // What a search matched, drawn strong.
+    ...(positions.length === 0 ? { text: item.label, color } : { spans: matchSpans(item.label, positions, color) }),
     selectable: false,
     ...(badge === '' ? { flex: 1 } : {}),
     ...(compact ? { textStyle: 'bodySmall' } : {})
@@ -509,7 +658,7 @@ function row(
           })
         ])
   );
-  if (item.separator !== true || index === 0) {
+  if (item.separator !== true || index === 0 || !rules) {
     return command;
   }
   // The rule goes with the item after it, so the rows stay one a command and the arrows walk them as before.

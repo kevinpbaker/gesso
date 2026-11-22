@@ -26,16 +26,19 @@ is disabled, so the walk steps over it.
 
 ## Props
 
-| Prop           | Type                       | Default          | What it does                                                                      |
-| -------------- | -------------------------- | ---------------- | --------------------------------------------------------------------------------- |
-| `items`        | `readonly MenuItem[]`      | required         | The commands, in the order they are drawn. Bound, so a cell of items follows.     |
-| `open`         | `boolean`                  | none             | Whether the menu is up. The application owns it; a menu never opens itself.       |
-| `onOpenChange` | `(open: boolean) => void`  | none             | Called with `false` when the menu closes. It is never called with `true`.         |
-| `onSelect`     | `(value: string) => void`  | none             | Called with the chosen item's `value`, just before the menu closes.               |
-| `anchor`       | `UiNode \| null`           | `null`           | The node the menu sits beside. Read when the menu opens. See below: pass a cell.  |
-| `at`           | `{ x: number, y: number }` | none             | Where to open, in viewport pixels, for a menu with no anchor. Read when it opens. |
-| `placement`    | `OverlayPlacement`         | `'bottom-start'` | Which side of the anchor to prefer. Read when the menu opens.                     |
-| `label`        | `string`                   | `'Menu'`         | The menu's accessible name. Not drawn, so name it after what the commands act on. |
+| Prop                | Type                       | Default             | What it does                                                                         |
+| ------------------- | -------------------------- | ------------------- | ------------------------------------------------------------------------------------ |
+| `items`             | `readonly MenuItem[]`      | required            | The commands, in the order they are drawn. Bound, so a cell of items follows.        |
+| `open`              | `boolean`                  | none                | Whether the menu is up. The application owns it; a menu never opens itself.          |
+| `onOpenChange`      | `(open: boolean) => void`  | none                | Called with `false` when the menu closes. It is never called with `true`.            |
+| `onSelect`          | `(value: string) => void`  | none                | Called with the chosen item's `value`, just before the menu closes.                  |
+| `anchor`            | `UiNode \| null`           | `null`              | The node the menu sits beside. Read when the menu opens. See below: pass a cell.     |
+| `at`                | `{ x: number, y: number }` | none                | Where to open, in viewport pixels, for a menu with no anchor. Read when it opens.    |
+| `placement`         | `OverlayPlacement`         | `'bottom-start'`    | Which side of the anchor to prefer. Read when the menu opens.                        |
+| `label`             | `string`                   | `'Menu'`            | The menu's accessible name. Not drawn, so name it after what the commands act on.    |
+| `searchable`        | `boolean`                  | `false`             | A field above the items that narrows them as it is typed into. Read once. See below. |
+| `searchPlaceholder` | `string`                   | `'Search'`          | The search field's placeholder and accessible name.                                  |
+| `emptyText`         | `string`                   | `'Nothing matches'` | Shown in a searchable menu when nothing matches.                                     |
 
 A `MenuItem` is these fields:
 
@@ -48,6 +51,7 @@ A `MenuItem` is these fields:
 | `shortcut`  | `string`              | none     | The keys that do the same from anywhere, said at the row's end: `⌘C`.                     |
 | `danger`    | `boolean`             | `false`  | It cannot be undone: draws its label in the danger colour.                                |
 | `items`     | `readonly MenuItem[]` | none     | A submenu, opened beside the row instead of choosing it. See below.                       |
+| `keywords`  | `readonly string[]`   | none     | Other words it answers to in a searchable menu: "erase" for Delete.                       |
 
 `Menu` does not take the shared layout props the rest of the library
 takes, and it has no `rootModifiers`. Nothing is drawn where it is
@@ -128,6 +132,33 @@ the point instead, whole, the way a native one does.
 The entry always takes a backdrop, so a press or a wheel anywhere
 outside closes the menu and nothing behind it scrolls while it is up.
 
+## Searching
+
+A menu too long to read is searched instead: forty labels, every person
+on a team. `searchable` puts a field above the items, which takes focus
+as the menu opens and keeps it. Typing narrows the items to what
+matches, best first, and the arrows walk what is left.
+
+<LiveExample id="menusearch" height="400" />
+
+<<< @/src/examples/MenuSearchExample.tsx#menu-search
+
+Type `chen`, or `ines` without the accent, or a team such as `infra`,
+which is a keyword. Eli is away, so the arrows pass him by.
+
+The match is [CommandPalette](/components/command-palette)'s: every word
+typed has to be found in the label or, for less, in the item's
+`keywords`, as a run of characters or as a subsequence, and case and
+accents don't count. The characters of the label that matched are drawn
+strong. While something is typed the rules between groups are not
+drawn, since the rows are ranked rather than grouped, and a submenu's
+items are not searched: its item matches by its own label.
+
+Each opening starts with the field empty and every item listed. In the
+field, Space is a space, and `Home`, `End`, `Left` and `Right` move the
+caret once something is typed; while the field is empty they do what the
+table below says.
+
 ## Keyboard
 
 The menu itself takes focus and traps it while it is open, so the keys
@@ -142,7 +173,7 @@ and Enter arriving at the menu.
 | `Home`   | The first item that can be chosen                     |
 | `End`    | The last item that can be chosen                      |
 | `Enter`  | Chooses the highlighted item and closes the menu      |
-| `Space`  | The same                                              |
+| `Space`  | The same, but in a searchable menu, where it is typed |
 | `Escape` | Closes the menu without choosing                      |
 | `Right`  | Opens the highlighted item's submenu                  |
 | `Left`   | In a submenu, closes it, back to its item             |
@@ -182,16 +213,19 @@ chooses an item the keyboard cannot reach.
 
 ## Semantics
 
-| What      | Value                                                                            |
-| --------- | -------------------------------------------------------------------------------- |
-| Menu      | `menu`, named by `label`, on the element that takes focus                        |
-| Item      | `menuitem`, named by the item's `label`                                          |
-| Disabled  | `disabled` on the record of an item marked so, and the subtree under it is inert |
-| Highlight | Not emitted at all: it is a background colour, with no state behind it           |
+| What      | Value                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------- |
+| Menu      | `menu`, named by `label`, on the element that takes focus                                   |
+| Item      | `menuitem`, named by the item's `label`                                                     |
+| Disabled  | `disabled` on the record of an item marked so, and the subtree under it is inert            |
+| Highlight | Not emitted at all: it is a background colour, with no state behind it                      |
+| Search    | `searchbox`, named by `searchPlaceholder`, whose `activeDescendant` is the highlighted item |
 
-Nothing says which item the arrows have reached. The highlight is a fill
+Outside a searchable menu, nothing says which item the arrows have reached. The highlight is a fill
 and no more, so an assistive technology following the semantics tree
-learns which item was chosen only when `onSelect` fires. A menu item
+learns which item was chosen only when `onSelect` fires. A searchable
+menu's field names the highlighted item as its `activeDescendant`, so a
+screen reader reads each item as the arrows reach it. A menu item
 also carries no `posInSet` and no `setSize`, so nothing announces
 "2 of 4"; the spec asserts both absences.
 

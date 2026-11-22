@@ -910,6 +910,7 @@ interface MenuItem {
   readonly badge?: string;
   readonly checked?: boolean;
   readonly items?: readonly MenuItem[];
+  readonly keywords?: readonly string[];
 }
 interface MenuProps {
   open?: boolean;
@@ -925,6 +926,9 @@ interface MenuProps {
   };
   compact?: boolean;
   submenu?: boolean;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  emptyText?: string;
 }
 declare function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild;
 interface ContextMenusProps extends ControlLayoutProps {
