@@ -8,9 +8,10 @@ This is the guide from nothing to a native window. It assumes you have
 read [desktop windows](/structure/desktop-windows), which explains the
 arrangement and the four files an Electrobun application is made of;
 this page is about getting one running, and about what has actually
-been seen running. Every claim on it comes from one fresh scaffold,
-opened on Linux with WebKitGTK on 2026-09-16, and the last section says
-what that leaves out.
+been seen running. Its claims come from one fresh scaffold, opened on
+Linux with WebKitGTK on 2026-09-16, and from Gesso applications that
+have run as desktop apps on an Apple-silicon Mac since 2026-11-09; the
+last section says what that leaves out.
 
 ## The shape
 
@@ -218,28 +219,61 @@ column that matters is the third.
 
 | What                                                           | WebKitGTK (Linux)                    | WKWebView (macOS) | WebView2 (Windows) |
 | -------------------------------------------------------------- | ------------------------------------ | ----------------- | ------------------ |
-| A module worker loads from `views://`                          | yes                                  | not run           | not run            |
-| `OffscreenCanvas` transfers and the render worker paints       | yes                                  | not run           | not run            |
-| A channel replicates from the main process                     | yes                                  | not run           | not run            |
-| A press crosses to the main process and the window repaints    | yes                                  | not run           | not run            |
-| The appearance is pushed to every window and the theme follows | yes                                  | not run           | not run            |
+| A module worker loads from `views://`                          | yes                                  | yes               | not run            |
+| `OffscreenCanvas` transfers and the render worker paints       | yes                                  | yes               | not run            |
+| A channel replicates from the main process                     | yes                                  | yes               | not run            |
+| A press crosses to the main process and the window repaints    | yes                                  | yes               | not run            |
+| The appearance is pushed to every window and the theme follows | yes                                  | yes, one window   | not run            |
 | A second window opens and shows the shared state               | yes                                  | not run           | not run            |
-| The window follows a resize                                    | yes                                  | not run           | not run            |
+| The window follows a resize                                    | yes                                  | yes               | not run            |
 | `prefers-color-scheme` from the webview is trustworthy         | no, it reported light in dark mode   | not run           | not run            |
 | WebGPU                                                         | no `navigator.gpu`; Canvas2D is used | not run           | not run            |
 
-The first seven rows come from the fresh scaffold of 2026-09-16 and
-from the E1 spike and Desk before it; the eighth is why the main
-process tells the window its appearance rather than letting it ask.
+The Linux column's first seven rows come from the fresh scaffold of
+2026-09-16 and from the E1 spike and Desk before it; the eighth is why
+the main process tells the window its appearance rather than letting it
+ask. The macOS column comes from applications in daily use, each with
+one window, not from the scaffold.
+
+### What macOS adds
+
+WKWebView treats a page in ways the other two engines do not, and two
+of them matter to an application that does work while no one is
+looking at it:
+
+- **A covered window stops.** WebKit takes a window that another app's
+  window fully covers for a hidden one, and stops its page about four
+  minutes in. An agent working the app over MCP then gets no answer
+  until the window is brought forward, and the window is blank when it
+  is. `keepRunningWhenCovered(window.webview.ptr, ffi)` from
+  `gesso-electrobun/desktop` turns WebKit's occlusion detection off for
+  the web view; see [agents and MCP](/structure/agents-and-mcp). A
+  minimized window, or an app hidden with ⌘H, still stops.
+- **Frames are held near 60 a second.** On a 120 Hz display, WebKit
+  keeps a page's rendering updates near 60 unless its feature flag
+  `PreferPageRenderingUpdatesNear60FPSEnabled` is turned off, which an
+  embedding app does through the private
+  `-[WKPreferences _setEnabled:forFeature:]`. Electrobun has no option
+  for it and `gesso-electrobun` has no helper yet, so a Gesso window on
+  a Mac draws at 60 unless the application reaches the preference
+  itself.
+
+A Mac application also needs an **Edit** menu for ⌘C, ⌘V and the rest to
+reach a text field; [desktop windows](/structure/desktop-windows) has
+it.
 
 ## What is unverified
 
 Claiming less than has been seen is the rule on this page, so:
 
-- **WKWebView and WebView2 have never run this framework.** Not known
-  to be broken, and not known to work. Both are the same scaffold,
-  `hutch install`, and `hutch run dev` on a machine that has them; the
-  first window on each is the experiment.
+- **WebView2 has never run this framework.** Not known to be broken,
+  and not known to work. It is the same scaffold, `hutch install`, and
+  `hutch run dev` on a Windows machine; the first window there is the
+  experiment.
+- **On macOS, the scaffold itself has not been opened.** The macOS
+  column comes from applications built on Gesso, each with one window.
+  A second window, `prefers-color-scheme` from WKWebView and WebGPU
+  have not been checked there, and Intel Macs have not been tried.
 - **No person has pressed the scaffold's button.** The desktop the
   window was opened on had no way to inject a pointer into an X11
   window, so the presses that counted to 1, flipped the appearance and

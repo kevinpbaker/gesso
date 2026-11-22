@@ -573,12 +573,14 @@ project:
 
 ## Limits
 
-- **Only Linux and WebKitGTK have been run.** Every number and every
-  claim on this page comes from one engine, on one machine, on one day.
-  macOS with WKWebView and Windows with WebView2 are unverified: not
-  known to be broken, and not known to work. If you are building for
-  those, treat the first window you open on each as the experiment it
-  is.
+- **The numbers are Linux's.** Every number on this page comes from
+  WebKitGTK, on one machine, on one day. Gesso applications have run
+  on macOS with WKWebView since 2026-11-09, but nothing here was
+  measured there; [Gesso on Electrobun](/structure/gesso-on-electrobun#what-works-on-which-engine)
+  says what has been seen on each engine. Windows with WebView2 is
+  unverified: not known to be broken, and not known to work. If you
+  are building for it, treat the first window you open as the
+  experiment it is.
 - **Nothing here is checked by a gate.** Every automated check in this
   project drives headless Chrome, and nothing in CI can open a native
   window. The specs cover the wire format and the bridge end to end,
