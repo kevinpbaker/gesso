@@ -72,9 +72,16 @@ jobs:
 
       # Layout conformance (L0) and the performance budgets (L7) are
       # vitest specs with committed artifacts, so this one command is
-      # three of the gates in one command.
+      # three of the gates in one command. The JSON report is for the
+      # step after it, so the suite runs once.
       - name: Tests, layout conformance and performance budgets
-        run: pnpm test:run
+        run: pnpm test:run --reporter=default --reporter=json --outputFile.json=${{ runner.temp }}/vitest.json
+
+      # The README and the docs quote test, case and paragraph counts as
+      # proof. Each is written between markers by `pnpm proof:update`,
+      # and this fails when one no longer matches the repository.
+      - name: Proof figures match the repository
+        run: pnpm proof:check --report ${{ runner.temp }}/vitest.json
 
       - name: Build the packages and the playground
         run: pnpm build
