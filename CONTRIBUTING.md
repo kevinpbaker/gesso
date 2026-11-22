@@ -36,6 +36,62 @@ because they are slow:
 
 Run them one at a time. They share Chrome's devtools port.
 
+### Firefox and Safari
+
+Everything above runs in Chrome. This one asks whether Gesso runs in
+the other two engines at all:
+
+```bash
+node scripts/check-browsers.ts --browser firefox
+node scripts/check-browsers.ts --browser firefox --headed   # adds the WebGPU checks
+node scripts/check-browsers.ts --browser safari
+node scripts/check-browsers.ts --browser ios                # Safari in a booted iOS Simulator
+```
+
+In each browser it checks that every playground route mounts and
+paints a frame that is not blank, with no uncaught error. It checks that
+the browser's own accessibility engine names every control in the
+committed accessibility reports, and that Tab walks them in the
+committed order. It checks that a real click and real key presses reach
+the app, and that the Canvas2D and WebGPU panes agree. It also runs the
+self-reporting pages: `rest` across a worker, a touch drag, and a video
+decode. It does not compare pixels with Chrome. The screenshot baselines
+are Chrome on Linux and mean nothing in another engine.
+
+`--only routes,accessibility,input,parity,probes` and `--route <id>` narrow
+a run; `--shots <dir>` saves what each route drew.
+
+Firefox needs nothing installed beyond itself: the check talks WebDriver
+BiDi to the endpoint Firefox serves, with no geckodriver. Headless
+Firefox has no WebGPU adapter on macOS, so the WebGPU route and the
+parity check are reported as not checked unless you pass `--headed`. A
+Firefox with an update waiting opens no endpoint on its first start;
+start it once by hand.
+
+Safari has to be allowed to be automated, once per machine. In Safari,
+turn on Settings > Advanced > "Show features for web developers", then
+Settings > Developer > "Allow remote automation". Then run
+`safaridriver --enable`, which asks for your password. Safari has no
+headless mode, so a window opens while the check runs. `--browser ios`
+uses the same driver against a booted simulator (`--device "iPhone 17"`
+picks one). In the simulator, turn on Settings > Safari > Advanced >
+Remote Automation first. The simulator runs WebKit on iOS with real touch,
+but on the Mac's GPU and memory, so it is not an iPhone.
+
+What no script here can check, and what to do by hand before a release:
+
+- **VoiceOver.** In Safari, turn VoiceOver on (Cmd+F5) and walk the sign-in and
+  notes examples with VO+arrows. Press a key with VO+Space. The names
+  should be the ones in `apps/playground/accessibility/`.
+- **IME composition.** WebDriver cannot send composition events. In
+  the notes example, switch to a Japanese input source and type in
+  Firefox and in Safari. The candidate window should open at the caret,
+  and the text should be underlined until you commit it.
+- **A real iPhone.** Its GPU, its memory limit and its habit of killing
+  a background tab are not in the simulator. Open the playground on
+  the phone over the local network, with Web Inspector attached from
+  Safari's Develop menu.
+
 ### Screenshot baselines
 
 The route and docs screenshots are compared with baselines captured on
