@@ -77,6 +77,7 @@ export type {
   AccordionSection
 } from './Structure';
 export { SplitPane, type SplitPaneProps } from './SplitPane';
+export { PanelGroup, type PanelGroupPanel, type PanelGroupProps } from './PanelGroup';
 export { FindBar, type FindBarProps } from './FindBar';
 export { Dialog, type DialogProps } from './Dialog';
 export { Drawer, type DrawerProps, type DrawerSide } from './Drawer';

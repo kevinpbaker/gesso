@@ -892,6 +892,28 @@ interface SplitPaneProps extends ControlLayoutProps {
   divider?: 'bar' | 'line';
 }
 declare function SplitPane(inputs: Inputs<SplitPaneProps>, ctx: ComponentContext): UiChild;
+interface PanelGroupPanel {
+  readonly key: string;
+  readonly content: UiChild;
+  readonly label?: string;
+  readonly defaultSize?: number;
+  readonly minSize?: number;
+  readonly maxSize?: number;
+  readonly collapsible?: boolean;
+  readonly fill?: boolean;
+}
+interface PanelGroupProps extends ControlLayoutProps {
+  panels: readonly PanelGroupPanel[];
+  direction?: 'row' | 'column';
+  sizes?: Readonly<Record<string, number>>;
+  defaultSizes?: Readonly<Record<string, number>>;
+  onSizesChange?: (sizes: Readonly<Record<string, number>>) => void;
+  collapsed?: readonly string[];
+  defaultCollapsed?: readonly string[];
+  onCollapsedChange?: (collapsed: readonly string[]) => void;
+  divider?: 'line' | 'bar';
+}
+declare function PanelGroup(inputs: Inputs<PanelGroupProps>, _ctx: ComponentContext): UiChild;
 interface FindBarProps {
   inset?: number;
   placeholder?: string;
@@ -1892,6 +1914,7 @@ export {
   paintCanvasOverlay,
   paintReadout,
   PALETTE,
+  PanelGroup,
   parseCellName,
   parseIsoDate,
   parseQuantity,
@@ -2061,6 +2084,8 @@ export {
   type OverlayOptions,
   type PaginationProps,
   type PaletteColor,
+  type PanelGroupPanel,
+  type PanelGroupProps,
   type PlainAction,
   type PlainLimits,
   type PlainNode,

@@ -178,6 +178,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Popover', link: '/components/popover' },
       { text: 'Toast', link: '/components/toast' },
       { text: 'SplitPane', link: '/components/split-pane' },
+      { text: 'PanelGroup', link: '/components/panel-group' },
       { text: 'ScrollArea', link: '/components/scroll-area' },
       { text: 'Tour', link: '/components/tour' },
       { text: 'FindBar', link: '/components/find-bar' },
