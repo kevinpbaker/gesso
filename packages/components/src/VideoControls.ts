@@ -6,6 +6,7 @@ import {
   linear,
   percent,
   Row,
+  Stack,
   Text,
   type UiChild,
   type UiColorValue,
@@ -330,17 +331,36 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
   }
 
   if (options.time !== false) {
-    parts.push(
+    // One width for as long as the clip's length is the same, so the
+    // label ticking moves nothing: the buttons after it stay put, and a
+    // frame whose only change is the time is drawn in part. A canvas
+    // cannot ask for tabular figures (see `UiFontVariant`), and in
+    // system-ui on macOS a 1 is narrower than a 0, so the width is held
+    // by a stack of the label written with each digit in every place,
+    // unseen; the widest of them is as wide as the label can get.
+    const sizers = DIGITS.map(digit =>
       Text({
-        key: 'time',
-        text: combineLatest([readout.position, readout.duration]).pipe(
-          map(([at, total]) => `${clockTime(at)} / ${clockTime(total)}`)
-        ),
-        color: ink,
+        text: readout.duration.pipe(map(total => widestClock(total, digit))),
         textStyle: 'bodySmall',
         textWrap: 'none',
-        selectable: false
+        visible: false
       })
+    );
+    parts.push(
+      Stack(
+        { key: 'time' },
+        ...sizers,
+        Text({
+          text: combineLatest([readout.position, readout.duration]).pipe(
+            map(([at, total]) => `${clockTime(at)} / ${clockTime(total)}`)
+          ),
+          color: ink,
+          textStyle: 'bodySmall',
+          textWrap: 'none',
+          selectable: false,
+          selfX: 'stretch'
+        })
+      )
     );
   }
 
@@ -468,6 +488,18 @@ function contains(root: UiNode | null, node: UiNode | null): boolean {
     }
   }
   return false;
+}
+
+const DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
+
+/**
+ * The time label for a clip `total` seconds long, with every digit of
+ * the elapsed half written as `digit`: the elapsed time has as many
+ * digits as the length does, and the length itself does not tick.
+ */
+export function widestClock(total: number, digit: string): string {
+  const length = clockTime(total);
+  return `${length.replace(/\d/g, digit)} / ${length}`;
 }
 
 /**

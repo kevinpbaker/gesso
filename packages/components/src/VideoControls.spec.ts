@@ -19,7 +19,7 @@ import {
   type VideoTransport
 } from 'gesso-core';
 
-import { followTransport, VideoControls, type VideoReadout } from './VideoControls';
+import { followTransport, VideoControls, widestClock, type VideoReadout } from './VideoControls';
 
 /**
  * `followTransport`, the readout under the bar and under a player's
@@ -149,8 +149,8 @@ describe('followTransport', () => {
  * of the readout was a layout change, and a frame in which a box moved
  * is drawn whole on both renderers: a playing clip drew the whole
  * surface ten times a second for a line a pixel or two longer. The time
- * label is left out of the window on purpose: it changes once a second,
- * and new text is laid out.
+ * label is left out of the first window on purpose: it changes once a
+ * second, and new text is laid out. The second window takes it in.
  */
 describe('VideoControls, playing', () => {
   afterEach(() => {
@@ -200,5 +200,46 @@ describe('VideoControls, playing', () => {
     expect(laidOut).toEqual([]);
     expect(renderer.damageStats.whole - stats.whole).toBe(0);
     expect(renderer.damageStats.partial - stats.partial).toBeGreaterThan(0);
+  });
+
+  it('ticks the clock without moving a box, so a second boundary is drawn in part too', () => {
+    vi.useFakeTimers();
+    const render = vi.spyOn(Canvas2DRenderer.prototype, 'render');
+    const clip = new FakeTransport();
+    clip.position = 8.05;
+    const ui = renderTest(createComponent(VideoControls, { transport: clip, visible: true }), {
+      width: 480,
+      height: 120
+    });
+    let time = 16;
+    const step = (): void => {
+      vi.advanceTimersByTime(16);
+      ui.frame((time += 16));
+    };
+    for (let i = 0; i < 10; i++) {
+      step();
+    }
+    const renderer = render.mock.contexts.at(-1) as Canvas2DRenderer;
+    const label = ui.getByText(/^0:08 \/ /);
+    const box = (): unknown => ui.getLayout(label);
+    const at = box();
+    const stats = { ...renderer.damageStats };
+
+    // Three seconds: the label reads 0:09, 0:10 and 0:11 in turn.
+    for (let i = 0; i < 180; i++) {
+      step();
+    }
+
+    expect(label.properties.get('text')).toMatch(/^0:11 \/ /);
+    expect(box()).toEqual(at);
+    expect(renderer.damageStats.whole - stats.whole).toBe(0);
+    expect(renderer.damageStats.partial - stats.partial).toBeGreaterThan(0);
+  });
+});
+
+describe('widestClock', () => {
+  it('writes the elapsed half in one digit, as many places as the length has', () => {
+    expect(widestClock(6 * 60, '8')).toBe('8:88 / 6:00');
+    expect(widestClock(75 * 60, '0')).toBe('0:00:00 / 1:15:00');
   });
 });

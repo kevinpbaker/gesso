@@ -409,4 +409,68 @@ describe('LayoutEngine invalidation', () => {
     expect(frame.nodes).toContain(h.root);
     expect(frame.dirtyFlagsFor(h.root)).toBe(DirtyFlags.Children);
   });
+
+  /**
+   * Whether a frame moved a box, as a renderer drawing only what changed
+   * asks it. A label ticking in a box of fixed size moves nothing; it
+   * used to count as moving something, and every such frame was drawn
+   * whole.
+   */
+  describe('geometry version', () => {
+    const LAYOUT = DirtyFlags.Content | DirtyFlags.Layout;
+
+    it('stays put for new words in a text whose box keeps its size', () => {
+      const h = createHarness();
+      h.root = h.builder.build(
+        Row({ x: 'start' }, Text({ text: '0:10', width: 60, fontSize: 10 }), Box({ width: 20 }))
+      );
+      firstFrame(h);
+      const before = h.engine.geometryVersion;
+
+      h.graph.updateProperty(h.root.firstChild!.id, 'text', '0:11', LAYOUT);
+      h.clock.tick(0);
+      expect(h.engine.geometryVersion).toBe(before);
+    });
+
+    it('moves for new words that change the box, and the boxes after it', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Row({ x: 'start' }, Text({ text: '0:10', fontSize: 10 }), Box({ width: 20 })));
+      firstFrame(h);
+      const before = h.engine.geometryVersion;
+
+      h.graph.updateProperty(h.root.firstChild!.id, 'text', '10:10', LAYOUT);
+      h.clock.tick(0);
+      expect(h.engine.geometryVersion).not.toBe(before);
+    });
+
+    it('moves for a node with children laid out again, though no box moved', () => {
+      const h = createHarness();
+      h.root = h.builder.build(Column({ x: 'start' }, Box({ width: 50, height: 50 }, Box({ width: 80, height: 80 }))));
+      firstFrame(h);
+      const before = h.engine.geometryVersion;
+
+      // A clip let go of lets the child out of its parent's box.
+      h.graph.updateProperty(h.root.firstChild!.id, 'overflow', 'hidden', DirtyFlags.Layout | DirtyFlags.Paint);
+      h.clock.tick(0);
+      expect(h.engine.geometryVersion).not.toBe(before);
+    });
+
+    it('moves for a sticky leaf laid out again', () => {
+      const h = createHarness();
+      h.root = h.builder.build(
+        ScrollView(
+          { width: 100, height: 100 },
+          Text({ text: 'Head', width: 60, position: 'sticky', top: 0, fontSize: 10 }),
+          Box({ height: 400 })
+        )
+      );
+      firstFrame(h);
+      const sticky = h.root.firstChild!.firstChild ?? h.root.firstChild!;
+      const before = h.engine.geometryVersion;
+
+      h.graph.updateProperty(sticky.id, 'text', 'Feet', LAYOUT);
+      h.clock.tick(0);
+      expect(h.engine.geometryVersion).not.toBe(before);
+    });
+  });
 });

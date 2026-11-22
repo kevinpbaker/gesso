@@ -1153,10 +1153,14 @@ export class LayoutEngine {
       this.boundsShifted.clear();
     }
     let anyLayout = false;
+    let meaningMayChange = false;
     let transformed = false;
     for (const [node, flags] of frame.entries()) {
       if ((flags & (DirtyFlags.Layout | DirtyFlags.Children | DirtyFlags.SubtreeLayout)) !== 0) {
         anyLayout = true;
+        if (!this.leafLaidOutAlone(node, flags)) {
+          meaningMayChange = true;
+        }
         // Its box may not move and still mean something new for its
         // bounds: children added or taken away, a clip let go.
         this.boundsMoved.add(node);
@@ -1223,8 +1227,12 @@ export class LayoutEngine {
     // can also change what a box means without moving it: a node that
     // stops clipping starts letting its children be hit outside it,
     // and its cached bounds are its own box. Work was done, so the
-    // summary of it is thrown away.
-    this.layoutVersion++;
+    // summary of it is thrown away. Not when all of it was leaves laid
+    // out again (see `leafLaidOutAlone`): a leaf has no children to
+    // let out, so a box it writes is the only thing it can move.
+    if (meaningMayChange) {
+      this.layoutVersion++;
+    }
     this.blockResized = false;
     this.resizedBlocks.clear();
     this.relayout(constraints);
@@ -4802,6 +4810,29 @@ export class LayoutEngine {
    * be that boundary only when `selfCanBound` says its own size is
    * not in question.
    */
+  /**
+   * Whether laying `node` out again can move nothing but boxes, each of
+   * which says so as it is written (`assignBox`). True for a leaf whose
+   * own layout properties changed, a text whose words did above all: a
+   * clock ticking in a label of fixed width. Without this every such
+   * frame counted as one in which a box moved, and was drawn whole.
+   *
+   * Not for a node with children, whose clip or overflow may have let
+   * them out of its box, nor for one gaining or losing children, nor
+   * for a sticky or anchored node, which can stop being one and so stop
+   * being shifted without any box being written.
+   */
+  private leafLaidOutAlone(node: UiNode, flags: number): boolean {
+    if ((flags & (DirtyFlags.Children | DirtyFlags.SubtreeLayout)) !== 0 || node.hasChildren()) {
+      return false;
+    }
+    if (this.stickyNodes.has(node) || this.anchoredNodes.has(node)) {
+      return false;
+    }
+    const rec = this.records.get(node);
+    return rec !== undefined && rec.placedOnce && rec.stickyOffsetX === 0 && rec.stickyOffsetY === 0;
+  }
+
   private markLayoutDirty(node: UiNode, selfCanBound = false): void {
     let current: UiNode = node;
     let bounded = false;

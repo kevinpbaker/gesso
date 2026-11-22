@@ -3164,6 +3164,7 @@ declare class LayoutEngine {
   private placeStack;
   private stackAlignment;
   private stackOffset;
+  private leafLaidOutAlone;
   private markLayoutDirty;
   private applyScroll;
   private applyFollowedScroll;
