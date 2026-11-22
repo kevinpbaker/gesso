@@ -161,6 +161,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Tree', link: '/components/tree' },
       { text: 'LazyList', link: '/components/lazy-list' },
       { text: 'Tabs', link: '/components/tabs' },
+      { text: 'TabBar', link: '/components/tab-bar' },
       { text: 'Accordion', link: '/components/accordion' },
       { text: 'Card', link: '/components/card' },
       { text: 'Divider', link: '/components/divider' },

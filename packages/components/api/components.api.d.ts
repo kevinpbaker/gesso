@@ -495,6 +495,74 @@ interface AccordionProps extends ControlLayoutProps {
   exclusive?: boolean;
 }
 declare function Accordion(inputs: Inputs<AccordionProps>, _ctx: ComponentContext): UiChild;
+type NavigationIcon = string | {
+  readonly path: string | readonly string[];
+  readonly style?: 'fill' | 'stroke';
+  readonly strokeWidth?: number;
+  readonly fillRule?: 'nonzero' | 'evenodd';
+};
+interface NavigationDestination {
+  readonly key: string;
+  readonly label: string;
+  readonly icon?: NavigationIcon;
+  readonly badge?: number | string;
+  readonly badgeLabel?: string;
+  readonly disabled?: boolean;
+  readonly to?: string | RouteTarget;
+}
+interface NavigationGroup {
+  readonly key: string;
+  readonly label: string;
+  readonly icon?: NavigationIcon;
+  readonly items: readonly NavigationItem[];
+  readonly defaultExpanded?: boolean;
+  readonly disabled?: boolean;
+}
+type NavigationItem = NavigationDestination | NavigationGroup;
+interface NavigationRailProps extends ControlLayoutProps {
+  items: readonly NavigationItem[];
+  value?: string | null;
+  defaultValue?: string | null;
+  onChange?: (key: string) => void;
+  onOpenElsewhere?: (key: string) => void;
+  expanded?: readonly string[];
+  defaultExpanded?: readonly string[];
+  onExpandedChange?: (expanded: readonly string[]) => void;
+  collapsed?: boolean;
+  width?: UiLength;
+  label?: string;
+}
+declare function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: ComponentContext): UiChild;
+interface TabBarTab {
+  readonly value: string;
+  readonly label: string;
+  readonly icon?: NavigationIcon;
+  readonly detail?: string;
+  readonly dirty?: boolean;
+  readonly preview?: boolean;
+  readonly closable?: boolean;
+  readonly disabled?: boolean;
+}
+interface TabBarProps extends ControlLayoutProps {
+  tabs: readonly TabBarTab[];
+  value?: string;
+  defaultValue?: string;
+  onChange?: (value: string) => void;
+  onClose?: (value: string) => void;
+  onMove?: (value: string, index: number) => void;
+  onRename?: (value: string, label: string) => void;
+  onContextMenu?: (value: string, at?: {
+    readonly x: number;
+    readonly y: number;
+  }) => void;
+  onAdd?: () => void;
+  addLabel?: string;
+  dragType?: string;
+  onDrop?: (value: string, index: number) => void;
+  label?: string;
+  ref?: UiNodeRef;
+}
+declare function TabBar(inputs: Inputs<TabBarProps>, ctx: ComponentContext): UiChild;
 interface SharedValue<T> {
   readonly value: T | undefined;
   readonly mixed: boolean;
@@ -1365,44 +1433,6 @@ declare function parseCellName(name: string): {
 declare function formatFormulaNumber(value: number): string;
 declare function formatFormulaValue(value: FormulaValue): string;
 declare function createFormulaEvaluator(resolve: FormulaResolver): FormulaEvaluator;
-type NavigationIcon = string | {
-  readonly path: string | readonly string[];
-  readonly style?: 'fill' | 'stroke';
-  readonly strokeWidth?: number;
-  readonly fillRule?: 'nonzero' | 'evenodd';
-};
-interface NavigationDestination {
-  readonly key: string;
-  readonly label: string;
-  readonly icon?: NavigationIcon;
-  readonly badge?: number | string;
-  readonly badgeLabel?: string;
-  readonly disabled?: boolean;
-  readonly to?: string | RouteTarget;
-}
-interface NavigationGroup {
-  readonly key: string;
-  readonly label: string;
-  readonly icon?: NavigationIcon;
-  readonly items: readonly NavigationItem[];
-  readonly defaultExpanded?: boolean;
-  readonly disabled?: boolean;
-}
-type NavigationItem = NavigationDestination | NavigationGroup;
-interface NavigationRailProps extends ControlLayoutProps {
-  items: readonly NavigationItem[];
-  value?: string | null;
-  defaultValue?: string | null;
-  onChange?: (key: string) => void;
-  onOpenElsewhere?: (key: string) => void;
-  expanded?: readonly string[];
-  defaultExpanded?: readonly string[];
-  onExpandedChange?: (expanded: readonly string[]) => void;
-  collapsed?: boolean;
-  width?: UiLength;
-  label?: string;
-}
-declare function NavigationRail(inputs: Inputs<NavigationRailProps>, ctx: ComponentContext): UiChild;
 type PopoverSide = 'bottom' | 'top' | 'start' | 'end';
 type PopoverAlign = 'start' | 'center' | 'end';
 interface PopoverProps {
@@ -1901,6 +1931,7 @@ export {
   SplitPane,
   stepIndex,
   Switch,
+  TabBar,
   Tabs,
   TextArea,
   TextInput,
@@ -2072,6 +2103,8 @@ export {
   type SpinnerProps,
   type SplitPaneProps,
   type SwitchProps,
+  type TabBarProps,
+  type TabBarTab,
   type TabDefinition,
   type TabsProps,
   type TextAreaProps,
