@@ -31,6 +31,7 @@ export { Chip, type ChipProps, type ChipSize, type ChipVariant } from './Chip';
 export { Switch, type SwitchProps } from './Switch';
 export { RadioGroup, type RadioGroupProps, type RadioOption } from './Radio';
 export { TextInput, TextArea, type TextInputProps, type TextAreaProps } from './TextInput';
+export { NativeInput, type NativeInputProps } from './NativeInput';
 export { Slider, type SliderProps } from './Slider';
 export { RangeSlider, type RangeSliderProps } from './RangeSlider';
 export { NumberInput, type NumberInputProps } from './NumberInput';

@@ -9,6 +9,7 @@ import { mountFrameworkRoute, mountFrameworkSyncRoute } from './routes/Framework
 import { mountInputExampleRoute } from './routes/InputExampleRoute';
 import { mountLayoutExampleRoute } from './routes/LayoutExampleRoute';
 import { mountSignInExampleRoute } from './routes/SignInExampleRoute';
+import { mountIslandsExampleRoute } from './routes/IslandsExampleRoute';
 import { mountNotesExampleRoute } from './routes/NotesExampleRoute';
 import { mountPaintRoute } from './routes/PaintRoute';
 import { mountLayoutRoute } from './routes/LayoutRoute';
@@ -49,6 +50,7 @@ const MOUNTS: Record<string, Mount> = {
   examples: mountExamplesRoute,
   'example-modifiers': mountModifiersRoute,
   'example-signin': mountSignInExampleRoute,
+  'example-islands': mountIslandsExampleRoute,
   'example-notes': mountNotesExampleRoute,
   'example-theme': mountThemeExampleRoute,
   'example-live': mountLiveExampleRoute,

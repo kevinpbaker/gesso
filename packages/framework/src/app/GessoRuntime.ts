@@ -150,6 +150,8 @@ import { FontService, type FontFamilyDeclaration } from './FontService';
 import { TextService } from './TextService';
 import { AnimationService } from './AnimationService';
 import { FrameService } from './FrameService';
+import { IslandService } from '../islands/IslandService';
+import type { IslandShellMessage, IslandUpdate } from '../islands/IslandProtocol';
 import { InspectionService } from './InspectionService';
 import { InputLatencyTracker } from './InputLatency';
 import { SmoothScroller } from './SmoothScroller';
@@ -588,6 +590,8 @@ export class GessoRuntime {
   private semanticsStale = false;
   private lastEditingState: EditingState | null = null;
   private shellListener: ((request: ShellRequest) => void) | null = null;
+  /** The shell's island host, fed once a frame; see `onIslands`. */
+  private islandListener: ((update: IslandUpdate) => void) | null = null;
   /** Shell requests made before `onShellRequest` gave them somewhere to go; see there. */
   private heldShellRequests: ShellRequest[] = [];
   private audioListener: ((request: AudioRequest) => void) | null = null;
@@ -710,12 +714,16 @@ export class GessoRuntime {
     this.focusManager = new UiFocusManager(this.graph.root, this.dispatcher);
     this.focusManager.onFocusChange(node => {
       this.focusNotifier.handleFocusChange(node, this.focusManager.focusVisible);
-      if (this.semanticsListener !== null) {
+      if (
+        this.semanticsListener !== null ||
+        (this.islandListener !== null && this.services.get(IslandService).active)
+      ) {
         // A mirror has to move DOM focus with the app's, and the frame
         // where it hears about it is the frame this arms. Most focus
         // changes dirty something anyway — a focus ring is a property
         // write — but a node with no visible focus state would
-        // otherwise change nothing and schedule nothing.
+        // otherwise change nothing and schedule nothing. The islands'
+        // host moves DOM focus into an element the same way.
         this.requestRepaint();
       }
     });
@@ -810,6 +818,25 @@ export class GessoRuntime {
     if (!this.services.has(ScrollService)) {
       this.services.register(ScrollService);
     }
+    // And the DOM islands: which nodes a real element covers, and what
+    // the shell must hear about them each frame.
+    if (!this.services.has(IslandService)) {
+      this.services.register(IslandService);
+    }
+    this.services.get(IslandService).setHooks({
+      // The island's own node, not the root: what has to happen is a
+      // frame, and a frame that repaints one leaf costs a leaf.
+      repaint: node => {
+        if (this.graph.getNode(node.id) === node) {
+          this.graph.markDirty(node, DirtyFlags.Paint);
+        } else {
+          this.requestRepaint();
+        }
+      },
+      focus: node => {
+        this.focusManager.focus(node, 'pointer');
+      }
+    });
     // And the frames themselves, for a screen that shows its own
     // frame gap or input latency.
     if (!this.services.has(FrameService)) {
@@ -1752,6 +1779,46 @@ export class GessoRuntime {
     this.editingListener = listener;
   }
 
+  /**
+   * Receives each frame's change to the DOM islands, for the shell's
+   * island host. Without a listener nothing is collected, and an
+   * `Island` is a box with nothing over it, which is what a headless
+   * runtime should draw.
+   */
+  onIslands(listener: ((update: IslandUpdate) => void) | null): void {
+    this.islandListener = listener;
+    if (listener !== null) {
+      this.requestRepaint();
+    }
+  }
+
+  /** What an island's element did on the shell; see `IslandService.receive`. */
+  applyIslandMessage(message: IslandShellMessage): void {
+    this.services.get(IslandService).receive(message);
+  }
+
+  /**
+   * Sends the islands' change for this frame. After layout has settled,
+   * because a placement is a box; before paint, because the element
+   * reaches the screen through the main thread's next frame, and every
+   * millisecond it leaves sooner is one it can catch up.
+   */
+  private sendIslands(): void {
+    const listener = this.islandListener;
+    const islands = this.services.get(IslandService);
+    if (listener === null || !islands.active) {
+      return;
+    }
+    const update = islands.collect(
+      this.engine,
+      { x: 0, y: 0, width: this.width, height: this.height },
+      this.focusManager.focusedNode
+    );
+    if (update !== null) {
+      listener(update);
+    }
+  }
+
   /** The editing state last reported to the shell. */
   get editingState(): EditingState | null {
     return this.lastEditingState;
@@ -2492,6 +2559,8 @@ export class GessoRuntime {
       this.caretTimer = null;
     }
     this.editingListener = null;
+    this.islandListener = null;
+    this.services.get(IslandService).dispose();
     this.shellListener = null;
     this.semanticsListener = null;
     if (this.inspectorTimer !== null) {
@@ -4350,6 +4419,7 @@ export class GessoRuntime {
     // reported by the time it does. Layout has run, so the caret box
     // it carries is this frame's.
     this.sendEditingState();
+    this.sendIslands();
 
     // What the tree *means* changes far less often than where it sits,
     // so the tree is rebuilt only when a semantics property or the

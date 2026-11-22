@@ -244,3 +244,30 @@ export type {
   RuntimeToShellMessage,
   RuntimeErrorSource
 } from './app/worker/RenderWorkerProtocol';
+export {
+  island,
+  provideIsland,
+  elementIsland,
+  type IslandToken,
+  type IslandContext,
+  type IslandFactory,
+  type IslandInstance,
+  type IslandRegistration,
+  type IslandUpdateInfo
+} from './islands/islandToken';
+export {
+  nativeInputIsland,
+  NativeInputIsland,
+  type NativeInputIslandProps,
+  type NativeInputIslandEvent
+} from './islands/nativeInput';
+export { Island, IslandController, islandController, type IslandProps } from './islands/Island';
+export { IslandService, type IslandHandle, type IslandSpec } from './islands/IslandService';
+export type {
+  IslandMount,
+  IslandPlacement,
+  IslandRect,
+  IslandShellMessage,
+  IslandStandIn,
+  IslandUpdate
+} from './islands/IslandProtocol';

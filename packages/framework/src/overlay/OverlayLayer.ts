@@ -19,6 +19,7 @@ import { Component } from '../Component';
 import { Define, Inject, Input } from '../decorators';
 import { input } from '../Input';
 import { OverlayService, physicalPlacement, type OverlayEntry, type OverlayPhysicalPlacement } from './OverlayService';
+import { IslandService } from '../islands/IslandService';
 
 /**
  * The layer every runtime mounts above the app root.
@@ -48,6 +49,9 @@ import { OverlayService, physicalPlacement, type OverlayEntry, type OverlayPhysi
 @Define('gesso-overlay-layer')
 export class OverlayLayer extends Component {
   @Inject(OverlayService) runtimeOverlays!: OverlayService;
+  @Inject(IslandService) islands!: IslandService;
+  /** This layer's node, marked so its entries cut the DOM islands under them. */
+  private layerNode: UiNode | null = null;
   /** The entries to draw, when not the runtime's: an `OverlayScope`'s. */
   @Input() service = input<OverlayService | null>(null);
 
@@ -57,7 +61,23 @@ export class OverlayLayer extends Component {
 
   override render(): UiElement {
     return Box(
-      { position: 'absolute', inset: 0, zIndex: 1000, hitTestable: false },
+      {
+        position: 'absolute',
+        inset: 0,
+        zIndex: 1000,
+        hitTestable: false,
+        // A menu drawn over a native field has to cut the field away
+        // under it, or it opens under the field; see `islandGeometry`.
+        ref: (node: UiNode | null) => {
+          if (this.layerNode !== null) {
+            this.islands.markLayer(this.layerNode, false);
+          }
+          this.layerNode = node;
+          if (node !== null) {
+            this.islands.markLayer(node, true);
+          }
+        }
+      },
       // Bound straight to the service's cell: it is on this thread,
       // so there is nothing for a selector to abstract over.
       this.overlays.entries.pipe(map(entries => this.renderEntries(entries)))

@@ -533,6 +533,7 @@ import {
 import {
   AnimatedCell,
   AnimationDriver,
+  BoxProps,
   CanvasHost,
   CaretRect,
   ComponentLikeElement,
@@ -582,12 +583,14 @@ import {
   UiModifier,
   UiMotion,
   UiNode,
+  UiNodeRef,
   UiPlatformAdapter,
   UiPointer,
   UiPointerController,
   UiPointerDevice,
   UiReducedMotionPolicy,
   UiRole,
+  UiRole as UiRole$1,
   UiScrollability,
   UiSelectionController,
   UiSemanticsAction,
@@ -899,8 +902,111 @@ interface StartingInputsProps {
 }
 declare function StartingInputs(inputs: Inputs<StartingInputsProps>, ctx: ComponentContext): UiChild;
 declare function liveInput(name: string, read: () => unknown): void;
+interface IslandRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+type IslandStandIn = 'never' | 'moving' | 'unfocused';
+interface IslandMount {
+  readonly id: string;
+  readonly kind: string;
+  readonly props: unknown;
+  readonly standIn: IslandStandIn;
+}
+interface IslandPlacement {
+  readonly id: string;
+  readonly visible: boolean;
+  readonly box: IslandRect;
+  readonly clip: IslandRect;
+  readonly cuts: readonly IslandRect[];
+  readonly opacity: number;
+  readonly moving: boolean;
+  readonly focused: boolean;
+  readonly inert: boolean;
+}
+interface IslandUpdate {
+  readonly unmounts?: readonly string[];
+  readonly mounts?: readonly IslandMount[];
+  readonly props?: readonly {
+    readonly id: string;
+    readonly props: unknown;
+    readonly seen: number;
+  }[];
+  readonly places?: readonly IslandPlacement[];
+  readonly focused?: string | null;
+  readonly posts?: readonly {
+    readonly id: string;
+    readonly message: unknown;
+  }[];
+  readonly submits?: readonly string[];
+}
+type IslandShellMessage =
+{
+  type: 'islandEvent';
+  id: string;
+  event: unknown;
+  seq: number;
+} |
+{
+  type: 'islandFocus';
+  id: string;
+} |
+{
+  type: 'islandSubmit';
+  form: string;
+  id: string | null;
+};
+interface IslandGeometrySource {
+  recordFor(node: UiNode): {
+    readonly width: number;
+    readonly height: number;
+    readonly clips: boolean;
+    readonly lifted: boolean;
+    readonly scrollable: boolean;
+  } | undefined;
+  screenBox(node: UiNode): IslandRect;
+  allStickyNodes(): ReadonlySet<UiNode>;
+}
+interface IslandSpec {
+  readonly kind: string;
+  readonly standIn: IslandStandIn;
+  onEvent?(event: unknown): void;
+  onSubmit?(): void;
+}
+interface IslandHandle {
+  setProps(props: unknown): void;
+  post(message: unknown): void;
+  readonly standIn: Observable<boolean>;
+  detach(): void;
+}
+interface IslandRuntimeHooks {
+  repaint(node: UiNode): void;
+  focus(node: UiNode): void;
+}
+declare class IslandService {
+  private readonly islands;
+  private readonly unmounted;
+  private readonly posts;
+  private readonly submits;
+  private readonly layers;
+  private hooks;
+  private lastFocused;
+  setHooks(hooks: IslandRuntimeHooks | null): void;
+  get active(): boolean;
+  attach(node: UiNode, spec: IslandSpec, props: unknown): IslandHandle;
+  submitForm(name: string): void;
+  markLayer(node: UiNode, on: boolean): void;
+  collect(source: IslandGeometrySource, viewport: IslandRect, focused: UiNode | null): IslandUpdate | null;
+  receive(message: IslandShellMessage): void;
+  dispose(): void;
+  private settleStandIn;
+}
 declare class OverlayLayer extends Component {
   runtimeOverlays: OverlayService;
+  islands: IslandService;
+  private layerNode;
   service: InputCell<OverlayService | null>;
   private get overlays();
   render(): UiElement;
@@ -1695,6 +1801,7 @@ declare class GessoRuntime {
   private semanticsStale;
   private lastEditingState;
   private shellListener;
+  private islandListener;
   private heldShellRequests;
   private audioListener;
   private caretTimer;
@@ -1749,6 +1856,9 @@ declare class GessoRuntime {
   claimedKeys(): string[];
   private sendClaimedKeys;
   onEditingState(listener: ((state: EditingState | null) => void) | null): void;
+  onIslands(listener: ((update: IslandUpdate) => void) | null): void;
+  applyIslandMessage(message: IslandShellMessage): void;
+  private sendIslands;
   get editingState(): EditingState | null;
   private toShell;
   onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
@@ -2084,7 +2194,8 @@ UiFileDropMessage |
   type: 'displayInterval';
   ms: number;
   origin: number;
-} | {
+} |
+IslandShellMessage | {
   type: 'dispose';
 };
 type RuntimeErrorSource = 'message' | 'uncaught' | 'renderer' | 'channel' | 'listener' |
@@ -2222,6 +2333,10 @@ type RuntimeToShellMessage = {
 } | {
   type: 'semantics';
   update: UiSemanticsUpdate;
+} |
+{
+  type: 'islands';
+  update: IslandUpdate;
 };
 interface UiTreeNode {
   readonly id: string;
@@ -2344,6 +2459,39 @@ type DevtoolsEvent = {
   source: RuntimeErrorSource;
 };
 declare function treeText(text: unknown): string | undefined;
+interface IslandToken<P, E> {
+  readonly kind: string;
+  readonly types?: {
+    readonly props: P;
+    readonly event: E;
+  };
+}
+declare function island<P = Record<string, never>, E = never>(kind: string): IslandToken<P, E>;
+interface IslandContext<E> {
+  readonly document: Document;
+  emit(event: E): void;
+  form(name: string): HTMLFormElement;
+}
+interface IslandUpdateInfo {
+  readonly current: boolean;
+}
+interface IslandInstance<P> {
+  readonly element: HTMLElement;
+  update?(props: P, info: IslandUpdateInfo): void;
+  receive?(message: unknown): void;
+  focus?(): void;
+  dispose?(): void;
+  readonly wheel?: 'forward' | 'own';
+}
+interface IslandFactory<P, E> {
+  create(props: P, context: IslandContext<E>): IslandInstance<P>;
+}
+interface IslandRegistration {
+  readonly kind: string;
+  readonly load: IslandFactory<any, any> | (() => Promise<IslandFactory<any, any>>);
+}
+declare function provideIsland<P, E>(token: IslandToken<P, E>, factory: IslandFactory<P, E> | (() => Promise<IslandFactory<P, E>>)): IslandRegistration;
+declare function elementIsland<P, E>(create: (context: IslandContext<E>, props: P) => HTMLElement, update?: (element: HTMLElement, props: P, info: IslandUpdateInfo) => void): IslandFactory<P, E>;
 type ShellHistoryMode = 'path' | 'hash' | 'memory';
 interface ShellHistoryOptions {
   readonly mode?: ShellHistoryMode;
@@ -2404,6 +2552,7 @@ interface WorkerAppOptions {
   accessibility?: boolean;
   textSize?: 'browser' | 'fixed';
   history?: ShellHistoryOptions | ShellHistory;
+  islands?: readonly IslandRegistration[];
 }
 declare class WorkerApp {
   private readonly options;
@@ -2425,6 +2574,9 @@ declare class WorkerApp {
   private pickers;
   private proxy;
   private mirror;
+  private islandHost;
+  private heldIslands;
+  private islandInput;
   private audio;
   private filesModule;
   private audioModule;
@@ -3095,6 +3247,15 @@ declare class EditingProxy {
 }
 declare function writeClipboardImage(png: Uint8Array, text?: string): Promise<boolean>;
 declare function writeClipboard(text: string, doc?: Document): Promise<boolean>;
+interface IslandMirrorLink {
+  readonly element: HTMLElement;
+  linkIslands(target: IslandMirrorTarget | null): void;
+  refreshIsland(id: string): void;
+}
+interface IslandMirrorTarget {
+  has(id: string): boolean;
+  elementId(id: string): string | undefined;
+}
 interface SemanticsMirrorSink {
   action(action: UiSemanticsAction): void;
   keyDown?(event: KeyboardEvent): void;
@@ -3106,11 +3267,12 @@ interface EditingMirrorTarget {
   describe(record: UiSemanticsRecord | null, activeDescendant?: string, controls?: string): void;
   focus(): void;
 }
-declare class SemanticsMirror {
+declare class SemanticsMirror implements IslandMirrorLink {
   private readonly canvas;
   private readonly sink;
   private readonly editing;
   private readonly container;
+  private islands;
   private readonly doc;
   private readonly entries;
   private readonly ids;
@@ -3124,6 +3286,8 @@ declare class SemanticsMirror {
   private readonly idPrefix;
   constructor(canvas: HTMLCanvasElement, sink: SemanticsMirrorSink, editing?: EditingMirrorTarget | null);
   get element(): HTMLElement;
+  linkIslands(target: IslandMirrorTarget | null): void;
+  refreshIsland(id: string): void;
   elementFor(id: string): HTMLElement | undefined;
   apply(update: UiSemanticsUpdate): void;
   dispose(): void;
@@ -3202,6 +3366,71 @@ declare class RenderWorkerApp {
   private resolveWorker;
   private initialize;
 }
+interface NativeInputIslandProps {
+  readonly type: 'text' | 'email' | 'password' | 'tel' | 'url' | 'search' | 'number';
+  readonly name?: string;
+  readonly autocomplete?: string;
+  readonly inputMode?: string;
+  readonly placeholder?: string;
+  readonly value: string;
+  readonly valueVersion: number;
+  readonly disabled?: boolean;
+  readonly readOnly?: boolean;
+  readonly required?: boolean;
+  readonly maxLength?: number;
+  readonly spellCheck?: boolean;
+  readonly form?: string;
+  readonly label?: string;
+  readonly fontFamily: string;
+  readonly fontSize: number;
+  readonly fontWeight: number | string;
+  readonly color: string;
+  readonly placeholderColor: string;
+  readonly paddingLeft: number;
+  readonly paddingRight: number;
+  readonly textAlign?: 'left' | 'center' | 'right';
+}
+type NativeInputIslandEvent =
+{
+  readonly type: 'input';
+  readonly value: string;
+  readonly autofilled: boolean;
+} |
+{
+  readonly type: 'change';
+  readonly value: string;
+} |
+{
+  readonly type: 'submit';
+};
+declare const NativeInputIsland: IslandToken<NativeInputIslandProps, NativeInputIslandEvent>;
+declare const nativeInputIsland: IslandRegistration;
+declare class IslandController {
+  private handle;
+  private focusNode;
+  private readonly queued;
+  post(message: unknown): void;
+  focus(): void;
+  bind(handle: IslandHandle | null, focus: (() => void) | null): void;
+}
+declare function islandController(): IslandController;
+type IslandBoxProps = Pick<BoxProps, 'width' | 'height' | 'minWidth' | 'minHeight' | 'maxWidth' | 'maxHeight' | 'flex' | 'flexGrow' | 'flexShrink' | 'margin' | 'selfX' | 'selfY' | 'padding' | 'x' | 'y' | 'overflow' | 'backgroundColor' | 'borderWidth' | 'borderColor' | 'borderRadius' | 'description' | 'states' | 'disabled'>;
+interface IslandProps<P, E> extends IslandBoxProps {
+  of: IslandToken<P, E>;
+  props: P;
+  onEvent?: (event: E) => void;
+  onSubmit?: () => void;
+  standIn?: IslandStandIn;
+  focusable?: boolean;
+  label?: string;
+  role?: UiRole;
+  controller?: IslandController;
+  rootModifiers?: readonly UiModifier[];
+  ref?: UiNodeRef;
+  children?: UiChild;
+  onStandIn?: (showing: boolean) => void;
+}
+declare function Island<P, E>(inputs: Inputs<IslandProps<P, E>>, ctx: ComponentContext): UiChild;
 export {
   ActionCause,
   ActionEntry,
@@ -3263,6 +3492,7 @@ export {
   EditingProxySink,
   EditingService,
   EditingState$1,
+  elementIsland,
   Equality,
   FanCell,
   FanKey,
@@ -3299,6 +3529,26 @@ export {
   Input,
   InspectionHost,
   InspectionService,
+  island,
+  Island,
+  IslandContext,
+  islandController,
+  IslandController,
+  IslandFactory,
+  IslandHandle,
+  IslandInstance,
+  IslandMount,
+  IslandPlacement,
+  IslandProps,
+  IslandRect,
+  IslandRegistration,
+  IslandService,
+  IslandShellMessage,
+  IslandSpec,
+  IslandStandIn,
+  IslandToken,
+  IslandUpdate,
+  IslandUpdateInfo,
   KeepInPlaceOptions,
   liveInput,
   MARK_PREFIX,
@@ -3312,6 +3562,10 @@ export {
   mutate,
   MutateOptions,
   Mutation,
+  nativeInputIsland,
+  NativeInputIsland,
+  NativeInputIslandEvent,
+  NativeInputIslandProps,
   NodePathTarget,
   observeColorScheme,
   observeMediaQuery,
@@ -3343,6 +3597,7 @@ export {
   Presence,
   PresenceProps,
   printPropValue,
+  provideIsland,
   ReadSource,
   registerUndoShortcuts,
   rememberedDirectory,
@@ -3434,7 +3689,7 @@ export {
   UiOwnerReport,
   UiPropOrigin,
   UiPropReport,
-  UiRole,
+  UiRole$1,
   UiSemanticsMap$1,
   UiSemanticsPatch,
   UiSemanticsRecord$1,
@@ -3595,6 +3850,7 @@ import {
   EditingProxySink,
   EditingService,
   EditingState,
+  elementIsland,
   Equality,
   FanCell,
   FanKey,
@@ -3631,6 +3887,26 @@ import {
   Input,
   InspectionHost,
   InspectionService,
+  island,
+  Island,
+  IslandContext,
+  islandController,
+  IslandController,
+  IslandFactory,
+  IslandHandle,
+  IslandInstance,
+  IslandMount,
+  IslandPlacement,
+  IslandProps,
+  IslandRect,
+  IslandRegistration,
+  IslandService,
+  IslandShellMessage,
+  IslandSpec,
+  IslandStandIn,
+  IslandToken,
+  IslandUpdate,
+  IslandUpdateInfo,
   KeepInPlaceOptions,
   liveInput,
   MARK_PREFIX,
@@ -3644,6 +3920,10 @@ import {
   mutate,
   MutateOptions,
   Mutation,
+  nativeInputIsland,
+  NativeInputIsland,
+  NativeInputIslandEvent,
+  NativeInputIslandProps,
   NodePathTarget,
   observeColorScheme,
   observeMediaQuery,
@@ -3675,6 +3955,7 @@ import {
   Presence,
   PresenceProps,
   printPropValue,
+  provideIsland,
   ReadSource,
   registerUndoShortcuts,
   rememberedDirectory,
@@ -3828,6 +4109,7 @@ export {
   Each,
   EditingProxy,
   EditingService,
+  elementIsland,
   FanCell,
   fanOut,
   FanOut,
@@ -3859,6 +4141,11 @@ export {
   isClassComponent,
   isComponentElement,
   isHubMessage,
+  island,
+  Island,
+  islandController,
+  IslandController,
+  IslandService,
   isOutputTarget,
   isPortErrorMessage,
   isPortHandshake,
@@ -3870,6 +4157,8 @@ export {
   MediaService,
   MemoryStorage,
   mutate,
+  nativeInputIsland,
+  NativeInputIsland,
   observeColorScheme,
   observeMediaQuery,
   observeReducedMotion,
@@ -3892,6 +4181,7 @@ export {
   printPropValue,
   provide,
   ProvidedChannel,
+  provideIsland,
   registerUndoShortcuts,
   rememberedDirectory,
   renderFrame,
@@ -4002,6 +4292,21 @@ export {
   type Inputs,
   type InputValue,
   type InspectionHost,
+  type IslandContext,
+  type IslandFactory,
+  type IslandHandle,
+  type IslandInstance,
+  type IslandMount,
+  type IslandPlacement,
+  type IslandProps,
+  type IslandRect,
+  type IslandRegistration,
+  type IslandShellMessage,
+  type IslandSpec,
+  type IslandStandIn,
+  type IslandToken,
+  type IslandUpdate,
+  type IslandUpdateInfo,
   type JsonSchema,
   type KeepInPlaceOptions,
   type MediaOptions,
@@ -4009,6 +4314,8 @@ export {
   type MessageEndpoint,
   type MutateOptions,
   type Mutation,
+  type NativeInputIslandEvent,
+  type NativeInputIslandProps,
   type NodePathTarget,
   type OpfsDirectory,
   type OpfsFileHandle,

@@ -33,6 +33,9 @@ import { redirectWith } from '../shellRedirect';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, readClipboard, writeClipboard, writeClipboardImage } from '../EditingProxy';
 import { SemanticsMirror } from '../SemanticsMirror';
+import type { IslandRegistration } from '../../islands/islandToken';
+import type { IslandHost } from '../../islands/IslandHost';
+import type { IslandUpdate } from '../../islands/IslandProtocol';
 import { performShellStorage } from '../shellStorage';
 import { observeColorScheme, type ColorScheme, type ColorSchemePreference } from '../colorScheme';
 import { observeContrast } from '../contrast';
@@ -330,6 +333,18 @@ export interface WorkerAppOptions {
    * `appLogicWorker` follows, and a remount picks the same one up.
    */
   history?: ShellHistoryOptions | ShellHistory;
+  /**
+   * The factories for the application's DOM islands: real elements the
+   * shell places over boxes in the layout, for what a canvas cannot be
+   * (a field a password manager fills, a map, an embedded editor).
+   *
+   *   islands: [nativeInputIsland, provideIsland(StoreMap, () => import('./map').then(m => m.mapFactory))]
+   *
+   * The code that places them is fetched when the app mounts, and only
+   * when this list is not empty, so a shell with no islands carries none
+   * of it. `IslandToken` has the rest.
+   */
+  islands?: readonly IslandRegistration[];
 }
 
 /** Refreshes timed to tell the worker the display's interval. */
@@ -458,6 +473,12 @@ export class WorkerApp {
   private pickers: ShellPickers | null = null;
   private proxy: EditingProxy | null = null;
   private mirror: SemanticsMirror | null = null;
+  /** The DOM islands' host, once its module has loaded; see `islands`. */
+  private islandHost: IslandHost | null = null;
+  /** Island updates that arrived before the host's module did, in order. */
+  private heldIslands: IslandUpdate[] | null = null;
+  /** `attachInput`'s own wheel and hover handlers, for input over an island's element. */
+  private islandInput: { wheel(event: WheelEvent): void; hover(event: PointerEvent): void } | null = null;
   /** The one audio element, behind `AudioService`; see `AudioSink`. Made on the first audio request. */
   private audio: AudioSink | null = null;
   /**
@@ -717,6 +738,40 @@ export class WorkerApp {
           paste: (text, html) => this.post({ type: 'paste', text, ...(html === null ? {} : { html }) })
         },
         this.proxy
+      );
+    }
+
+    const islands = this.options.islands ?? [];
+    if (islands.length > 0) {
+      // Fetched now rather than on an idle callback: a sign-in form is
+      // often the first screen, and its fields are islands.
+      this.heldIslands = [];
+      void import('../../islands/IslandHost').then(
+        ({ IslandHost }) => {
+          if (this.renderWorker !== worker) {
+            return;
+          }
+          const host = new IslandHost(
+            canvas,
+            islands,
+            {
+              post: message => this.post(message),
+              hover: event => this.islandInput?.hover(event),
+              wheel: event => this.islandInput?.wheel(event),
+              key: (event, down) => (down ? this.forwardKeyDown(event) : this.forwardKeyUp(event)),
+              blur: () => this.post({ type: 'blur' }),
+              owns: target => target === this.proxy?.element
+            },
+            this.mirror
+          );
+          this.islandHost = host;
+          const held = this.heldIslands ?? [];
+          this.heldIslands = null;
+          for (const update of held) {
+            host.apply(update);
+          }
+        },
+        (error: unknown) => console.warn('[gesso] The DOM island host could not load:', error)
       );
     }
 
@@ -1034,6 +1089,9 @@ export class WorkerApp {
     this.detachViewportInsets = null;
     this.proxy?.dispose();
     this.proxy = null;
+    this.islandHost?.dispose();
+    this.islandHost = null;
+    this.heldIslands = null;
     this.mirror?.dispose();
     this.mirror = null;
     if (this.history !== null) {
@@ -1277,6 +1335,14 @@ export class WorkerApp {
     }
     if (message.type === 'semantics') {
       this.mirror?.apply(message.update);
+      return;
+    }
+    if (message.type === 'islands') {
+      if (this.islandHost !== null) {
+        this.islandHost.apply(message.update);
+      } else {
+        this.heldIslands?.push(message.update);
+      }
       return;
     }
     if (message.type === 'history') {
@@ -1782,6 +1848,10 @@ export class WorkerApp {
     };
     const onKeyDown = (event: KeyboardEvent): void => this.forwardKeyDown(event);
     const onKeyUp = (event: KeyboardEvent): void => this.forwardKeyUp(event);
+    // A wheel or a hover over an island's element is the canvas's, as if
+    // the element were not there: a list scrolls with the pointer over a
+    // field in it, and the hover leaves whatever it was on.
+    this.islandInput = { wheel: onWheel, hover: onPointerMove };
     /**
      * The canvas has moved on the page without necessarily changing
      * size: an ancestor scrolled, or the window resized and the page
@@ -1868,6 +1938,7 @@ export class WorkerApp {
       }
       window.removeEventListener('scroll', onCanvasMayHaveMoved, { capture: true });
       window.removeEventListener('resize', onCanvasMayHaveMoved);
+      this.islandInput = null;
       // A frame still holding a hover move would post it against a
       // surface that is no longer listening, so it is dropped rather
       // than flushed.

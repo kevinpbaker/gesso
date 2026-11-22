@@ -1,4 +1,5 @@
 import { isContextMenuKey, type UiSemanticsAction, type UiSemanticsRecord, type UiSemanticsUpdate } from 'gesso-core';
+import type { IslandMirrorLink, IslandMirrorTarget } from '../islands/IslandHost';
 
 /**
  * How long after the Menu key or Shift+F10 a browser's `contextmenu` on
@@ -136,7 +137,8 @@ const RECORD_ATTRIBUTES: readonly string[] = [
   'aria-activedescendant',
   'aria-controls',
   'aria-autocomplete',
-  'aria-orientation'
+  'aria-orientation',
+  'aria-owns'
 ];
 
 let mirrors = 0;
@@ -227,8 +229,10 @@ type MirrorBox = UiSemanticsUpdate['boxes'][number]['box'];
  *     click the way a real `<button>` would. Every activation path
  *     ends in one `click` action.
  */
-export class SemanticsMirror {
+export class SemanticsMirror implements IslandMirrorLink {
   private readonly container: HTMLElement;
+  /** The DOM islands' host: which records are islands, and their elements. */
+  private islands: IslandMirrorTarget | null = null;
   private readonly doc: Document;
   private readonly entries = new Map<string, MirrorEntry>();
   /** Element back to record id, for the events an assistive technology sends. */
@@ -301,6 +305,24 @@ export class SemanticsMirror {
   /** The container, for tests and for a shell that wants to inspect it. */
   get element(): HTMLElement {
     return this.container;
+  }
+
+  /**
+   * Connects the DOM islands' host. A record that is an island is not
+   * stood in for: its element points at the island's real element with
+   * `aria-owns`, so an assistive technology reads the real field in the
+   * tree's order, and its focus is the host's to move.
+   */
+  linkIslands(target: IslandMirrorTarget | null): void {
+    this.islands = target;
+  }
+
+  /** An island's element was made or dropped; its record's `aria-owns` follows. */
+  refreshIsland(id: string): void {
+    const entry = this.entries.get(id);
+    if (entry !== undefined) {
+      this.describe(entry.element, entry.record);
+    }
   }
 
   /** The element standing for a node, if the mirror has one. */
@@ -463,6 +485,20 @@ export class SemanticsMirror {
 
   /** Writes a record onto its element as ARIA, clearing what it no longer says. */
   private describe(element: HTMLElement, record: UiSemanticsRecord): void {
+    const islands = this.islands;
+    if (islands !== null && islands.has(record.id)) {
+      // Generic and empty: the real element is the control, and says
+      // its own role and name.
+      for (const attribute of RECORD_ATTRIBUTES) {
+        element.removeAttribute(attribute);
+      }
+      setText(element, '');
+      const owned = islands.elementId(record.id);
+      if (owned !== undefined) {
+        element.setAttribute('aria-owns', owned);
+      }
+      return;
+    }
     // A text field's value is its content, which a person may select;
     // the rest of the mirror is not text to select. Written only when it
     // changes, as every style write here costs the element its style.
@@ -662,6 +698,11 @@ export class SemanticsMirror {
    */
   private applyFocus(id: string | null): void {
     this.focusedId = id;
+    if (id !== null && this.islands?.has(id) === true) {
+      // The island host moves DOM focus to the real element.
+      this.describeEditing(null);
+      return;
+    }
     const entry = id === null ? undefined : this.entries.get(id);
     if (this.editing !== null && this.editing.active) {
       // The hidden textarea is where the person is really typing: it is

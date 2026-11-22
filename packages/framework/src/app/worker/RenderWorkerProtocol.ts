@@ -17,6 +17,7 @@ import type { AudioAction, AudioRequest, AudioSample } from '../AudioService';
 import type { ColorScheme, ColorSchemePreference } from '../colorScheme';
 import type { ShellFileRequest, ShellFileResult, ShellStorageOp, ShellStorageResult } from '../ShellService';
 import type { FramePhaseTimings, GpuStageTimings, RendererChoice } from '../GessoRuntime';
+import type { IslandShellMessage, IslandUpdate } from '../../islands/IslandProtocol';
 
 /**
  * Messages the main-thread shell sends to the render worker.
@@ -314,6 +315,11 @@ export type ShellToRuntimeMessage =
    * \`UiHostFrameClock.displayInterval\`.
    */
   | { type: 'displayInterval'; ms: number; origin: number }
+  /**
+   * What a DOM island's element did: emitted an event, took DOM focus,
+   * or had its form submitted from the page. See `IslandProtocol.ts`.
+   */
+  | IslandShellMessage
   | { type: 'dispose' };
 
 /**
@@ -532,7 +538,14 @@ export type RuntimeToShellMessage =
    * of the size it is holding from one it has already superseded.
    */
   | { type: 'resized'; width: number; height: number; dpr: number }
-  | { type: 'semantics'; update: UiSemanticsUpdate };
+  | { type: 'semantics'; update: UiSemanticsUpdate }
+  /**
+   * This frame's change to the DOM islands: elements to make or drop,
+   * their props, where each one is and what covers it, and which has the
+   * focus. Sent after layout and before paint, so it leaves for the main
+   * thread as early as it can; see `IslandService`.
+   */
+  | { type: 'islands'; update: IslandUpdate };
 
 /**
  * The set of shell messages that carry a user input.

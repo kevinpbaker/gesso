@@ -42,6 +42,7 @@ import {
   InputCell,
   Inputs,
   InternalState,
+  NativeInputIslandProps,
   OverlayPlacement,
   OverlayRect,
   ReadableCell,
@@ -280,6 +281,29 @@ interface TextInputProps extends ControlLayoutProps {
 declare function TextInput(inputs: Inputs<TextInputProps>, ctx: ComponentContext): UiChild;
 type TextAreaProps = Omit<TextInputProps, 'multiline' | 'secret'>;
 declare function TextArea(inputs: Inputs<TextAreaProps>, ctx: ComponentContext): UiChild;
+interface NativeInputProps extends ControlLayoutProps {
+  ref?: UiNodeRef;
+  value?: string;
+  defaultValue?: string;
+  onChange?: (value: string) => void;
+  onSubmit?: () => void;
+  label?: string;
+  labelHidden?: boolean;
+  placeholder?: string;
+  description?: string;
+  error?: string;
+  type?: NativeInputIslandProps['type'];
+  name?: string;
+  autocomplete?: string;
+  inputMode?: string;
+  form?: string;
+  disabled?: boolean;
+  readOnly?: boolean;
+  required?: boolean;
+  maxLength?: number;
+  spellCheck?: boolean;
+}
+declare function NativeInput(inputs: Inputs<NativeInputProps>, ctx: ComponentContext): UiChild;
 interface SliderProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   value?: number;
@@ -1830,6 +1854,7 @@ export {
   Meter,
   minLength,
   monthGrid,
+  NativeInput,
   NavigationRail,
   normalizeHex,
   NumberInput,
@@ -1993,6 +2018,7 @@ export {
   type MenuProps,
   type MeterOptimum,
   type MeterProps,
+  type NativeInputProps,
   type NavigationDestination,
   type NavigationGroup,
   type NavigationIcon,

@@ -679,6 +679,11 @@ export class RenderWorkerApp {
       case 'fileDrop':
         runtime.applyFileDrop(message);
         break;
+      case 'islandEvent':
+      case 'islandFocus':
+      case 'islandSubmit':
+        runtime.applyIslandMessage(message);
+        break;
       case 'dispose':
         this.setConsoleForwarding(false);
         runtime.dispose();
@@ -796,6 +801,9 @@ export class RenderWorkerApp {
         this.host.postMessage({ type: 'semantics', update });
       });
     }
+    this.runtime.onIslands(update => {
+      this.host.postMessage({ type: 'islands', update });
+    });
     this.runtime.onAudioRequest(request => {
       this.host.postMessage({ type: 'audio', request });
     });

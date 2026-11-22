@@ -110,6 +110,12 @@ export const ROUTES: readonly RouteMeta[] = [
     parent: 'examples'
   },
   {
+    id: 'example-islands',
+    label: 'DOM islands',
+    title: 'Example · native fields a password manager fills, placed over the canvas',
+    parent: 'examples'
+  },
+  {
     id: 'example-video',
     label: 'Video',
     title: 'Example · every way a clip arrives, decoded in the render worker',

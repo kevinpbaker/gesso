@@ -175,6 +175,20 @@ export const EXAMPLES: readonly ExampleMeta[] = [
     tags: ['drag and drop', 'pinch', 'shortcuts', 'context menu', 'modifiers', 'JSX', 'render worker']
   },
   {
+    route: 'example-islands',
+    title: 'DOM islands',
+    description:
+      'A sign-in form whose two fields are real `<input>` elements, so the browser offers to fill them and to save ' +
+      'the password, on a page everything else of which is drawn. The render worker lays out a box for each field ' +
+      'and draws its frame; the shell puts the element over the box every frame, cuts it where the sticky header or ' +
+      'a menu covers it, and moves focus in and out of it in Tab order. Only the field being typed into shows its ' +
+      'own text: the others are drawn by the canvas in the same font, so none of them trails its frame while the ' +
+      'page scrolls. The red block is an element over a blue box, and a blue strip while scrolling is the frame an ' +
+      'element lags behind the canvas.',
+    source: 'apps/playground/src/examples/IslandsExampleApp.tsx',
+    tags: ['DOM islands', 'password manager', 'autofill', 'native input', 'render worker']
+  },
+  {
     route: 'example-paint',
     title: 'Painting',
     description:

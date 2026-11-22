@@ -29,6 +29,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Light and dark', link: '/guide/appearance' },
       { text: 'State and services', link: '/guide/state-and-services' },
       { text: 'Workers', link: '/guide/workers' },
+      { text: 'DOM islands', link: '/guide/dom-islands' },
       { text: 'Testing', link: '/guide/testing' }
     ]
   },
