@@ -14,7 +14,7 @@ Gesso is a declarative UI toolkit in the spirit of SwiftUI and Jetpack Compose: 
 
 **[Try it live](https://gesso-docs.vercel.app)** · **[A logic simulator built on it](https://gesso-logic.vercel.app/)** · **[A spreadsheet built on it](https://gesso-sheets.vercel.app/)**
 
-[Thirty seconds of code](#thirty-seconds-of-code) · [What you get](#what-you-get) · [Built for agents](#built-for-ai-agents) · [Is it for you?](#is-it-for-you) · [How it works](#how-it-works) · [Proof](#proof-not-promises) · [Get started](#get-started)
+[Built with Gesso](#built-with-gesso) · [Thirty seconds of code](#thirty-seconds-of-code) · [What you get](#what-you-get) · [Built for agents](#built-for-ai-agents) · [Is it for you?](#is-it-for-you) · [How it works](#how-it-works) · [Proof](#proof-not-promises) · [Get started](#get-started)
 
 _gesso_ (**JESS**-oh): the primer coat that makes a raw canvas take paint.
 
@@ -24,6 +24,22 @@ playing Pong, that you can open up and rewire while it plays without the game or
 </div>
 
 ---
+
+## Built with Gesso
+
+Three applications, each drawn entirely by Gesso. Open any of them in a browser.
+
+**[Calcwright](https://calcwright.app)**: an engineering calculation worksheet, like Mathcad. Type the math with its units; the results, the OK or NG checks and the beam drawn from the values follow.
+
+[![Calcwright: a steel beam check on engineering paper, with its load, shear and moment diagrams](brand/showcase/calcwright.png)](https://calcwright.app)
+
+**[Gesso Sheets](https://gesso-sheets.vercel.app/)**: a spreadsheet. Formulas that spill, charts and scenarios across a workbook of five sheets.
+
+[![Gesso Sheets: a sales dashboard of formulas, a line chart and a bar chart](brand/showcase/sheets.png)](https://gesso-sheets.vercel.app/)
+
+**[gessologic](https://gesso-logic.vercel.app/)**: a logic simulator. On screen, an 8-bit CPU of 8,559 gates plays Pong at 18 kHz while you edit it.
+
+[![gessologic: an 8-bit CPU wired to ROM, memory and a pixel display, running Pong](brand/showcase/logic.png)](https://gesso-logic.vercel.app/)
 
 ## What it is
 
