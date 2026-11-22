@@ -57,7 +57,7 @@ export class UiGraph {
    * layout engine) subscribe here so their state stays in sync
    * with tree lifetime.
    */
-  private nodeRemovedListener: ((node: UiNode) => void) | null = null;
+  private nodeRemovedListener: ((node: UiNode, parent: UiNode | null) => void) | null = null;
   private environmentChangedListener: ((node: UiNode) => void) | null = null;
 
   public readonly root: UiNode;
@@ -233,7 +233,7 @@ export class UiGraph {
     // parent, which left the walk nothing to find under the root, and
     // the engine kept the records — sticky and absolute registrations
     // included — of every descendant of every node ever removed.
-    this.nodeRemovedListener?.(node);
+    this.nodeRemovedListener?.(node, parent);
     // Then unlink the rest, so nothing removed points at a parent.
     for (let i = removed.length - 1; i > 0; i--) {
       this.detachNode(removed[i]);
@@ -644,10 +644,11 @@ export class UiGraph {
    * The listener is invoked once per removal, with the root of the
    * removed subtree. It is already out of the tree, and everything
    * that was under it is still linked under it, so a listener that
-   * keeps state per node walks down from it. Pass null to clear the
-   * subscription.
+   * keeps state per node walks down from it. The parent it was taken
+   * from comes with it, for a listener that needs to know where it was.
+   * Pass null to clear the subscription.
    */
-  public setNodeRemovedListener(listener: ((node: UiNode) => void) | null): void {
+  public setNodeRemovedListener(listener: ((node: UiNode, parent: UiNode | null) => void) | null): void {
     this.nodeRemovedListener = listener;
   }
 

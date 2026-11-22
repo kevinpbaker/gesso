@@ -50,6 +50,19 @@ export const SCROLLBAR_FADE_MS = 350;
 const MOVES_LIMIT = 4096;
 /** `recordMove` with no transform of its own: the one the node was laid out with. */
 const KEEP_TRANSFORM = Symbol('keep transform');
+/** Where a node laid out for the first time was: nowhere. */
+const ADDED: MovedFrom = Object.freeze({
+  extentMinX: 0,
+  extentMinY: 0,
+  extentMaxX: 0,
+  extentMaxY: 0,
+  x: 0,
+  y: 0,
+  stickyOffsetX: 0,
+  stickyOffsetY: 0,
+  transform: undefined,
+  added: true
+});
 /**
  * How many times a pass re-places anchored nodes that moved because
  * something they are anchored to moved. One pass settles an overlay on
@@ -1203,6 +1216,25 @@ export class LayoutEngine {
         anyLayout = true;
         if (!this.leafLaidOutAlone(node, flags) && !this.heldByScroll(node, flags)) {
           meaningMayChange = true;
+          // Its children changed, or its clip, or it stopped or started
+          // sticking: whatever it drew, it drew inside its extent as it
+          // stands, which is noted before anything is laid out again.
+          if ((flags & (DirtyFlags.Layout | DirtyFlags.SubtreeLayout)) !== 0) {
+            // Its own layout changed: its clip, its padding, whether it
+            // sticks. Whatever it drew, it drew inside its extent as it
+            // stands. A fragment has no record and is given none here.
+            const rec = this.records.get(node);
+            if (rec !== undefined) {
+              this.recordMove(node, rec);
+            }
+          } else {
+            // Only its children changed. One added says where it is, one
+            // taken away where it was; the rest are noted where they are,
+            // for a reorder that moves none of them but changes which is
+            // drawn over which. Its own extent, an overlay layer the size
+            // of the surface, is not the change.
+            this.recordChildren(node);
+          }
         }
         // Its box may not move and still mean something new for its
         // bounds: children added or taken away, a clip let go.
@@ -1286,7 +1318,6 @@ export class LayoutEngine {
     // let out, so a box it writes is the only thing it can move.
     if (meaningMayChange) {
       this.layoutVersion++;
-      this.movesIncomplete();
     }
     this.blockResized = false;
     this.resizedBlocks.clear();
@@ -1984,7 +2015,17 @@ export class LayoutEngine {
    * Drops layout records for a removed subtree. Wired to
    * UiGraph's node-removal listener.
    */
-  detachNode(node: UiNode): void {
+  detachNode(node: UiNode, parent?: UiNode | null): void {
+    // Where it was drawn, for the frame that draws over it: through the
+    // parent it was taken from, now that it has none.
+    const rec = this.records.get(node);
+    if (rec !== undefined && rec.placedOnce) {
+      if (parent === undefined || parent === null) {
+        this.movesIncomplete();
+      } else {
+        this.keepMove(node, { ...this.snapshot(node, rec), parent });
+      }
+    }
     const stack: UiNode[] = [node];
     while (stack.length > 0) {
       const current = stack.pop()!;
@@ -4913,11 +4954,26 @@ export class LayoutEngine {
       return;
     }
     if (!rec.placedOnce) {
-      this.movesIncomplete();
+      // Laid out for the first time: drawn nowhere, so only where it is.
+      this.keepMove(node, ADDED);
       return;
     }
     const before = this.snapshot(node, rec);
     this.keepMove(node, transform === KEEP_TRANSFORM ? before : { ...before, transform });
+  }
+
+  /** Notes where each child of `node` is, looking through fragments, for a frame that may reorder them. */
+  private recordChildren(node: UiNode): void {
+    for (let child = node.firstChild; child !== null && this.movesComplete; child = child.nextSibling) {
+      if (child.type === UiNodeType.Fragment) {
+        this.recordChildren(child);
+        continue;
+      }
+      const rec = this.records.get(child);
+      if (rec !== undefined) {
+        this.recordMove(child, rec);
+      }
+    }
   }
 
   /** Keeps a node's oldest place since the last `takeMoves`. */

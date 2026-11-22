@@ -958,8 +958,8 @@ export class GessoRuntime {
     // nothing else would.
     this.animations.setWakeListener(() => this.scheduler.wake());
     this.graph.setDirtyListener(() => this.scheduler.notifyDirty());
-    this.graph.setNodeRemovedListener(node => {
-      this.engine.detachNode(node);
+    this.graph.setNodeRemovedListener((node, parent) => {
+      this.engine.detachNode(node, parent);
       // Neither a selection nor a set of find matches can outlive its
       // nodes: virtualization and route changes both take them out from
       // under one.

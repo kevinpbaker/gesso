@@ -374,9 +374,38 @@ describe('dirty rectangles', () => {
       expect(cleared()).toEqual([[0, 22, 298, 276]]);
     });
 
-    it('draws the whole surface when a node was added, which no move describes', () => {
-      graph.appendChild(root, box('c', 50, 20, '#00ffff'));
-      graph.markDirty(root, DirtyFlags.Children | DirtyFlags.Layout);
+    it('draws a node added where it is, and nothing of the container it joined', () => {
+      const added = box('c', 50, 20, '#00ffff');
+      graph.appendChild(list.firstChild!, added);
+      graph.markDirty(list.firstChild!, DirtyFlags.Children);
+      frame({ moves: true });
+      // At the list's top left, 0..50 by 120..140: a spill wider,
+      // doubled, and cut by the list's clip a pixel above its top. The
+      // content it joined is 400 tall and is not drawn.
+      expect(cleared()).toEqual([[0, 238, 116, 58]]);
+    });
+
+    it('draws over where a node taken away was, through the parent it had', () => {
+      graph.setNodeRemovedListener((node, parent) => engine.detachNode(node, parent));
+      const gone = box('c', 50, 20, '#00ffff');
+      graph.appendChild(list.firstChild!, gone);
+      graph.markDirty(list.firstChild!, DirtyFlags.Children);
+      frame({ moves: true });
+
+      graph.removeNode(gone);
+      frame({ moves: true });
+      // Where it was, out of a tree it is no longer in.
+      expect(cleared()).toEqual([[0, 238, 116, 58]]);
+    });
+
+    it('draws the whole surface for a node taken away when no one says from where', () => {
+      graph.setNodeRemovedListener(node => engine.detachNode(node));
+      const gone = box('c', 50, 20, '#00ffff');
+      graph.appendChild(list.firstChild!, gone);
+      graph.markDirty(list.firstChild!, DirtyFlags.Children);
+      frame({ moves: true });
+
+      graph.removeNode(gone);
       frame({ moves: true });
       expect(cleared()).toEqual([WHOLE]);
     });

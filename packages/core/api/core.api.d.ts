@@ -1734,7 +1734,7 @@ declare class UiGraph {
   markDirtyById(id: NodeId, flags: DirtyFlags): void;
   clearDirty(node: UiNode): void;
   setDirtyListener(listener: (() => void) | null): void;
-  setNodeRemovedListener(listener: ((node: UiNode) => void) | null): void;
+  setNodeRemovedListener(listener: ((node: UiNode, parent: UiNode | null) => void) | null): void;
   setEnvironmentChangedListener(listener: ((node: UiNode) => void) | null): void;
   getDirtyNodes(): DirtyNodeSet;
   updateProperty<T>(nodeId: string, property: string, value: T, dirtyFlags?: DirtyFlags): boolean;
@@ -3093,7 +3093,7 @@ declare class LayoutEngine {
   nextScrollbarChange(now: number): number | undefined;
   scrollbarsShowing(now: number): UiNode[];
   contentWindow(node: UiNode): LayoutBox;
-  detachNode(node: UiNode): void;
+  detachNode(node: UiNode, parent?: UiNode | null): void;
   private measure;
   private measureContainer;
   private measureGrid;
@@ -3172,6 +3172,7 @@ declare class LayoutEngine {
   takeMoves(): LayoutMoves;
   private snapshot;
   private recordMove;
+  private recordChildren;
   private keepMove;
   private movesIncomplete;
   private heldByScroll;
@@ -9059,6 +9060,8 @@ interface MovedFrom {
   readonly stickyOffsetX: number;
   readonly stickyOffsetY: number;
   readonly transform: unknown;
+  readonly parent?: UiNode | null;
+  readonly added?: boolean;
 }
 interface LayoutMoves {
   readonly nodes: ReadonlyMap<UiNode, MovedFrom>;

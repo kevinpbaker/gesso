@@ -49,9 +49,13 @@ type LayerRect = DamageRect;
  *
  * Its own box and no more is enough for a node that did not move. One
  * that did (a box written, a subtree shifted, a sticky node shifting, a
- * transform, a shadow reaching less far) is drawn where it is and where
- * it was, from the place `LayoutEngine.takeMoves` says it had: its
- * extent then, through its own placement then and its ancestors' now.
+ * transform, a shadow reaching less far, a clip let go) is drawn where
+ * it is and where it was; one added, only where it is; one taken away,
+ * only where it was, through the parent it was taken from. A node whose
+ * only change is its children is not drawn as itself: its children are
+ * all in the moves, and an overlay layer is the size of the surface.
+ * Where a node was is what `LayoutEngine.takeMoves` says: its extent
+ * then, through its own placement then and its ancestors' now.
  * An ancestor that moved too is in the moves itself. A lifted node is
  * drawn outside every clip, so where each one landed is noted at the
  * end of every frame, and a frame that carries one somewhere else (a
@@ -66,8 +70,8 @@ type LayerRect = DamageRect;
  *   - the first frame, a resize, a new device pixel ratio, a restored
  *     surface or a font that loaded (`invalidate`);
  *   - a box moved that the layout's moves do not describe: a full
- *     layout, a node added or removed, a clip let go, or moves handed
- *     over by no one (`RenderChanges.moved` absent);
+ *     layout, a node removed with no parent to say where it was, or
+ *     moves handed over by no one (`RenderChanges.moved` absent);
  *   - the root itself was dirtied, which is how the runtime asks for a
  *     repaint that nothing else describes (a kept subtree drawn sharp,
  *     the inspector) and how a theme changes;
@@ -253,7 +257,7 @@ export class FrameDamage {
     // its own extent then holds the child's.
     if (changes.moved !== undefined) {
       for (const [node, from] of changes.moved.nodes) {
-        const was = this.surfaceRect(node, root, context, from);
+        const was = from.added === true ? undefined : this.surfaceRect(node, root, context, from);
         const is = this.surfaceRect(node, root, context);
         if (was === null || is === null) {
           return null;
@@ -287,9 +291,16 @@ export class FrameDamage {
         return null;
       }
     }
+    const movesComplete = changes.moved?.complete === true;
     for (const [node, flags] of changes.frame.entries()) {
       // What a node means is not how it looks.
       if ((flags & ~DirtyFlags.Semantics) === 0) {
+        continue;
+      }
+      // Only its children changed, and each child added, taken away or
+      // reordered is in the moves, where it was and where it is. Its own
+      // extent, an overlay layer as big as the surface, is not.
+      if (movesComplete && (flags & ~(DirtyFlags.Semantics | DirtyFlags.Children)) === 0 && node !== root) {
         continue;
       }
       if (node === root) {
@@ -355,7 +366,7 @@ export class FrameDamage {
   ): LayerRect | null | undefined {
     const layout = context.layout;
     const rec = layout.recordFor(node);
-    if (rec === undefined) {
+    if (rec === undefined && from === undefined) {
       // A fragment has no box, and its children paint, inside whatever
       // the nearest ancestor with a box paints: a virtual list keeps
       // its rows under one, and a scroll that recycled them named only
@@ -370,16 +381,17 @@ export class FrameDamage {
       }
       return null;
     }
-    const own = from ?? rec;
+    const own = from ?? rec!;
     box.left = own.extentMinX - SPILL;
     box.top = own.extentMinY - SPILL;
     box.right = own.extentMaxX + SPILL;
     box.bottom = own.extentMaxY + SPILL;
     placeThrough(from === undefined ? node.properties.get('transform') : from.transform, own, box);
-    // A lifted node is drawn outside every clip above it.
-    let unclipped = rec.lifted;
+    // A lifted node is drawn outside every clip above it. One taken out
+    // of the tree is carried from the parent it was taken from.
+    let unclipped = rec?.lifted === true;
     let reached = node === root;
-    for (let ancestor = node.parent; ancestor !== null; ancestor = ancestor.parent) {
+    for (let ancestor = from?.parent ?? node.parent; ancestor !== null; ancestor = ancestor.parent) {
       if (ancestor === root) {
         reached = true;
       }

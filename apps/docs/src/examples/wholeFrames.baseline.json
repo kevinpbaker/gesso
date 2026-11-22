@@ -45,7 +45,7 @@
   "CanvasEditingExample": {
     "idle": 0,
     "hover": 0,
-    "tab": 8,
+    "tab": 0,
     "arrows": 0,
     "wheel": 0
   },
@@ -266,7 +266,7 @@
     "idle": 0,
     "hover": 0,
     "tab": 0,
-    "arrows": 4,
+    "arrows": 0,
     "wheel": 0
   },
   "MenuExample": {
@@ -310,7 +310,7 @@
     "idle": 0,
     "hover": 0,
     "tab": 0,
-    "arrows": 1,
+    "arrows": 0,
     "wheel": 0
   },
   "NumberInputExample": {
@@ -529,7 +529,7 @@
     "idle": 0,
     "hover": 0,
     "tab": 0,
-    "arrows": 2,
+    "arrows": 0,
     "wheel": 0
   },
   "StateExample": "not mounted alone: Error: Channel 'docs-basket' is not attached. Did you forget useChannel(...)? Attached channels: (none).",
@@ -558,7 +558,7 @@
     "idle": 0,
     "hover": 0,
     "tab": 0,
-    "arrows": 2,
+    "arrows": 0,
     "wheel": 0
   },
   "TextExample": {
@@ -593,15 +593,15 @@
   "ToolbarOverflowExample": {
     "idle": 0,
     "hover": 0,
-    "tab": 8,
-    "arrows": 5,
+    "tab": 0,
+    "arrows": 0,
     "wheel": 0
   },
   "TooltipExample": {
     "idle": 0,
-    "hover": 2,
-    "tab": 8,
-    "arrows": 1,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
     "wheel": 0
   },
   "TourExample": {

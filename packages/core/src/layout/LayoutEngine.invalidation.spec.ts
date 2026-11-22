@@ -35,7 +35,7 @@ describe('LayoutEngine invalidation', () => {
       onFrame
     });
     graph.setDirtyListener(() => scheduler.notifyDirty());
-    graph.setNodeRemovedListener(node => engine.detachNode(node));
+    graph.setNodeRemovedListener((node, parent) => engine.detachNode(node, parent));
     return {
       graph,
       engine,
@@ -579,16 +579,23 @@ describe('LayoutEngine invalidation', () => {
         expect(h.engine.takeMoves().nodes.get(first)?.transform).toEqual({ translateX: 10 });
       });
 
-      it('is incomplete when a node is added, which no move describes', () => {
-        const { h } = rows();
+      it('says a node added was drawn nowhere, and one taken away where it was and under whom', () => {
+        const { h, first } = rows();
         const added = h.graph.createNode('added', UiNodeType.Box);
         added.setProperty('width', 10);
         added.setProperty('height', 10);
-        h.graph.appendChild(h.root, added);
-        h.graph.markDirty(h.root, DirtyFlags.Children | DirtyFlags.Layout);
+        h.graph.appendChild(h.root!, added);
+        h.graph.markDirty(h.root!, DirtyFlags.Children | DirtyFlags.Layout);
         h.clock.tick(0);
+        const adding = h.engine.takeMoves();
+        expect(adding.complete).toBe(true);
+        expect(adding.nodes.get(added)).toMatchObject({ added: true });
 
-        expect(h.engine.takeMoves()).toMatchObject({ complete: false });
+        h.graph.removeNode(first);
+        h.clock.tick(0);
+        const removing = h.engine.takeMoves();
+        expect(removing.complete).toBe(true);
+        expect(removing.nodes.get(first)).toMatchObject({ parent: h.root, y: 0, extentMaxY: 20 });
       });
     });
 

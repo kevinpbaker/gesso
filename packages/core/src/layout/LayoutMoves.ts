@@ -22,6 +22,13 @@ export interface MovedFrom {
   readonly stickyOffsetY: number;
   /** The `transform` property's value then. */
   readonly transform: unknown;
+  /**
+   * For a node taken out of the tree, the parent it was taken from,
+   * through whose placement it is carried out to where it was drawn.
+   */
+  readonly parent?: UiNode | null;
+  /** A node laid out for the first time: drawn nowhere before, so only where it is. */
+  readonly added?: boolean;
 }
 
 /**
@@ -31,7 +38,10 @@ export interface MovedFrom {
  * drawing where it was and where it is, rather than everything. That is
  * only sound when every move is here, so `complete` is false whenever
  * something changed that no entry describes (a full layout, a node
- * added or taken away, a clip let go), and the frame is drawn whole.
+ * taken away with no parent to say where it was), and the frame is
+ * drawn whole. A node added is an entry with nowhere to come from; a
+ * node taken away, one with its old parent; a node whose children
+ * changed, or whose clip did, one with its whole extent as it was.
  * An entry is the node's oldest place since the last ask: a node moved
  * twice between frames was drawn at neither but the first.
  *

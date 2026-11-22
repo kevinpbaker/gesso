@@ -436,11 +436,15 @@ describe('sharedElement()', () => {
     mounted.frame();
     expect(onTop()).toBe('card');
 
-    // And gives the row back once it has arrived: `onTop` reads the
-    // last frame that drew, which is the settled one.
-    fills.mockClear();
+    // And gives the row back once it has arrived. The frame that
+    // settles it draws only what changed, the card, which no longer
+    // reaches the neighbour; a frame drawn whole (a resize, by a pixel
+    // the column does not fill) says which is on top.
     drain(mounted);
     expect(morphing.value).toBe(false);
+    fills.mockClear();
+    mounted.runtime.resize(800, 601);
+    drain(mounted);
     expect(onTop()).toBe('neighbour');
   });
 
