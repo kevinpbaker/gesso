@@ -100,7 +100,7 @@ and dark toggle without being told either exists.
   Latin, Japanese, Chinese, Korean, Arabic, Hebrew, Hindi and Thai, with
   colour emoji, right-to-left paragraphs and web fonts loaded in the
   worker, on both renderers.
-- **<!-- proof:components Words -->Fifty-one<!-- /proof --> components.** Inputs, overlays, tables, trees and
+- **<!-- proof:components Words -->Fifty-four<!-- /proof --> components.** Inputs, overlays, tables, trees and
   media, every one of them themed, keyboard operable, and announced to
   assistive technology without you doing anything.
 - **Tests without a browser.** `renderTest` queries the same tree a
@@ -129,7 +129,7 @@ script is the claim.
 | What a screen reader is given is what the tree says | Chrome's computed accessibility tree per route, written to a committed report with every control named and the Tab order walked                                                                              | `pnpm check:a11y`; VoiceOver and NVDA have not been run says so                                           |
 | Every control works from the keyboard               | a form of every control tabbed through from nothing, each operated by its keys                                                                                                                               | `Keyboard.spec.ts` in `gesso-components`                                                                  |
 | An agent goes through the paths a person does       | a channel command reaches the handler a click does; a screen press is the mirror's click, refused by a disabled control                                                                                      | the specs beside `gesso-framework/agent`, over real ports and a real runtime                              |
-| It stays this way                                   | <!-- proof:tests -->7,916<!-- /proof --> tests in <!-- proof:test-files -->582<!-- /proof --> files, the public surface as committed reports                                                                 | `pnpm test:run`, `pnpm api:check`                                                                         |
+| It stays this way                                   | <!-- proof:tests -->8,033<!-- /proof --> tests in <!-- proof:test-files -->594<!-- /proof --> files, the public surface as committed reports                                                                 | `pnpm test:run`, `pnpm api:check`                                                                         |
 
 ## How it compares
 
