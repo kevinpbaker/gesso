@@ -83,6 +83,31 @@ importers:
         specifier: ^3.5.42
         version: 3.5.42(typescript@7.0.2)
 
+  apps/eval-tracker:
+    dependencies:
+      gesso-components:
+        specifier: workspace:^
+        version: link:../../packages/components
+      gesso-core:
+        specifier: workspace:^
+        version: link:../../packages/core
+      gesso-framework:
+        specifier: workspace:^
+        version: link:../../packages/framework
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+    devDependencies:
+      gesso-devtools:
+        specifier: workspace:^
+        version: link:../../packages/devtools
+      gesso-vite-plugin:
+        specifier: workspace:^
+        version: link:../../packages/vite-plugin
+      vite:
+        specifier: ^8.2.0
+        version: 8.2.1(yaml@2.9.0)
+
   apps/playground:
     dependencies:
       gesso-components:

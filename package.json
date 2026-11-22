@@ -35,6 +35,7 @@
     "check:touch": "node scripts/check-touch-scroll.ts",
     "check:islands": "node scripts/check-dom-islands.ts",
     "check:browsers": "node scripts/check-browsers.ts",
+    "eval:agents": "node scripts/eval-agents.ts",
     "bench:graph": "vite-node scripts/bench-graph.ts",
     "bench:frame": "vite-node scripts/bench-frame.ts",
     "bench:rewrap": "vite-node scripts/bench-rewrap.ts",
