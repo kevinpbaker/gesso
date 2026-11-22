@@ -433,7 +433,17 @@ jobs:
       # hidden. Desktop safaridriver delivers a touch drag as a mouse, so
       # the touch probe is listed as not checked.
       - name: The browser check, in Safari
-        run: pnpm check:browsers --browser safari
+        run: pnpm check:browsers --browser safari --shots ${{ runner.temp }}/shots
+
+      # What each route drew, which says at a glance whether a failure is
+      # the app or a runner that cannot render.
+      - name: Upload what each route drew
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safari-routes
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
 
   screenshots:
     name: route screenshots
