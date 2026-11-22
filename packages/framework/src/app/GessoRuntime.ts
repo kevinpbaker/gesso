@@ -3771,8 +3771,12 @@ export class GessoRuntime {
       },
       scrollContainers: () => this.engine.scrollContainers(),
       revealScrollbars: (node): void => {
-        this.engine.revealScrollbars(node);
-        this.graph.markDirty(node, DirtyFlags.Paint);
+        // A pointer moving along a bar that is already up asks for this
+        // on every move; marking the container each time drew all of it
+        // again, the whole surface for a grid that fills it.
+        if (this.engine.revealScrollbars(node)) {
+          this.graph.markDirty(node, DirtyFlags.Paint);
+        }
       },
       scrollbar: (node, axis) => {
         const record = this.engine.recordFor(node);

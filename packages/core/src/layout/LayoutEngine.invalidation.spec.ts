@@ -455,6 +455,30 @@ describe('LayoutEngine invalidation', () => {
       expect(h.engine.geometryVersion).not.toBe(before);
     });
 
+    it('stays put for a sticky header shifted by its own list scrolling', () => {
+      const h = createHarness();
+      h.root = h.builder.build(
+        ScrollView(
+          { width: 100, height: 100 },
+          Column(
+            { x: 'start' },
+            Box({ width: 60, height: 20, position: 'sticky', top: 0 }),
+            Box({ width: 60, height: 400 })
+          )
+        )
+      );
+      firstFrame(h);
+      const header = h.root.firstChild!.firstChild ?? h.root.firstChild!;
+      const before = h.engine.geometryVersion;
+
+      // The list scrolls and the header stays at its top: a shift, held
+      // in the list's clip, which the frame draws again anyway.
+      h.graph.updateProperty(h.root.id, 'scrollY', 50, DirtyFlags.Transform);
+      h.clock.tick(0);
+      expect(h.engine.recordFor(header)!.stickyOffsetY).toBe(50);
+      expect(h.engine.geometryVersion).toBe(before);
+    });
+
     it('moves for a sticky leaf laid out again', () => {
       const h = createHarness();
       h.root = h.builder.build(

@@ -3024,6 +3024,7 @@ declare class LayoutEngine {
   private readonly boundsMoved;
   private readonly boundsShifted;
   private transformMoves;
+  private readonly scrolledThisFrame;
   constructor(textMeasurer?: TextMeasurer);
   recordFor(node: UiNode): LayoutRecord | undefined;
   allStickyNodes(): ReadonlySet<UiNode>;
@@ -3082,7 +3083,7 @@ declare class LayoutEngine {
   private revealThroughTransforms;
   private spanIn;
   private textScrollAdjustment;
-  revealScrollbars(node: UiNode): void;
+  revealScrollbars(node: UiNode): boolean;
   scrollContainers(): Iterable<UiNode>;
   private scrollbarNodes;
   nextScrollbarChange(now: number): number | undefined;

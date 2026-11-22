@@ -643,6 +643,12 @@ export class LayoutEngine {
    * `layoutVersion` alone, and `geometryVersion` adds these to it.
    */
   private transformMoves = 0;
+  /**
+   * The scroll containers whose offset this frame changed. A sticky
+   * node shifted inside one of them moves nothing a renderer has not
+   * been told of: the container is dirty, and it clips the node.
+   */
+  private readonly scrolledThisFrame = new Set<UiNode>();
 
   constructor(textMeasurer: TextMeasurer = new CharacterCountTextMeasurer()) {
     this.textMeasurer = textMeasurer;
@@ -1144,6 +1150,7 @@ export class LayoutEngine {
 
     this.resetStats();
     this.relayoutRoots.clear();
+    this.scrolledThisFrame.clear();
     if (this.boundsMoved.size + this.boundsShifted.size > this.wholeBoundsRefill()) {
       // Frames that nothing hit-tested between: past this many, the
       // next ask walks the whole tree anyway, and the nodes need not be
@@ -1199,6 +1206,7 @@ export class LayoutEngine {
         } else if (rec.scrollable) {
           rec.transformDirty = true;
           this.scrollNodes.add(node);
+          this.scrolledThisFrame.add(node);
         }
         // A node that does not scroll had its transform changed, which
         // moves it on screen and nothing in the layout. Kept with the
@@ -1844,13 +1852,19 @@ export class LayoutEngine {
 
   /**
    * Shows a scroll container's scrollbars as if it had just scrolled:
-   * the pointer is near them, or dragging one.
+   * the pointer is near them, or dragging one. True when that changes
+   * how they look, because they were hidden or fading; false when they
+   * were showing in full and only stay up longer, which needs no frame.
    */
-  revealScrollbars(node: UiNode): void {
+  revealScrollbars(node: UiNode): boolean {
     const rec = this.records.get(node);
-    if (rec !== undefined) {
-      rec.scrollbarVisibleUntil = this.now() + SCROLLBAR_LINGER_MS;
+    if (rec === undefined) {
+      return false;
     }
+    const now = this.now();
+    const showing = rec.scrollbarVisibleUntil - SCROLLBAR_FADE_MS > now;
+    rec.scrollbarVisibleUntil = now + SCROLLBAR_LINGER_MS;
+    return !showing;
   }
 
   /** Every scroll container that has been laid out. */
@@ -4987,10 +5001,21 @@ export class LayoutEngine {
     if (this.stickyShifted.size > 0) {
       // A shift moves a node, and everything under it, without moving
       // a box, so nothing else here would tell the subtree bounds that
-      // the tree they summarise has changed shape.
-      this.layoutVersion++;
+      // the tree they summarise has changed shape. The version is for
+      // a renderer, which draws a frame where something moved whole;
+      // a shift inside a container scrolled this frame is held in that
+      // container's clip, which the renderer draws again as it is, so
+      // a list with a sticky header scrolls in part.
+      let held = true;
       for (const node of this.stickyShifted) {
         this.boundsMoved.add(node);
+        const scroller = this.scrollAncestorOf(node);
+        if (scroller === null || !this.scrolledThisFrame.has(scroller)) {
+          held = false;
+        }
+      }
+      if (!held) {
+        this.layoutVersion++;
       }
       if (this.anchorOf.size > 0) {
         this.followStickyShifts();

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { UiNodeType } from '../graph/UiNodeType';
 import type { UiNode } from '../graph/UiNode';
@@ -73,6 +73,27 @@ describe('LayoutEngine overflow', () => {
       expect(h.engine.nextScrollbarChange(now)).toBe(until - SCROLLBAR_FADE_MS);
       expect(h.engine.nextScrollbarChange(until - 10)).toBe(until - 10 + 16);
       expect(h.engine.nextScrollbarChange(until + 1)).toBeUndefined();
+    });
+
+    it('says a reveal changes the bars only when they were hidden or fading', () => {
+      const h = new LayoutHarness();
+      const root = column(h, 'top', { height: 40, overflow: 'scroll', x: 'start' });
+      h.append(root, box(h, 'a', { width: 20, height: 100, flexShrink: 0 }));
+      h.layout(root, Constraints.loose(300, 300));
+      const clock = vi.spyOn(performance, 'now');
+      try {
+        clock.mockReturnValue(100_000);
+        expect(h.engine.revealScrollbars(root)).toBe(true);
+        // A pointer moving along a bar that is up asks again on every
+        // move; the bars look the same, so no frame is needed.
+        clock.mockReturnValue(100_500);
+        expect(h.engine.revealScrollbars(root)).toBe(false);
+        const until = h.record(root).scrollbarVisibleUntil;
+        clock.mockReturnValue(until - SCROLLBAR_FADE_MS + 1);
+        expect(h.engine.revealScrollbars(root)).toBe(true);
+      } finally {
+        clock.mockRestore();
+      }
     });
   });
 
