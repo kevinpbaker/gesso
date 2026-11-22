@@ -38,8 +38,9 @@ function fakePage(emit: ReturnType<typeof fakeSocket>['emit'], answer: (message:
 function request(
   bridge: ReturnType<typeof createAgentBridge>,
   init: { method?: string; url?: string; body?: string; headers?: Record<string, string> }
-): Promise<{ status: number; body: string | undefined; passed: boolean }> {
+): Promise<{ status: number; body: string | undefined; passed: boolean; headers: Record<string, string> }> {
   return new Promise(resolve => {
+    const headers: Record<string, string> = {};
     const handlers: Record<string, ((chunk?: unknown) => void)[]> = { data: [], end: [], error: [] };
     const req: BridgeRequest = {
       method: init.method ?? 'POST',
@@ -50,10 +51,10 @@ function request(
     };
     const res: BridgeResponse = {
       statusCode: 200,
-      setHeader: () => {},
-      end: body => resolve({ status: res.statusCode, body, passed: false })
+      setHeader: (name, value) => (headers[name.toLowerCase()] = value),
+      end: body => resolve({ status: res.statusCode, body, passed: false, headers })
     };
-    bridge.middleware(req, res, () => resolve({ status: 0, body: undefined, passed: true }));
+    bridge.middleware(req, res, () => resolve({ status: 0, body: undefined, passed: true, headers }));
     queueMicrotask(() => {
       if (init.body !== undefined) {
         handlers.data.forEach(listener => listener(init.body));
@@ -512,5 +513,41 @@ describe('a single-thread shell, in a dev server', () => {
   it('leaves a module that does not create a single-thread app alone, and does not wrap twice', () => {
     expect(transformSyncShell("import { createSyncApp } from './elsewhere';\ncreateSyncApp(App);\n")).toBeNull();
     expect(transformSyncShell(transformSyncShell(SYNC)!)).toBeNull();
+  });
+});
+
+describe('which agent is asking', () => {
+  const rpc = (id: number, method: string, params: Record<string, unknown> = {}) =>
+    JSON.stringify({ jsonrpc: '2.0', id, method, params });
+
+  it("tells the page the name the agent's session began with, and never a name the call gave itself", async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket);
+    const seen: unknown[] = [];
+    const page = fakePage(emit, message => {
+      seen.push(message);
+      return { jsonrpc: '2.0', id: (message as { id: unknown }).id, result: {} };
+    });
+    emit(EVENTS.ready, {}, page);
+
+    const hello = await request(bridge, {
+      body: rpc(1, 'initialize', { clientInfo: { name: 'Claude Code', version: '2' } })
+    });
+    const session = hello.headers['mcp-session-id'];
+    expect(session).toMatch(/^[0-9a-f]{32}$/);
+
+    await request(bridge, {
+      body: rpc(2, 'tools/call', { name: 'notes_remove', arguments: {}, _meta: { 'gesso/agent': 'The person' } }),
+      headers: { 'mcp-session-id': session }
+    });
+    await request(bridge, {
+      body: rpc(3, 'tools/call', { name: 'notes_remove', arguments: {}, _meta: { 'gesso/agent': 'The person' } })
+    });
+    const calls = seen.filter(message => (message as { method: string }).method === 'tools/call') as {
+      params: { _meta: Record<string, unknown> };
+    }[];
+    expect(calls.map(call => call.params._meta['gesso/agent'])).toEqual(['Claude Code', undefined]);
+
+    expect((await request(bridge, { method: 'DELETE', headers: { 'mcp-session-id': session } })).status).toBe(204);
   });
 });

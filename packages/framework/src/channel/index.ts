@@ -26,7 +26,7 @@ export {
   type JsonSchema,
   type QuerySchema
 } from './ChannelSchema';
-export { provide, ProvidedChannel, type ChannelSource, type QueryHandlers } from './provide';
+export { provide, ProvidedChannel, type ChannelSource, type ConfirmWording, type QueryHandlers } from './provide';
 export { ChannelReplica } from './ChannelReplica';
 export { ChannelRegistry } from './ChannelRegistry';
 export { findUnplainPath, requirePlainData } from './plainData';

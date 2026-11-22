@@ -284,7 +284,8 @@ describe('an agent surface', () => {
       command: 'remove',
       description: 'Deletes a note for good.',
       arguments: { id: '7' },
-      destructive: true
+      destructive: true,
+      question: { title: 'Allow remove in notes?', detail: 'Deletes a note for good.\n\nid: 7' }
     });
 
     answer = true;

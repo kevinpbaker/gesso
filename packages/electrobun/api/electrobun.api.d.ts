@@ -14,6 +14,7 @@ import {
 } from "./view.js";
 import {
   AgentConfirmation,
+  AgentConfirmResult,
   AgentSurface,
   AgentSurfaceLike,
   McpHandlerOptions
@@ -34,7 +35,7 @@ interface BunFfi {
 declare function showAppearance(window: number | bigint | null | undefined, preference: ColorSchemePreference, ffi: BunFfi, platform?: string): string | null;
 interface ScreenAgentOptions {
   readonly windowChannels?: boolean;
-  readonly confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  readonly confirm?: (request: AgentConfirmation) => AgentConfirmResult;
 }
 interface ScreenAgent {
   readonly surface: AgentSurfaceLike;
@@ -54,7 +55,7 @@ type DesktopServe = (options: {
 interface DesktopAgentOptions extends Omit<McpHandlerOptions, 'allowedOrigins'> {
   port?: number;
   hostname?: string;
-  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  confirm?: (request: AgentConfirmation) => AgentConfirmResult;
   serve?: DesktopServe;
   screen?: AgentSurfaceLike;
   catalog?: AgentSurfaceLike & {

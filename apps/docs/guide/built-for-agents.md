@@ -67,6 +67,17 @@ list that the person is looking at.
 [Queries](/structure/agents-and-mcp#queries-reading-without-moving-the-screen)
 has the detail.
 
+A `@confirm` command is put to the person in their own words, not as
+a command and its arguments: write the question after the tag
+(`@confirm Delete the note {id}?`), or word it from the data in
+`serve`. With `useAgentConfirm(agentConfirmDialog())`, which a new
+project has already, it is asked in a dialog on the app's own screen,
+and it says which agent is asking. When nobody can be asked, because
+the window is hidden for example, the agent is told that, not that the
+person said no.
+[Asking the person](/structure/agents-and-mcp#asking-the-person) has
+the detail.
+
 `@hidden` on a view key keeps that key out of everything an agent
 reads: geometry for the screen, a clipboard, the text of a file being
 saved. An agent is handed the rest of the view after every command, so

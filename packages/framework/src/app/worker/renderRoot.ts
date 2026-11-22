@@ -6,6 +6,7 @@ import { AGENT_PORT } from '../../agent/remote';
 import { serveApplicationAgent } from '../../agent/app';
 import { renderModule } from '../../agent/render';
 import type { AgentToolDefinition } from '../../agent/tools';
+import type { AgentConfirmAsk } from '../../agent/app';
 import type { DesignThemes } from '../../agent/designedTheme';
 import { isClaimedError } from '../claimedErrors';
 import type { ServedChannel } from '../../channel/serveChannels';
@@ -109,6 +110,8 @@ export class RenderWorkerApp {
   private loadModule: (path: string) => Promise<Record<string, unknown>> = path => import(/* @vite-ignore */ path);
   /** The application's own agent tools (`useAgentTools`). */
   private readonly agentTools: AgentToolDefinition[] = [];
+  /** How the application asks the person itself (`useAgentConfirm`). */
+  private agentConfirm: AgentConfirmAsk | undefined;
   /** What the application asked to hear of the errors this worker reports (`onError`). */
   private readonly errorListeners: ((error: RenderWorkerError) => void)[] = [];
   /** Held so forwarded display refreshes can be handed to it. */
@@ -319,6 +322,22 @@ export class RenderWorkerApp {
   }
 
   /**
+   * Asks the person on the application's own screen, in its own theme,
+   * before an AI agent's `@confirm` command is sent, rather than with
+   * the browser's dialog. `gesso-components`' `agentConfirmDialog()` is
+   * one ready to use; see `AgentConfirmAsk` to write another.
+   *
+   *   renderRoot(App).useAgentConfirm(agentConfirmDialog());
+   *
+   * A hidden window cannot show it, and the agent is told nobody could
+   * be asked; so it is when nobody answers within `AGENT_CONFIRM_MS`.
+   */
+  useAgentConfirm(ask: AgentConfirmAsk): this {
+    this.agentConfirm = ask;
+    return this;
+  }
+
+  /**
    * Hears every error this worker reports to the shell: a frame that
    * threw, a listener, the renderer, a channel, anything uncaught. For
    * an application that shows errors itself, where they happen: a design
@@ -449,6 +468,7 @@ export class RenderWorkerApp {
         return workers;
       },
       tools: () => this.agentTools,
+      confirm: () => this.agentConfirm,
       ui: () => {
         const runtime = this.runtime;
         if (runtime === undefined) {
@@ -464,6 +484,11 @@ export class RenderWorkerApp {
           },
           flush: () => this.clock?.flush(),
           theme: at => runtime.themeAt(at),
+          agentContext: () => ({
+            hidden: !runtime.isVisible(),
+            inject: service => runtime.services.get(service),
+            environment: runtime.contentNode() ?? null
+          }),
           designThemes: () => this.renderThemes(),
           render: request =>
             renderModule(request, {

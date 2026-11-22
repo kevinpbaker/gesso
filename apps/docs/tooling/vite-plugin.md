@@ -278,6 +278,9 @@ A channel's queries (its third type argument, or `queries` in
 returns is checked as plain data: a promise's value, for a query that
 waits. `@hidden` is the only tag a query takes.
 
+Text after `@confirm` is the question the person is asked, kept as
+`CommandSchema.question`: `@confirm Delete the note {id}?`.
+
 `@hidden` on a view key is read too: the key stays in the schema, and
 `ChannelSchema.hidden` lists it, so an agent is given the view without
 it. On the exported token it marks the whole channel

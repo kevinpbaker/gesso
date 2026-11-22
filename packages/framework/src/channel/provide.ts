@@ -4,6 +4,7 @@ import { diffProjection, type Patch } from './StorePatch';
 import { isChannelClientMessage, type ChannelHostMessage, type ChannelPort } from './ChannelProtocol';
 import { requirePlainData } from './plainData';
 import { viewKeys, type ChannelToken, type CommandMap } from './ChannelToken';
+import type { AgentQuestion } from '../agent/AgentSurface';
 
 /** What the owning thread supplies for a channel. */
 export interface ChannelSource<View extends object, Commands extends object, Queries extends object = object> {
@@ -18,7 +19,26 @@ export interface ChannelSource<View extends object, Commands extends object, Que
    * without anything crossing until an agent asks.
    */
   queries?: QueryHandlers<Queries>;
+  /**
+   * What the person is asked before an AI agent's `@confirm` command is
+   * sent, worded from the data, for a question its arguments alone cannot
+   * put: given the arguments the command takes, on this thread, where an
+   * id can be looked up.
+   *
+   *   confirm: { remove: id => ({ title: 'Delete this expense?', detail: describe(store.get(id)), action: 'Delete' }) }
+   *
+   * Without one, the question is the one after the command's `@confirm`
+   * tag, or one written from its name.
+   */
+  confirm?: ConfirmWording<Commands>;
 }
+
+/** The application's wording for its commands' questions to the person; see `ChannelSource.confirm`. */
+export type ConfirmWording<Commands extends object> = {
+  readonly [K in keyof Commands]?: Commands[K] extends (...args: infer A) => unknown
+    ? (...args: A) => string | AgentQuestion
+    : never;
+};
 
 /**
  * The functions that answer a channel's queries: each takes what the

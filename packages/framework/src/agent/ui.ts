@@ -1,4 +1,4 @@
-import type { UiKeyModifiers, UiSemanticsAction, UiSemanticsMap, UiSemanticsRecord, UiTheme } from 'gesso-core';
+import type { UiKeyModifiers, UiNode, UiSemanticsAction, UiSemanticsMap, UiSemanticsRecord, UiTheme } from 'gesso-core';
 
 import type { JsonSchema } from '../channel/ChannelSchema';
 import type { AgentSurface, AgentTool, AgentToolResult } from './AgentSurface';
@@ -58,6 +58,16 @@ export interface UiHost {
   designThemes?(): DesignThemes;
   /** Draws a module of the project to a PNG; see `renderModule`. Optional, as `theme` is. */
   render?(request: RenderRequest): Promise<AgentToolResult>;
+  /**
+   * What an in-app question to the person needs (`useAgentConfirm`):
+   * whether the window is hidden, the running application's services,
+   * and its outermost content, for the question's theme.
+   */
+  agentContext?(): {
+    readonly hidden: boolean;
+    inject<T extends object>(service: new () => T): T;
+    readonly environment: UiNode | null;
+  };
 }
 
 export interface UiSurfaceOptions {

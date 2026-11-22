@@ -307,6 +307,11 @@ export class GessoApp {
       },
       flush: () => this.flushFrame(),
       theme: at => runtime.themeAt(at),
+      agentContext: () => ({
+        hidden: !runtime.isVisible(),
+        inject: service => runtime.services.get(service),
+        environment: runtime.contentNode() ?? null
+      }),
       render: request =>
         renderModule(request, {
           load: path => import(/* @vite-ignore */ path),

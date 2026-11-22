@@ -144,18 +144,99 @@ a positional `arguments` list and saying so in their descriptions.
 
 ## Asking the person
 
-A command marked `@confirm` is not sent until `confirm` says so:
+A command marked `@confirm` is not sent until the person says yes.
+
+### In their words
+
+The person is asked a question, not shown a command and its arguments.
+Write the question after the tag, with `{parameter}` (or
+`{parameter.field}`) where an argument goes:
 
 ```ts
-const surface = agentSurface(channels, {
-  confirm: ({ channel, command, arguments: args, destructive }) =>
-    askThePerson(`An agent wants to ${command} in ${channel}.`, { destructive })
+/** Moves an issue to another state. @confirm Move {id} to {state}? */
+move(id: string, state: IssueState): void;
+```
+
+When the question needs the data, word it where the data is, in `serve`
+(or `useChannel`'s `source`). The function takes what the command takes
+and returns a string or `{ title, detail?, action? }`:
+
+```ts
+serve(Expenses, {
+  view: { rows },
+  commands: { remove: id => store.remove(id) },
+  confirm: {
+    remove: id => {
+      const expense = store.get(id);
+      return {
+        title: 'Delete this expense?',
+        detail: `${money(expense.cents)} ${expense.category}, ${expense.note}`,
+        action: 'Delete'
+      };
+    }
+  }
 });
 ```
 
-`confirm` returns a boolean or a promise of one. Without it, such a
-command is refused and the agent is told to ask the person to do it,
-which is the safe reading of a contract that asked for a person.
+A bare `@confirm` still works. Gesso then asks "Allow remove in
+expenses?", with the command's description and arguments as the
+detail. Wording that throws is passed over for the next.
+
+### On the app's own screen
+
+```ts
+import { agentConfirmDialog } from 'gesso-components';
+
+renderRoot(App).useAgentConfirm(agentConfirmDialog());
+```
+
+`agentConfirmDialog()` asks in a `Dialog` on the canvas, in the app's
+theme. It shows the question, its detail, which agent is asking ("Asked
+by Claude Code"), and a button with the question's own word, painted
+as danger for a `@destructive` command. A new project from
+`create-gesso-app` has it already. To draw your own, pass any
+`AgentConfirmAsk`: it is given the request and the running app's
+services, its outermost content (for the theme), and a signal that is
+aborted when the question is withdrawn.
+
+Without `useAgentConfirm`, the page asks with the browser's own dialog,
+as before.
+
+### When nobody can be asked
+
+The answer is `approved`, `declined`, or `unavailable` (with a reason
+as `{ unavailable: why }`), and a boolean is taken as the first two.
+`unavailable` is not a no. The command is not sent, and the agent is
+told that nobody could be asked and why, so it can ask the person to
+bring the window forward:
+
+```text
+Nobody could be asked to approve expenses.remove: the app's window is hidden. The person did not decline it.
+Ask them to bring the app's window forward and call it again, or to do it themselves.
+```
+
+Gesso answers `unavailable` when the window is hidden, when the
+browser does not show its dialog (a `window.confirm` that answers no in
+under 50 ms was never shown), when an in-app question gets no answer in
+`AGENT_CONFIRM_MS` (110 seconds, inside the time the page gives a
+call), and when the app gave agents no way to ask.
+
+### On a server
+
+`agentSurface` takes the same `confirm`:
+
+```ts
+const surface = agentSurface(channels, {
+  confirm: ({ question, agent, destructive }) =>
+    askThePerson(question.title, { detail: question.detail, agent, destructive })
+});
+```
+
+`agent` is the client's own name for itself, from MCP's `clientInfo`,
+when the transport knows it: `mcpHandler` and the dev server both do.
+Without `confirm`, a `@confirm` command is refused and the agent is
+told to ask the person to do it, which is the safe reading of a
+contract that asked for a person.
 
 ## Operating the interface
 
@@ -224,7 +305,8 @@ holds a socket to the server for hot replacement. So each message an
 agent posts goes down that socket to the page, the page answers it
 against the render worker, and the render worker asks each worker
 behind it over a port of its own. A command marked `@confirm` is put
-to you in the page with the browser's own dialog before it is sent.
+to you before it is sent, in the app's own dialog (`useAgentConfirm`)
+or else with the browser's.
 
 With several tabs open, the newest answers, and closing it hands back
 to the one before. With none open, the agent is told to open one. The
@@ -329,8 +411,9 @@ disposed. The view tools carry `readOnlyHint`, a command marked
 view it left, or fails with the sentence that says why.
 
 WebMCP has no way to ask the person, so a `@confirm` command is put to
-them with the browser's `window.confirm`. Pass your own to use the
-application's dialog:
+them in the app's own dialog when it has one (`useAgentConfirm`), and
+otherwise with the browser's `window.confirm`. Pass your own to ask
+another way:
 
 ```ts
 createApp({ webmcp: { confirm: request => myDialog.ask(request) } });

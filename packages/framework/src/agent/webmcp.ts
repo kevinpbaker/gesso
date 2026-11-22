@@ -1,4 +1,10 @@
-import { resultText, type AgentConfirmation, type AgentSurfaceLike, type AgentToolResult } from './AgentSurface';
+import {
+  resultText,
+  type AgentAnswer,
+  type AgentConfirmation,
+  type AgentSurfaceLike,
+  type AgentToolResult
+} from './AgentSurface';
 import { AGENT_PORT, remoteSurface, type AgentConfirm } from './remote';
 
 /**
@@ -21,7 +27,8 @@ import { AGENT_PORT, remoteSurface, type AgentConfirm } from './remote';
  *   - There is no output schema. The result of a call is serialized to
  *     JSON for the agent, so a call answers with the view it left.
  *   - There is no way to ask the person. A command marked `@confirm`
- *     asks through `confirm`, `window.confirm` unless told otherwise.
+ *     asks through the application's own dialog (`useAgentConfirm`),
+ *     else through `confirm`, `window.confirm` unless told otherwise.
  *   - A failed call rejects, which the spec turns into a failed
  *     `executeTool` the agent reads, with the sentence that says why.
  *
@@ -130,20 +137,40 @@ export async function connectWebMcp(
   };
 }
 
-/** The browser's own dialog, worded for a person who did not ask for anything. */
-export function confirmInWindow(request: AgentConfirmation): boolean {
-  const lines = [`An AI agent wants to ${request.command} in ${request.channel}.`];
-  if (request.description !== undefined) {
-    lines.push(request.description);
+/**
+ * The browser's own dialog, worded for a person who did not ask for
+ * anything: the question, what it is about, and which agent asks.
+ *
+ * Says when it could not ask, rather than answer no for someone who
+ * never saw the question. A hidden window's browser shows no dialog, so
+ * one is not tried; and a browser that suppresses a page's dialogs
+ * answers `confirm` false at once, which no person can, so a no in
+ * under 50 ms is taken as no dialog at all.
+ */
+export function confirmInWindow(request: AgentConfirmation): AgentAnswer {
+  if ((globalThis.document as Document | undefined)?.visibilityState === 'hidden') {
+    return { unavailable: "the app's window is hidden, so its browser cannot show the question" };
   }
-  if (Object.keys(request.arguments).length > 0) {
-    lines.push(JSON.stringify(request.arguments, null, 2));
+  const lines = [request.question.title];
+  if (request.question.detail !== undefined && request.question.detail !== '') {
+    lines.push(request.question.detail);
   }
   if (request.destructive) {
     lines.push('This cannot be undone.');
   }
-  return window.confirm(lines.join('\n\n'));
+  lines.push(
+    `Asked by ${request.agent ?? 'an AI agent'}. OK to ${(request.question.action ?? 'allow').toLowerCase()}.`
+  );
+  const started = performance.now();
+  const approved = window.confirm(lines.join('\n\n'));
+  if (!approved && performance.now() - started < SUPPRESSED_MS) {
+    return { unavailable: 'the browser did not show its dialog; it may be blocking dialogs from this page' };
+  }
+  return approved ? 'approved' : 'declined';
 }
+
+/** A `window.confirm` that answers no faster than this was never shown. */
+const SUPPRESSED_MS = 50;
 
 /** What a call hands back to WebMCP: the view it left, or a rejection that says why. */
 function answerOf(result: AgentToolResult): unknown {

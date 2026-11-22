@@ -155,7 +155,9 @@ export const Notes = defineChannel('notes', {
   Schema on the token, with descriptions taken from those comments. It
   is what an AI agent driving the app reads to understand it. Mark a
   command `@destructive` if it cannot be undone, `@confirm` if a person
-  should approve it first, `@idempotent` if repeating it changes
+  should approve it first (text after the tag is the question they are
+  asked, `@confirm Delete the note {id}?`, and `confirm` in the source
+  words it from the data), `@idempotent` if repeating it changes
   nothing, and `@hidden` to keep it from agents. A field that takes a
   number code (`priority: 0 | 1 | 2`) needs a comment saying what each
   number means. The dev server warns about a channel that is missing

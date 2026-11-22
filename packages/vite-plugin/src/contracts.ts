@@ -29,6 +29,7 @@ import { blankLiterals, findCalls, importSources } from './source.ts';
  *   - `@param name text` describes a parameter.
  *   - `@destructive`, `@idempotent`, `@confirm` and `@hidden` on a
  *     command are its annotations; `CommandSchema` says what each means.
+ *     Text after `@confirm` is the question the person is asked.
  *   - A query (the token's third type argument, `ChannelSpec.queries`)
  *     is read as a command is, with its `@returns` text, and its answer
  *     is checked as plain data; `@hidden` keeps it from an agent.
@@ -74,6 +75,7 @@ interface CommandSchemaOut {
   destructive?: true;
   idempotent?: true;
   confirm?: true;
+  question?: string;
   hidden?: true;
 }
 
@@ -830,6 +832,11 @@ class Describer {
       if (tags.some(tag => tag.name === annotation)) {
         out[annotation] = true;
       }
+    }
+    // `@confirm Delete the note {id}?`: what the person is asked, in the author's words.
+    const question = tags.find(tag => tag.name === 'confirm')?.text?.trim();
+    if (question !== undefined && question !== '') {
+      out.question = question;
     }
     return out;
   }

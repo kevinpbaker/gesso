@@ -210,6 +210,24 @@ The entrance fades and scales from 0.96 to 1 through `AnimationService`,
 so it costs a repaint and no layout. Under reduced motion the animation
 writes its end state and completes, and the dialog is simply present.
 
+## Asking for an AI agent
+
+`agentConfirmDialog()` is a `Dialog` that asks the person whether an
+AI agent may send a command its contract marks `@confirm`:
+
+```ts
+import { agentConfirmDialog } from 'gesso-components';
+
+renderRoot(App).useAgentConfirm(agentConfirmDialog());
+```
+
+It shows the question in the app's words, its detail, which agent is
+asking, Cancel, and a button with the question's own word, painted as
+danger for a `@destructive` command. Cancel, Escape and a press outside
+decline. It takes `cancelLabel` and `width`.
+[Asking the person](/structure/agents-and-mcp#asking-the-person) has
+the rest.
+
 ## Semantics
 
 | What        | Value                                                           |

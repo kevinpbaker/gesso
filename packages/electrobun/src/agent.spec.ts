@@ -159,7 +159,9 @@ describe('messageBoxConfirm', () => {
     command: 'remove',
     description: 'Deletes a note for good.',
     arguments: { id: '7' },
-    destructive: true
+    destructive: true,
+    question: { title: 'Delete the note "Groceries"?', detail: 'It has 3 items.', action: 'Delete' },
+    agent: 'Claude Code'
   };
 
   it('allows only on Allow, and makes Decline the first button, which macOS treats as the default', async () => {
@@ -173,10 +175,10 @@ describe('messageBoxConfirm', () => {
     expect(await confirm(request)).toBe(false);
     response = 1;
     expect(await confirm(request)).toBe(true);
-    expect(shown[0]).toMatchObject({ type: 'warning', buttons: ['Decline', 'Allow'], defaultId: 0, cancelId: 0 });
+    expect(shown[0]).toMatchObject({ type: 'warning', buttons: ['Decline', 'Delete'], defaultId: 0, cancelId: 0 });
   });
 
-  it('puts the description and the arguments in the message, which every platform shows', async () => {
+  it("puts the application's question and which agent asks in the message, which every platform shows", async () => {
     const shown: Parameters<ShowMessageBox>[0][] = [];
     await messageBoxConfirm(async options => {
       shown.push(options);
@@ -184,7 +186,8 @@ describe('messageBoxConfirm', () => {
     })(request);
 
     expect(shown[0].message).toBe(
-      'An AI agent wants to remove in notes. This cannot be undone.\n\nDeletes a note for good.\n\nid: "7"'
+      'Delete the note "Groceries"?\n\nIt has 3 items.\n\nAsked by Claude Code. This cannot be undone.'
     );
+    expect(shown[0].title).toBe('Claude Code is asking');
   });
 });

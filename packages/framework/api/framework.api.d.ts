@@ -6,10 +6,18 @@
 
 // ==== agent/index.d.ts ====
 import {
+  AGENT_CONFIRM_MS,
+  agentAnswer,
+  AgentAnswer,
+  AgentCallContext,
+  AgentConfirmAsk,
   AgentConfirmation,
+  AgentConfirmContext,
+  AgentConfirmResult,
   AgentContent,
   agentError,
   agentImages,
+  AgentQuestion,
   AgentResource,
   agentSurface,
   AgentSurface,
@@ -20,8 +28,10 @@ import {
   AgentTool,
   AgentToolDefinition,
   AgentToolResult,
+  ApplicationAgentParts,
   designedTheme,
   DesignThemes,
+  fillQuestion,
   JsonSchema,
   outline,
   RenderDependencies,
@@ -31,18 +41,18 @@ import {
   resourceUri,
   resultText,
   SCREEN_TOOL_NAMES,
-  ServedChannel,
+  serveApplicationAgent,
   toolSurface,
   UiHost,
   UiRefs,
   uiSurface,
   UiSurfaceOptions,
-  WAITS_UP_TO,
-  WorkerHandle
-} from "../tools.js";
+  WAITS_UP_TO
+} from "../app.js";
 import {
   UiTheme
 } from "gesso-core";
+declare const AGENT_META = "gesso/agent";
 declare const MCP_PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26'];
 interface McpServerInfo {
   name?: string;
@@ -80,7 +90,7 @@ type JsonRpcResponse = {
     message: string;
   };
 };
-declare function handleMcpMessage(surface: AgentSurfaceLike, message: unknown, info?: McpServerInfo): Promise<JsonRpcResponse | null>;
+declare function handleMcpMessage(surface: AgentSurfaceLike, message: unknown, info?: McpServerInfo, context?: AgentCallContext): Promise<JsonRpcResponse | null>;
 interface McpCaller {
   readonly session: string;
   readonly number: number;
@@ -108,6 +118,7 @@ type AgentPortRequest = {
   op: 'call';
   name: string;
   args?: Readonly<Record<string, unknown>>;
+  context?: AgentCallContext;
 } | {
   id: number;
   op: 'read';
@@ -120,7 +131,7 @@ type AgentPortResponse = {
   id: number;
   error: string;
 };
-type AgentConfirm = (request: AgentConfirmation) => boolean | Promise<boolean>;
+type AgentConfirm = (request: AgentConfirmation) => AgentConfirmResult;
 type AgentPort = Pick<MessagePort, 'postMessage' | 'onmessage'>;
 declare function serveAgentPort(port: AgentPort, makeSurface: (confirm: AgentConfirm) => AgentSurfaceLike): () => void;
 declare function remoteSurface(port: AgentPort, options?: {
@@ -177,14 +188,7 @@ declare function registerWebMcpTools(surface: AgentSurfaceLike, modelContext?: M
 declare function connectWebMcp(app: {
   openRenderPort(key: string): MessagePort | undefined;
 }, options?: WebMcpOptions): Promise<() => void>;
-declare function confirmInWindow(request: AgentConfirmation): boolean;
-interface ApplicationAgentParts {
-  readonly channels: () => readonly ServedChannel[];
-  readonly workers: () => Iterable<WorkerHandle>;
-  readonly ui: () => UiHost | undefined;
-  readonly tools?: () => readonly AgentToolDefinition[];
-}
-declare function serveApplicationAgent(port: MessagePort, parts: ApplicationAgentParts): () => void;
+declare function confirmInWindow(request: AgentConfirmation): AgentAnswer;
 interface ThemeTokens {
   readonly colors: Readonly<Record<string, string>>;
   readonly typography: Readonly<Record<string, TextStyleToken>>;
@@ -209,7 +213,10 @@ interface TextStyleToken {
 declare function themeTokens(theme: UiTheme): ThemeTokens;
 declare function formatThemeTokens(tokens: ThemeTokens, which: string): string;
 export {
+  AGENT_CONFIRM_MS,
+  AGENT_META,
   AGENT_PORT,
+  agentAnswer,
   agentError,
   agentImages,
   agentSurface,
@@ -220,6 +227,7 @@ export {
   connectWebMcp,
   designedTheme,
   DEV_AGENT_EVENTS,
+  fillQuestion,
   formatThemeTokens,
   handleMcpMessage,
   listedPrompts,
@@ -239,11 +247,17 @@ export {
   serveApplicationAgent,
   themeTokens,
   toolSurface,
+  type AgentAnswer,
+  type AgentCallContext,
+  type AgentConfirmAsk,
   type AgentConfirmation,
+  type AgentConfirmContext,
+  type AgentConfirmResult,
   type AgentContent,
   type AgentPortRequest,
   type AgentPortResponse,
   type AgentPrompt,
+  type AgentQuestion,
   type AgentResource,
   type AgentSurface,
   type AgentSurfaceLike,
@@ -274,6 +288,455 @@ export {
   uiSurface,
   validate,
   WAITS_UP_TO
+};
+// ==== app.d.ts ====
+import {
+  ChannelPort,
+  ChannelReplica,
+  ChannelToken,
+  Command,
+  CommandMap,
+  ComponentType,
+  Query
+} from "./FunctionComponent.js";
+import {
+  Observable
+} from "rxjs";
+import {
+  CanvasHost,
+  UiChild,
+  UiKeyModifiers,
+  UiNode,
+  UiSemanticsAction,
+  UiSemanticsMap,
+  UiSemanticsRecord,
+  UiSourceLocation,
+  UiTheme
+} from "gesso-core";
+type JsonSchema = {
+  readonly [keyword: string]: unknown;
+};
+interface CommandSchema {
+  readonly description?: string;
+  readonly parameters: readonly string[];
+  readonly rest?: true;
+  readonly input: JsonSchema;
+  readonly destructive?: true;
+  readonly idempotent?: true;
+  readonly confirm?: true;
+  readonly question?: string;
+  readonly hidden?: true;
+}
+interface QuerySchema {
+  readonly description?: string;
+  readonly returns?: string;
+  readonly parameters: readonly string[];
+  readonly rest?: true;
+  readonly input: JsonSchema;
+  readonly hidden?: true;
+}
+interface ChannelSchema {
+  readonly description?: string;
+  readonly view: JsonSchema;
+  readonly hidden?: readonly string[];
+  readonly internal?: true;
+  readonly commands: {
+    readonly [name: string]: CommandSchema;
+  };
+  readonly queries?: {
+    readonly [name: string]: QuerySchema;
+  };
+}
+declare function describeChannel(token: ChannelToken<object, object>, schema: ChannelSchema): void;
+declare function channelSchema(token: ChannelToken<object, object>): ChannelSchema | undefined;
+interface MessageEndpoint {
+  postMessage(message: unknown): void;
+  onmessage: ((event: {
+    data: unknown;
+  }) => void) | null;
+}
+interface PortHandshake {
+  type: 'gesso:port';
+  key: string;
+}
+declare function isPortHandshake(value: unknown): value is PortHandshake;
+interface WorkerHandle {
+  open(key: string): MessagePort;
+  readonly spawned: boolean;
+  terminate(): void;
+}
+declare const APPLICATION_WORKER: WorkerHandle;
+interface TransferTarget {
+  postMessage(message: unknown, transfer: Transferable[]): void;
+}
+declare function portHandle(endpoint: TransferTarget): WorkerHandle;
+interface HubMessage {
+  type: 'gesso:hub';
+}
+declare function isHubMessage(value: unknown): value is HubMessage;
+declare function workerHandle(factory: () => Worker): WorkerHandle;
+interface PortHost {
+  onmessage: ((event: {
+    data: unknown;
+    ports?: readonly MessagePort[];
+  }) => void) | null;
+}
+interface PortErrorMessage {
+  type: 'port:error';
+  message: string;
+}
+declare function isPortErrorMessage(value: unknown): value is PortErrorMessage;
+declare function servePorts(onPort: (key: string, port: MessagePort) => boolean, names: () => readonly string[], host?: PortHost): () => void;
+interface ChannelSource<View extends object, Commands extends object, Queries extends object = object> {
+  view: { readonly [K in keyof View]: Observable<View[K]>; };
+  commands?: Commands;
+  queries?: QueryHandlers<Queries>;
+  confirm?: ConfirmWording<Commands>;
+}
+type ConfirmWording<Commands extends object> = { readonly [K in keyof Commands]?: Commands[K] extends ((...args: infer A) => unknown) ? (...args: A) => string | AgentQuestion : never; };
+type QueryHandlers<Queries extends object> = { readonly [K in keyof Queries]: Queries[K] extends ((...args: infer A) => infer R) ? (...args: A) => R | Promise<Awaited<R>> : never; };
+declare function provide<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>, port: ChannelPort): ProvidedChannel;
+declare class ProvidedChannel {
+  private readonly token;
+  private readonly source;
+  private readonly port;
+  private readonly subscriptions;
+  private readonly previous;
+  private readonly checked;
+  private pending;
+  private readonly dirty;
+  private flushQueued;
+  private disposed;
+  private commanding;
+  private synced;
+  constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
+  private receive;
+  private runCommand;
+  private sync;
+  private publish;
+  private collectDirty;
+  private sendPending;
+  private resend;
+  private post;
+  dispose(): void;
+}
+interface ServedChannel {
+  token: {
+    name: string;
+    initial: object;
+  };
+  source: {
+    view: Record<string, Observable<unknown>>;
+    commands?: Record<string, Command>;
+    queries?: Record<string, Query>;
+    confirm?: Record<string, (...args: never[]) => string | AgentQuestion>;
+  };
+}
+declare function serve<View extends object, Commands extends object, Queries extends object = object>(token: ChannelToken<View, Commands, Queries>, source: ChannelSource<View, Commands, Queries>): ServedChannel;
+declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
+interface AgentTool {
+  readonly name: string;
+  readonly title?: string;
+  readonly description: string;
+  readonly inputSchema: JsonSchema;
+  readonly outputSchema?: JsonSchema;
+  readonly annotations: {
+    readonly title?: string;
+    readonly readOnlyHint: boolean;
+    readonly destructiveHint?: boolean;
+    readonly idempotentHint?: boolean;
+    readonly openWorldHint: false;
+  };
+  readonly _meta?: Readonly<Record<string, unknown>>;
+}
+declare const WAITS_UP_TO = "gesso/waitsUpToMs";
+interface AgentResource {
+  readonly uri: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly mimeType: 'application/json';
+}
+type AgentContent = {
+  readonly type: 'text';
+  readonly text: string;
+} | {
+  readonly type: 'image';
+  readonly data: string;
+  readonly mimeType: string;
+};
+declare function resultText(result: AgentToolResult): string;
+interface AgentToolResult {
+  readonly content: readonly AgentContent[];
+  readonly structuredContent?: Record<string, unknown>;
+  readonly isError: boolean;
+}
+interface AgentQuestion {
+  readonly title: string;
+  readonly detail?: string;
+  readonly action?: string;
+}
+interface AgentConfirmation {
+  readonly channel: string;
+  readonly command: string;
+  readonly description?: string;
+  readonly arguments: Readonly<Record<string, unknown>>;
+  readonly destructive: boolean;
+  readonly question: AgentQuestion;
+  readonly agent?: string;
+}
+type AgentAnswer = 'approved' | 'declined' | 'unavailable' | {
+  readonly unavailable: string;
+};
+type AgentConfirmResult = AgentAnswer | boolean | Promise<AgentAnswer | boolean>;
+declare function agentAnswer(answer: AgentAnswer | boolean): AgentAnswer;
+interface AgentCallContext {
+  readonly agent?: string;
+}
+interface AgentSurfaceOptions {
+  confirm?: (request: AgentConfirmation) => AgentConfirmResult;
+  quietMs?: number;
+  settleMs?: number;
+}
+interface AgentSurfaceLike {
+  tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
+  call(name: string, args: Readonly<Record<string, unknown>> | undefined, context?: AgentCallContext): Promise<AgentToolResult>;
+  resources(): readonly AgentResource[] | Promise<readonly AgentResource[]>;
+  read(uri: string): Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>;
+  dispose?(): void;
+}
+interface AgentSurface extends AgentSurfaceLike {
+  tools(): readonly AgentTool[];
+  call(name: string, args: Readonly<Record<string, unknown>> | undefined, context?: AgentCallContext): Promise<AgentToolResult>;
+  resources(): readonly AgentResource[];
+  read(uri: string): Record<string, unknown> | undefined;
+  dispose(): void;
+}
+declare function agentSurface(channels: readonly ServedChannel[], options?: AgentSurfaceOptions): AgentSurface;
+declare function fillQuestion(template: string, input: Readonly<Record<string, unknown>>): string;
+declare function resourceUri(channel: string): string;
+type AgentThemeName = 'app' | 'light' | 'dark';
+interface DesignThemes {
+  readonly light?: UiTheme;
+  readonly dark?: UiTheme;
+}
+declare function designedTheme(asked: AgentThemeName | undefined, themes: DesignThemes, appTheme: () => UiTheme | undefined): {
+  readonly theme: UiTheme;
+  readonly name: AgentThemeName;
+};
+declare class ChannelRegistry {
+  private readonly replicas;
+  attach<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, port: ChannelPort): ChannelReplica<View, Commands>;
+  get<View extends object, Commands extends object>(token: ChannelToken<View, Commands>): ChannelReplica<View, Commands>;
+  has(token: ChannelToken<object, CommandMap>): boolean;
+  all(): ChannelReplica<object, CommandMap>[];
+  dispose(): void;
+}
+declare class ServiceRegistry {
+  private readonly services;
+  private readonly parent;
+  constructor(parent?: ServiceRegistry);
+  register<T extends object>(ServiceClass: new () => T): T;
+  adopt(ServiceClass: new () => object): boolean;
+  get<T extends object>(ServiceClass: new () => T): T;
+  has(ServiceClass: Function): boolean;
+}
+interface ComponentElement<P = Record<string, unknown>> {
+  readonly kind: 'component';
+  readonly tag: string;
+  readonly component: ComponentType;
+  readonly props: P;
+  readonly key?: string | number;
+  readonly source?: UiSourceLocation;
+}
+declare function isComponentElement(value: unknown): value is ComponentElement;
+type FrameworkChild = UiChild | ComponentElement;
+type ColorScheme = 'light' | 'dark';
+type ColorSchemePreference = ColorScheme | 'auto';
+declare function observeColorScheme(onChange: (scheme: ColorScheme) => void): () => void;
+interface PictureCanvas extends CanvasHost {
+  convertToBlob(options?: {
+    type?: string;
+  }): Promise<Blob>;
+}
+interface RenderFrameOptions {
+  readonly width: number;
+  readonly height?: number;
+  readonly scale?: number;
+  readonly theme?: UiTheme;
+  readonly maxHeight?: number;
+  readonly channels?: ChannelRegistry;
+  readonly services?: ServiceRegistry;
+  readonly colorScheme?: ColorScheme;
+  readonly settleMs?: number;
+  readonly claims?: (error: unknown) => boolean;
+  readonly createCanvas?: (width: number, height: number) => PictureCanvas;
+}
+interface RenderedFrame {
+  readonly png: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+  readonly clipped: boolean;
+  readonly empty: boolean;
+  readonly blank: boolean;
+  readonly errors: readonly string[];
+}
+declare function renderFrame(root: FrameworkChild, options: RenderFrameOptions): Promise<RenderedFrame>;
+interface RenderRequest {
+  readonly module: string;
+  readonly export?: string;
+  readonly inputs?: Readonly<Record<string, unknown>>;
+  readonly width: number;
+  readonly height?: number;
+  readonly scale?: number;
+  readonly theme?: AgentThemeName;
+}
+interface RenderDependencies {
+  load(path: string): Promise<Record<string, unknown>>;
+  appTheme(): UiTheme | undefined;
+  readonly channels?: ChannelRegistry;
+  readonly services?: ServiceRegistry;
+  readonly themes?: () => DesignThemes;
+  readonly frame?: Pick<RenderFrameOptions, 'createCanvas' | 'settleMs'>;
+}
+declare function renderModule(request: RenderRequest, deps: RenderDependencies): Promise<AgentToolResult>;
+interface UiHost {
+  semanticsTree(): UiSemanticsMap;
+  focusedNodeId(): string | null;
+  applySemanticsAction(action: UiSemanticsAction): void;
+  key(key: string, modifiers: UiKeyModifiers): void;
+  flush(): void;
+  theme?(at?: string): UiTheme | undefined;
+  designThemes?(): DesignThemes;
+  render?(request: RenderRequest): Promise<AgentToolResult>;
+  agentContext?(): {
+    readonly hidden: boolean;
+    inject<T extends object>(service: new () => T): T;
+    readonly environment: UiNode | null;
+  };
+}
+interface UiSurfaceOptions {
+  quietMs?: number;
+  settleMs?: number;
+}
+declare const SCREEN_TOOL_NAMES: readonly string[];
+declare class UiRefs {
+  private readonly byId;
+  private readonly byRef;
+  refOf(id: string): string;
+  idOf(ref: string): string;
+}
+declare function uiSurface(host: () => UiHost | undefined, options?: UiSurfaceOptions): AgentSurface;
+declare function outline(tree: UiSemanticsMap, focused: string | null, refs?: UiRefs): string;
+declare function resolveTarget(tree: UiSemanticsMap, args: Readonly<Record<string, unknown>>, refs?: UiRefs): UiSemanticsRecord | string;
+interface AgentToolDefinition {
+  readonly name: string;
+  readonly title?: string;
+  readonly description: string;
+  readonly inputSchema: JsonSchema;
+  readonly readOnly?: boolean;
+  readonly destructive?: boolean;
+  readonly idempotent?: boolean;
+  readonly waitsUpToMs?: number;
+  run(args: Readonly<Record<string, unknown>>): AgentToolResult | Promise<AgentToolResult>;
+}
+declare function agentText(text: string, structured?: Record<string, unknown>): AgentToolResult;
+declare function agentError(text: string): AgentToolResult;
+declare function agentImages(text: string, pictures: readonly Uint8Array[], structured?: Record<string, unknown>): AgentToolResult;
+declare function toolSurface(definitions: () => readonly AgentToolDefinition[]): AgentSurfaceLike;
+interface ApplicationAgentParts {
+  readonly channels: () => readonly ServedChannel[];
+  readonly workers: () => Iterable<WorkerHandle>;
+  readonly ui: () => UiHost | undefined;
+  readonly tools?: () => readonly AgentToolDefinition[];
+  readonly confirm?: () => AgentConfirmAsk | undefined;
+}
+interface AgentConfirmContext {
+  inject<T extends object>(service: new () => T): T;
+  readonly environment: UiNode | null;
+  readonly signal: AbortSignal;
+}
+type AgentConfirmAsk = (request: AgentConfirmation, context: AgentConfirmContext) => AgentConfirmResult;
+declare const AGENT_CONFIRM_MS = 110000;
+declare function serveApplicationAgent(port: MessagePort, parts: ApplicationAgentParts): () => void;
+export {
+  AGENT_CONFIRM_MS,
+  agentAnswer,
+  AgentAnswer,
+  AgentCallContext,
+  AgentConfirmAsk,
+  AgentConfirmation,
+  AgentConfirmContext,
+  AgentConfirmResult,
+  AgentContent,
+  agentError,
+  agentImages,
+  AgentQuestion,
+  AgentResource,
+  agentSurface,
+  AgentSurface,
+  AgentSurfaceLike,
+  AgentSurfaceOptions,
+  agentText,
+  AgentThemeName,
+  AgentTool,
+  AgentToolDefinition,
+  AgentToolResult,
+  APPLICATION_WORKER,
+  ApplicationAgentParts,
+  ChannelRegistry,
+  channelSchema,
+  ChannelSchema,
+  ChannelSource,
+  ColorScheme,
+  ColorSchemePreference,
+  CommandSchema,
+  ComponentElement,
+  ConfirmWording,
+  describeChannel,
+  designedTheme,
+  DesignThemes,
+  fillQuestion,
+  FrameworkChild,
+  isComponentElement,
+  isHubMessage,
+  isPortErrorMessage,
+  isPortHandshake,
+  JsonSchema,
+  MessageEndpoint,
+  observeColorScheme,
+  outline,
+  PictureCanvas,
+  portHandle,
+  PortHandshake,
+  PortHost,
+  provide,
+  ProvidedChannel,
+  QueryHandlers,
+  QuerySchema,
+  RenderDependencies,
+  RenderedFrame,
+  renderFrame,
+  RenderFrameOptions,
+  renderModule,
+  RenderRequest,
+  resolveTarget,
+  resourceUri,
+  resultText,
+  SCREEN_TOOL_NAMES,
+  serve,
+  serveApplicationAgent,
+  serveChannels,
+  ServedChannel,
+  servePorts,
+  ServiceRegistry,
+  toolSurface,
+  UiHost,
+  UiRefs,
+  uiSurface,
+  UiSurfaceOptions,
+  WAITS_UP_TO,
+  workerHandle,
+  WorkerHandle
 };
 // ==== FunctionComponent.d.ts ====
 import {
@@ -520,6 +983,7 @@ import {
   ReadableCell
 } from "./FunctionComponent.js";
 import {
+  AgentConfirmAsk,
   AgentConfirmation,
   AgentToolDefinition,
   ChannelRegistry,
@@ -532,7 +996,7 @@ import {
   ServiceRegistry,
   UiHost,
   WorkerHandle
-} from "./tools.js";
+} from "./app.js";
 import {
   BehaviorSubject,
   Observable,
@@ -1849,6 +2313,8 @@ declare class GessoRuntime {
   snapshotTree(): UiTreeSnapshot;
   private sendTree;
   themeAt(id?: string): UiTheme | undefined;
+  contentNode(): UiNode | undefined;
+  isVisible(): boolean;
   private previewProperty;
   private endPreviews;
   inspectNodeById(id: string): UiNodeReport | null;
@@ -2651,6 +3117,7 @@ declare class GessoAppBuilder {
   private readonly channelRegistrations;
   private readonly serviceRegistrations;
   private readonly agentTools;
+  private agentConfirm;
   private frameListener;
   private inspectListener;
   private devtoolsListener;
@@ -2674,6 +3141,7 @@ declare class GessoAppBuilder {
   }): this;
   useService(ServiceClass: new () => object): this;
   useAgentTools(tools: readonly AgentToolDefinition[]): this;
+  useAgentConfirm(ask: AgentConfirmAsk): this;
   useRoutes(routes: RouterRoutes): this;
   useMedia(media: MediaOptions): this;
   useFonts(families: readonly FontFamilyDeclaration[]): this;
@@ -3342,6 +3810,7 @@ declare class RenderWorkerApp {
   private renderThemes;
   private loadModule;
   private readonly agentTools;
+  private agentConfirm;
   private readonly errorListeners;
   private clock;
   private channels;
@@ -3359,6 +3828,7 @@ declare class RenderWorkerApp {
   }): this;
   useService(ServiceClass: new () => object): this;
   useAgentTools(tools: readonly AgentToolDefinition[]): this;
+  useAgentConfirm(ask: AgentConfirmAsk): this;
   onError(listener: (error: RenderWorkerError) => void): this;
   useRoutes(routes: RouterRoutes): this;
   useMedia(media: MediaOptions): this;
@@ -3770,6 +4240,7 @@ import {
   ColorSchemePreference,
   CommandSchema,
   ComponentElement,
+  ConfirmWording,
   describeChannel,
   FrameworkChild,
   isComponentElement,
@@ -3797,7 +4268,7 @@ import {
   ServiceRegistry,
   workerHandle,
   WorkerHandle
-} from "./tools.js";
+} from "./app.js";
 import {
   ActionCause,
   ActionEntry,
@@ -4265,6 +4736,7 @@ export {
   type ComponentProps,
   type ComponentType,
   type ComputedOptions,
+  type ConfirmWording,
   type ConsoleEntry,
   type ControlledOptions,
   type ControlledValue,
@@ -4547,7 +5019,7 @@ export {
 import {
   ColorSchemePreference,
   ServedChannel
-} from "../tools.js";
+} from "../app.js";
 import {
   AppLogicEndpoint
 } from "../index.js";
@@ -4619,402 +5091,6 @@ export {
   type RemoteChannelHost,
   type RemoteChannelHostOptions
 };
-// ==== tools.d.ts ====
-import {
-  ChannelPort,
-  ChannelReplica,
-  ChannelToken,
-  Command,
-  CommandMap,
-  ComponentType,
-  Query
-} from "./FunctionComponent.js";
-import {
-  Observable
-} from "rxjs";
-import {
-  CanvasHost,
-  UiChild,
-  UiKeyModifiers,
-  UiSemanticsAction,
-  UiSemanticsMap,
-  UiSemanticsRecord,
-  UiSourceLocation,
-  UiTheme
-} from "gesso-core";
-type JsonSchema = {
-  readonly [keyword: string]: unknown;
-};
-interface CommandSchema {
-  readonly description?: string;
-  readonly parameters: readonly string[];
-  readonly rest?: true;
-  readonly input: JsonSchema;
-  readonly destructive?: true;
-  readonly idempotent?: true;
-  readonly confirm?: true;
-  readonly hidden?: true;
-}
-interface QuerySchema {
-  readonly description?: string;
-  readonly returns?: string;
-  readonly parameters: readonly string[];
-  readonly rest?: true;
-  readonly input: JsonSchema;
-  readonly hidden?: true;
-}
-interface ChannelSchema {
-  readonly description?: string;
-  readonly view: JsonSchema;
-  readonly hidden?: readonly string[];
-  readonly internal?: true;
-  readonly commands: {
-    readonly [name: string]: CommandSchema;
-  };
-  readonly queries?: {
-    readonly [name: string]: QuerySchema;
-  };
-}
-declare function describeChannel(token: ChannelToken<object, object>, schema: ChannelSchema): void;
-declare function channelSchema(token: ChannelToken<object, object>): ChannelSchema | undefined;
-interface MessageEndpoint {
-  postMessage(message: unknown): void;
-  onmessage: ((event: {
-    data: unknown;
-  }) => void) | null;
-}
-interface PortHandshake {
-  type: 'gesso:port';
-  key: string;
-}
-declare function isPortHandshake(value: unknown): value is PortHandshake;
-interface WorkerHandle {
-  open(key: string): MessagePort;
-  readonly spawned: boolean;
-  terminate(): void;
-}
-declare const APPLICATION_WORKER: WorkerHandle;
-interface TransferTarget {
-  postMessage(message: unknown, transfer: Transferable[]): void;
-}
-declare function portHandle(endpoint: TransferTarget): WorkerHandle;
-interface HubMessage {
-  type: 'gesso:hub';
-}
-declare function isHubMessage(value: unknown): value is HubMessage;
-declare function workerHandle(factory: () => Worker): WorkerHandle;
-interface PortHost {
-  onmessage: ((event: {
-    data: unknown;
-    ports?: readonly MessagePort[];
-  }) => void) | null;
-}
-interface PortErrorMessage {
-  type: 'port:error';
-  message: string;
-}
-declare function isPortErrorMessage(value: unknown): value is PortErrorMessage;
-declare function servePorts(onPort: (key: string, port: MessagePort) => boolean, names: () => readonly string[], host?: PortHost): () => void;
-interface ChannelSource<View extends object, Commands extends object, Queries extends object = object> {
-  view: { readonly [K in keyof View]: Observable<View[K]>; };
-  commands?: Commands;
-  queries?: QueryHandlers<Queries>;
-}
-type QueryHandlers<Queries extends object> = { readonly [K in keyof Queries]: Queries[K] extends ((...args: infer A) => infer R) ? (...args: A) => R | Promise<Awaited<R>> : never; };
-declare function provide<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>, port: ChannelPort): ProvidedChannel;
-declare class ProvidedChannel {
-  private readonly token;
-  private readonly source;
-  private readonly port;
-  private readonly subscriptions;
-  private readonly previous;
-  private readonly checked;
-  private pending;
-  private readonly dirty;
-  private flushQueued;
-  private disposed;
-  private commanding;
-  private synced;
-  constructor(token: ChannelToken<object, CommandMap>, source: ChannelSource<object, CommandMap>, port: ChannelPort);
-  private receive;
-  private runCommand;
-  private sync;
-  private publish;
-  private collectDirty;
-  private sendPending;
-  private resend;
-  private post;
-  dispose(): void;
-}
-interface ServedChannel {
-  token: {
-    name: string;
-    initial: object;
-  };
-  source: {
-    view: Record<string, Observable<unknown>>;
-    commands?: Record<string, Command>;
-    queries?: Record<string, Query>;
-  };
-}
-declare function serve<View extends object, Commands extends object, Queries extends object = object>(token: ChannelToken<View, Commands, Queries>, source: ChannelSource<View, Commands, Queries>): ServedChannel;
-declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
-interface AgentTool {
-  readonly name: string;
-  readonly title?: string;
-  readonly description: string;
-  readonly inputSchema: JsonSchema;
-  readonly outputSchema?: JsonSchema;
-  readonly annotations: {
-    readonly title?: string;
-    readonly readOnlyHint: boolean;
-    readonly destructiveHint?: boolean;
-    readonly idempotentHint?: boolean;
-    readonly openWorldHint: false;
-  };
-  readonly _meta?: Readonly<Record<string, unknown>>;
-}
-declare const WAITS_UP_TO = "gesso/waitsUpToMs";
-interface AgentResource {
-  readonly uri: string;
-  readonly name: string;
-  readonly description?: string;
-  readonly mimeType: 'application/json';
-}
-type AgentContent = {
-  readonly type: 'text';
-  readonly text: string;
-} | {
-  readonly type: 'image';
-  readonly data: string;
-  readonly mimeType: string;
-};
-declare function resultText(result: AgentToolResult): string;
-interface AgentToolResult {
-  readonly content: readonly AgentContent[];
-  readonly structuredContent?: Record<string, unknown>;
-  readonly isError: boolean;
-}
-interface AgentConfirmation {
-  readonly channel: string;
-  readonly command: string;
-  readonly description?: string;
-  readonly arguments: Readonly<Record<string, unknown>>;
-  readonly destructive: boolean;
-}
-interface AgentSurfaceOptions {
-  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
-  quietMs?: number;
-  settleMs?: number;
-}
-interface AgentSurfaceLike {
-  tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
-  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
-  resources(): readonly AgentResource[] | Promise<readonly AgentResource[]>;
-  read(uri: string): Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>;
-  dispose?(): void;
-}
-interface AgentSurface extends AgentSurfaceLike {
-  tools(): readonly AgentTool[];
-  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
-  resources(): readonly AgentResource[];
-  read(uri: string): Record<string, unknown> | undefined;
-  dispose(): void;
-}
-declare function agentSurface(channels: readonly ServedChannel[], options?: AgentSurfaceOptions): AgentSurface;
-declare function resourceUri(channel: string): string;
-type AgentThemeName = 'app' | 'light' | 'dark';
-interface DesignThemes {
-  readonly light?: UiTheme;
-  readonly dark?: UiTheme;
-}
-declare function designedTheme(asked: AgentThemeName | undefined, themes: DesignThemes, appTheme: () => UiTheme | undefined): {
-  readonly theme: UiTheme;
-  readonly name: AgentThemeName;
-};
-declare class ChannelRegistry {
-  private readonly replicas;
-  attach<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, port: ChannelPort): ChannelReplica<View, Commands>;
-  get<View extends object, Commands extends object>(token: ChannelToken<View, Commands>): ChannelReplica<View, Commands>;
-  has(token: ChannelToken<object, CommandMap>): boolean;
-  all(): ChannelReplica<object, CommandMap>[];
-  dispose(): void;
-}
-declare class ServiceRegistry {
-  private readonly services;
-  private readonly parent;
-  constructor(parent?: ServiceRegistry);
-  register<T extends object>(ServiceClass: new () => T): T;
-  adopt(ServiceClass: new () => object): boolean;
-  get<T extends object>(ServiceClass: new () => T): T;
-  has(ServiceClass: Function): boolean;
-}
-interface ComponentElement<P = Record<string, unknown>> {
-  readonly kind: 'component';
-  readonly tag: string;
-  readonly component: ComponentType;
-  readonly props: P;
-  readonly key?: string | number;
-  readonly source?: UiSourceLocation;
-}
-declare function isComponentElement(value: unknown): value is ComponentElement;
-type FrameworkChild = UiChild | ComponentElement;
-type ColorScheme = 'light' | 'dark';
-type ColorSchemePreference = ColorScheme | 'auto';
-declare function observeColorScheme(onChange: (scheme: ColorScheme) => void): () => void;
-interface PictureCanvas extends CanvasHost {
-  convertToBlob(options?: {
-    type?: string;
-  }): Promise<Blob>;
-}
-interface RenderFrameOptions {
-  readonly width: number;
-  readonly height?: number;
-  readonly scale?: number;
-  readonly theme?: UiTheme;
-  readonly maxHeight?: number;
-  readonly channels?: ChannelRegistry;
-  readonly services?: ServiceRegistry;
-  readonly colorScheme?: ColorScheme;
-  readonly settleMs?: number;
-  readonly claims?: (error: unknown) => boolean;
-  readonly createCanvas?: (width: number, height: number) => PictureCanvas;
-}
-interface RenderedFrame {
-  readonly png: Uint8Array;
-  readonly width: number;
-  readonly height: number;
-  readonly clipped: boolean;
-  readonly empty: boolean;
-  readonly blank: boolean;
-  readonly errors: readonly string[];
-}
-declare function renderFrame(root: FrameworkChild, options: RenderFrameOptions): Promise<RenderedFrame>;
-interface RenderRequest {
-  readonly module: string;
-  readonly export?: string;
-  readonly inputs?: Readonly<Record<string, unknown>>;
-  readonly width: number;
-  readonly height?: number;
-  readonly scale?: number;
-  readonly theme?: AgentThemeName;
-}
-interface RenderDependencies {
-  load(path: string): Promise<Record<string, unknown>>;
-  appTheme(): UiTheme | undefined;
-  readonly channels?: ChannelRegistry;
-  readonly services?: ServiceRegistry;
-  readonly themes?: () => DesignThemes;
-  readonly frame?: Pick<RenderFrameOptions, 'createCanvas' | 'settleMs'>;
-}
-declare function renderModule(request: RenderRequest, deps: RenderDependencies): Promise<AgentToolResult>;
-interface UiHost {
-  semanticsTree(): UiSemanticsMap;
-  focusedNodeId(): string | null;
-  applySemanticsAction(action: UiSemanticsAction): void;
-  key(key: string, modifiers: UiKeyModifiers): void;
-  flush(): void;
-  theme?(at?: string): UiTheme | undefined;
-  designThemes?(): DesignThemes;
-  render?(request: RenderRequest): Promise<AgentToolResult>;
-}
-interface UiSurfaceOptions {
-  quietMs?: number;
-  settleMs?: number;
-}
-declare const SCREEN_TOOL_NAMES: readonly string[];
-declare class UiRefs {
-  private readonly byId;
-  private readonly byRef;
-  refOf(id: string): string;
-  idOf(ref: string): string;
-}
-declare function uiSurface(host: () => UiHost | undefined, options?: UiSurfaceOptions): AgentSurface;
-declare function outline(tree: UiSemanticsMap, focused: string | null, refs?: UiRefs): string;
-declare function resolveTarget(tree: UiSemanticsMap, args: Readonly<Record<string, unknown>>, refs?: UiRefs): UiSemanticsRecord | string;
-interface AgentToolDefinition {
-  readonly name: string;
-  readonly title?: string;
-  readonly description: string;
-  readonly inputSchema: JsonSchema;
-  readonly readOnly?: boolean;
-  readonly destructive?: boolean;
-  readonly idempotent?: boolean;
-  readonly waitsUpToMs?: number;
-  run(args: Readonly<Record<string, unknown>>): AgentToolResult | Promise<AgentToolResult>;
-}
-declare function agentText(text: string, structured?: Record<string, unknown>): AgentToolResult;
-declare function agentError(text: string): AgentToolResult;
-declare function agentImages(text: string, pictures: readonly Uint8Array[], structured?: Record<string, unknown>): AgentToolResult;
-declare function toolSurface(definitions: () => readonly AgentToolDefinition[]): AgentSurfaceLike;
-export {
-  AgentConfirmation,
-  AgentContent,
-  agentError,
-  agentImages,
-  AgentResource,
-  agentSurface,
-  AgentSurface,
-  AgentSurfaceLike,
-  AgentSurfaceOptions,
-  agentText,
-  AgentThemeName,
-  AgentTool,
-  AgentToolDefinition,
-  AgentToolResult,
-  APPLICATION_WORKER,
-  ChannelRegistry,
-  channelSchema,
-  ChannelSchema,
-  ChannelSource,
-  ColorScheme,
-  ColorSchemePreference,
-  CommandSchema,
-  ComponentElement,
-  describeChannel,
-  designedTheme,
-  DesignThemes,
-  FrameworkChild,
-  isComponentElement,
-  isHubMessage,
-  isPortErrorMessage,
-  isPortHandshake,
-  JsonSchema,
-  MessageEndpoint,
-  observeColorScheme,
-  outline,
-  PictureCanvas,
-  portHandle,
-  PortHandshake,
-  PortHost,
-  provide,
-  ProvidedChannel,
-  QueryHandlers,
-  QuerySchema,
-  RenderDependencies,
-  RenderedFrame,
-  renderFrame,
-  RenderFrameOptions,
-  renderModule,
-  RenderRequest,
-  resolveTarget,
-  resourceUri,
-  resultText,
-  SCREEN_TOOL_NAMES,
-  serve,
-  serveChannels,
-  ServedChannel,
-  servePorts,
-  ServiceRegistry,
-  toolSurface,
-  UiHost,
-  UiRefs,
-  uiSurface,
-  UiSurfaceOptions,
-  WAITS_UP_TO,
-  workerHandle,
-  WorkerHandle
-};
 // ==== worker/index.d.ts ====
 import {
   channel,
@@ -5049,7 +5125,7 @@ import {
   serveChannels,
   ServedChannel,
   servePorts
-} from "../tools.js";
+} from "../app.js";
 import {
   classifyStorageError,
   computed,

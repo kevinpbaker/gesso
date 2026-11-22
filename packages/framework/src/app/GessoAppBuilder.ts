@@ -12,6 +12,7 @@ import type { ServedChannel } from '../channel/serveChannels';
 import { AGENT_PORT } from '../agent/remote';
 import type { AgentConfirmation } from '../agent/AgentSurface';
 import type { AgentToolDefinition } from '../agent/tools';
+import type { AgentConfirmAsk } from '../agent/app';
 
 /** What `useWebMcp` takes besides a boolean: the app's own way to ask the person. */
 export interface WebMcpChoice {
@@ -37,6 +38,8 @@ export class GessoAppBuilder {
   private readonly serviceRegistrations: (new () => object)[] = [];
   /** The application's own agent tools (`useAgentTools`). */
   private readonly agentTools: AgentToolDefinition[] = [];
+  /** How the application asks the person itself (`useAgentConfirm`). */
+  private agentConfirm: AgentConfirmAsk | undefined;
   private frameListener: ((metrics: FrameMetrics) => void) | undefined;
   private inspectListener: ((report: UiNodeReport | null) => void) | undefined;
   private devtoolsListener: ((event: DevtoolsEvent) => void) | null = null;
@@ -99,6 +102,22 @@ export class GessoAppBuilder {
   /** Offers an agent tools of the application's own; see `renderRoot(...).useAgentTools`. */
   useAgentTools(tools: readonly AgentToolDefinition[]): this {
     this.agentTools.push(...tools);
+    return this;
+  }
+
+  /**
+   * Asks the person on the application's own screen, in its own theme,
+   * before an AI agent's `@confirm` command is sent, rather than with
+   * the browser's dialog. `gesso-components`' `agentConfirmDialog()` is
+   * one ready to use; see `AgentConfirmAsk` to write another.
+   *
+   *   renderRoot(App).useAgentConfirm(agentConfirmDialog());
+   *
+   * A hidden window cannot show it, and the agent is told nobody could
+   * be asked; so it is when nobody answers within `AGENT_CONFIRM_MS`.
+   */
+  useAgentConfirm(ask: AgentConfirmAsk): this {
+    this.agentConfirm = ask;
     return this;
   }
 
@@ -355,7 +374,8 @@ export class GessoAppBuilder {
             ),
         workers: () => this.channelHandle?.workers ?? [],
         ui: () => (this.app === app ? app.uiHost() : undefined),
-        tools: () => this.agentTools
+        tools: () => this.agentTools,
+        confirm: () => this.agentConfirm
       })
     );
     return pair.port1;

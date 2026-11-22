@@ -1,6 +1,6 @@
 import type { Observable } from 'rxjs';
 
-import { agentSurface } from '../agent/AgentSurface';
+import { agentSurface, type AgentQuestion } from '../agent/AgentSurface';
 import { AGENT_PORT, serveAgentPort } from '../agent/remote';
 import { servePorts, type PortHost } from '../worker/WorkerPorts';
 import { provide, type ChannelSource, ProvidedChannel } from './provide';
@@ -21,6 +21,7 @@ export interface ServedChannel {
     view: Record<string, Observable<unknown>>;
     commands?: Record<string, Command>;
     queries?: Record<string, Query>;
+    confirm?: Record<string, (...args: never[]) => string | AgentQuestion>;
   };
 }
 

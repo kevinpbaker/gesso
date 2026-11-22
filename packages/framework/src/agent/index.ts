@@ -1,8 +1,14 @@
 export {
+  agentAnswer,
   agentSurface,
+  fillQuestion,
   resourceUri,
   resultText,
+  type AgentAnswer,
+  type AgentCallContext,
   type AgentConfirmation,
+  type AgentConfirmResult,
+  type AgentQuestion,
   type AgentContent,
   type AgentResource,
   type AgentSurface,
@@ -13,6 +19,7 @@ export {
   WAITS_UP_TO
 } from './AgentSurface';
 export {
+  AGENT_META,
   handleMcpMessage,
   listedPrompts,
   mcpHandler,
@@ -50,7 +57,13 @@ export {
   type WebMcpOptions
 } from './webmcp';
 export { outline, resolveTarget, SCREEN_TOOL_NAMES, UiRefs, uiSurface, type UiHost, type UiSurfaceOptions } from './ui';
-export { serveApplicationAgent, type ApplicationAgentParts } from './app';
+export {
+  AGENT_CONFIRM_MS,
+  serveApplicationAgent,
+  type AgentConfirmAsk,
+  type AgentConfirmContext,
+  type ApplicationAgentParts
+} from './app';
 export { designedTheme, type AgentThemeName, type DesignThemes } from './designedTheme';
 export { renderModule, type RenderDependencies, type RenderRequest } from './render';
 export { formatThemeTokens, themeTokens, type TextStyleToken, type ThemeTokens } from './tokens';

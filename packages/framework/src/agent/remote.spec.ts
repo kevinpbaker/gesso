@@ -103,10 +103,12 @@ describe('a command that needs a person, across a port', () => {
     expect(asked).toEqual(['lists.clear', 'lists.clear']);
   });
 
-  it('takes no way to ask as a no', async () => {
+  it('takes no way to ask as nobody asked, which is not a no', async () => {
     const app = lists();
     const result = await across([app.served]).call('lists_clear', {});
-    expect(resultText(result)).toContain('The person declined');
+    expect(resultText(result)).toContain(
+      'Nobody could be asked to approve lists.clear: this application has no way to ask the person here. The person did not decline it.'
+    );
     expect(app.size.value).toBe(3);
   });
 });

@@ -1608,16 +1608,31 @@ export class GessoRuntime {
    * the root is built, or for an id the tree does not hold.
    */
   themeAt(id?: string): UiTheme | undefined {
-    let node = id === undefined ? this.appRoot : this.graph.getNode(id);
+    const node = id === undefined ? this.contentNode() : this.graph.getNode(id);
     if (node === undefined) {
       return undefined;
     }
-    if (id === undefined) {
-      while (node.firstChild !== null && node.firstChild === node.lastChild) {
-        node = node.firstChild;
-      }
-    }
     return (node.environment ?? this.graph.buildNodeEnvironment(node)).get(UiEnvironmentKeys.theme);
+  }
+
+  /**
+   * The application's outermost content: its root, and down through
+   * every node with exactly one child, past the wrappers an application
+   * usually puts its theme on. What something drawn over the whole app,
+   * a question to the person, takes its theme from. Undefined before the
+   * root is built.
+   */
+  contentNode(): UiNode | undefined {
+    let node = this.appRoot;
+    while (node !== undefined && node.firstChild !== null && node.firstChild === node.lastChild) {
+      node = node.firstChild;
+    }
+    return node;
+  }
+
+  /** Whether the shell last said the window is visible (`setVisible`). A hidden one draws no frames. */
+  isVisible(): boolean {
+    return this.visible;
   }
 
   /**

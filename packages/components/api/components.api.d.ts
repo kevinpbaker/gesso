@@ -50,6 +50,9 @@ import {
   ResourceStatus,
   RouteTarget
 } from "gesso-framework";
+import {
+  AgentConfirmAsk
+} from "gesso-framework/agent";
 type Keymap = Readonly<Record<string, (event: UiKeyboardEvent) => void>>;
 declare function keymap(bindings: Keymap): (event: UiKeyboardEvent) => void;
 declare function quantize(value: number, min: number, max: number, step: number): number;
@@ -989,6 +992,11 @@ interface DialogProps {
   width?: number;
 }
 declare function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiChild;
+interface AgentConfirmDialogOptions {
+  readonly cancelLabel?: string;
+  readonly width?: number;
+}
+declare function agentConfirmDialog(options?: AgentConfirmDialogOptions): AgentConfirmAsk;
 type DrawerSide = 'start' | 'end' | 'top' | 'bottom';
 interface DrawerProps {
   open?: boolean;
@@ -1921,6 +1929,7 @@ export {
   Accordion,
   addDays,
   addMonths,
+  agentConfirmDialog,
   Alert,
   allOf,
   Avatar,
@@ -2069,6 +2078,7 @@ export {
   Tree,
   type AccordionProps,
   type AccordionSection,
+  type AgentConfirmDialogOptions,
   type AlertProps,
   type AlertTone,
   type AsyncValidator,

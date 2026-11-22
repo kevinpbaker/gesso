@@ -61,6 +61,11 @@ export const Catalog = defineChannel('catalog', {
     addToCart(id: string, quantity?: number): void;
     /** @idempotent */
     select(...ids: string[]): void;
+    /**
+     * Empties the basket.
+     * @confirm Empty the basket of {count} things?
+     */
+    empty(count: number): void;
     /** @hidden */
     debugReset(): void;
     /** A picture of the product, as the file it came from. */
@@ -324,6 +329,12 @@ describe('a contract, read by the checker', () => {
     expect(select.idempotent).toBe(true);
     expect(select.input.properties).toEqual({ ids: { type: 'array', items: { type: 'string' } } });
     expect(debugReset).toMatchObject({ parameters: [], hidden: true });
+    // A bare @confirm asks nothing in particular; with text, the text is the question.
+    expect(addToCart.question).toBeUndefined();
+    expect(catalog.channels.get('Catalog')!.commands.empty).toMatchObject({
+      confirm: true,
+      question: 'Empty the basket of {count} things?'
+    });
   });
 
   it('lets a command carry bytes, described as base64 tagged with what they become', () => {

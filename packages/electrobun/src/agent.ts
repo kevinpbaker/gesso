@@ -5,6 +5,7 @@ import {
   mcpHandler,
   type AgentSurfaceLike,
   type AgentConfirmation,
+  type AgentConfirmResult,
   type AgentSurface,
   type McpHandlerOptions
 } from 'gesso-framework/agent';
@@ -59,7 +60,7 @@ export interface DesktopAgentOptions extends Omit<McpHandlerOptions, 'allowedOri
    * it such a command is refused. `messageBoxConfirm` makes one from
    * Electrobun's native dialog.
    */
-  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  confirm?: (request: AgentConfirmation) => AgentConfirmResult;
   /** The server to start. Defaults to the runtime's `Bun.serve`. */
   serve?: DesktopServe;
   /**
@@ -150,10 +151,11 @@ export type ShowMessageBox = (options: {
  * because Electrobun is a toolchain a project is projected into, not a
  * package this one can depend on.
  *
- * Everything the person needs to decide is in `message`, the command's
- * description and its arguments included, because macOS shows no
- * `detail`: a dialog that asked there showed only "wants to
- * createBranch in workspace", with nothing to say which branch.
+ * Everything the person needs to decide is in `message`: the question
+ * and its detail as the application worded them (`AgentConfirmation.question`),
+ * and which agent asks, because macOS shows no `detail`: a dialog that
+ * asked there showed only "wants to createBranch in workspace", with
+ * nothing to say which branch.
  *
  * Decline is the first button. macOS makes the first button the
  * default, whatever `defaultId` says, so with Allow first, Enter
@@ -162,19 +164,18 @@ export type ShowMessageBox = (options: {
  */
 export function messageBoxConfirm(showMessageBox: ShowMessageBox): (request: AgentConfirmation) => Promise<boolean> {
   return async request => {
-    const argumentLines = Object.entries(request.arguments).map(([name, value]) => `${name}: ${JSON.stringify(value)}`);
     const message = [
-      `An AI agent wants to ${request.command} in ${request.channel}.${request.destructive ? ' This cannot be undone.' : ''}`,
-      request.description,
-      argumentLines.join('\n')
+      request.question.title,
+      request.question.detail,
+      `Asked by ${request.agent ?? 'an AI agent'}.${request.destructive ? ' This cannot be undone.' : ''}`
     ]
       .filter((part): part is string => part !== undefined && part !== '')
       .join('\n\n');
     const { response } = await showMessageBox({
       type: request.destructive ? 'warning' : 'question',
-      title: 'An AI agent is asking',
+      title: `${request.agent ?? 'An AI agent'} is asking`,
       message,
-      buttons: ['Decline', 'Allow'],
+      buttons: ['Decline', request.question.action ?? 'Allow'],
       defaultId: 0,
       cancelId: 0
     });

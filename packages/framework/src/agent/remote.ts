@@ -1,6 +1,10 @@
 import {
+  agentAnswer,
   WAITS_UP_TO,
+  type AgentAnswer,
+  type AgentCallContext,
   type AgentConfirmation,
+  type AgentConfirmResult,
   type AgentResource,
   type AgentSurfaceLike,
   type AgentTool,
@@ -29,7 +33,7 @@ export const AGENT_PORT = 'gesso:agent';
 export type AgentPortRequest =
   | { id: number; op: 'tools' }
   | { id: number; op: 'resources' }
-  | { id: number; op: 'call'; name: string; args?: Readonly<Record<string, unknown>> }
+  | { id: number; op: 'call'; name: string; args?: Readonly<Record<string, unknown>>; context?: AgentCallContext }
   | { id: number; op: 'read'; uri: string };
 
 /** A request before it is given an id. */
@@ -43,10 +47,12 @@ export type AgentPortResponse = { id: number; result: unknown } | { id: number; 
  * a person, the person is at the far end, so the thread that serves
  * the channel asks down the port it was asked on and waits.
  */
-export type AgentPortConfirm = { confirm: number; request: AgentConfirmation } | { confirm: number; approved: boolean };
+export type AgentPortConfirm =
+  | { confirm: number; request: AgentConfirmation }
+  | { confirm: number; answer: AgentAnswer };
 
 /** How a thread asks the person, wherever the person is. */
-export type AgentConfirm = (request: AgentConfirmation) => boolean | Promise<boolean>;
+export type AgentConfirm = (request: AgentConfirmation) => AgentConfirmResult;
 
 /** A `MessagePort`, or anything that posts and receives like one. */
 type AgentPort = Pick<MessagePort, 'postMessage' | 'onmessage'>;
@@ -64,7 +70,7 @@ type AgentPort = Pick<MessagePort, 'postMessage' | 'onmessage'>;
 export function serveAgentPort(port: AgentPort, makeSurface: (confirm: AgentConfirm) => AgentSurfaceLike): () => void {
   let surface: AgentSurfaceLike | undefined;
   let nextConfirm = 1;
-  const asking = new Map<number, (approved: boolean) => void>();
+  const asking = new Map<number, (answer: AgentAnswer) => void>();
   const confirm: AgentConfirm = request =>
     new Promise(resolve => {
       const id = nextConfirm++;
@@ -73,8 +79,8 @@ export function serveAgentPort(port: AgentPort, makeSurface: (confirm: AgentConf
     });
   port.onmessage = async event => {
     const data = event.data as AgentPortRequest | AgentPortConfirm;
-    if ('confirm' in data && 'approved' in data) {
-      asking.get(data.confirm)?.(data.approved);
+    if ('confirm' in data && 'answer' in data) {
+      asking.get(data.confirm)?.(data.answer);
       asking.delete(data.confirm);
       return;
     }
@@ -96,7 +102,7 @@ export function serveAgentPort(port: AgentPort, makeSurface: (confirm: AgentConf
     port.onmessage = null;
     surface?.dispose?.();
     for (const resolve of asking.values()) {
-      resolve(false);
+      resolve({ unavailable: 'the window that was asking closed' });
     }
     asking.clear();
   };
@@ -109,7 +115,7 @@ function answer(surface: AgentSurfaceLike, request: AgentPortRequest): unknown {
     case 'resources':
       return surface.resources();
     case 'call':
-      return surface.call(request.name, request.args);
+      return surface.call(request.name, request.args, request.context);
     case 'read':
       return surface.read(request.uri) ?? null;
   }
@@ -138,10 +144,16 @@ export function remoteSurface(
     const question = event.data as AgentPortConfirm;
     if (question !== null && typeof question === 'object' && 'request' in question) {
       // Asked to put a command to the person. With nobody to ask, the
-      // answer is no, which is what a contract asking for a person means.
-      void Promise.resolve(options.confirm?.(question.request) ?? false).then(
-        approved => port.postMessage({ confirm: question.confirm, approved } satisfies AgentPortConfirm),
-        () => port.postMessage({ confirm: question.confirm, approved: false } satisfies AgentPortConfirm)
+      // command is not sent, and the agent is told nobody could be asked.
+      const unavailable: AgentAnswer = { unavailable: 'this application has no way to ask the person here' };
+      void Promise.resolve(options.confirm?.(question.request) ?? unavailable).then(
+        answer =>
+          port.postMessage({ confirm: question.confirm, answer: agentAnswer(answer) } satisfies AgentPortConfirm),
+        (error: unknown) =>
+          port.postMessage({
+            confirm: question.confirm,
+            answer: { unavailable: `asking failed: ${error instanceof Error ? error.message : String(error)}` }
+          } satisfies AgentPortConfirm)
       );
       return;
     }
@@ -191,9 +203,9 @@ export function remoteSurface(
     // A command may wait on the person through `confirm`, so a call is
     // given far longer than a listing before it is abandoned; a tool
     // that waits on purpose, as long as it said, and a moment more.
-    call: (name, args) =>
+    call: (name, args, context) =>
       ask<AgentToolResult>(
-        { op: 'call', name, args },
+        { op: 'call', name, args, ...(context === undefined ? {} : { context }) },
         { content: [{ type: 'text', text: `${name} did not answer in time.` }], isError: true },
         Math.max(timeoutMs, callTimeoutMs, waits.has(name) ? waits.get(name)! + 5_000 : 0)
       ),
@@ -244,7 +256,7 @@ export function combineSurfaces(surfaces: readonly AgentSurfaceLike[]): AgentSur
   return {
     tools,
     resources,
-    call: async (name, args) => {
+    call: async (name, args, context) => {
       if (!toolOwners.has(name)) {
         await tools();
       }
@@ -258,7 +270,7 @@ export function combineSurfaces(surfaces: readonly AgentSurfaceLike[]): AgentSur
             : `There is no tool called ${name}. The tools are ${known}.`;
         return { content: [{ type: 'text', text }], isError: true };
       }
-      return owner.call(name, args);
+      return owner.call(name, args, context);
     },
     read: async uri => {
       if (!resourceOwners.has(uri)) {

@@ -47,6 +47,11 @@ export interface CommandSchema {
   readonly idempotent?: true;
   /** `@confirm`: a person should approve it before anything else sends it. */
   readonly confirm?: true;
+  /**
+   * What the person is asked, written after the tag: `@confirm Delete
+   * the note {id}?`, each `{parameter}` standing for that argument.
+   */
+  readonly question?: string;
   /** `@hidden`: for the application's own components, not for an agent. */
   readonly hidden?: true;
 }

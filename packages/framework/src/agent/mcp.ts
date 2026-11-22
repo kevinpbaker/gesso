@@ -1,4 +1,4 @@
-import type { AgentSurfaceLike } from './AgentSurface';
+import type { AgentCallContext, AgentSurfaceLike } from './AgentSurface';
 
 /**
  * An agent surface, served over the Model Context Protocol.
@@ -26,6 +26,14 @@ import type { AgentSurfaceLike } from './AgentSurface';
  * A request without a session, or with one the server has forgotten, is
  * still answered, as one from an unknown caller.
  */
+
+/**
+ * The `_meta` key on a relayed `tools/call` that names the agent, for a
+ * relay that keeps the session and passes the message on (the dev
+ * server's bridge to the page). Read only when the caller is not passed
+ * in, so an agent talking to `mcpHandler` cannot name itself another.
+ */
+export const AGENT_META = 'gesso/agent';
 
 /** The protocol revisions this server speaks, newest first. */
 export const MCP_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'] as const;
@@ -131,7 +139,8 @@ const RESOURCE_NOT_FOUND = -32002;
 export async function handleMcpMessage(
   surface: AgentSurfaceLike,
   message: unknown,
-  info: McpServerInfo = {}
+  info: McpServerInfo = {},
+  context?: AgentCallContext
 ): Promise<JsonRpcResponse | null> {
   if (!isRequest(message)) {
     return error(null, INVALID_REQUEST, 'Expected a JSON-RPC 2.0 request with a method.');
@@ -144,7 +153,7 @@ export async function handleMcpMessage(
   }
   const { id } = message;
   try {
-    return await answerRequest(surface, id, message, info);
+    return await answerRequest(surface, id, message, info, context);
   } catch (failure) {
     // Never throws: whatever goes wrong reading a listing or a view is said as the JSON-RPC error for it.
     return error(id, INTERNAL_ERROR, failure instanceof Error ? failure.message : String(failure));
@@ -156,7 +165,8 @@ async function answerRequest(
   surface: AgentSurfaceLike,
   id: JsonRpcId,
   message: JsonRpcRequest,
-  info: McpServerInfo
+  info: McpServerInfo,
+  context: AgentCallContext | undefined
 ): Promise<JsonRpcResponse> {
   const params = message.params ?? {};
   switch (message.method) {
@@ -185,7 +195,14 @@ async function answerRequest(
       // A tool that fails (its thread threw, or its answer could not be sent back) is the agent's to hear about,
       // as a tool error it can read, not a request left unanswered.
       try {
-        return ok(id, await surface.call(params.name, args as Record<string, unknown> | undefined));
+        return ok(
+          id,
+          await surface.call(
+            params.name,
+            args as Record<string, unknown> | undefined,
+            context ?? relayedContext(params)
+          )
+        );
       } catch (failure) {
         const said = failure instanceof Error ? failure.message : String(failure);
         return ok(id, { content: [{ type: 'text', text: `${params.name} failed: ${said}` }], isError: true });
@@ -318,13 +335,21 @@ export function mcpHandler(
       if (sessions.size > MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
     }
     const caller = started ?? (sessionId === null ? null : (sessions.get(sessionId) ?? null));
-    const handle = () => handleMcpMessage(surface, message, options);
+    const context: AgentCallContext = caller === null || caller.client.name === '' ? {} : { agent: caller.client.name };
+    const handle = () => handleMcpMessage(surface, message, options, context);
     const response = await (options.around === undefined ? handle() : options.around(caller, handle));
     if (response === null) return new Response(null, { status: 202 });
     const answered = json(200, response);
     if (started !== null) answered.headers.set('mcp-session-id', started.session);
     return answered;
   };
+}
+
+/** The caller a relay named in `_meta`, or an unknown one. */
+function relayedContext(params: Record<string, unknown>): AgentCallContext {
+  const meta = params._meta;
+  const agent = typeof meta === 'object' && meta !== null ? (meta as Record<string, unknown>)[AGENT_META] : undefined;
+  return typeof agent === 'string' && agent !== '' ? { agent } : {};
 }
 
 /** A session id no one can guess: 128 random bits, as hex. */

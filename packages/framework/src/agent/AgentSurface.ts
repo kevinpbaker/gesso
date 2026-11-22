@@ -101,6 +101,19 @@ export interface AgentToolResult {
   readonly isError: boolean;
 }
 
+/**
+ * What the person is asked, in their own words: the question, what it
+ * is about, and the word on the button that says yes.
+ *
+ *   { title: 'Delete this expense?', detail: '$3.35 Transport, Bus fare', action: 'Delete' }
+ */
+export interface AgentQuestion {
+  readonly title: string;
+  readonly detail?: string;
+  /** The word on the button that approves. Default `Allow`. */
+  readonly action?: string;
+}
+
 /** A command an agent wants to send that its contract says a person should approve. */
 export interface AgentConfirmation {
   readonly channel: string;
@@ -109,15 +122,54 @@ export interface AgentConfirmation {
   /** The arguments, by parameter name. */
   readonly arguments: Readonly<Record<string, unknown>>;
   readonly destructive: boolean;
+  /**
+   * What to ask the person, already worded: from the application's own
+   * `confirm` for the command in `serve`, else from the question after
+   * its `@confirm` tag with the arguments put in, else written from the
+   * command's name. Show this rather than the command and its arguments.
+   */
+  readonly question: AgentQuestion;
+  /** The agent asking, as its client names itself (`Claude Code`), when the transport knows. */
+  readonly agent?: string;
+}
+
+/**
+ * How the person answered: yes, no, or nobody could be asked. A
+ * boolean is taken too, true for approved and false for declined.
+ *
+ * `unavailable` is not a no. The agent is told that nobody saw the
+ * question, and why, so it can ask the person to bring the window
+ * forward rather than take a decision nobody made. `{ unavailable }`
+ * says the why: "the app's window is hidden".
+ */
+export type AgentAnswer = 'approved' | 'declined' | 'unavailable' | { readonly unavailable: string };
+
+/** What a `confirm` may return: an answer, a boolean, or a promise of either. */
+export type AgentConfirmResult = AgentAnswer | boolean | Promise<AgentAnswer | boolean>;
+
+/** A `confirm` answer as one of the three, with the reason a person could not be asked, if one was given. */
+export function agentAnswer(answer: AgentAnswer | boolean): AgentAnswer {
+  return answer === true ? 'approved' : answer === false ? 'declined' : answer;
+}
+
+/**
+ * Who is calling a tool, as far as the transport knows. Passed to
+ * `call` by whatever speaks MCP; a surface that is given none treats
+ * the caller as unknown.
+ */
+export interface AgentCallContext {
+  /** The client's own name for itself, from MCP's `clientInfo`: `Claude Code`. */
+  readonly agent?: string;
 }
 
 export interface AgentSurfaceOptions {
   /**
-   * Asks the person whether a `@confirm` command may be sent. Resolve
-   * true to send it. Without this, such a command is refused, which is
-   * the safe reading of a contract that asked for a person.
+   * Asks the person whether a `@confirm` command may be sent. Answer
+   * `approved` (or true) to send it. Without this, such a command is
+   * refused, which is the safe reading of a contract that asked for a
+   * person.
    */
-  confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  confirm?: (request: AgentConfirmation) => AgentConfirmResult;
   /**
    * How long the view must be quiet after a command before the call
    * returns it, in milliseconds (default 50). A command whose effect is
@@ -136,7 +188,11 @@ export interface AgentSurfaceOptions {
  */
 export interface AgentSurfaceLike {
   tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
-  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
+  call(
+    name: string,
+    args: Readonly<Record<string, unknown>> | undefined,
+    context?: AgentCallContext
+  ): Promise<AgentToolResult>;
   resources(): readonly AgentResource[] | Promise<readonly AgentResource[]>;
   read(uri: string): Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>;
   dispose?(): void;
@@ -145,7 +201,11 @@ export interface AgentSurfaceLike {
 export interface AgentSurface extends AgentSurfaceLike {
   tools(): readonly AgentTool[];
   /** Calls a tool by name. Never throws: a failure is a result with `isError`, which an agent can read and correct. */
-  call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<AgentToolResult>;
+  call(
+    name: string,
+    args: Readonly<Record<string, unknown>> | undefined,
+    context?: AgentCallContext
+  ): Promise<AgentToolResult>;
   resources(): readonly AgentResource[];
   /** The current view of the channel a resource names, or undefined for a URI this surface does not hold. */
   read(uri: string): Record<string, unknown> | undefined;
@@ -180,7 +240,10 @@ interface Entry {
   lastChange: number;
 }
 
-type Handler = (request: Readonly<Record<string, unknown>> | undefined) => Promise<AgentToolResult>;
+type Handler = (
+  request: Readonly<Record<string, unknown>> | undefined,
+  context: AgentCallContext
+) => Promise<AgentToolResult>;
 
 export function agentSurface(channels: readonly ServedChannel[], options: AgentSurfaceOptions = {}): AgentSurface {
   const quietMs = options.quietMs ?? 50;
@@ -299,7 +362,7 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
     );
 
     for (const [command, described] of commands) {
-      add(commandTool(entry, command, described), args => send(entry, command, described, args));
+      add(commandTool(entry, command, described), (args, context) => send(entry, command, described, args, context));
     }
     for (const [query, described] of queries) {
       add(queryTool(entry, query, described), args => ask(entry, query, described, args));
@@ -351,7 +414,8 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
     entry: Entry,
     command: string,
     described: CommandSchema | null,
-    args: Readonly<Record<string, unknown>> | undefined
+    args: Readonly<Record<string, unknown>> | undefined,
+    context: AgentCallContext
   ): Promise<AgentToolResult> => {
     follow();
     const channel = entry.served.token.name;
@@ -359,27 +423,39 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
     if (!Array.isArray(positional)) {
       return positional;
     }
-    const input = (described === null ? (args ?? {}) : repairedArguments(described.input, args ?? {})) as Readonly<
-      Record<string, unknown>
-    >;
-    if (described !== null) {
-      if (described.confirm === true) {
-        if (options.confirm === undefined) {
-          return failure(
-            `${channel}.${command} asks for a person to approve it, and this application has given agents no way ` +
-              'to ask. Ask the person to do it themselves.'
-          );
-        }
-        const approved = await options.confirm({
-          channel,
-          command,
-          description: described.description,
-          arguments: input,
-          destructive: described.destructive === true
-        });
-        if (!approved) {
-          return failure(`The person declined ${channel}.${command}. Do not send it again unless they ask.`);
-        }
+    if (described?.confirm === true) {
+      if (options.confirm === undefined) {
+        return failure(
+          `${channel}.${command} asks for a person to approve it, and this application has given agents no way ` +
+            'to ask. Ask the person to do it themselves.'
+        );
+      }
+      const input = repairedArguments(described.input, args ?? {}) as Readonly<Record<string, unknown>>;
+      let answer: AgentAnswer;
+      try {
+        answer = agentAnswer(
+          await options.confirm({
+            channel,
+            command,
+            ...(described.description === undefined ? {} : { description: described.description }),
+            arguments: input,
+            destructive: described.destructive === true,
+            question: questionFor(entry, command, described, input, positional),
+            ...(context.agent === undefined || context.agent === '' ? {} : { agent: context.agent })
+          })
+        );
+      } catch (error) {
+        answer = { unavailable: `asking failed: ${error instanceof Error ? error.message : String(error)}` };
+      }
+      if (answer === 'declined') {
+        return failure(`The person declined ${channel}.${command}. Do not send it again unless they ask.`);
+      }
+      if (answer !== 'approved') {
+        const why = answer === 'unavailable' ? 'there was no way to show them the question' : answer.unavailable;
+        return failure(
+          `Nobody could be asked to approve ${channel}.${command}: ${why}. The person did not decline it. Ask them ` +
+            "to bring the app's window forward and call it again, or to do it themselves."
+        );
       }
     }
     const handler = entry.served.source.commands?.[command] as ((...values: unknown[]) => void) | undefined;
@@ -410,12 +486,12 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
 
   return {
     tools: () => tools,
-    call: async (name, args) => {
+    call: async (name, args, context = {}) => {
       const handler = handlers.get(name);
       if (handler === undefined) {
         return failure(`There is no tool called ${name}. The tools are ${[...handlers.keys()].join(', ')}.`);
       }
-      return handler(args);
+      return handler(args, context);
     },
     resources: () =>
       entries.map(entry => ({
@@ -440,6 +516,57 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
       following = false;
     }
   };
+}
+
+/**
+ * What the person is asked before a `@confirm` command: the
+ * application's own wording for it in `serve`, given the arguments as
+ * the command takes them; else the question written after the tag, with
+ * each `{parameter}` (or `{parameter.field}`) put in; else a question
+ * written from the command's name, with its description and arguments
+ * as the detail. Wording that throws is passed over for the next.
+ */
+function questionFor(
+  entry: Entry,
+  command: string,
+  described: CommandSchema,
+  input: Readonly<Record<string, unknown>>,
+  positional: readonly unknown[]
+): AgentQuestion {
+  const own = entry.served.source.confirm?.[command] as ((...values: unknown[]) => string | AgentQuestion) | undefined;
+  if (own !== undefined) {
+    try {
+      const worded = own(...positional);
+      if (typeof worded === 'string' && worded.trim() !== '') return { title: worded };
+      if (typeof worded === 'object' && worded !== null && typeof worded.title === 'string') return worded;
+    } catch {
+      // The wording failed, not the command: ask in the contract's words instead.
+    }
+  }
+  if (described.question !== undefined && described.question.trim() !== '') {
+    return { title: fillQuestion(described.question, input) };
+  }
+  const shownArguments = Object.entries(input)
+    .filter(([, value]) => value !== undefined)
+    .map(([name, value]) => `${name}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+    .join('\n');
+  const detail = [described.description, shownArguments].filter(part => part !== undefined && part !== '').join('\n\n');
+  return {
+    title: `Allow ${command} in ${entry.served.token.name}?`,
+    ...(detail === '' ? {} : { detail })
+  };
+}
+
+/** A `@confirm` question with each `{name}` or `{name.field}` replaced by that argument, and the rest left as written. */
+export function fillQuestion(template: string, input: Readonly<Record<string, unknown>>): string {
+  return template.replace(/\{\s*([\w$]+(?:\.[\w$]+)*)\s*\}/g, (whole, path: string) => {
+    let value: unknown = input;
+    for (const key of path.split('.')) {
+      value = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+    }
+    if (value === undefined) return whole;
+    return typeof value === 'string' ? value : JSON.stringify(value);
+  });
 }
 
 /**

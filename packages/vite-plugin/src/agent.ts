@@ -200,6 +200,31 @@ export interface AgentBridge {
   readonly connected: boolean;
 }
 
+/** The most agent sessions remembered at once; the oldest is forgotten first. */
+const MAX_SESSIONS = 256;
+
+/**
+ * The `_meta` key that names the agent on a call relayed to the page,
+ * as `gesso-framework/agent`'s `AGENT_META`: the page shows it to the
+ * person when it asks them to approve a command.
+ */
+export const AGENT_META = 'gesso/agent';
+
+/**
+ * A call's params with the agent its session began as, and never the
+ * name the agent put there itself: the page trusts this key, so only
+ * the bridge writes it.
+ */
+function withAgent(params: Record<string, unknown>, agent: string | undefined): Record<string, unknown> {
+  const meta = { ...(typeof params._meta === 'object' && params._meta !== null ? params._meta : {}) } as Record<
+    string,
+    unknown
+  >;
+  delete meta[AGENT_META];
+  if (agent !== undefined && agent !== '') meta[AGENT_META] = agent;
+  return { ...params, _meta: meta };
+}
+
 /** What a request sent to a page that went away is answered with, before it is said to the agent. */
 const PAGE_GONE = Symbol('page gone');
 
@@ -222,6 +247,17 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
     tools: []
   };
   let next = 1;
+  /** The agents connected, by the session id `initialize` gave each: the name each client gave itself. */
+  const sessions = new Map<string, string>();
+  const startSession = (clientInfo: unknown): string => {
+    const name = (clientInfo as { name?: unknown } | undefined)?.name;
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join(
+      ''
+    );
+    sessions.set(id, typeof name === 'string' ? name : '');
+    if (sessions.size > MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
+    return id;
+  };
   /**
    * How long each tool the page listed says it may wait, under MCP's
    * `_meta` as `gesso/waitsUpToMs` (gesso-framework's `WAITS_UP_TO`):
@@ -481,8 +517,15 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
         send(response, 403, 'text/plain', 'The agent endpoint does not take requests from browser pages.');
         return;
       }
+      const sessionHeader = request.headers['mcp-session-id'];
+      const sessionId = typeof sessionHeader === 'string' ? sessionHeader : undefined;
+      if (request.method === 'DELETE' && sessionId !== undefined) {
+        sessions.delete(sessionId);
+        send(response, 204);
+        return;
+      }
       if (request.method !== 'POST') {
-        response.setHeader('allow', 'POST');
+        response.setHeader('allow', 'POST, DELETE');
         send(response, 405, 'text/plain', 'POST JSON-RPC messages here.');
         return;
       }
@@ -499,6 +542,14 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           return;
         }
         const notification = typeof message === 'object' && message !== null && !('id' in message);
+        // `initialize` begins a session, so a call can say which agent made it; anything else names its session.
+        const asked = asRequest(message);
+        if (asked?.method === 'initialize') {
+          const id = startSession(asked.params.clientInfo);
+          response.setHeader('mcp-session-id', id);
+        } else if (asked?.method === 'tools/call') {
+          message = { ...(message as object), params: withAgent(asked.params, sessions.get(sessionId ?? '')) };
+        }
         const own = answerHere(message);
         if (own !== undefined) {
           void own.then(answer => send(response, 200, 'application/json', JSON.stringify(answer)));

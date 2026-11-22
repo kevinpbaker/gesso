@@ -1,4 +1,4 @@
-import type { AgentConfirmation, AgentSurfaceLike, AgentToolResult } from 'gesso-framework/agent';
+import type { AgentConfirmation, AgentConfirmResult, AgentSurfaceLike, AgentToolResult } from 'gesso-framework/agent';
 import { remoteSurface, SCREEN_TOOL_NAMES } from 'gesso-framework/agent';
 
 /**
@@ -47,7 +47,7 @@ export interface ScreenAgentOptions {
    * Asks the person before a window channel's `@confirm` command is
    * sent. Without it such a command is refused.
    */
-  readonly confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  readonly confirm?: (request: AgentConfirmation) => AgentConfirmResult;
 }
 
 /** The main process's half. */
@@ -95,7 +95,7 @@ export function createScreenAgent(options: ScreenAgentOptions = {}): ScreenAgent
       // The screen tools ask the person nothing; a window channel's
       // command marked `@confirm` is asked through `confirm`, and refused
       // without one.
-      const entry = { surface: remoteSurface(port, { confirm: options.confirm ?? (() => false) }) };
+      const entry = { surface: remoteSurface(port, options.confirm === undefined ? {} : { confirm: options.confirm }) };
       windows.push(entry);
       return {
         receive: message => port.onmessage?.({ data: message } as MessageEvent),
