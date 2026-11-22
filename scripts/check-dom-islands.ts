@@ -24,8 +24,8 @@
  *     headless Chrome composites without a display, so the number is a
  *     guide to a real browser's and not the same thing.
  *
- *   node scripts/check-dom-islands.ts
- *   CHROME_BIN=/path/to/chrome node scripts/check-dom-islands.ts
+ *   pnpm check:islands
+ *   CHROME_BIN=/path/to/chrome pnpm check:islands
  *
  * The ports are this script's own, as every script under `scripts/`
  * takes a pair nothing else uses.

@@ -33,6 +33,7 @@
     "check:a11y:update": "node scripts/check-a11y-tree.ts --update",
     "check:rest": "node scripts/check-rest-across-worker.ts",
     "check:touch": "node scripts/check-touch-scroll.ts",
+    "check:islands": "node scripts/check-dom-islands.ts",
     "check:browsers": "node scripts/check-browsers.ts",
     "bench:graph": "vite-node scripts/bench-graph.ts",
     "bench:frame": "vite-node scripts/bench-frame.ts",

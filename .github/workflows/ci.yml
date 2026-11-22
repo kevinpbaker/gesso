@@ -301,6 +301,32 @@ jobs:
         env:
           CHROME_BIN: google-chrome
 
+  islands:
+    name: native fields over the canvas are what a password manager reads
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The islands' specs run in Node against a fake DOM. This opens the
+      # playground's islands route beside chrome://password-manager-internals
+      # and reads Chrome's own log: the sign-in form parsed with the email
+      # field as its username and the password field as its password, and
+      # the submission seen after Enter. It also checks each element stays
+      # over its box through a scroll and a resize, and that a focused
+      # field hides its DOM text while it moves. The scroll lag it
+      # measures is printed, not judged. Compares no pixels with any
+      # baseline.
+      - name: DOM islands
+        run: pnpm check:islands
+        env:
+          CHROME_BIN: google-chrome
+
   parity:
     name: Canvas2D and WebGPU agree
     runs-on: ubuntu-latest

@@ -165,7 +165,7 @@ canvas reaches the screen from the render worker. The element reaches
 the screen from the main thread, which applies the placement on its
 next frame. These two paths do not synchronize.
 
-Measured in headless Chrome with `node scripts/check-dom-islands.ts`:
+Measured in headless Chrome with `pnpm check:islands`, which CI runs on every push:
 
 | Wheel input       | Scroll per frame | Element behind its box    |
 | ----------------- | ---------------- | ------------------------- |
