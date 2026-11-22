@@ -73,12 +73,14 @@ describe('the docs images example', () => {
     // a square box is drawn wider than the box and cropped by it.
     const cover = drawn.filter(one => about(one.dh, BOX) && one.dw > BOX);
     expect(cover).toHaveLength(1);
-    expect(cover[0]!.dw).toBeCloseTo((SAMPLE_WIDTH / SAMPLE_HEIGHT) * BOX, 5);
+    // Each edge is put on its nearest device pixel, as a browser draws
+    // it, so a side is within a pixel of the exact scale.
+    expect(Math.abs(cover[0]!.dw - (SAMPLE_WIDTH / SAMPLE_HEIGHT) * BOX)).toBeLessThanOrEqual(1);
     // `contain` scales until both sides fit, so the same picture is
     // shorter than the box and centred in it.
     const contain = drawn.filter(one => about(one.dw, BOX) && one.dh < BOX);
     expect(contain).toHaveLength(1);
-    expect(contain[0]!.dh).toBeCloseTo((SAMPLE_HEIGHT / SAMPLE_WIDTH) * BOX, 5);
+    expect(Math.abs(contain[0]!.dh - (SAMPLE_HEIGHT / SAMPLE_WIDTH) * BOX)).toBeLessThanOrEqual(1);
     // `none` draws it at its own size, from the box's top left, and the
     // box clips whatever hangs out.
     expect(drawn.filter(one => about(one.dw, SAMPLE_WIDTH) && about(one.dh, SAMPLE_HEIGHT))).toHaveLength(1);

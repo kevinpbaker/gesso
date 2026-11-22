@@ -129,7 +129,7 @@ const QUIET_TURNS = 3;
  * expect(ui.getSemantics(ui.getByRole('checkbox')).states).toEqual(['checked']);
  * ```
  *
- * Three things are decided here rather than by the caller, because
+ * Four things are decided here rather than by the caller, because
  * getting any of them wrong makes a test that passes for the wrong
  * reason:
  *
@@ -142,10 +142,16 @@ const QUIET_TURNS = 3;
  *    the font size and identical on every machine.
  *  - **A first frame has run** by the time this returns, so the graph
  *    is built, laid out and described before the first query.
+ *  - **The canvas double reports its transform,** as a browser's
+ *    context does. Without it the renderer cannot say where on the
+ *    surface something was drawn: every caret blink and fading
+ *    scrollbar counted as drawn somewhere unknown and made the next
+ *    frame whole, which no browser does, and edges were not put on
+ *    device pixels.
  */
 export function renderTest(root: FrameworkChild, options: RenderTestOptions = {}): Rendered {
   const { autoFrame = true, onCreate, allowFrameErrors = false, ...runtimeOptions } = options;
-  const context = new RecordingCanvasContext();
+  const context = new RecordingCanvasContext({ transform: true });
   const canvas: CanvasHost = new FakeCanvasHost(context);
   const width = runtimeOptions.width ?? DEFAULT_WIDTH;
   const height = runtimeOptions.height ?? DEFAULT_HEIGHT;
