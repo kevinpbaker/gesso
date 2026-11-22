@@ -16,6 +16,7 @@
     "apps/docs/reference/api.md",
     "channels.described.ts",
     "docs/accessibility/",
+    "evals/agents/results/",
     "build/",
     "out/",
     "public/build/",
