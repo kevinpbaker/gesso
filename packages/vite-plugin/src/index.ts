@@ -21,6 +21,7 @@ import {
 import { CATALOG_INSTRUCTIONS, CATALOG_TOOLS, ComponentCatalog, type CatalogLibrary } from './catalog.ts';
 import { ContractReader, declaresChannel, describeCalls, type TypeScriptApi } from './contracts.ts';
 import { transformRenderWorker } from './render.ts';
+import { agentReadiness } from './readiness.ts';
 import { findShellCall, transformShell, transformSyncShell, type WorkerEntries } from './shell.ts';
 
 export {
@@ -142,6 +143,15 @@ export interface GessoPluginOptions {
    */
   readonly agentPath?: string;
   /**
+   * Say, while the dev server runs, what in a channel's contract an
+   * agent will struggle with: commands with no JSDoc, an undescribed
+   * one whose name says it may not be undone and that nothing marks
+   * `@destructive` or `@confirm`, and inputs that are bare number codes
+   * (default true while `agent` is on). One warning per channel, again
+   * only when what it says changes.
+   */
+  readonly agentReadiness?: boolean;
+  /**
    * The name an agent lists the endpoint under, and so the prefix of
    * its tools' names in most agents (`mcp__my-app__…`): the lines the
    * dev server prints to connect one use it. Default the root folder's
@@ -238,6 +248,8 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
   let shellId: string | null = null;
   /** The render worker entry, once the shell has named it. */
   let renderWorkerId: string | null = null;
+  /** What `agentReadiness` last said of each contract, so it is said again only when it changes. */
+  const readinessSaid = new Map<string, string>();
   /** Files already reported as reloading, so a save is not a stream of warnings. */
   const reported = new Set<string>();
   /** The checker, started by the first contract, or null once it is known to be unavailable. */
@@ -261,7 +273,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
     reader?.close();
     contracts = undefined;
   };
-  /** The module with its channels described, or null when it declares none. */
+  /** The module with its channels described, and the channels, or null when it declares none. */
   const describeContract = async (code: string, id: string, warn: (message: string) => void) => {
     if (
       options.channelSchemas === false ||
@@ -277,7 +289,9 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
     }
     const reading = reader.read(id.replace(/\?.*$/, ''));
     reading.warnings.forEach(warn);
-    return reading.channels.size > 0 ? code + describeCalls(reading.channels) : null;
+    return reading.channels.size > 0
+      ? { code: code + describeCalls(reading.channels), channels: reading.channels }
+      : null;
   };
   /**
    * The same description, for a worker's bundle.
@@ -295,7 +309,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
     enforce: 'pre',
     async transform(code, id) {
       const described = await describeContract(code, id, message => this.warn(message));
-      return described === null ? null : { code: described, map: null };
+      return described === null ? null : { code: described.code, map: null };
     },
     async closeBundle() {
       await closeContracts();
@@ -415,7 +429,16 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
       }
 
       const described = await describeContract(source, id, message => this.warn(message));
-      const code = described ?? source;
+      const code = described?.code ?? source;
+      if (described !== null && serving && options.agent !== false && options.agentReadiness !== false) {
+        const file = id.replace(/\?.*$/, '').replace(`${root}/`, '');
+        const messages = agentReadiness(described.channels, file);
+        // Once per change in what it says: a save that fixes nothing is not another screenful.
+        if (readinessSaid.get(file) !== messages.join('\n')) {
+          readinessSaid.set(file, messages.join('\n'));
+          messages.forEach(message => this.warn(message));
+        }
+      }
 
       if (serving && options.hmr !== false) {
         const wiring = transformRenderWorker(code);

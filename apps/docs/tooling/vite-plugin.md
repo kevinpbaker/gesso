@@ -285,6 +285,22 @@ So write those comments for a reader who has never seen the code. A
 comment explaining why two keys are separate is useful to a maintainer
 and noise to an agent deciding what to send.
 
+While the dev server runs, the plugin says where a contract leaves an
+agent guessing, one warning per channel, and again only when that
+changes:
+
+```text
+The channel Issues in src/issues/IssuesContract.ts is hard for an AI agent to use:
+  - 7 of its 11 commands have no JSDoc, so an agent reads only their names: setQuery, setWindow, update, clearSelection, undo, redo, reset. Write a sentence on each, for someone who has never seen the code.
+  - reset has no JSDoc, and its name says it may not be undone, so agents are offered it with no confirm. Mark it `@destructive @confirm`, or `@hidden` to keep it from agents.
+  - update(request).patch.priority is one of 0, 1, 2, 3, 4, with nothing saying what each number means. Say so in a JSDoc on the field.
+```
+
+A command whose name begins `reset`, `remove`, `delete`, `destroy`,
+`purge`, `wipe`, `erase`, `drop` or `truncate` is named only while it
+has no JSDoc and no `@destructive` or `@confirm`: a described one is its
+author's call. `agentReadiness: false` turns the warnings off.
+
 A value that cannot cross a channel cannot be described either. A
 `Date`, a `Map`, a class instance or a function in a contract is
 reported as a build warning naming its path, and so is an empty array
@@ -360,6 +376,7 @@ a desktop app's main process, opens the same catalog from
 | `agentName`         | root folder    | The name the printed lines add the endpoint under                        |
 | `agentInstructions` | none           | What an agent is told when it connects, after what the catalog says      |
 | `agentPrompts`      | none           | Prompts the person runs in their agent, as slash commands                |
+| `agentReadiness`    | `true`         | Warn where a channel's contract leaves an agent guessing                 |
 | `catalog`           | `true`         | Offer the project's components on that endpoint, and any libraries named |
 
 ## Is it required?
