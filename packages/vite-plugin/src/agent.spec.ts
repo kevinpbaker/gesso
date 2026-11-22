@@ -241,6 +241,35 @@ describe('the agent endpoint', () => {
     expect(seen).toEqual(['free_tool']);
   });
 
+  it("refuses a page tool's call its local check refuses, before the page sees it", async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket, {
+      local: {
+        tools: [],
+        call: () => Promise.reject(new Error('none')),
+        check: (name, args) =>
+          name === 'render_frame' && args?.inputs === undefined ? Promise.resolve('Pill needs label.') : undefined
+      }
+    });
+    const seen: unknown[] = [];
+    emit(
+      EVENTS.ready,
+      {},
+      fakePage(emit, message => {
+        const { id, params } = message as { id: unknown; params?: { arguments?: unknown } };
+        if (!String(id).startsWith('gesso:')) seen.push(params?.arguments);
+        return { jsonrpc: '2.0', id: 4, result: { content: [] } };
+      })
+    );
+
+    const call = (args: object) =>
+      JSON.stringify({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'render_frame', arguments: args } });
+    const refused = JSON.parse((await request(bridge, { body: call({ module: 'src/Pill' }) })).body!);
+    expect(refused.result).toEqual({ content: [{ type: 'text', text: 'Pill needs label.' }], isError: true });
+    await request(bridge, { body: call({ module: 'src/Pill', inputs: { label: 'Open' } }) });
+    expect(seen).toEqual([{ module: 'src/Pill', inputs: { label: 'Open' } }]);
+  });
+
   it('asks the newest page, and falls back to the one before when it closes', async () => {
     const { socket, emit } = fakeSocket();
     const bridge = createAgentBridge(socket);

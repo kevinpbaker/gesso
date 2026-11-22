@@ -518,6 +518,8 @@ import {
   AgentToolDefinition,
   ChannelRegistry,
   ChannelSource,
+  ColorScheme,
+  ColorSchemePreference,
   ComponentElement,
   DesignThemes,
   FrameworkChild,
@@ -1153,9 +1155,6 @@ interface UiSemanticsReport {
 declare function printPropValue(value: unknown): string;
 declare function formatSourceLocation(source: UiSourceLocation): string;
 declare function formatNodeReport(report: UiNodeReport): string;
-type ColorScheme = 'light' | 'dark';
-type ColorSchemePreference = ColorScheme | 'auto';
-declare function observeColorScheme(onChange: (scheme: ColorScheme) => void): () => void;
 type ShellRequest = {
   type: 'clipboard';
   id: number;
@@ -3458,8 +3457,6 @@ export {
   ChannelRegistration,
   ChannelRegistryHandle,
   classifyStorageError,
-  ColorScheme,
-  ColorSchemePreference,
   CommandEntry,
   ComponentHost,
   ComponentHostResolver,
@@ -3567,7 +3564,6 @@ export {
   NativeInputIslandEvent,
   NativeInputIslandProps,
   NodePathTarget,
-  observeColorScheme,
   observeMediaQuery,
   observeReducedMotion,
   OpfsDirectory,
@@ -3762,6 +3758,8 @@ import {
   channelSchema,
   ChannelSchema,
   ChannelSource,
+  ColorScheme,
+  ColorSchemePreference,
   CommandSchema,
   ComponentElement,
   describeChannel,
@@ -3772,6 +3770,7 @@ import {
   isPortHandshake,
   JsonSchema,
   MessageEndpoint,
+  observeColorScheme,
   PictureCanvas,
   portHandle,
   PortHandshake,
@@ -3816,8 +3815,6 @@ import {
   ChannelRegistration,
   ChannelRegistryHandle,
   classifyStorageError,
-  ColorScheme,
-  ColorSchemePreference,
   CommandEntry,
   ComponentHost,
   ComponentHostResolver,
@@ -3925,7 +3922,6 @@ import {
   NativeInputIslandEvent,
   NativeInputIslandProps,
   NodePathTarget,
-  observeColorScheme,
   observeMediaQuery,
   observeReducedMotion,
   OpfsDirectory,
@@ -4535,11 +4531,11 @@ export {
 };
 // ==== remote/index.d.ts ====
 import {
+  ColorSchemePreference,
   ServedChannel
 } from "../tools.js";
 import {
-  AppLogicEndpoint,
-  ColorSchemePreference
+  AppLogicEndpoint
 } from "../index.js";
 declare const DEFAULT_CHUNK_BYTES = 1048576;
 type GessoFrame = {
@@ -4834,6 +4830,9 @@ interface ComponentElement<P = Record<string, unknown>> {
 }
 declare function isComponentElement(value: unknown): value is ComponentElement;
 type FrameworkChild = UiChild | ComponentElement;
+type ColorScheme = 'light' | 'dark';
+type ColorSchemePreference = ColorScheme | 'auto';
+declare function observeColorScheme(onChange: (scheme: ColorScheme) => void): () => void;
 interface PictureCanvas extends CanvasHost {
   convertToBlob(options?: {
     type?: string;
@@ -4847,6 +4846,7 @@ interface RenderFrameOptions {
   readonly maxHeight?: number;
   readonly channels?: ChannelRegistry;
   readonly services?: ServiceRegistry;
+  readonly colorScheme?: ColorScheme;
   readonly settleMs?: number;
   readonly claims?: (error: unknown) => boolean;
   readonly createCanvas?: (width: number, height: number) => PictureCanvas;
@@ -4857,6 +4857,7 @@ interface RenderedFrame {
   readonly height: number;
   readonly clipped: boolean;
   readonly empty: boolean;
+  readonly blank: boolean;
   readonly errors: readonly string[];
 }
 declare function renderFrame(root: FrameworkChild, options: RenderFrameOptions): Promise<RenderedFrame>;
@@ -4937,6 +4938,8 @@ export {
   channelSchema,
   ChannelSchema,
   ChannelSource,
+  ColorScheme,
+  ColorSchemePreference,
   CommandSchema,
   ComponentElement,
   describeChannel,
@@ -4949,6 +4952,7 @@ export {
   isPortHandshake,
   JsonSchema,
   MessageEndpoint,
+  observeColorScheme,
   outline,
   PictureCanvas,
   portHandle,

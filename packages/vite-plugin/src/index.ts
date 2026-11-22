@@ -764,7 +764,10 @@ function pageMemory(root: string): PageMemory {
  * with its components) still has what it wrote told to every agent.
  */
 export function localAgentPart(
-  catalog: { call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<unknown> } | null,
+  catalog: {
+    call(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<unknown>;
+    checkRender?(args: Readonly<Record<string, unknown>> | undefined): Promise<string | undefined>;
+  } | null,
   agentInstructions: string | undefined,
   agentPrompts: readonly DevPrompt[] = []
 ): LocalTools | null {
@@ -782,6 +785,9 @@ export function localAgentPart(
   return {
     tools: CATALOG_TOOLS,
     call: (name, args) => catalog.call(name, args),
+    ...(catalog.checkRender === undefined
+      ? {}
+      : { check: (name, args) => (name === 'render_frame' ? catalog.checkRender!(args) : undefined) }),
     instructions: [CATALOG_INSTRUCTIONS, ...(agentInstructions === undefined ? [] : [agentInstructions])].join('\n\n'),
     ...prompts
   };

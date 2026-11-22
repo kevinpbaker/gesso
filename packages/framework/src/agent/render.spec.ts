@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { Box, Text, UiEnvironmentKeys, darkTheme, lightTheme, type UiChild } from 'gesso-core';
-import type { Inputs } from '../FunctionComponent';
+import type { ComponentContext, Inputs } from '../FunctionComponent';
+import { ShellService } from '../app/ShellService';
 import { mockCanvas } from '../app/RuntimeTestUtils';
 import type { PictureCanvas } from '../app/renderFrame';
 import { resultText } from './AgentSurface';
@@ -46,6 +47,21 @@ function project(modules: Record<string, Record<string, unknown>>, theme = darkT
 }
 
 describe('renderModule', () => {
+  it("tells a root that follows the shell the scheme it was asked to draw in, as a new project's root does", async () => {
+    const schemes: string[] = [];
+    function Root(_inputs: Inputs<{}>, ctx: ComponentContext): UiChild {
+      schemes.push(ctx.inject(ShellService).colorScheme.value);
+      return Box({ height: 20 });
+    }
+    const { deps } = project({ '/src/App.tsx': { App: Root } });
+
+    const dark = await renderModule({ module: 'src/App', width: 200, theme: 'dark' }, deps);
+    await renderModule({ module: 'src/App', width: 200, theme: 'light' }, deps);
+
+    expect(schemes).toEqual(['dark', 'light']);
+    expect(resultText(dark)).toContain('in the dark theme');
+  });
+
   it('draws the only component a module exports, with its inputs, and answers with the picture', async () => {
     seen = [];
     const { deps, asked } = project({ '/src/ui/Pill.tsx': { Pill, helper: () => 1 } });

@@ -1,6 +1,8 @@
 import { Column, isUiElement, Text, type UiElement, type UiTheme } from 'gesso-core';
 
 import type { ChannelRegistry } from '../channel/ChannelRegistry';
+import type { ColorScheme } from '../app/colorScheme';
+import { ShellService } from '../app/ShellService';
 import type { ServiceRegistry } from '../service/ServiceRegistry';
 import { createComponent } from '../createComponent';
 import type { ComponentType } from '../FunctionComponent';
@@ -80,6 +82,7 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
     : createComponent(chosen.value as ComponentType, (request.inputs ?? {}) as never);
   const { theme, name: themeName } = designedTheme(request.theme, deps.themes?.() ?? {}, deps.appTheme);
   const scale = Math.min(3, Math.max(1, request.scale ?? 1));
+  const colorScheme = frameScheme(themeName, deps.services);
   let frame;
   try {
     frame = await renderFrame(root, {
@@ -89,6 +92,7 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
       theme,
       ...(deps.channels === undefined ? {} : { channels: deps.channels }),
       ...(deps.services === undefined ? {} : { services: deps.services }),
+      ...(colorScheme === undefined ? {} : { colorScheme }),
       // Its own when the stack runs through the module drawn.
       claims: error => error instanceof Error && (error.stack ?? '').includes(`/${module.path}`),
       ...deps.frame
@@ -107,7 +111,10 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
   const note = frame.empty
     ? ' It drew nothing: it has no height of its own. A popup or dialog may be closed until an input opens it, or ' +
       'it may fill its parent; give inputs that show it, or a height.'
-    : frame.clipped
+    : frame.blank
+      ? ' It drew nothing but the background. A popup or dialog may be closed until an input opens it, or it may ' +
+        'need data a channel has not sent; give inputs that show it, or draw a part of it.'
+      : frame.clipped
       ? ` It is taller than that and is cut off; give a height, or draw a part of it.`
       : request.height === undefined
         ? ' As tall as its content; give a height to draw a whole screen that fills the window.'
@@ -128,12 +135,28 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
       scale,
       clipped: frame.clipped,
       empty: frame.empty,
+      blank: frame.blank,
       errors: frame.errors,
       mimeType: 'image/png',
       data
     },
     isError: false
   };
+}
+
+/**
+ * The colour scheme a frame reports to what it draws through
+ * `ShellService`: the one asked for, or for `app` the one the running
+ * application is in. An application's root picks its theme from the
+ * shell's colour scheme, as every new project's does, and that binding
+ * is inside the module drawn, below the theme the frame provides; the
+ * frame's runtime has a shell of its own, which reported light. So a
+ * root that follows the shell drew light whatever was asked, while the
+ * answer said it was dark.
+ */
+function frameScheme(theme: AgentThemeName, services: ServiceRegistry | undefined): ColorScheme | undefined {
+  if (theme !== 'app') return theme;
+  return services?.has(ShellService) === true ? services.get(ShellService).colorScheme.value : undefined;
 }
 
 async function loadModule(

@@ -215,6 +215,52 @@ export class ComponentCatalog {
     }
   }
 
+  /**
+   * Why a `render_frame` call would draw the wrong thing, or undefined
+   * to let it through: a component of the project's drawn without an
+   * input it requires. The frame cannot tell, because a component given
+   * nothing for a required string mostly draws without it, and the agent
+   * is told it drew. Callbacks and children are left out: JSON carries
+   * neither. A module the catalog does not know, or one with more than
+   * one component and no `export`, is let through for the page to answer.
+   */
+  async checkRender(args: Readonly<Record<string, unknown>> | undefined): Promise<string | undefined> {
+    if (typeof args?.module !== 'string') return undefined;
+    const from = args.module.replace(/^\.?\/+/, '').replace(/\.[cm]?[jt]sx?$/, '');
+    let entries: readonly CatalogEntry[];
+    try {
+      entries = (await this.entries()).filter(entry => entry.library === undefined && entry.from === from);
+    } catch {
+      return undefined;
+    }
+    const chosen =
+      typeof args.export === 'string'
+        ? entries.filter(entry => entry.name === args.export)
+        : entries.length === 1
+          ? entries
+          : [];
+    const entry = chosen[0];
+    if (chosen.length !== 1 || entry === undefined) return undefined;
+    const inputs = entry.schema.inputs;
+    const properties = (inputs.properties ?? {}) as Record<string, Record<string, unknown>>;
+    const given = (typeof args.inputs === 'object' && args.inputs !== null ? args.inputs : {}) as Record<string, unknown>;
+    const missing = ((inputs.required ?? []) as string[]).filter(
+      name =>
+        given[name] === undefined &&
+        properties[name]?.['x-gesso-callback'] !== true &&
+        properties[name]?.['x-gesso-child'] !== true
+    );
+    if (missing.length === 0) return undefined;
+    const said = missing.map(name => {
+      const type = properties[name]?.['x-gesso-type'];
+      return typeof type === 'string' ? `${name} (${type})` : name;
+    });
+    return (
+      `${entry.name} needs ${said.join(' and ')} in inputs, and was not given ${missing.length === 1 ? 'it' : 'them'}. ` +
+      `library_get ${entry.name} lists every input it takes.`
+    );
+  }
+
   private async read(): Promise<readonly CatalogEntry[]> {
     const reader = await this.reader();
     if (reader === null) {

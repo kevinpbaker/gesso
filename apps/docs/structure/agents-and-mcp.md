@@ -237,9 +237,18 @@ theme being designed in unless `light`, `dark` or `app` is asked for.
 
 Without a height a frame is as tall as its content, which suits a
 component or a section; a whole screen is given one, and fills it. The
-answer says when nothing was drawn (a dialog closed until an input opens
-it) and what was thrown while it was drawn, and an error the frame
-caused is reported to the agent instead of over the person's screen.
+answer says when nothing was drawn, either no height at all or nothing
+but the background in the height given (a dialog closed until an input
+opens it), and what was thrown while it was drawn, and an error the frame
+caused is reported to the agent instead of over the person's screen. In
+a dev server, a component of the project drawn without an input it
+requires is refused before it is drawn, naming the input, since most
+draw without one and look nearly right.
+
+A frame's `ShellService` reports the scheme the frame is in: `dark` for
+`theme: "dark"`, the application's own for `app`. So a root that picks
+its theme from the shell's colour scheme, as every new project's does,
+is drawn in the theme asked for and not in whichever the page is in.
 
 A frame shares the running application's channels and services, so a
 screen shows the application's real data, and a command the frame

@@ -12,7 +12,9 @@ import type { ChannelRegistry } from '../channel/ChannelRegistry';
 import type { FrameworkChild } from '../ComponentElement';
 import { ServiceRegistry } from '../service/ServiceRegistry';
 import { claimErrors } from './claimedErrors';
+import type { ColorScheme } from './colorScheme';
 import { GessoRuntime } from './GessoRuntime';
+import { ShellService } from './ShellService';
 
 /**
  * A tree drawn once, off screen, to a PNG.
@@ -60,6 +62,12 @@ export interface RenderFrameOptions {
    * rather than borrowing them, since those belong to the window.
    */
   readonly services?: ServiceRegistry;
+  /**
+   * The colour scheme its `ShellService` reports (default light): what a
+   * root that picks its theme from the shell's scheme, as an
+   * application's does, sees while the frame is drawn.
+   */
+  readonly colorScheme?: ColorScheme;
   /** The longest to wait for the tree to stop asking for frames, in milliseconds (default 2000). */
   readonly settleMs?: number;
   /**
@@ -83,6 +91,13 @@ export interface RenderedFrame {
   readonly clipped: boolean;
   /** Whether the content had no height of its own: a closed popup, say, or one waiting on inputs. */
   readonly empty: boolean;
+  /**
+   * Whether every pixel came out one colour, the background's: a frame
+   * that has a height, so is not `empty`, but drew nothing in it. A
+   * dialog that is closed until an input opens it, given a height, is
+   * one. False where the canvas cannot be read back.
+   */
+  readonly blank: boolean;
   /**
    * What was thrown and not caught in this thread while the frame was
    * drawn. A component reading an input it was not given throws from a
@@ -111,6 +126,12 @@ export async function renderFrame(root: FrameworkChild, options: RenderFrameOpti
   // read off it.
   const frame = Column(options.height === undefined ? {} : { flex: 1 }, root as UiChild);
   let clock!: UiManualFrameClock;
+  // The frame's own shell, registered before the runtime would make one, so the tree, which mounts as the
+  // runtime is made, reads the scheme asked for from its first frame.
+  const services = new ServiceRegistry(options.services);
+  if (options.colorScheme !== undefined) {
+    services.register(ShellService).applyColorScheme(options.colorScheme);
+  }
   const runtime = new GessoRuntime({
     // Painted in the theme's background, as a window is: a canvas left
     // transparent shows dark-theme content on whatever the viewer's
@@ -122,7 +143,7 @@ export async function renderFrame(root: FrameworkChild, options: RenderFrameOpti
     height: probe,
     dpr: scale,
     ...(options.channels === undefined ? {} : { channels: options.channels }),
-    services: new ServiceRegistry(options.services),
+    services,
     clock: callback => (clock = new UiManualFrameClock(callback))
   });
   let failure: string | null = null;
@@ -185,7 +206,15 @@ export async function renderFrame(root: FrameworkChild, options: RenderFrameOpti
     }
 
     const blob = await canvas.convertToBlob({ type: 'image/png' });
-    return { png: new Uint8Array(await blob.arrayBuffer()), width, height, clipped, empty, errors };
+    return {
+      png: new Uint8Array(await blob.arrayBuffer()),
+      width,
+      height,
+      clipped,
+      empty,
+      blank: oneColour(canvas, width * scale, height * scale),
+      errors
+    };
   } finally {
     runtime.dispose();
     // RxJS rethrows what a subscriber did not catch from a timer, so an
@@ -196,4 +225,30 @@ export async function renderFrame(root: FrameworkChild, options: RenderFrameOpti
     scope.removeEventListener?.('error', uncaught);
     scope.removeEventListener?.('unhandledrejection', uncaught);
   }
+}
+
+/**
+ * Whether every pixel of the canvas's top `width` by `height` is the same
+ * colour. Read through the 2D context the renderer already holds, which a
+ * canvas hands back again; false for one that has none to read.
+ */
+function oneColour(canvas: PictureCanvas, width: number, height: number): boolean {
+  const context = (
+    canvas as { getContext?: (kind: '2d') => { getImageData(x: number, y: number, w: number, h: number): ImageData } | null }
+  ).getContext?.('2d');
+  if (context === null || context === undefined || width < 1 || height < 1) {
+    return false;
+  }
+  let pixels: Uint32Array;
+  try {
+    const data = context.getImageData(0, 0, width, height).data;
+    pixels = new Uint32Array(data.buffer, data.byteOffset, data.byteLength / 4);
+  } catch {
+    return false;
+  }
+  const first = pixels[0];
+  for (let at = 1; at < pixels.length; at++) {
+    if (pixels[at] !== first) return false;
+  }
+  return true;
 }

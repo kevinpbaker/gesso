@@ -136,6 +136,12 @@ export interface LocalTools {
   readonly instructions?: string;
   /** The application's prompts, answered here whether or not a page is open. */
   readonly prompts?: readonly DevPrompt[];
+  /**
+   * Why a call of one of the page's tools should not be sent, or
+   * undefined to send it: what the server knows and the page does not,
+   * such as the inputs a component requires. Asked before relaying.
+   */
+  check?(name: string, args: Readonly<Record<string, unknown>> | undefined): Promise<string | undefined> | undefined;
 }
 
 /** A prompt the application offers, as `gesso-framework/agent`'s `AgentPrompt`: its message, `{{name}}` for each argument. */
@@ -283,6 +289,24 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
    * the page still reads the catalog, and still sees the page's tools,
    * as it last listed them, each saying no page is open to answer it.
    */
+  /**
+   * A page tool's call refused here by `LocalTools.check`, as the answer
+   * it resolves to, or to undefined to relay it. Undefined itself when
+   * there is nothing to ask, so a call that is not checked is relayed at
+   * once, as before there were checks.
+   */
+  const refusal = (message: unknown): Promise<unknown> | undefined => {
+    const request = asRequest(message);
+    if (request === undefined || request.method !== 'tools/call' || typeof request.params.name !== 'string') {
+      return undefined;
+    }
+    const asked = local?.check?.(
+      request.params.name,
+      request.params.arguments as Readonly<Record<string, unknown>> | undefined
+    );
+    return asked?.then(said => (said === undefined ? undefined : failed(request.id, said)));
+  };
+
   const answerHere = (message: unknown): Promise<unknown> | undefined => {
     const request = asRequest(message);
     if (request === undefined) {
@@ -500,8 +524,10 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           );
           return;
         }
-        void relay(message)
-          .then(answer => (local === undefined ? answer : mergeLocal(message, answer, local)))
+        const relayed = () =>
+          relay(message).then(answer => (local === undefined ? answer : mergeLocal(message, answer, local)));
+        const checking = refusal(message);
+        void (checking === undefined ? relayed() : checking.then(refused => refused ?? relayed()))
           .then(answer => {
             if (answer === null || answer === undefined) {
               send(response, 202);
