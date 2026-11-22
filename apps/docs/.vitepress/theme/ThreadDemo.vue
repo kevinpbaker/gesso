@@ -7,6 +7,7 @@ import { exampleRoot } from '../../src/examples/ExampleRoot';
 import { Pulse } from '../../src/examples/PulseExample';
 import PulseWorker from '../../src/examples/PulseExampleWorker?worker';
 import { workerName } from '../../src/still';
+import { reloadOnStaleWorker } from './embeddedApp';
 
 /**
  * The same application, twice, on two different threads, with a button
@@ -73,7 +74,7 @@ onMounted(() => {
   const colorScheme = scheme();
   try {
     worker = createApp({
-      renderWorker: () => new PulseWorker({ name: workerName() }),
+      renderWorker: () => reloadOnStaleWorker(new PulseWorker({ name: workerName() })),
       colorScheme,
       onError: message => {
         failure.value = message;

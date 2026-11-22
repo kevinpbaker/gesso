@@ -4,12 +4,12 @@ import { useData } from 'vitepress';
 import { createApp, type WorkerApp } from 'gesso-framework';
 import ExampleWorker from '../../src/exampleWorker?worker';
 import { workerName } from '../../src/still';
-import { embeddedAppOptions } from './embeddedApp';
+import { embeddedAppOptions, reloadOnStaleWorker } from './embeddedApp';
 
 /**
  * A running Gesso application, embedded in a documentation page.
  *
- * Two things make this work at all, and both are worth knowing before
+ * Four things make this work at all, and all are worth knowing before
  * adding an example:
  *
  *  1. **Every example runs in the same worker.** Vite bundles a
@@ -28,6 +28,9 @@ import { embeddedAppOptions } from './embeddedApp';
  *     with come from `embeddedAppOptions`, which is where the memory
  *     history lives: an example with routes navigates a history of
  *     its own and never the site's address bar.
+ *  4. **A tab can outlive a deploy.** The worker is wrapped in
+ *     `reloadOnStaleWorker`, so a worker file name from an earlier
+ *     deploy reloads the page once instead of showing an error.
  *
  * `?still` on the page's url asks every example on it to hold a frame,
  * so a screenshot gate has something to photograph. A worker has no
@@ -63,7 +66,7 @@ onMounted(() => {
   try {
     app = createApp(
       embeddedAppOptions({
-        renderWorker: () => new ExampleWorker({ name: workerName(props.id.toLowerCase()) }),
+        renderWorker: () => reloadOnStaleWorker(new ExampleWorker({ name: workerName(props.id.toLowerCase()) })),
         colorScheme: isDark.value ? 'dark' : 'light',
         onError: message => {
           failure.value = message;
