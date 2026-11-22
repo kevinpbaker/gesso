@@ -19,7 +19,10 @@
 #
 # `firefox` and `safari` run `check:browsers`, the one gate that is not
 # Chrome: the playground in Firefox on this runner and in Safari on a
-# macOS one, which is the only image that has it.
+# macOS one, which is the only image that has it. `safari` is off
+# (`if: false`, below): the hosted macOS runner's Safari renders neither
+# a canvas nor its own screenshots, so it can only fail. The check runs
+# in Safari locally.
 #
 # `pnpm check` runs the `checks` job's steps locally in the same order.
 #
@@ -411,6 +414,17 @@ jobs:
 
   safari:
     name: the playground works in Safari
+    # Off. Its first run (Safari 27.2 on macos-latest, 2026-11-22) found
+    # every route blank, `renderers/dom` included, which is plain DOM, so
+    # the screenshots themselves were empty; and WebKit threw "Cannot
+    # create ImageBitmap from canvas that can't be rendered" wherever a
+    # route made a bitmap. Locally, on a Mac with a GPU, the same check
+    # passes in Safari 27.0.1. The runner is a virtual machine without
+    # GPU acceleration, and that is what it looks like to Safari: nothing
+    # here can make it pass. Turn it back on for a runner with a GPU (a
+    # self-hosted Mac) by deleting the `if:` line; the screenshots it
+    # saves on failure show at once whether the runner can render.
+    if: false
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
