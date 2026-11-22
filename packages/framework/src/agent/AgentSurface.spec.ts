@@ -159,6 +159,21 @@ describe('an agent surface', () => {
     expect(resultText(result)).toContain('Sent create to notes');
   });
 
+  it('says so when a command leaves the view as it was, rather than answer as if it did something', async () => {
+    // `remove` with an id no row has: the source sends its rows again, equal to the ones before.
+    const app = notesApp();
+    const surface = agentSurface([app.served], { ...fast, confirm: () => true });
+    await surface.call('notes_create', { title: 'Groceries' });
+
+    const missed = await surface.call('notes_remove', { id: 'nope' });
+    expect(missed.isError).toBe(false);
+    expect(resultText(missed)).toMatch(/^Sent remove to notes, and the view is the same as before\./);
+    expect(missed.structuredContent).toEqual({ rows: [{ id: '1', title: 'Groceries' }], status: 'ready' });
+
+    const hit = await surface.call('notes_remove', { id: '1' });
+    expect(resultText(hit)).toMatch(/^Sent remove to notes\. The view afterwards:/);
+  });
+
   it('waits for the effect of a command that answers after a request, rather than the first quiet moment', async () => {
     // A command whose work outlasts the quiet window: a fetch, a
     // subprocess. Nothing changes until it answers, and the view the
@@ -354,7 +369,9 @@ describe('an agent surface', () => {
       properties: { score: { type: 'number' } },
       required: ['score']
     });
-    expect(bump.outputSchema).toEqual(view.outputSchema);
+    // The view's schema is the view tool's alone: a command returns the same view, and says where its shape is.
+    expect(bump.outputSchema).toBeUndefined();
+    expect(bump.description).toContain('in the shape board_view gives');
     const result = await surface.call('board_bump', {});
     expect(result.structuredContent).toEqual({ score: 1 });
     expect(resultText(result)).toBe('Sent bump to board. The view afterwards:\n{"score":1}');

@@ -48,7 +48,14 @@ did without asking again. The call waits for the view to change and
 then to be quiet for `quietMs` (50 by default), or for at most
 `settleMs` (1000), so a command whose effect waits on a request still
 comes back with it. A command that changes nothing in the view returns
-at `settleMs`, since nothing distinguishes it from one still working.
+at `settleMs`, since nothing distinguishes it from one still working,
+and its answer says the view is the same as before. A command returns
+nothing of its own, so that sentence is how an agent learns that an id
+it sent matched nothing.
+
+The view's JSON Schema is the `<channel>_view` tool's `outputSchema`.
+Command tools return the same view but do not repeat its schema, which
+would make the tool list as many times larger as there are commands.
 
 Everything an agent reads about a tool comes from the contract.
 [The Vite plugin](/tooling/vite-plugin#channels-described) writes each

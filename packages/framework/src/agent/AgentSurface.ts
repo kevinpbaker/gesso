@@ -347,12 +347,24 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
       return failure(`${channel} has no command ${command}.`);
     }
     const before = entry.changes;
+    // What the agent last could have seen, to tell it when a command left it as it was: commands return
+    // nothing, so a view that did not move is the only sign that one had nothing to act on. Compared as
+    // text, because a source that sends an equal value again counts as a change.
+    const was = JSON.stringify(shown(entry));
     try {
       handler(...positional);
     } catch (error) {
       return failure(`${channel}.${command} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     await settle(entry, before);
+    if (JSON.stringify(shown(entry)) === was) {
+      return viewResult(
+        entry,
+        `Sent ${command} to ${channel}, and the view is the same as before. Either the command had nothing to act on ` +
+          '(an id that matches nothing, a value it already had), or what it changed is not in this view, or it is ' +
+          `still working after ${settleMs} ms. The view:`
+      );
+    }
     return viewResult(entry, `Sent ${command} to ${channel}. The view afterwards:`);
   };
 
@@ -408,7 +420,7 @@ function commandTool(entry: Entry, command: string, described: CommandSchema | n
   if (described?.confirm === true) {
     lines.push('The person is asked to approve this before it is sent.');
   }
-  lines.push('Returns the view after the command has taken effect.');
+  lines.push(`Returns the view after the command has taken effect, in the shape ${toolName(`${channel}_view`)} gives.`);
   return {
     name: toolName(`${channel}_${command}`),
     title: `${channel}: ${command}`,
@@ -420,7 +432,9 @@ function commandTool(entry: Entry, command: string, described: CommandSchema | n
         properties: { arguments: { type: 'array', description: 'The arguments, in order.' } },
         additionalProperties: false
       } satisfies JsonSchema),
-    ...(entry.viewSchema === undefined ? {} : { outputSchema: entry.viewSchema }),
+    // No `outputSchema`, though a command returns the view: it is the view tool's already, and repeating a
+    // whole view's schema on every command made a real application's tool list about 200 KB, which an agent
+    // pays for in context before its first call. The result still carries the view as `structuredContent`.
     annotations: {
       readOnlyHint: false,
       ...(destructive ? { destructiveHint: true } : { destructiveHint: false }),
