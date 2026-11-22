@@ -97,6 +97,15 @@ export { DatePicker, type DatePickerProps } from './DatePicker';
 export { addDays, addMonths, formatDate, isoDate, monthGrid, parseIsoDate, todayIso } from './calendar';
 export { Combobox, comboboxRank, filterCombobox, type ComboboxProps, type ComboboxOption } from './Combobox';
 export {
+  CommandPalette,
+  commandPaletteMatch,
+  filterCommands,
+  shortcutCommands,
+  type CommandMatch,
+  type CommandPaletteItem,
+  type CommandPaletteProps
+} from './CommandPalette';
+export {
   Tooltip,
   tooltip,
   tooltipContent,

@@ -25,6 +25,7 @@ import {
   UiNodeRef,
   UiPointerEvent,
   UiSelfAlignment,
+  UiShortcutRegistry,
   UiThemeExtension,
   UiTrackSize,
   UiTypographyRole,
@@ -1063,6 +1064,42 @@ interface ComboboxProps extends ControlLayoutProps {
 declare function comboboxRank(option: ComboboxOption, query: string): number;
 declare function filterCombobox(options: readonly ComboboxOption[], query: string): ComboboxOption[];
 declare function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): UiChild;
+interface CommandPaletteItem {
+  readonly value: string;
+  readonly label: string;
+  readonly detail?: string;
+  readonly group?: string;
+  readonly keywords?: readonly string[];
+  readonly shortcut?: string;
+  readonly disabled?: boolean;
+  readonly run?: () => void;
+}
+interface CommandPaletteProps {
+  items: readonly CommandPaletteItem[];
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onSelect?: (value: string) => void;
+  onQueryChange?: (query: string) => void;
+  initialQuery?: string;
+  filter?: boolean;
+  registry?: UiShortcutRegistry;
+  shortcut?: string;
+  label?: string;
+  placeholder?: string;
+  emptyText?: string;
+  limit?: number;
+  width?: number;
+  listHeight?: number;
+}
+interface CommandMatch {
+  readonly score: number;
+  readonly positions: readonly number[];
+}
+declare function commandPaletteMatch(item: CommandPaletteItem, query: string): CommandMatch | null;
+declare function filterCommands(items: readonly CommandPaletteItem[], query: string): CommandPaletteItem[];
+declare function shortcutCommands(registry: UiShortcutRegistry, focused: UiNode | null): CommandPaletteItem[];
+declare function CommandPalette(inputs: Inputs<CommandPaletteProps>, ctx: ComponentContext): UiChild;
 declare function tooltipContent(text: string): UiChild;
 interface TooltipProps {
   text?: string;
@@ -1736,6 +1773,8 @@ export {
   columnLetters,
   Combobox,
   comboboxRank,
+  CommandPalette,
+  commandPaletteMatch,
   ContextMenus,
   controlDescription,
   controlled,
@@ -1753,6 +1792,7 @@ export {
   field,
   fieldArray,
   filterCombobox,
+  filterCommands,
   FindBar,
   followTransport,
   form,
@@ -1822,6 +1862,7 @@ export {
   SegmentedControl,
   Select,
   sharedValue,
+  shortcutCommands,
   Skeleton,
   SkeletonText,
   Slider,
@@ -1888,6 +1929,9 @@ export {
   type ColorPickerProps,
   type ComboboxOption,
   type ComboboxProps,
+  type CommandMatch,
+  type CommandPaletteItem,
+  type CommandPaletteProps,
   type ContextMenusProps,
   type ControlFocus,
   type ControlLayoutProps,
