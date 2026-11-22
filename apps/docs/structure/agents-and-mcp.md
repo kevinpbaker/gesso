@@ -650,8 +650,19 @@ own machine: a packaged app has no TypeScript in it to read with.
 `mcpHandler` is MCP's Streamable HTTP transport as a `fetch` handler,
 `(Request) => Promise<Response>`, which `Bun.serve`, Deno and a service
 worker take directly. The framework imports no server. It answers with
-JSON rather than an event stream, which the transport allows, and has
-nothing to push, so it declines the event stream with a 405.
+JSON rather than an event stream, which the transport allows.
+
+It also says some things unasked. A session that opens the GET event
+stream (with the `Mcp-Session-Id` that `initialize` gave) and sends
+`resources/subscribe` for a channel's view hears
+`notifications/resources/updated` when that view changes, once for each
+burst of changes. Every open stream hears
+`notifications/tools/list_changed` when the tools change. The
+capabilities say `subscribe` and `listChanged`. A surface that cannot
+`watch` declines the stream with a 405. The dev server's endpoint opens
+the same stream and says when the tools change, which happens when a
+window with other tools connects, after an edit for example. It does
+not say when a view changes.
 
 Two options guard it, and a third, `authorize`, decides what each agent
 may do (see [Scopes and OAuth](#scopes-and-oauth)):

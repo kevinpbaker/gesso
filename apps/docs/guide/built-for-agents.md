@@ -197,8 +197,9 @@ theme. Gesso meets that head on.
 
 ## What is not done
 
-- **Nothing is pushed to an agent.** A view is read when asked for;
-  there are no subscriptions yet.
+- **The dev server pushes only tool changes.** `mcpHandler` tells a
+  subscribed agent when a view changes, but the dev server's endpoint
+  says only that the tools changed. Few agents act on either yet.
 - **WebMCP has been checked against the spec, not inside a browser that
   ships it.** The browser used here had no trial token.
 - **A desktop app offers its channels, not its screen.** The main

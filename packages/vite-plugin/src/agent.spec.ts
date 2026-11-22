@@ -157,7 +157,11 @@ describe("the server's own tools", () => {
     const ask = async (id: number, method: string, params: Record<string, unknown> = {}) =>
       JSON.parse((await request(bridge, { body: rpc(id, method, params) })).body!);
 
-    expect((await ask(1, 'initialize')).result.capabilities).toEqual({ tools: {}, resources: {}, prompts: {} });
+    expect((await ask(1, 'initialize')).result.capabilities).toEqual({
+      tools: { listChanged: true },
+      resources: {},
+      prompts: {}
+    });
     expect((await ask(2, 'prompts/list')).result.prompts).toEqual([
       { name: 'draw', description: 'Draw a problem', arguments: [{ name: 'problem', required: true }] }
     ]);
@@ -176,7 +180,11 @@ describe("the server's own tools", () => {
         };
       })
     );
-    expect((await ask(3, 'initialize')).result.capabilities).toEqual({ tools: {}, resources: {}, prompts: {} });
+    expect((await ask(3, 'initialize')).result.capabilities).toEqual({
+      tools: { listChanged: true },
+      resources: {},
+      prompts: {}
+    });
     expect((await ask(4, 'prompts/get', { name: 'draw', arguments: { problem: 'a ladder' } })).result.messages).toEqual(
       [{ role: 'user', content: { type: 'text', text: 'Draw this: a ladder' } }]
     );
@@ -575,5 +583,59 @@ describe("the server's name", () => {
     const after = JSON.parse((await request(bridge, { body: rpc(2, 'initialize') })).body!);
     expect(after.result.serverInfo).toEqual({ name: 'expenses', version: '1' });
     expect(after.result.instructions).toBe('The page.');
+  });
+});
+
+describe('what the dev server says unasked', () => {
+  it('tells an open event stream when a page with other tools answers', async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket);
+    const hello = await request(bridge, {
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { clientInfo: { name: 'Claude Code' } }
+      })
+    });
+    const session = hello.headers['mcp-session-id'];
+    const written: string[] = [];
+    const closers: (() => void)[] = [];
+    const req: BridgeRequest = {
+      method: 'GET',
+      url: AGENT_PATH,
+      headers: { 'mcp-session-id': session, accept: 'text/event-stream' },
+      on: ((event: string, listener: () => void) => {
+        if (event === 'close') closers.push(listener);
+      }) as BridgeRequest['on']
+    };
+    const res: BridgeResponse = {
+      statusCode: 0,
+      setHeader: () => {},
+      end: () => written.push('(ended)'),
+      write: chunk => written.push(chunk)
+    };
+    bridge.middleware(req, res, () => written.push('(passed on)'));
+    expect(res.statusCode).toBe(200);
+
+    let tools = [{ name: 'notes_view' }];
+    const page = fakePage(emit, message => {
+      const { id, method } = message as { id: unknown; method: string };
+      return { jsonrpc: '2.0', id, result: method === 'tools/list' ? { tools } : {} };
+    });
+    emit(EVENTS.ready, {}, page);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    emit(EVENTS.ready, {}, page);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    tools = [{ name: 'notes_view' }, { name: 'notes_add' }];
+    emit(EVENTS.ready, {}, page);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const said = written.filter(chunk => chunk.startsWith('event: message'));
+    expect(said).toEqual([
+      `event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' })}\n\n`,
+      `event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' })}\n\n`
+    ]);
+    closers.forEach(close => close());
   });
 });

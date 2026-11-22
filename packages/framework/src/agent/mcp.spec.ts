@@ -222,9 +222,11 @@ describe('mcpHandler', () => {
     }
   });
 
-  it('declines the server-sent stream, a protocol it does not speak, and a body that is not JSON', async () => {
+  it('declines the server-sent stream without a session or a surface that can watch, a protocol it does not speak, and a body that is not JSON', async () => {
     const handler = mcpHandler(surface());
-    expect((await handler(new Request('http://127.0.0.1/mcp', { method: 'GET' }))).status).toBe(405);
+    expect((await handler(new Request('http://127.0.0.1/mcp', { method: 'GET' }))).status).toBe(400);
+    const { watch: _watch, ...blind } = surface();
+    expect((await mcpHandler(blind)(new Request('http://127.0.0.1/mcp', { method: 'GET' }))).status).toBe(405);
     expect((await handler(post(rpc(1, 'ping'), { 'mcp-protocol-version': '2024-01-01' }))).status).toBe(400);
     const garbled = await handler(post('{not json'));
     expect(garbled.status).toBe(400);

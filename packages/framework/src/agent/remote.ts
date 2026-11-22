@@ -6,6 +6,7 @@ import {
   type AgentConfirmation,
   type AgentConfirmResult,
   type AgentResource,
+  type AgentSurfaceChange,
   type AgentSurfaceLike,
   type AgentTool,
   type AgentToolResult
@@ -253,9 +254,18 @@ export function combineSurfaces(surfaces: readonly AgentSurfaceLike[]): AgentSur
     return out;
   };
 
+  const watchable = surfaces.filter(surface => surface.watch !== undefined);
   return {
     tools,
     resources,
+    ...(watchable.length === 0
+      ? {}
+      : {
+          watch: (listener: (change: AgentSurfaceChange) => void) => {
+            const stops = watchable.map(surface => surface.watch!(listener));
+            return () => stops.forEach(stop => stop());
+          }
+        }),
     call: async (name, args, context) => {
       if (!toolOwners.has(name)) {
         await tools();

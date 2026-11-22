@@ -58,7 +58,8 @@ export function recordAgentActivity(
       }
       return result;
     },
-    ...(surface.dispose === undefined ? {} : { dispose: () => surface.dispose!() })
+    ...(surface.dispose === undefined ? {} : { dispose: () => surface.dispose!() }),
+    ...(surface.watch === undefined ? {} : { watch: listener => surface.watch!(listener) })
   };
 }
 

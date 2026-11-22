@@ -13,6 +13,7 @@ export {
   type AgentContent,
   type AgentResource,
   type AgentSurface,
+  type AgentSurfaceChange,
   type AgentSurfaceLike,
   type AgentSurfaceOptions,
   type AgentTool,

@@ -201,10 +201,22 @@ export interface AgentSurfaceOptions {
 }
 
 /**
+ * Something a surface's agents may want to hear without asking: a
+ * resource's content changed, or the tools it offers did.
+ */
+export type AgentSurfaceChange = { readonly type: 'resource'; readonly uri: string } | { readonly type: 'tools' };
+
+/**
  * Any surface an MCP server can speak for: one in this thread, or one
  * across a port whose every answer is a promise.
  */
 export interface AgentSurfaceLike {
+  /**
+   * Hears each change as it happens, until the returned function is
+   * called. Optional: a surface without it has nothing to say unasked,
+   * and `mcpHandler` then offers no subscriptions.
+   */
+  watch?(listener: (change: AgentSurfaceChange) => void): () => void;
   tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
   call(
     name: string,
@@ -272,6 +284,7 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
   const entries: Entry[] = [];
   const tools: AgentTool[] = [];
   const handlers = new Map<string, Handler>();
+  const watchers = new Set<(change: AgentSurfaceChange) => void>();
   let following = false;
 
   /**
@@ -291,6 +304,10 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
             entry.view[key] = value;
             entry.lastChange = Date.now();
             entry.changes++;
+            if (watchers.size > 0 && !entry.hidden.has(key)) {
+              const change: AgentSurfaceChange = { type: 'resource', uri: resourceUri(entry.served.token.name) };
+              for (const watcher of watchers) watcher(change);
+            }
           })
         );
       }
@@ -503,6 +520,13 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
 
   return {
     tools: () => tools,
+    watch: listener => {
+      // A view is followed only once something reads it; hearing of its changes is reading it. Followed before
+      // listening, so the values a view already holds are not heard as changes.
+      follow();
+      watchers.add(listener);
+      return () => watchers.delete(listener);
+    },
     call: async (name, args, context = {}) => {
       const handler = handlers.get(name);
       if (handler === undefined) {

@@ -9,7 +9,7 @@ import {
   type AgentGrant,
   type McpOAuthOptions
 } from './auth';
-import type { AgentCallContext, AgentSurfaceLike } from './AgentSurface';
+import type { AgentCallContext, AgentSurfaceChange, AgentSurfaceLike } from './AgentSurface';
 
 /**
  * An agent surface, served over the Model Context Protocol.
@@ -25,9 +25,13 @@ import type { AgentCallContext, AgentSurfaceLike } from './AgentSurface';
  * `tools/list`, `tools/call`, `resources/list` and `resources/read`,
  * and `prompts/list` and `prompts/get` for an application's prompts.
  * Responses are plain JSON rather than an event stream, which the
- * transport allows, and the GET stream for server-initiated messages
- * is declined with 405, which it also allows: nothing here sends one,
- * so the capabilities say neither `listChanged` nor `subscribe`.
+ * transport allows. The GET stream for server-initiated messages is
+ * opened for a surface that can `watch`: a session that subscribed to a
+ * resource hears `notifications/resources/updated` when its view
+ * changes, and every session hears `notifications/tools/list_changed`;
+ * the capabilities then say `subscribe` and `listChanged`. A surface
+ * that cannot watch declines the stream with 405, as the transport
+ * allows.
  *
  * `mcpHandler` keeps sessions, as the transport describes: `initialize`
  * is answered with an `Mcp-Session-Id`, the client sends it back on
@@ -343,6 +347,7 @@ export function mcpHandler(
 ): (request: Request) => Promise<Response> {
   const sessions = new Map<string, McpCaller>();
   let begun = 0;
+  const notices = surface.watch === undefined ? undefined : notifier(surface);
   const challenge =
     options.oauth === undefined
       ? 'Bearer'
@@ -376,15 +381,24 @@ export function mcpHandler(
     const sessionId = request.headers.get('mcp-session-id');
     if (request.method === 'DELETE' && sessionId !== null) {
       sessions.delete(sessionId);
+      notices?.end(sessionId);
       return new Response(null, { status: 204 });
+    }
+    // The stream for what the server says unasked: a resource a session subscribed to changed, or the tools did.
+    if (request.method === 'GET' && notices !== undefined) {
+      if (sessionId === null || !sessions.has(sessionId)) {
+        return text(400, 'Open the event stream with the Mcp-Session-Id that initialize gave.');
+      }
+      return notices.stream(sessionId);
     }
     const version = request.headers.get('mcp-protocol-version');
     if (version !== null && !(MCP_PROTOCOL_VERSIONS as readonly string[]).includes(version)) {
       return text(400, `Unsupported MCP protocol version ${version}.`);
     }
     if (request.method !== 'POST') {
-      // GET is the optional stream for messages the server starts. There
-      // are no such messages, and 405 is how the transport says so.
+      // GET is the optional stream for messages the server starts. A
+      // surface that cannot watch has none, and 405 is how the transport
+      // says so.
       return new Response(null, { status: 405, headers: { allow: 'POST, DELETE' } });
     }
     let message: unknown;
@@ -434,7 +448,35 @@ export function mcpHandler(
       }
     }
     const context: AgentCallContext = caller === null || caller.client.name === '' ? {} : { agent: caller.client.name };
-    const handle = () => handleMcpMessage(grantedSurface(surface, grant), message, options, context);
+    const granted = grantedSurface(surface, grant);
+    const handle = async (): Promise<JsonRpcResponse | null> => {
+      if (
+        notices !== undefined &&
+        isRequest(message) &&
+        message.id !== undefined &&
+        (message.method === 'resources/subscribe' || message.method === 'resources/unsubscribe')
+      ) {
+        const uri = message.params?.uri;
+        if (typeof uri !== 'string' || session === null) {
+          return error(
+            message.id,
+            INVALID_PARAMS,
+            `${message.method} needs a uri, sent in a session initialize began.`
+          );
+        }
+        if (message.method === 'resources/unsubscribe') {
+          notices.unsubscribe(session.session, uri);
+          return ok(message.id, {});
+        }
+        if ((await granted.read(uri)) === undefined) {
+          return error(message.id, RESOURCE_NOT_FOUND, `No resource at ${uri}.`);
+        }
+        notices.subscribe(session.session, uri);
+        return ok(message.id, {});
+      }
+      const answered = await handleMcpMessage(granted, message, options, context);
+      return notices === undefined ? answered : withNotices(message, answered);
+    };
     const response = await (options.around === undefined ? handle() : options.around(caller, handle));
     if (response === null) return new Response(null, { status: 202 });
     const answered = json(200, response);
@@ -456,6 +498,131 @@ function relayedContext(params: Record<string, unknown>): AgentCallContext {
   const meta = params._meta;
   const agent = typeof meta === 'object' && meta !== null ? (meta as Record<string, unknown>)[AGENT_META] : undefined;
   return typeof agent === 'string' && agent !== '' ? { agent } : {};
+}
+
+/** How long a change waits for others to the same resource before it is said, in milliseconds. */
+const COALESCE_MS = 50;
+
+/** How often a quiet event stream says it is still there, in milliseconds, before a proxy gives up on it. */
+const KEEP_ALIVE_MS = 25_000;
+
+/**
+ * The server's side of what it says unasked: each session's event
+ * streams and the resources it subscribed to, fed from the surface's
+ * `watch`. A change to a resource reaches the sessions subscribed to it
+ * as `notifications/resources/updated`, once per burst; a change to the
+ * tools reaches every session as `notifications/tools/list_changed`.
+ */
+function notifier(surface: AgentSurfaceLike) {
+  const streams = new Map<string, Set<ReadableStreamDefaultController<Uint8Array>>>();
+  const subscribed = new Map<string, Set<string>>();
+  const waiting = new Set<string>();
+  const encoder = new TextEncoder();
+  let stopWatching: (() => void) | undefined;
+
+  const send = (session: string, method: string, params?: Record<string, unknown>): void => {
+    const event = encoder.encode(
+      `event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', method, ...(params === undefined ? {} : { params }) })}\n\n`
+    );
+    for (const controller of streams.get(session) ?? []) {
+      try {
+        controller.enqueue(event);
+      } catch {
+        // A stream the client closed between the change and now: its cancel removes it.
+      }
+    }
+  };
+
+  const heard = (change: AgentSurfaceChange): void => {
+    if (change.type === 'tools') {
+      for (const session of streams.keys()) send(session, 'notifications/tools/list_changed');
+      return;
+    }
+    if (waiting.has(change.uri)) return;
+    waiting.add(change.uri);
+    setTimeout(() => {
+      waiting.delete(change.uri);
+      for (const [session, uris] of subscribed) {
+        if (uris.has(change.uri)) send(session, 'notifications/resources/updated', { uri: change.uri });
+      }
+    }, COALESCE_MS);
+  };
+
+  const watchWhileOpen = (): void => {
+    const open = [...streams.values()].some(set => set.size > 0);
+    if (open && stopWatching === undefined) stopWatching = surface.watch!(heard);
+    if (!open && stopWatching !== undefined) {
+      stopWatching();
+      stopWatching = undefined;
+    }
+  };
+
+  return {
+    stream(session: string): Response {
+      let held: ReadableStreamDefaultController<Uint8Array> | undefined;
+      let alive: ReturnType<typeof setInterval> | undefined;
+      const body = new ReadableStream<Uint8Array>({
+        start: controller => {
+          held = controller;
+          const set = streams.get(session) ?? new Set();
+          set.add(controller);
+          streams.set(session, set);
+          controller.enqueue(encoder.encode(': gesso\n\n'));
+          alive = setInterval(() => controller.enqueue(encoder.encode(': still here\n\n')), KEEP_ALIVE_MS);
+          watchWhileOpen();
+        },
+        cancel: () => {
+          clearInterval(alive);
+          if (held !== undefined) streams.get(session)?.delete(held);
+          watchWhileOpen();
+        }
+      });
+      return new Response(body, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'mcp-session-id': session }
+      });
+    },
+    subscribe(session: string, uri: string): void {
+      const uris = subscribed.get(session) ?? new Set();
+      uris.add(uri);
+      subscribed.set(session, uris);
+    },
+    unsubscribe(session: string, uri: string): void {
+      subscribed.get(session)?.delete(uri);
+    },
+    end(session: string): void {
+      for (const controller of streams.get(session) ?? []) {
+        try {
+          controller.close();
+        } catch {
+          // Already closed.
+        }
+      }
+      streams.delete(session);
+      subscribed.delete(session);
+      watchWhileOpen();
+    }
+  };
+}
+
+/** An `initialize` answer that says this server sends what it says unasked: subscriptions, and lists that change. */
+function withNotices(message: unknown, answered: JsonRpcResponse | null): JsonRpcResponse | null {
+  if (answered === null || !('result' in answered) || !isRequest(message) || message.method !== 'initialize') {
+    return answered;
+  }
+  const result = answered.result as { capabilities?: Record<string, Record<string, unknown>> };
+  const capabilities = result.capabilities ?? {};
+  return {
+    ...answered,
+    result: {
+      ...result,
+      capabilities: {
+        ...capabilities,
+        tools: { ...capabilities.tools, listChanged: true },
+        resources: { ...capabilities.resources, subscribe: true, listChanged: true }
+      }
+    }
+  };
 }
 
 /** A session id no one can guess: 128 random bits, as hex. */

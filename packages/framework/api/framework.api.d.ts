@@ -22,6 +22,7 @@ import {
   AgentResource,
   agentSurface,
   AgentSurface,
+  AgentSurfaceChange,
   AgentSurfaceLike,
   AgentSurfaceOptions,
   agentText,
@@ -301,6 +302,7 @@ export {
   type AgentQuestion,
   type AgentResource,
   type AgentSurface,
+  type AgentSurfaceChange,
   type AgentSurfaceLike,
   type AgentSurfaceOptions,
   type AgentThemeName,
@@ -545,7 +547,14 @@ interface AgentSurfaceOptions {
   quietMs?: number;
   settleMs?: number;
 }
+type AgentSurfaceChange = {
+  readonly type: 'resource';
+  readonly uri: string;
+} | {
+  readonly type: 'tools';
+};
 interface AgentSurfaceLike {
+  watch?(listener: (change: AgentSurfaceChange) => void): () => void;
   tools(): readonly AgentTool[] | Promise<readonly AgentTool[]>;
   call(name: string, args: Readonly<Record<string, unknown>> | undefined, context?: AgentCallContext): Promise<AgentToolResult>;
   resources(): readonly AgentResource[] | Promise<readonly AgentResource[]>;
@@ -757,6 +766,7 @@ export {
   AgentResource,
   agentSurface,
   AgentSurface,
+  AgentSurfaceChange,
   AgentSurfaceLike,
   AgentSurfaceOptions,
   agentText,

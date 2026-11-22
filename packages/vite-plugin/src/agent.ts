@@ -76,7 +76,7 @@ export interface BridgeRequest {
   readonly url?: string;
   readonly headers: Readonly<Record<string, string | readonly string[] | undefined>>;
   on(event: 'data', listener: (chunk: { toString(): string }) => void): unknown;
-  on(event: 'end' | 'error', listener: () => void): unknown;
+  on(event: 'end' | 'error' | 'close', listener: () => void): unknown;
 }
 
 /** A response as Connect hands it over. */
@@ -84,6 +84,8 @@ export interface BridgeResponse {
   statusCode: number;
   setHeader(name: string, value: string): unknown;
   end(body?: string): unknown;
+  /** Writes part of a body and keeps the response open: an event stream's. */
+  write?(chunk: string): unknown;
 }
 
 export interface AgentBridgeOptions {
@@ -266,6 +268,13 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
   let next = 1;
   /** The agents connected, by the session id `initialize` gave each: the name each client gave itself. */
   const sessions = new Map<string, string>();
+  /** The open event streams, each a session's, for what the server says unasked. */
+  const streams = new Set<BridgeResponse>();
+  /** Tells every open stream that the tools changed: a page with other tools has answered. */
+  const toolsChanged = (): void => {
+    const event = `event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' })}\n\n`;
+    for (const stream of streams) stream.write?.(event);
+  };
   const startSession = (clientInfo: unknown): string => {
     const name = (clientInfo as { name?: unknown } | undefined)?.name;
     const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join(
@@ -402,7 +411,11 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           id,
           result: {
             protocolVersion: typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-06-18',
-            capabilities: { tools: {}, resources: {}, ...((local?.prompts ?? []).length === 0 ? {} : { prompts: {} }) },
+            capabilities: {
+              tools: { listChanged: true },
+              resources: {},
+              ...((local?.prompts ?? []).length === 0 ? {} : { prompts: {} })
+            },
             serverInfo: { name: options.name ?? 'gesso', version: '0.0.0' },
             ...(instructions.length === 0 ? {} : { instructions: instructions.join('\n\n') })
           }
@@ -498,6 +511,10 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
     if (JSON.stringify(now) === JSON.stringify(remembered)) {
       return;
     }
+    const names = (page: { tools: readonly { readonly name: string }[] }) => page.tools.map(tool => tool.name).join();
+    if (names(now) !== names(remembered)) {
+      toolsChanged();
+    }
     remembered = now;
     try {
       options.memory?.write(now);
@@ -540,6 +557,24 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
       if (request.method === 'DELETE' && sessionId !== undefined) {
         sessions.delete(sessionId);
         send(response, 204);
+        return;
+      }
+      // The stream for what the server says unasked: that the tools changed, when a page with other tools answers.
+      const accept = request.headers.accept;
+      if (
+        request.method === 'GET' &&
+        sessionId !== undefined &&
+        sessions.has(sessionId) &&
+        response.write !== undefined &&
+        (typeof accept === 'string' ? accept : (accept ?? []).join(',')).includes('text/event-stream')
+      ) {
+        response.statusCode = 200;
+        response.setHeader('content-type', 'text/event-stream');
+        response.setHeader('cache-control', 'no-cache');
+        response.setHeader('mcp-session-id', sessionId);
+        response.write(': gesso\n\n');
+        streams.add(response);
+        request.on('close', () => streams.delete(response));
         return;
       }
       if (request.method !== 'POST') {
@@ -678,14 +713,28 @@ function asRequest(
   };
 }
 
-/** A page's `initialize` answer under the name the dev server printed, so the server's name does not change when a page connects. */
+/**
+ * A page's `initialize` answer under the name the dev server printed, so
+ * the server's name does not change when a page connects, and saying
+ * that the tools can change, which the server's event stream says.
+ */
 function named(message: unknown, answer: unknown, name: string | undefined): unknown {
   const result = (answer as { result?: Record<string, unknown> } | null)?.result;
-  if (name === undefined || result === undefined || asRequest(message)?.method !== 'initialize') {
+  if (result === undefined || asRequest(message)?.method !== 'initialize') {
     return answer;
   }
   const serverInfo = typeof result.serverInfo === 'object' && result.serverInfo !== null ? result.serverInfo : {};
-  return { ...(answer as object), result: { ...result, serverInfo: { ...serverInfo, name } } };
+  const capabilities = (
+    typeof result.capabilities === 'object' && result.capabilities !== null ? result.capabilities : {}
+  ) as Record<string, Record<string, unknown>>;
+  return {
+    ...(answer as object),
+    result: {
+      ...result,
+      capabilities: { ...capabilities, tools: { ...capabilities.tools, listChanged: true } },
+      ...(name === undefined ? {} : { serverInfo: { ...serverInfo, name } })
+    }
+  };
 }
 
 /**
