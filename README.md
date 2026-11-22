@@ -395,7 +395,7 @@ Every Chrome-driven script runs with no browser-automation dependency: `--dump-d
 
 Gesso is an active research project: a serious attempt at building a small, deterministic UI runtime from first principles. The runtime is functional and heavily tested, on the evidence in the table above rather than on assertion.
 
-It is also published. All eight packages are on npm at **0.3.0**: `gesso-core`, `gesso-framework`, `gesso-components`, `gesso-testing`, `gesso-devtools`, `gesso-vite-plugin`, `gesso-electrobun` and `create-gesso-app`. `pnpm create gesso-app my-app` scaffolds a working project from them right now.
+It is also published. All eight packages are on npm at **0.9.0**: `gesso-core`, `gesso-framework`, `gesso-components`, `gesso-testing`, `gesso-devtools`, `gesso-vite-plugin`, `gesso-electrobun` and `create-gesso-app`. `pnpm create gesso-app my-app` scaffolds a working project from them right now.
 
 Pre-1.0 means the API still moves. What that buys you is that it moves in the open: every package's public surface is committed as an API report, so an addition or a removal shows up as a diff in review, and every release is a changeset that says in the package's `CHANGELOG.md` what changed and why.
 
