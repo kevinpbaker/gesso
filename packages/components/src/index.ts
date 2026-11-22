@@ -67,6 +67,15 @@ export {
   type SharedValue
 } from './Inspector';
 export * from './canvas';
+export {
+  Viewport,
+  clampCamera,
+  fitCamera,
+  zoomCameraAt,
+  type ViewportCamera,
+  type ViewportFrame,
+  type ViewportProps
+} from './Viewport';
 export type {
   CardProps,
   DividerProps,

@@ -182,6 +182,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'SplitPane', link: '/components/split-pane' },
       { text: 'PanelGroup', link: '/components/panel-group' },
       { text: 'ScrollArea', link: '/components/scroll-area' },
+      { text: 'Viewport', link: '/components/viewport' },
       { text: 'Tour', link: '/components/tour' },
       { text: 'FindBar', link: '/components/find-bar' },
       { text: 'MenuBar', link: '/components/menu-bar' },

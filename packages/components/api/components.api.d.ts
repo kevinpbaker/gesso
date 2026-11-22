@@ -879,6 +879,41 @@ interface CanvasEditorProps extends ControlLayoutProps {
   children?: UiChild;
 }
 declare function CanvasEditor(inputs: Inputs<CanvasEditorProps>, ctx: ComponentContext): UiChild;
+interface ViewportCamera {
+  readonly x: number;
+  readonly y: number;
+  readonly zoom: number;
+}
+interface ViewportFrame {
+  readonly contentWidth: number;
+  readonly contentHeight: number;
+  readonly width: number;
+  readonly height: number;
+  readonly minZoom: number;
+  readonly maxZoom: number;
+}
+interface ViewportProps extends ControlLayoutProps {
+  content: UiChild;
+  contentWidth: number;
+  contentHeight: number;
+  camera?: ViewportCamera;
+  defaultCamera?: ViewportCamera;
+  onCameraChange?: (camera: ViewportCamera) => void;
+  minZoom?: number;
+  maxZoom?: number;
+  panOnBackground?: boolean;
+  minimap?: boolean;
+  minimapPaint?: (surface: PaintSurface, scale: number) => void;
+  controls?: boolean;
+  label?: string;
+}
+declare function clampCamera(camera: ViewportCamera, frame: ViewportFrame): ViewportCamera;
+declare function fitCamera(frame: ViewportFrame): ViewportCamera;
+declare function zoomCameraAt(camera: ViewportCamera, at: {
+  readonly x: number;
+  readonly y: number;
+}, factor: number, frame: ViewportFrame): ViewportCamera;
+declare function Viewport(inputs: Inputs<ViewportProps>, ctx: ComponentContext): UiChild;
 interface SplitPaneProps extends ControlLayoutProps {
   split?: number;
   defaultSplit?: number;
@@ -1903,6 +1938,7 @@ export {
   cellName,
   Checkbox,
   Chip,
+  clampCamera,
   clockTime,
   ColorPalette,
   ColorPicker,
@@ -1932,6 +1968,7 @@ export {
   filterCommands,
   filterShortcutSections,
   FindBar,
+  fitCamera,
   followTransport,
   form,
   formatDate,
@@ -2225,6 +2262,9 @@ export {
   type VideoPlayerProps,
   type VideoProps,
   type VideoReadout,
+  type ViewportCamera,
+  type ViewportFrame,
+  type ViewportProps,
   type VirtualList,
   unionRect,
   UnitField,
@@ -2232,6 +2272,8 @@ export {
   Video,
   VideoControls,
   VideoPlayer,
+  Viewport,
   virtualList,
+  zoomCameraAt,
   zoomStep
 };
