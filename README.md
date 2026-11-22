@@ -117,12 +117,12 @@ Gesso is easy for a coding agent to write, too: every new project carries an `AG
 
 Gesso is a runtime for **applications**: editors, dashboards, tools, anything with a hundred thousand rows or a computation the interface must not wait on. It is the wrong tool for anything whose value is being read by a crawler.
 
-| Reach for it when                                                   | Don't when                                                                   |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Your app does real work and the interface must not feel it          | Your screen is a document, an article or a marketing page                    |
-| A scroll through 100,000 rows has to stay at 60 fps                 | Crawlers, view-source or browser extensions need to read it                  |
-| You want layout you can reason about and ask questions of           | You need native form controls: autofill, password managers, mobile keyboards |
-| You want tests that run in node and query what a screen reader sees | You need the React ecosystem more than you need the thread                   |
+| Reach for it when                                                   | Don't when                                                                                                          |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Your app does real work and the interface must not feel it          | Your screen is a document, an article or a marketing page                                                           |
+| A scroll through 100,000 rows has to stay at 60 fps                 | Crawlers, view-source or browser extensions need to read it                                                         |
+| You want layout you can reason about and ask questions of           | Most of the screen is form fields or someone else's DOM ([DOM islands](apps/docs/guide/dom-islands.md) cover a few) |
+| You want tests that run in node and query what a screen reader sees | You need the React ecosystem more than you need the thread                                                          |
 
 The long form, with a framework-by-framework comparison and the list of what has **not** been proven, is [Why Gesso](https://gesso-docs.vercel.app/guide/why-gesso).
 

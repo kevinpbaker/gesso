@@ -158,9 +158,16 @@ Read the right-hand columns as the price. If your screen is a document, or its v
 ## Where it doesn't belong
 
 Documents. Articles, marketing pages, anything whose value is being
-indexed and linked: a canvas has nothing for a crawler to read. Native
-form controls also bring autofill, password managers and mobile
-keyboards that a canvas cannot match.
+indexed and linked: a canvas has nothing for a crawler to read.
+
+Screens that are mostly native DOM. A sign-in form or a card field
+that a password manager or autofill must fill can be a
+[DOM island](/guide/dom-islands): a real `<input>` that the shell
+places over a box in the layout. A map or a widget from another vendor
+can be one too. But each island is DOM on the main thread, and it is
+one frame behind the canvas while it scrolls. A product that is mostly
+forms, or mostly embedded widgets, pays for the canvas and gets little
+from it. Islands are checked in Chrome only so far.
 
 [Is Gesso for your project?](/guide/is-gesso-for-you) is the one-minute
 version of that decision, with the alternatives named; [What Gesso
