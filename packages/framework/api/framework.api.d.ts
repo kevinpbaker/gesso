@@ -44,6 +44,7 @@ import {
   resolveTarget,
   resourceUri,
   resultText,
+  SCOPE_META,
   SCREEN_TOOL_NAMES,
   serveApplicationAgent,
   toolSurface,
@@ -56,6 +57,23 @@ import {
 import {
   UiTheme
 } from "gesso-core";
+interface AgentGrant {
+  readonly subject?: string;
+  readonly scopes: readonly string[];
+}
+declare const FULL_GRANT: AgentGrant;
+interface McpOAuthOptions {
+  readonly resource: string;
+  readonly authorizationServers: readonly string[];
+  readonly scopesSupported?: readonly string[];
+  readonly resourceName?: string;
+}
+declare const PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource";
+declare function grantAllows(grant: AgentGrant, scope: string | undefined): boolean;
+declare function scopeOf(item: Pick<AgentTool, '_meta'> | Pick<AgentResource, '_meta'>): string | undefined;
+declare function protectedResourceMetadata(surface: AgentSurfaceLike, oauth: McpOAuthOptions): Promise<Record<string, unknown>>;
+declare function protectedResourceMetadataUrl(resource: string): string;
+declare function grantedSurface(surface: AgentSurfaceLike, grant: AgentGrant): AgentSurfaceLike;
 declare const AGENT_META = "gesso/agent";
 declare const OPERATE_INSTRUCTIONS: string;
 declare const MCP_PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26'];
@@ -104,10 +122,13 @@ interface McpCaller {
     readonly name: string;
     readonly version: string;
   };
+  readonly grant?: AgentGrant;
 }
 interface McpHandlerOptions extends McpServerInfo {
   allowedOrigins?: readonly string[];
   token?: string;
+  authorize?: (request: Request) => AgentGrant | null | Promise<AgentGrant | null>;
+  oauth?: McpOAuthOptions;
   around?: (caller: McpCaller | null, handle: () => Promise<JsonRpcResponse | null>) => Promise<JsonRpcResponse | null>;
 }
 declare function mcpHandler(surface: AgentSurfaceLike, options?: McpHandlerOptions): (request: Request) => Promise<Response>;
@@ -235,6 +256,9 @@ export {
   DEV_AGENT_EVENTS,
   fillQuestion,
   formatThemeTokens,
+  FULL_GRANT,
+  grantAllows,
+  grantedSurface,
   handleMcpMessage,
   listedPrompts,
   MCP_PROTOCOL_VERSIONS,
@@ -245,6 +269,9 @@ export {
   outline,
   pageModelContext,
   promptMessages,
+  PROTECTED_RESOURCE_PATH,
+  protectedResourceMetadata,
+  protectedResourceMetadataUrl,
   recordAgentActivity,
   registerWebMcpTools,
   remoteSurface,
@@ -252,6 +279,8 @@ export {
   resolveTarget,
   resourceUri,
   resultText,
+  SCOPE_META,
+  scopeOf,
   SCREEN_TOOL_NAMES,
   serveAgentPort,
   serveApplicationAgent,
@@ -265,6 +294,7 @@ export {
   type AgentConfirmContext,
   type AgentConfirmResult,
   type AgentContent,
+  type AgentGrant,
   type AgentPortRequest,
   type AgentPortResponse,
   type AgentPrompt,
@@ -286,6 +316,7 @@ export {
   type JsonRpcResponse,
   type McpCaller,
   type McpHandlerOptions,
+  type McpOAuthOptions,
   type McpServerInfo,
   type ModelContextLike,
   type RenderDependencies,
@@ -337,6 +368,7 @@ interface CommandSchema {
   readonly confirm?: true;
   readonly question?: string;
   readonly hidden?: true;
+  readonly scope?: string;
 }
 interface QuerySchema {
   readonly description?: string;
@@ -345,6 +377,7 @@ interface QuerySchema {
   readonly rest?: true;
   readonly input: JsonSchema;
   readonly hidden?: true;
+  readonly scope?: string;
 }
 interface ChannelSchema {
   readonly description?: string;
@@ -354,6 +387,7 @@ interface ChannelSchema {
   readonly commands: {
     readonly [name: string]: CommandSchema;
   };
+  readonly scope?: string;
   readonly queries?: {
     readonly [name: string]: QuerySchema;
   };
@@ -461,11 +495,13 @@ interface AgentTool {
   readonly _meta?: Readonly<Record<string, unknown>>;
 }
 declare const WAITS_UP_TO = "gesso/waitsUpToMs";
+declare const SCOPE_META = "gesso/scope";
 interface AgentResource {
   readonly uri: string;
   readonly name: string;
   readonly description?: string;
   readonly mimeType: 'application/json';
+  readonly _meta?: Readonly<Record<string, unknown>>;
 }
 type AgentContent = {
   readonly type: 'text';
@@ -677,6 +713,7 @@ interface AgentToolDefinition {
   readonly readOnly?: boolean;
   readonly destructive?: boolean;
   readonly idempotent?: boolean;
+  readonly scope?: string;
   readonly waitsUpToMs?: number;
   run(args: Readonly<Record<string, unknown>>): AgentToolResult | Promise<AgentToolResult>;
 }
@@ -772,6 +809,7 @@ export {
   resolveTarget,
   resourceUri,
   resultText,
+  SCOPE_META,
   SCREEN_TOOL_NAMES,
   serve,
   serveApplicationAgent,

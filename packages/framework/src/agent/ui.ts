@@ -4,6 +4,7 @@ import type { JsonSchema } from '../channel/ChannelSchema';
 import {
   agentAnswer,
   refusal,
+  SCOPE_META,
   type AgentAnswer,
   type AgentCallContext,
   type AgentConfirmation,
@@ -144,7 +145,8 @@ const TOOLS: readonly AgentTool[] = [
       'expected. Prefer a channel tool when one covers what you want; these act on the interface, as the person ' +
       'would.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false }
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    _meta: { [SCOPE_META]: 'screen' }
   },
   {
     name: 'ui_press',
@@ -155,7 +157,8 @@ const TOOLS: readonly AgentTool[] = [
       'to press, not yours, unless they asked you to. A control marked (asks the person first) is put to them before ' +
       'it is pressed.',
     inputSchema: { type: 'object', properties: TARGET, additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    _meta: { [SCOPE_META]: 'screen' }
   },
   {
     name: 'ui_type',
@@ -169,14 +172,16 @@ const TOOLS: readonly AgentTool[] = [
       required: ['text'],
       additionalProperties: false
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    _meta: { [SCOPE_META]: 'screen' }
   },
   {
     name: 'ui_focus',
     title: 'Focus a control',
     description: 'Moves keyboard focus to a control, by ref or by role and name. Returns the screen afterwards.',
     inputSchema: { type: 'object', properties: TARGET, additionalProperties: false },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: { [SCOPE_META]: 'screen' }
   },
   {
     name: 'ui_key',
@@ -196,7 +201,8 @@ const TOOLS: readonly AgentTool[] = [
       required: ['key'],
       additionalProperties: false
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    _meta: { [SCOPE_META]: 'screen' }
   },
   {
     name: 'tokens_view',
@@ -207,7 +213,8 @@ const TOOLS: readonly AgentTool[] = [
       'by role and name, to read the theme where it is: part of a screen may have a theme of its own. Example: {}, ' +
       'or {"theme": "dark"}.',
     inputSchema: { type: 'object', properties: { ...TARGET, theme: THEME }, additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false }
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    _meta: { [SCOPE_META]: 'design' }
   },
   {
     name: 'render_frame',
@@ -241,7 +248,8 @@ const TOOLS: readonly AgentTool[] = [
       required: ['module', 'width'],
       additionalProperties: false
     },
-    annotations: { readOnlyHint: true, openWorldHint: false }
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    _meta: { [SCOPE_META]: 'design' }
   }
 ];
 

@@ -30,6 +30,8 @@ import { blankLiterals, findCalls, importSources } from './source.ts';
  *   - `@destructive`, `@idempotent`, `@confirm` and `@hidden` on a
  *     command are its annotations; `CommandSchema` says what each means.
  *     Text after `@confirm` is the question the person is asked.
+ *   - `@scope name` on a command or query is the scope an agent's grant
+ *     needs to use it; on the token, what its scopes are named after.
  *   - A query (the token's third type argument, `ChannelSpec.queries`)
  *     is read as a command is, with its `@returns` text, and its answer
  *     is checked as plain data; `@hidden` keeps it from an agent.
@@ -52,6 +54,7 @@ export type TypeScriptApi = typeof TsApi;
 export interface ChannelSchemaOut {
   description?: string;
   internal?: true;
+  scope?: string;
   view: JsonSchema;
   hidden?: string[];
   commands: Record<string, CommandSchemaOut>;
@@ -65,6 +68,7 @@ interface QuerySchemaOut {
   rest?: true;
   input: JsonSchema;
   hidden?: true;
+  scope?: string;
 }
 
 interface CommandSchemaOut {
@@ -77,6 +81,7 @@ interface CommandSchemaOut {
   confirm?: true;
   question?: string;
   hidden?: true;
+  scope?: string;
 }
 
 type JsonSchema = Record<string, unknown>;
@@ -118,6 +123,15 @@ export interface ContractReading {
   readonly channels: ReadonlyMap<string, ChannelSchemaOut>;
   /** One sentence per value that could not be described, naming where it is. */
   readonly warnings: readonly string[];
+}
+
+/** `@scope name`: the first word after the tag, or undefined when there is none. */
+function scopeTag(tags: readonly TsApi.JSDocTagInfo[]): string | undefined {
+  const word = tags
+    .find(tag => tag.name === 'scope')
+    ?.text?.trim()
+    .split(/\s+/)[0];
+  return word === undefined || word === '' ? undefined : word;
 }
 
 /** The functions that declare a channel. */
@@ -699,6 +713,10 @@ class Describer {
     if (this.checker.getJsDocTagsOfSymbol(token).some(tag => tag.name === 'hidden')) {
       out.internal = true;
     }
+    const scope = scopeTag(this.checker.getJsDocTagsOfSymbol(token));
+    if (scope !== undefined) {
+      out.scope = scope;
+    }
     const hidden = this.checker
       .getPropertiesOfType(view)
       .filter(key => this.checker.getJsDocTagsOfSymbol(key).some(tag => tag.name === 'hidden'))
@@ -771,14 +789,15 @@ class Describer {
     const returns = this.checker
       .getJsDocTagsOfSymbol(symbol)
       .find(tag => (tag.name === 'returns' || tag.name === 'return') && (tag.text ?? '').trim() !== '');
-    const { description, parameters, rest, input, hidden } = read;
+    const { description, parameters, rest, input, hidden, scope } = read;
     return {
       ...(description === undefined ? {} : { description }),
       ...(returns === undefined ? {} : { returns: returns.text!.trim() }),
       parameters,
       ...(rest === undefined ? {} : { rest }),
       input,
-      ...(hidden === undefined ? {} : { hidden })
+      ...(hidden === undefined ? {} : { hidden }),
+      ...(scope === undefined ? {} : { scope })
     };
   }
 
@@ -837,6 +856,10 @@ class Describer {
     const question = tags.find(tag => tag.name === 'confirm')?.text?.trim();
     if (question !== undefined && question !== '') {
       out.question = question;
+    }
+    const scope = scopeTag(tags);
+    if (scope !== undefined) {
+      out.scope = scope;
     }
     return out;
   }

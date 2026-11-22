@@ -54,6 +54,8 @@ export interface CommandSchema {
   readonly question?: string;
   /** `@hidden`: for the application's own components, not for an agent. */
   readonly hidden?: true;
+  /** `@scope name`: the scope an agent's grant must hold to send it, in place of `<channel>:write`. */
+  readonly scope?: string;
 }
 
 /** One query, described: a command's parameters, and what it answers with. */
@@ -70,6 +72,8 @@ export interface QuerySchema {
   readonly input: JsonSchema;
   /** `@hidden`: not offered to an agent. */
   readonly hidden?: true;
+  /** `@scope name`: the scope an agent's grant must hold to ask it, in place of `<channel>:read`. */
+  readonly scope?: string;
 }
 
 /** A channel, described. */
@@ -96,6 +100,12 @@ export interface ChannelSchema {
    */
   readonly internal?: true;
   readonly commands: { readonly [name: string]: CommandSchema };
+  /**
+   * `@scope name` on the token: what its scopes are named after, in
+   * place of the channel's name, so `@scope tracker` makes its reads
+   * `tracker:read` and its commands `tracker:write`.
+   */
+  readonly scope?: string;
   /** The queries an agent can ask (`ChannelSpec.queries`), absent when there are none. */
   readonly queries?: { readonly [name: string]: QuerySchema };
 }

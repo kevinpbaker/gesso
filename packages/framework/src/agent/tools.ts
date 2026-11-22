@@ -1,5 +1,6 @@
 import type { JsonSchema } from '../channel/ChannelSchema';
 import {
+  SCOPE_META,
   WAITS_UP_TO,
   type AgentContent,
   type AgentSurfaceLike,
@@ -42,6 +43,8 @@ export interface AgentToolDefinition {
   readonly destructive?: boolean;
   /** Calling it twice with the same arguments does what calling it once did. */
   readonly idempotent?: boolean;
+  /** The scope an agent's grant must hold to call it (`mcpHandler`'s `authorize`); `app:read` or `app:write` by default. */
+  readonly scope?: string;
   /**
    * How long a call may take, in milliseconds, for a tool that waits on
    * purpose: for a person to answer, or for something to happen (a tool
@@ -94,7 +97,10 @@ export function toolSurface(definitions: () => readonly AgentToolDefinition[]): 
       ...(definition.idempotent === undefined ? {} : { idempotentHint: definition.idempotent }),
       openWorldHint: false
     },
-    ...(definition.waitsUpToMs === undefined ? {} : { _meta: { [WAITS_UP_TO]: definition.waitsUpToMs } })
+    _meta: {
+      [SCOPE_META]: definition.scope ?? (definition.readOnly === true ? 'app:read' : 'app:write'),
+      ...(definition.waitsUpToMs === undefined ? {} : { [WAITS_UP_TO]: definition.waitsUpToMs })
+    }
   });
   return {
     tools: () => definitions().map(listed),

@@ -58,6 +58,7 @@ describe('a surface across a port', () => {
     serveAgentPort(pair.port2, () => toolSurface(() => [slowly('wait_for_task', 500), slowly('measure')]));
     const remote = remoteSurface(pair.port1, { timeoutMs: 10, callTimeoutMs: 20 });
     expect((await remote.tools()).find(tool => tool.name === 'wait_for_task')?._meta).toEqual({
+      'gesso/scope': 'app:write',
       'gesso/waitsUpToMs': 500
     });
     expect(resultText(await remote.call('wait_for_task', {}))).toBe('here');

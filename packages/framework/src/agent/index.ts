@@ -4,6 +4,7 @@ export {
   fillQuestion,
   resourceUri,
   resultText,
+  SCOPE_META,
   type AgentAnswer,
   type AgentCallContext,
   type AgentConfirmation,
@@ -33,6 +34,17 @@ export {
   type McpServerInfo
 } from './mcp';
 export { validate } from './validate';
+export {
+  FULL_GRANT,
+  grantAllows,
+  grantedSurface,
+  PROTECTED_RESOURCE_PATH,
+  protectedResourceMetadata,
+  protectedResourceMetadataUrl,
+  scopeOf,
+  type AgentGrant,
+  type McpOAuthOptions
+} from './auth';
 export {
   AGENT_PORT,
   combineSurfaces,

@@ -653,7 +653,8 @@ worker take directly. The framework imports no server. It answers with
 JSON rather than an event stream, which the transport allows, and has
 nothing to push, so it declines the event stream with a 405.
 
-Two options guard it:
+Two options guard it, and a third, `authorize`, decides what each agent
+may do (see [Scopes and OAuth](#scopes-and-oauth)):
 
 - **`allowedOrigins`.** A request with any other `Origin` header is
   refused. Without that, a web page the person has open could reach a
@@ -666,6 +667,56 @@ Two options guard it:
 Bind to `127.0.0.1`, not to every interface, unless you mean it. The
 token is compared in constant time, so it cannot be guessed a character
 at a time from how quickly a wrong one is refused.
+
+### Scopes and OAuth
+
+One token lets an agent do everything. For agents that may do some
+things and not others, give `authorize` instead. It takes each request
+and returns what that request may do, or null to refuse it:
+
+```ts
+mcpHandler(surface, {
+  name: 'tracker',
+  authorize: async request => {
+    const claims = await verifyAccessToken(request.headers.get('authorization'));
+    return claims === null ? null : { subject: claims.sub, scopes: claims.scope.split(' ') };
+  },
+  oauth: { resource: 'https://tracker.example.com/mcp', authorizationServers: ['https://auth.example.com'] }
+});
+```
+
+Every tool says the scope it needs, under `_meta['gesso/scope']`:
+
+| Tool                                       | Scope                     |
+| ------------------------------------------ | ------------------------- |
+| `<channel>_view`, a query, a view resource | `<channel>:read`          |
+| A command                                  | `<channel>:write`         |
+| `ui_*`                                     | `screen`                  |
+| `tokens_view`, `render_frame`              | `design`                  |
+| An app's own tool                          | `app:read` or `app:write` |
+
+`<channel>:write` includes `<channel>:read`, and `*` is everything.
+`@scope admin` on a command or a query gives it a scope of its own.
+`@scope tracker` on the token names its scopes `tracker:read` and
+`tracker:write` instead of after the channel. An app's own tool takes
+`scope` beside `readOnly`.
+
+An agent is listed only the tools and resources its grant holds. A call
+of any other tool is refused with HTTP 403 and
+`WWW-Authenticate: Bearer error="insufficient_scope", scope="issues:write"`,
+which is how MCP tells a client to ask for more. `around` is told the
+grant as `caller.grant`.
+
+With `oauth`, Gesso takes the part of the resource server in MCP's
+authorization flow. A refused request's 401 points at the server's
+protected resource metadata (RFC 9728), which `mcpHandler` answers
+under `/.well-known/oauth-protected-resource`. The metadata gives the
+authorization servers and every scope the tools need.
+`protectedResourceMetadata(surface, oauth)` gives the same metadata to
+a server that routes that path somewhere else. Checking a token (its
+signature, that its audience is the `resource`, that it has not
+expired) is `authorize`'s job. Gesso is not an authorization server,
+and it does not register clients.
 
 ### Prompts
 

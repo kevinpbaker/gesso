@@ -24,7 +24,8 @@ describe("an application's own agent tools", () => {
         name: 'board_measure',
         description: 'How wide a screen is.',
         inputSchema: measure.inputSchema,
-        annotations: { readOnlyHint: true, openWorldHint: false }
+        annotations: { readOnlyHint: true, openWorldHint: false },
+        _meta: { 'gesso/scope': 'app:read' }
       }
     ]);
     expect(await surface.call('board_measure', { screen: 'SignIn' })).toEqual({

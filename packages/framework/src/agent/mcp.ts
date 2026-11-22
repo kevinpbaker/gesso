@@ -1,3 +1,14 @@
+import {
+  FULL_GRANT,
+  grantAllows,
+  grantedSurface,
+  PROTECTED_RESOURCE_PATH,
+  protectedResourceMetadata,
+  protectedResourceMetadataUrl,
+  scopeOf,
+  type AgentGrant,
+  type McpOAuthOptions
+} from './auth';
 import type { AgentCallContext, AgentSurfaceLike } from './AgentSurface';
 
 /**
@@ -263,6 +274,8 @@ export interface McpCaller {
   readonly number: number;
   /** What the client said it was in `initialize`'s `clientInfo`; an empty name when it said nothing. */
   readonly client: { readonly name: string; readonly version: string };
+  /** What this request may do, from `authorize` (or the one `token`); everything when neither is set. */
+  readonly grant?: AgentGrant;
 }
 
 /** The most sessions remembered at once; the oldest is forgotten first, and its requests are then from an unknown caller. */
@@ -280,9 +293,30 @@ export interface McpHandlerOptions extends McpServerInfo {
   /**
    * A secret every request must carry as `Authorization: Bearer
    * <token>`. Worth setting whenever the port is reachable by anything
-   * other than the person's own agents.
+   * other than the person's own agents. It grants every scope; for
+   * agents allowed some tools and not others, use `authorize`.
    */
   token?: string;
+  /**
+   * Decides what each request may do, from the request itself (its
+   * `Authorization` header, as a rule): an `AgentGrant`, or null to
+   * refuse it with a 401. A grant's scopes decide which tools and
+   * resources the agent is listed and may call; see `AgentGrant`.
+   * Checking a token (its signature, that its audience is this
+   * resource, that it has not expired) is this function's job.
+   *
+   *   authorize: async request => {
+   *     const claims = await verifyAccessToken(request.headers.get('authorization'));
+   *     return claims === null ? null : { subject: claims.sub, scopes: claims.scope.split(' ') };
+   *   }
+   */
+  authorize?: (request: Request) => AgentGrant | null | Promise<AgentGrant | null>;
+  /**
+   * Where agents get a token, for MCP's authorization flow. With it, a
+   * refused request's 401 points at this server's protected resource
+   * metadata (RFC 9728), which is answered at `PROTECTED_RESOURCE_PATH`.
+   */
+  oauth?: McpOAuthOptions;
   /**
    * Runs around every request, told who sent it: the session and the
    * client it belongs to, or null for a request outside any session. A
@@ -309,16 +343,35 @@ export function mcpHandler(
 ): (request: Request) => Promise<Response> {
   const sessions = new Map<string, McpCaller>();
   let begun = 0;
+  const challenge =
+    options.oauth === undefined
+      ? 'Bearer'
+      : `Bearer resource_metadata="${protectedResourceMetadataUrl(options.oauth.resource)}"`;
   return async request => {
     const origin = request.headers.get('origin');
     if (origin !== null && !(options.allowedOrigins ?? []).includes(origin)) {
       return text(403, `Requests from ${origin} are not allowed.`);
     }
+    // Where to get a token is said to anyone: it is how an agent without one learns to ask.
     if (
+      options.oauth !== undefined &&
+      request.method === 'GET' &&
+      new URL(request.url).pathname.startsWith(PROTECTED_RESOURCE_PATH)
+    ) {
+      return json(200, await protectedResourceMetadata(surface, options.oauth));
+    }
+    let grant: AgentGrant = FULL_GRANT;
+    if (options.authorize !== undefined) {
+      const given = await options.authorize(request);
+      if (given === null) {
+        return text(401, 'This server needs a valid access token.', { 'www-authenticate': challenge });
+      }
+      grant = given;
+    } else if (
       options.token !== undefined &&
       !sameText(request.headers.get('authorization') ?? '', `Bearer ${options.token}`)
     ) {
-      return text(401, 'This server needs a bearer token.');
+      return text(401, 'This server needs a bearer token.', { 'www-authenticate': challenge });
     }
     const sessionId = request.headers.get('mcp-session-id');
     if (request.method === 'DELETE' && sessionId !== null) {
@@ -355,9 +408,33 @@ export function mcpHandler(
       sessions.set(started.session, started);
       if (sessions.size > MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
     }
-    const caller = started ?? (sessionId === null ? null : (sessions.get(sessionId) ?? null));
+    const session = started ?? (sessionId === null ? null : (sessions.get(sessionId) ?? null));
+    const caller = session === null ? null : { ...session, grant };
+    // A call of a tool the grant does not hold is refused as the transport says: 403, naming the scope to ask for.
+    if (
+      !grant.scopes.includes('*') &&
+      isRequest(message) &&
+      message.method === 'tools/call' &&
+      typeof message.params?.name === 'string'
+    ) {
+      const tool = (await surface.tools()).find(each => each.name === message.params!.name);
+      const scope = tool === undefined ? undefined : scopeOf(tool);
+      if (!grantAllows(grant, scope)) {
+        return json(
+          403,
+          error(
+            message.id ?? null,
+            INVALID_REQUEST,
+            `Calling ${tool!.name} needs the scope ${scope}, which this token does not have.`
+          ),
+          {
+            'www-authenticate': `Bearer error="insufficient_scope", scope="${scope}"${options.oauth === undefined ? '' : `, resource_metadata="${protectedResourceMetadataUrl(options.oauth.resource)}"`}`
+          }
+        );
+      }
+    }
     const context: AgentCallContext = caller === null || caller.client.name === '' ? {} : { agent: caller.client.name };
-    const handle = () => handleMcpMessage(surface, message, options, context);
+    const handle = () => handleMcpMessage(grantedSurface(surface, grant), message, options, context);
     const response = await (options.around === undefined ? handle() : options.around(caller, handle));
     if (response === null) return new Response(null, { status: 202 });
     const answered = json(200, response);
@@ -417,10 +494,10 @@ function error(id: JsonRpcId | null, code: number, message: string): JsonRpcResp
   return { jsonrpc: '2.0', id, error: { code, message } };
 }
 
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
 }
 
-function text(status: number, body: string): Response {
-  return new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+function text(status: number, body: string, headers: Record<string, string> = {}): Response {
+  return new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8', ...headers } });
 }

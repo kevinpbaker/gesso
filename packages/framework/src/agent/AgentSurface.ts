@@ -74,12 +74,23 @@ export interface AgentTool {
 /** The `_meta` key a tool that waits on purpose says how long under, in milliseconds. */
 export const WAITS_UP_TO = 'gesso/waitsUpToMs';
 
+/**
+ * The `_meta` key a tool says the scope it needs under, for a server
+ * that grants agents some tools and not others (`mcpHandler`'s
+ * `authorize`): `<channel>:read` for a view or a query, `<channel>:write`
+ * for a command, `screen` for the screen tools, `design` for the design
+ * tools, `app:read` or `app:write` for an application's own.
+ */
+export const SCOPE_META = 'gesso/scope';
+
 /** A resource, in the shape MCP's `resources/list` returns. */
 export interface AgentResource {
   readonly uri: string;
   readonly name: string;
   readonly description?: string;
   readonly mimeType: 'application/json';
+  /** MCP's own place for what is not in its schema: `gesso/scope`, the scope reading it needs. */
+  readonly _meta?: Readonly<Record<string, unknown>>;
 }
 
 /** One part of a tool's answer: text, or a picture, as `render_frame` returns. */
@@ -236,6 +247,8 @@ interface Entry {
   readonly hidden: ReadonlySet<string>;
   readonly commands: ReadonlyMap<string, CommandSchema | null>;
   readonly queries: ReadonlyMap<string, QuerySchema | null>;
+  /** What its scopes are named after: `@scope` on the token, else the channel's name. */
+  readonly scope: string;
   /**
    * Every change this channel's view has seen, and when the last was,
    * so a command can tell its own effect from what came before it.
@@ -347,6 +360,7 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
       hidden: new Set(schema?.hidden ?? []),
       commands,
       queries,
+      scope: schema?.scope ?? served.token.name,
       changes: 0,
       lastChange: 0
     };
@@ -360,7 +374,8 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
         description: `What the ${served.token.name} channel currently holds.${about}`,
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         ...(entry.viewSchema === undefined ? {} : { outputSchema: entry.viewSchema }),
-        annotations: { readOnlyHint: true, openWorldHint: false }
+        annotations: { readOnlyHint: true, openWorldHint: false },
+        _meta: { [SCOPE_META]: `${entry.scope}:read` }
       },
       async () => {
         follow();
@@ -500,7 +515,8 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
         uri: resourceUri(entry.served.token.name),
         name: entry.served.token.name,
         ...(entry.description === undefined ? {} : { description: entry.description }),
-        mimeType: 'application/json' as const
+        mimeType: 'application/json' as const,
+        _meta: { [SCOPE_META]: `${entry.scope}:read` }
       })),
     read: uri => {
       const entry = entries.find(candidate => resourceUri(candidate.served.token.name) === uri);
@@ -672,7 +688,8 @@ function commandTool(entry: Entry, command: string, described: CommandSchema | n
       ...(destructive ? { destructiveHint: true } : { destructiveHint: false }),
       ...(described?.idempotent === true ? { idempotentHint: true } : {}),
       openWorldHint: false
-    }
+    },
+    _meta: { [SCOPE_META]: described?.scope ?? `${entry.scope}:write` }
   };
 }
 
@@ -698,7 +715,8 @@ function queryTool(entry: Entry, query: string, described: QuerySchema | null): 
         additionalProperties: false
       } satisfies JsonSchema),
     // No `outputSchema`, as for a command: a row type repeated on every query is what made tool lists heavy.
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    _meta: { [SCOPE_META]: described?.scope ?? `${entry.scope}:read` }
   };
 }
 

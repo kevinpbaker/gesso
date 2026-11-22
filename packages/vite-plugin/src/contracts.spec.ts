@@ -38,7 +38,10 @@ import type { ProductRow } from './rows';
 
 type Status = 'loading' | 'ready' | 'error';
 
-/** The shop's catalogue. */
+/**
+ * The shop's catalogue.
+ * @scope shop
+ */
 export const Catalog = defineChannel('catalog', {
   view: {
     /** Every product, in shelf order. */
@@ -64,6 +67,7 @@ export const Catalog = defineChannel('catalog', {
     /**
      * Empties the basket.
      * @confirm Empty the basket of {count} things?
+     * @scope basket-admin
      */
     empty(count: number): void;
     /** @hidden */
@@ -268,6 +272,7 @@ describe('a contract, read by the checker', () => {
   it('describes exported tokens and nothing else', () => {
     expect([...catalog.channels.keys()]).toEqual(['Catalog']);
     expect(catalog.channels.get('Catalog')!.description).toBe("The shop's catalogue.");
+    expect(catalog.channels.get('Catalog')!.scope).toBe('shop');
   });
 
   it('describes the view from types it had to resolve across files and aliases', () => {
@@ -333,8 +338,10 @@ describe('a contract, read by the checker', () => {
     expect(addToCart.question).toBeUndefined();
     expect(catalog.channels.get('Catalog')!.commands.empty).toMatchObject({
       confirm: true,
-      question: 'Empty the basket of {count} things?'
+      question: 'Empty the basket of {count} things?',
+      scope: 'basket-admin'
     });
+    expect(addToCart.scope).toBeUndefined();
   });
 
   it('lets a command carry bytes, described as base64 tagged with what they become', () => {

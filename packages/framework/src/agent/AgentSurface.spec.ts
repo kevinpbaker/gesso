@@ -409,7 +409,8 @@ describe('an agent surface', () => {
         uri: 'gesso://notes/view',
         name: 'notes',
         description: 'The notes the person has written.',
-        mimeType: 'application/json'
+        mimeType: 'application/json',
+        _meta: { 'gesso/scope': 'notes:read' }
       }
     ]);
     expect(surface.read(resourceUri('notes'))).toEqual({ rows: [{ id: '1', title: 'A' }], status: 'ready' });
