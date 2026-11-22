@@ -914,6 +914,29 @@ interface PanelGroupProps extends ControlLayoutProps {
   divider?: 'line' | 'bar';
 }
 declare function PanelGroup(inputs: Inputs<PanelGroupProps>, _ctx: ComponentContext): UiChild;
+type StatusBarTone = 'muted' | 'default' | 'primary' | 'danger';
+interface StatusBarItem {
+  readonly key: string;
+  readonly text: string | Observable<string>;
+  readonly label?: string | Observable<string>;
+  readonly icon?: NavigationIcon;
+  readonly side?: 'start' | 'end';
+  readonly tone?: StatusBarTone | Observable<StatusBarTone>;
+  readonly tooltip?: string;
+  readonly busy?: boolean | Observable<boolean>;
+  readonly live?: boolean;
+  readonly onClick?: () => void;
+}
+interface StatusBarProps extends ControlLayoutProps {
+  items: readonly StatusBarItem[];
+  zoom?: number;
+  defaultZoom?: number;
+  onZoomChange?: (zoom: number) => void;
+  zoomSteps?: readonly number[];
+  label?: string;
+}
+declare function zoomStep(zoom: number, delta: 1 | -1, steps?: readonly number[]): number;
+declare function StatusBar(inputs: Inputs<StatusBarProps>, ctx: ComponentContext): UiChild;
 interface FindBarProps {
   inset?: number;
   placeholder?: string;
@@ -1952,6 +1975,7 @@ export {
   snapPoint,
   Spinner,
   SplitPane,
+  StatusBar,
   stepIndex,
   Switch,
   TabBar,
@@ -2127,6 +2151,9 @@ export {
   type SnapTarget,
   type SpinnerProps,
   type SplitPaneProps,
+  type StatusBarItem,
+  type StatusBarProps,
+  type StatusBarTone,
   type SwitchProps,
   type TabBarProps,
   type TabBarTab,
@@ -2162,5 +2189,6 @@ export {
   Video,
   VideoControls,
   VideoPlayer,
-  virtualList
+  virtualList,
+  zoomStep
 };

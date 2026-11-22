@@ -167,6 +167,17 @@ export function tooltip(ctx: ComponentContext, options: TooltipModifierOptions):
   return tooltipKind({ ...options, overlay: useOverlay(ctx, 'tooltip') });
 }
 
+/**
+ * The same tooltip on an overlay entry the caller already holds: for a
+ * component that makes its tooltips as its rows are built, after its body
+ * has run and an entry of its own can no longer be registered. One entry
+ * serves every tooltip it makes, since one tooltip is up at a time.
+ * Internal to the library.
+ */
+export function tooltipOn(overlay: OverlayHandle, options: TooltipModifierOptions): UiModifier<TooltipArgs> {
+  return tooltipKind({ ...options, overlay });
+}
+
 /** What `tooltip()` builds: the options, plus the component's overlay entry. */
 export interface TooltipArgs extends TooltipModifierOptions {
   readonly overlay: OverlayHandle;

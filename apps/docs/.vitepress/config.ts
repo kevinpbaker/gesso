@@ -166,6 +166,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Card', link: '/components/card' },
       { text: 'Divider', link: '/components/divider' },
       { text: 'Toolbar', link: '/components/toolbar' },
+      { text: 'StatusBar', link: '/components/status-bar' },
       { text: 'Dialog', link: '/components/dialog' },
       { text: 'Drawer', link: '/components/drawer' },
       { text: 'Menu', link: '/components/menu' },

@@ -13,7 +13,6 @@ import {
 } from 'gesso-framework';
 import {
   autoFocus,
-  Box,
   dragSource,
   dropTarget,
   EditableText,
@@ -32,7 +31,7 @@ import {
   type UiTextChangeEvent
 } from 'gesso-core';
 import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
-import { Icon } from './Media';
+import { glyph } from './glyph';
 import { Menu, type MenuItem } from './Menu';
 import type { NavigationIcon } from './NavigationRail';
 
@@ -353,7 +352,7 @@ export function TabBar(inputs: Inputs<TabBarProps>, ctx: ComponentContext): UiCh
               }
             })
       },
-      ...(tab.icon === undefined ? [] : [glyph(tab.icon, ink)]),
+      ...(tab.icon === undefined ? [] : [glyph(tab.icon, ink, GLYPH)]),
       Text({
         key: 'label',
         text: tab.label,
@@ -416,7 +415,7 @@ export function TabBar(inputs: Inputs<TabBarProps>, ctx: ComponentContext): UiCh
             tab.value === edited
               ? Row(
                   { key: `rename ${tab.value}`, flexShrink: 0, height: 32, paddingX: 6, gap: 6, y: 'center' },
-                  ...(tab.icon === undefined ? [] : [glyph(tab.icon, of<UiColorValue>('controlForeground'))]),
+                  ...(tab.icon === undefined ? [] : [glyph(tab.icon, of<UiColorValue>('controlForeground'), GLYPH)]),
                   renameField(
                     tab,
                     text => finishRename(tab.value, text),
@@ -600,21 +599,4 @@ function renameField(
     },
     onBlur: () => finish(text)
   });
-}
-
-/** A tab's glyph, as the rail draws one: one `Icon` per path, laid over each other. */
-function glyph(icon: NavigationIcon, ink: Observable<UiColorValue>): UiChild {
-  if (typeof icon === 'string') {
-    return createComponent(Icon, { path: icon, size: GLYPH, color: ink });
-  }
-  const how = {
-    ...(icon.style === undefined ? {} : { style: icon.style }),
-    ...(icon.strokeWidth === undefined ? {} : { strokeWidth: icon.strokeWidth }),
-    ...(icon.fillRule === undefined ? {} : { fillRule: icon.fillRule })
-  };
-  const paths = typeof icon.path === 'string' ? [icon.path] : icon.path;
-  return Box(
-    { width: GLYPH, height: GLYPH, flexShrink: 0 },
-    ...paths.map(path => createComponent(Icon, { path, size: GLYPH, color: ink, ...how }))
-  );
 }

@@ -78,6 +78,7 @@ export type {
 } from './Structure';
 export { SplitPane, type SplitPaneProps } from './SplitPane';
 export { PanelGroup, type PanelGroupPanel, type PanelGroupProps } from './PanelGroup';
+export { StatusBar, zoomStep, type StatusBarItem, type StatusBarProps, type StatusBarTone } from './StatusBar';
 export { FindBar, type FindBarProps } from './FindBar';
 export { Dialog, type DialogProps } from './Dialog';
 export { Drawer, type DrawerProps, type DrawerSide } from './Drawer';
