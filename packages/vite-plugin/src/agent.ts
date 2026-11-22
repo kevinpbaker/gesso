@@ -17,7 +17,9 @@
  *
  * Several tabs may be open. The newest to announce itself answers,
  * which is the one a person most likely means, and a tab that closes
- * hands back to the one before it.
+ * hands back to the one before it. An agent that means another lists
+ * them with `windows_list` and chooses one with `windows_use`, for its
+ * own session's calls only.
  *
  * A few tools are the server's own: the component catalog, which the
  * checker reads here and which an agent should be able to read before
@@ -219,6 +221,37 @@ export interface AgentBridge {
   readonly connected: boolean;
 }
 
+/**
+ * The dev server's tools for choosing which window of the app answers,
+ * when the app is open in more than one. Without a choice, the newest
+ * window answers.
+ */
+export const WINDOW_TOOLS = [
+  {
+    name: 'windows_list',
+    title: "List the app's windows",
+    description:
+      'Every browser window or tab that has the app open from this dev server, numbered, with its title and address, ' +
+      'and which one answers your calls. The newest answers unless you choose another with windows_use.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false }
+  },
+  {
+    name: 'windows_use',
+    title: 'Choose a window',
+    description:
+      "Sends your calls to one window of the app, by its number in windows_list, until it closes. Other agents' " +
+      'calls are not affected. Example: {"window": 2}.',
+    inputSchema: {
+      type: 'object',
+      properties: { window: { type: 'number', description: 'The number windows_list gave the window.' } },
+      required: ['window'],
+      additionalProperties: false
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+  }
+] as const;
+
 /** The most agent sessions remembered at once; the oldest is forgotten first. */
 const MAX_SESSIONS = 256;
 
@@ -259,6 +292,19 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
     number,
     { readonly page: BridgeClient; readonly resolve: (response: unknown) => void; received?: () => void }
   >();
+  /** Each window's number, which it keeps across reloads, and what it last said it was. */
+  const windows = new WeakMap<
+    BridgeClient,
+    { readonly number: number; readonly title: string; readonly url: string }
+  >();
+  let opened = 0;
+  /** The window each session chose (`windows_use`), while it is open. */
+  const chosen = new Map<string, BridgeClient>();
+  /** The window a session's calls go to: the one it chose while that is open, else the newest. */
+  const pageFor = (session: string | undefined): BridgeClient | undefined => {
+    const choice = session === undefined ? undefined : chosen.get(session);
+    return choice !== undefined && pages.includes(choice) ? choice : pages[pages.length - 1];
+  };
   /** Pages that say when they take a request: one that goes quiet is waited on only `receiveTimeoutMs`. */
   const receiving = new WeakSet<BridgeClient>();
   /** What a page last listed, said for it while none is open. */
@@ -292,12 +338,20 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
    */
   const waits = new Map<string, number>();
 
-  socket.on(EVENTS.ready, (_data, client) => {
+  socket.on(EVENTS.ready, (data: { title?: unknown; url?: unknown } | undefined, client) => {
     const at = pages.indexOf(client);
     if (at >= 0) {
       pages.splice(at, 1);
     }
     pages.push(client);
+    if (pages.length === 2 && at < 0) {
+      toolsChanged();
+    }
+    windows.set(client, {
+      number: windows.get(client)?.number ?? ++opened,
+      title: typeof data?.title === 'string' ? data.title : '',
+      url: typeof data?.url === 'string' ? data.url : ''
+    });
     // What it offers, asked of it now rather than when an agent next
     // lists: kept, it is what is listed for it should it go.
     void relay({ jsonrpc: '2.0', id: 'gesso:tools', method: 'tools/list', params: {} });
@@ -316,6 +370,8 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
     const at = pages.indexOf(client);
     if (at >= 0) {
       pages.splice(at, 1);
+      // The window tools are listed only while there are several to choose from.
+      if (pages.length === 1) toolsChanged();
     }
     // What was asked of a page that has gone (closed, or reloaded) is
     // never answered: said so now, so the agent asks again, rather than
@@ -369,12 +425,15 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
     return asked?.then(said => (said === undefined ? undefined : failed(request.id, said)));
   };
 
-  const answerHere = (message: unknown): Promise<unknown> | undefined => {
+  const answerHere = (message: unknown, session?: string): Promise<unknown> | undefined => {
     const request = asRequest(message);
     if (request === undefined) {
       return undefined;
     }
     const { id, method, params } = request;
+    if (method === 'tools/call' && (params.name === 'windows_list' || params.name === 'windows_use')) {
+      return Promise.resolve(answerWindows(id, params, session));
+    }
     if (method === 'prompts/list' || method === 'prompts/get') {
       return Promise.resolve(answerPrompt(id, method, params, local?.prompts ?? []));
     }
@@ -421,7 +480,11 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           }
         });
       case 'tools/list':
-        return Promise.resolve({ jsonrpc: '2.0', id, result: { tools: [...(local?.tools ?? []), ...pageTools] } });
+        return Promise.resolve({
+          jsonrpc: '2.0',
+          id,
+          result: { tools: [...(local?.tools ?? []), ...pageTools] }
+        });
       case 'tools/call':
         if (typeof params.name === 'string' && pageTools.some(tool => tool.name === params.name)) {
           return Promise.resolve(
@@ -445,8 +508,50 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
     }
   };
 
-  const relay = (message: unknown): Promise<unknown> => {
-    const page = pages[pages.length - 1];
+  /** `windows_list` and `windows_use`, answered here: the server is what knows the windows. */
+  const answerWindows = (
+    id: string | number,
+    params: Record<string, unknown>,
+    session: string | undefined
+  ): unknown => {
+    const ok = (text: string) => ({
+      jsonrpc: '2.0',
+      id,
+      result: { content: [{ type: 'text', text }], isError: false }
+    });
+    const listed = pages.map(page => ({ page, ...windows.get(page)! })).sort((a, b) => a.number - b.number);
+    const yours = pageFor(session);
+    if (params.name === 'windows_list') {
+      if (listed.length === 0) return ok('No window of the app is open. Open it in a browser from this dev server.');
+      return ok(
+        listed
+          .map(
+            ({ page, number, title, url }) =>
+              `${number}. ${JSON.stringify(title || '(untitled)')} ${url}` +
+              `${page === pages[pages.length - 1] ? ' (newest)' : ''}${page === yours ? ' (answers your calls)' : ''}`
+          )
+          .join('\n')
+      );
+    }
+    const wanted = (params.arguments as { window?: unknown } | undefined)?.window;
+    const found = listed.find(entry => entry.number === wanted);
+    if (found === undefined) {
+      return failed(
+        id,
+        `There is no window ${String(wanted)}. ${listed.length === 0 ? 'None is open.' : `The windows are ${listed.map(entry => entry.number).join(', ')}; windows_list says which is which.`}`
+      );
+    }
+    if (session === undefined) {
+      return failed(id, 'Choosing a window needs a session: send the Mcp-Session-Id that initialize gave.');
+    }
+    chosen.set(session, found.page);
+    return ok(
+      `Your calls now go to window ${found.number}, ${JSON.stringify(found.title || '(untitled)')}, until it closes.`
+    );
+  };
+
+  const relay = (message: unknown, session?: string): Promise<unknown> => {
+    const page = pageFor(session)!;
     const id = next++;
     const request = asRequest(message);
     const tool =
@@ -603,7 +708,7 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
         } else if (asked?.method === 'tools/call') {
           message = { ...(message as object), params: withAgent(asked.params, sessions.get(sessionId ?? '')) };
         }
-        const own = answerHere(message);
+        const own = answerHere(message, sessionId);
         if (own !== undefined) {
           void own.then(answer => send(response, 200, 'application/json', JSON.stringify(answer)));
           return;
@@ -629,8 +734,12 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           return;
         }
         const relayed = () =>
-          relay(message).then(answer =>
-            named(message, local === undefined ? answer : mergeLocal(message, answer, local), options.name)
+          relay(message, sessionId).then(answer =>
+            withWindowTools(
+              message,
+              named(message, local === undefined ? answer : mergeLocal(message, answer, local), options.name),
+              pages.length > 1
+            )
           );
         const checking = refusal(message);
         void (checking === undefined ? relayed() : checking.then(refused => refused ?? relayed())).then(answer => {
@@ -711,6 +820,19 @@ function asRequest(
     method,
     params: typeof params === 'object' && params !== null ? (params as Record<string, unknown>) : {}
   };
+}
+
+/**
+ * A `tools/list` answer with the window tools after everything else,
+ * while more than one window is open: with one, they would only cost an
+ * agent context. They answer whether listed or not.
+ */
+function withWindowTools(message: unknown, answer: unknown, several: boolean): unknown {
+  const result = (answer as { result?: Record<string, unknown> } | null)?.result;
+  if (!several || result === undefined || asRequest(message)?.method !== 'tools/list' || !Array.isArray(result.tools)) {
+    return answer;
+  }
+  return { ...(answer as object), result: { ...result, tools: [...result.tools, ...WINDOW_TOOLS] } };
 }
 
 /**

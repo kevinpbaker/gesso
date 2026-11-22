@@ -639,3 +639,64 @@ describe('what the dev server says unasked', () => {
     closers.forEach(close => close());
   });
 });
+
+describe('more than one window of the app', () => {
+  const rpc = (id: number, method: string, params: Record<string, unknown> = {}) =>
+    JSON.stringify({ jsonrpc: '2.0', id, method, params });
+  const text = (body: string | undefined) =>
+    (JSON.parse(body!) as { result: { content: { text: string }[] } }).result.content[0].text;
+
+  it('lists the windows, lets an agent send its calls to one, and leaves the newest for every other agent', async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket);
+    const answeredBy: string[] = [];
+    const window = (name: string) =>
+      fakePage(emit, message => {
+        const { id, method } = message as { id: unknown; method: string };
+        if (method === 'tools/call') answeredBy.push(name);
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: method === 'tools/list' ? { tools: [{ name: 'notes_view' }] } : { content: [] }
+        };
+      });
+    const first = window('first');
+    const second = window('second');
+    emit(EVENTS.ready, { title: 'Notes', url: 'http://localhost:5173/' }, first);
+    emit(EVENTS.ready, { title: 'Notes: drafts', url: 'http://localhost:5173/drafts' }, second);
+
+    const session = (await request(bridge, { body: rpc(1, 'initialize', { clientInfo: { name: 'Claude Code' } }) }))
+      .headers['mcp-session-id'];
+    const other = (await request(bridge, { body: rpc(1, 'initialize') })).headers['mcp-session-id'];
+    const listed = JSON.parse(
+      (await request(bridge, { body: rpc(2, 'tools/list'), headers: { 'mcp-session-id': session } })).body!
+    );
+    expect(listed.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      'notes_view',
+      'windows_list',
+      'windows_use'
+    ]);
+
+    const call = (id: number, name: string, args: object, as: string) =>
+      request(bridge, { body: rpc(id, 'tools/call', { name, arguments: args }), headers: { 'mcp-session-id': as } });
+    expect(text((await call(3, 'windows_list', {}, session)).body)).toBe(
+      '1. "Notes" http://localhost:5173/\n2. "Notes: drafts" http://localhost:5173/drafts (newest) (answers your calls)'
+    );
+    expect(text((await call(4, 'windows_use', { window: 1 }, session)).body)).toBe(
+      'Your calls now go to window 1, "Notes", until it closes.'
+    );
+    await call(5, 'notes_view', {}, session);
+    await call(6, 'notes_view', {}, other);
+    expect(answeredBy).toEqual(['first', 'second']);
+    expect(JSON.parse((await call(7, 'windows_use', { window: 9 }, session)).body!).result.isError).toBe(true);
+
+    // The window it chose closes: its calls go to the newest again, and the window tools are no longer listed.
+    emit('vite:client:disconnect', undefined, first);
+    await call(8, 'notes_view', {}, session);
+    expect(answeredBy).toEqual(['first', 'second', 'second']);
+    const after = JSON.parse(
+      (await request(bridge, { body: rpc(9, 'tools/list'), headers: { 'mcp-session-id': session } })).body!
+    );
+    expect(after.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['notes_view']);
+  });
+});

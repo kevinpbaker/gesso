@@ -374,7 +374,10 @@ to you before it is sent, in the app's own dialog (`useAgentConfirm`)
 or else with the browser's.
 
 With several tabs open, the newest answers, and closing it hands back
-to the one before. With none open, the agent is told to open one. The
+to the one before. While more than one is open, the endpoint also lists
+`windows_list`, which numbers them with their titles and addresses, and
+`windows_use`, which sends one agent's calls to the window it names
+until that window closes. Other agents keep the newest. With none open, the agent is told to open one. The
 endpoint refuses any request from a browser page, so a site you have
 open cannot reach it, and a build carries none of it.
 
