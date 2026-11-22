@@ -101,16 +101,26 @@ describe('dirty rectangles', () => {
   }
 
   /** One runtime frame: collect, lay out, draw with the changes. */
-  function frame(options: { vouch?: boolean; now?: number; overlay?: OverlayShape[] } = {}): void {
+  function frame(options: { vouch?: boolean; now?: number; overlay?: OverlayShape[]; moves?: boolean } = {}): void {
     const collected = drain();
     engine.layoutForFrame(collected, constraints, root);
+    // Taken every frame, as the runtime takes them, and handed over only
+    // when a spec asks: without them a moved box draws the whole frame.
+    const moved = engine.takeMoves();
     context.calls.length = 0;
     renderer.render(root, {
       layout: engine,
       text: new CharacterCountTextMeasurer(),
       now: options.now ?? Number.MAX_SAFE_INTEGER,
       overlay: options.overlay,
-      changes: options.vouch === false ? undefined : { frame: collected, geometryVersion: engine.geometryVersion }
+      changes:
+        options.vouch === false
+          ? undefined
+          : {
+              frame: collected,
+              geometryVersion: engine.geometryVersion,
+              moved: options.moves === true ? moved : undefined
+            }
     });
   }
 
@@ -143,7 +153,7 @@ describe('dirty rectangles', () => {
       [0, 0, 216, 96],
       [0, 238, 402, 204]
     ]);
-    // Each walk draws what it reaches; \`b\`, between them, is drawn by neither.
+    // Each walk draws what it reaches; `b`, between them, is drawn by neither.
     expect(fills()).toEqual([
       [0, 0, 100, 40],
       [0, 120, 200, 400]
@@ -187,20 +197,23 @@ describe('dirty rectangles', () => {
       expect(cleared()).toEqual([LIST]);
     });
 
-    it('is drawn whole when a lifted node drawn last frame is gone', () => {
+    it('draws over where a lifted node the last frame drew was, when it is gone', () => {
       const tip = box('tip', 60, 20, '#ff00ff');
       tip.setProperty('lift', true);
+      // Lifted out of the list and above it: 0..60 by 20..40.
+      tip.setProperty('transform', { translateY: -100 });
       graph.appendChild(list.firstChild!, tip);
       graph.markDirty(list.firstChild!, DirtyFlags.Children | DirtyFlags.Layout);
       frame();
 
       // A tooltip on a row a scroll recycles: it was drawn outside the
-      // list's clip, where nothing in this frame says.
+      // list's clip, where no node in this frame says. The last frame
+      // noted where.
       graph.removeNode(tip);
       graph.markDirty(list.firstChild!, DirtyFlags.Children);
       set(list, 'scrollY', 30);
       frame();
-      expect(cleared()).toEqual([WHOLE]);
+      expect(cleared()).toEqual([[0, 24, 136, 72], LIST]);
     });
   });
 
@@ -240,14 +253,14 @@ describe('dirty rectangles', () => {
 
   describe('lifted nodes', () => {
     it('draws one lying over the damage again, over what is under it', () => {
-      // \`a\`, lifted and carried down over \`b\`.
+      // `a`, lifted and carried down over `b`.
       set(a, 'lift', true);
       set(a, 'transform', { translateY: 60 });
       frame();
       set(b, 'backgroundColor', '#00ff00');
       frame();
       expect(cleared()).toEqual([B]);
-      // \`b\`, then \`a\` over it: the walk culled to \`B\` never reaches \`a\`
+      // `b`, then `a` over it: the walk culled to `B` never reaches `a`
       // from the tree, where its box is still at the top.
       expect(fills()).toEqual([
         [0, 60, 100, 40],
@@ -257,7 +270,7 @@ describe('dirty rectangles', () => {
     });
 
     it('damages a lifted node where it is drawn when an ancestor changes', () => {
-      // A tip inside \`b\`, lifted and drawn 150 below it.
+      // A tip inside `b`, lifted and drawn 150 below it.
       const tip = box('tip', 20, 20, '#ffff00');
       set(tip, 'lift', true);
       set(tip, 'transform', { translateY: 150 });
@@ -266,8 +279,106 @@ describe('dirty rectangles', () => {
       frame();
       set(b, 'opacity', 0.5);
       frame();
-      // \`b\` where it is, and the tip at 0..20 by 210..230, a spill wider.
+      // `b` where it is, and the tip at 0..20 by 210..230, a spill wider.
       expect(cleared()).toEqual([B, [0, 404, 56, 72]]);
+    });
+  });
+
+  it('draws a lifted node a scroll carried where it was and where it is', () => {
+    const tip = box('tip', 20, 20, '#ffff00');
+    set(tip, 'lift', true);
+    graph.appendChild(list.firstChild!, tip);
+    graph.markDirty(list.firstChild!, DirtyFlags.Children | DirtyFlags.Layout);
+    frame();
+    // From 0..20 by 120..140, inside the list, to 0..20 by 90..110,
+    // above it and outside its clip: the list, which holds where it
+    // was, and the tip where it is.
+    set(list, 'scrollY', 30);
+    frame();
+    expect(cleared()).toEqual([LIST, [0, 164, 56, 72]]);
+  });
+
+  /**
+   * Under a turn, the box that holds the turned corners of what changed:
+   * `b`'s extent a spill wider, turned about the root's origin, in
+   * device pixels and cut at the surface's edges.
+   */
+  function turned(rotation: number): number[] {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const x of [-8, 108]) {
+      for (const y of [52, 108]) {
+        xs.push(cos * x - sin * y);
+        ys.push(sin * x + cos * y);
+      }
+    }
+    const left = Math.max(0, Math.floor(Math.min(...xs) * 2));
+    const top = Math.max(0, Math.floor(Math.min(...ys) * 2));
+    return [left, top, Math.ceil(Math.max(...xs) * 2) - left, Math.ceil(Math.max(...ys) * 2) - top];
+  }
+
+  it('draws a change under a turn over the box that holds its turned corners', () => {
+    set(root, 'transform', { rotation: 0.1 });
+    frame();
+    set(b, 'backgroundColor', '#00ff00');
+    frame();
+    expect(cleared()).toEqual([turned(0.1)]);
+  });
+
+  /**
+   * With the layout's moves (`LayoutMoves`), as the runtime hands them
+   * over: a box that moved is drawn where it was and where it is.
+   */
+  describe('with the moves', () => {
+    it('draws a box that grew over where it is, which holds where it was', () => {
+      set(a, 'width', 150);
+      frame({ moves: true });
+      // `a` was 0..100 by 0..40 and is 0..150: a spill wider, doubled.
+      expect(cleared()).toEqual([[0, 0, 316, 96]]);
+      expect(renderer.damageStats.whole).toBe(1);
+    });
+
+    it('draws a box a transform moved where it was and where it is', () => {
+      set(a, 'transform', { translateX: 200 });
+      frame({ moves: true });
+      expect(cleared()).toEqual([
+        [0, 0, 216, 96],
+        [384, 0, 232, 96]
+      ]);
+    });
+
+    it('draws a spinning box over the box that holds it at each turn', () => {
+      set(a, 'transform', { rotation: 0.3, x: 50, y: 20 });
+      frame({ moves: true });
+      set(a, 'transform', { rotation: 0.6, x: 50, y: 20 });
+      frame({ moves: true });
+      const [rect, more] = cleared();
+      expect(more).toBeUndefined();
+      // Turned about its middle, it stays near the top left, and well
+      // short of the whole surface.
+      expect(Number(rect![2]) * Number(rect![3])).toBeLessThan(800 * 600 * 0.1);
+      expect(renderer.damageStats.whole).toBe(1);
+    });
+
+    it('draws over where a shadow reached, when it shrinks', () => {
+      set(b, 'boxShadows', [{ offsetX: 0, offsetY: 0, blurRadius: 0, spreadRadius: 40, color: '#000000' }]);
+      frame({ moves: true });
+      set(b, 'boxShadows', []);
+      frame({ moves: true });
+      // `b` with a spread of 40 reached 41 past its box on every side,
+      // a pixel for the edge's antialiasing: 0..141 by 19..141, a spill
+      // wider and doubled. Only `b`'s own box was drawn before, and the
+      // ring of shadow around it stayed on the surface.
+      expect(cleared()).toEqual([[0, 22, 298, 276]]);
+    });
+
+    it('draws the whole surface when a node was added, which no move describes', () => {
+      graph.appendChild(root, box('c', 50, 20, '#00ffff'));
+      graph.markDirty(root, DirtyFlags.Children | DirtyFlags.Layout);
+      frame({ moves: true });
+      expect(cleared()).toEqual([WHOLE]);
     });
   });
 
@@ -310,14 +421,6 @@ describe('dirty rectangles', () => {
       expectWhole();
     });
 
-    it('under a turn', () => {
-      set(root, 'transform', { rotation: 0.1 });
-      frame();
-      set(b, 'backgroundColor', '#00ff00');
-      frame();
-      expectWhole();
-    });
-
     it('while the inspector draws over the frame, and the frame after', () => {
       const shape: OverlayShape = { kind: 'fill', x: 0, y: 0, width: 10, height: 10, color: '#f00' };
       frame({ overlay: [shape] });
@@ -326,17 +429,6 @@ describe('dirty rectangles', () => {
       expectWhole();
       frame();
       expect(cleared()).toEqual([]);
-    });
-
-    it('when a scroll moves a lifted node', () => {
-      const tip = box('tip', 20, 20, '#ffff00');
-      set(tip, 'lift', true);
-      graph.appendChild(list.firstChild!, tip);
-      graph.markDirty(list.firstChild!, DirtyFlags.Children | DirtyFlags.Layout);
-      frame();
-      set(list, 'scrollY', 30);
-      frame();
-      expectWhole();
     });
 
     it('when the damage is most of it', () => {

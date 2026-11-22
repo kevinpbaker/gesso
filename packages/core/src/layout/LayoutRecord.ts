@@ -228,7 +228,7 @@ export class LayoutRecord {
    */
   scrollsText = false;
 
-  /** A scroll container set to show no scrollbars (\`scrollbars: 'none'\`). */
+  /** A scroll container set to show no scrollbars (`scrollbars: 'none'`). */
   hidesScrollbars = false;
 
   /**
@@ -465,6 +465,14 @@ export class LayoutRecord {
   /** Whether the node's children have been placed at least once, so its subtree can be shifted rather than placed. */
   placedOnce = false;
   transformDirty = false;
+  /**
+   * The `transform` property's value as the node was last laid out,
+   * which is the one it was last drawn with: what `LayoutEngine` hands
+   * a renderer as where a node whose transform just changed used to be
+   * (see `LayoutMoves`). Unknown until the node is first placed.
+   */
+  placedTransform: unknown = undefined;
+  placedTransformKnown = false;
 
   /**
    * Which layout pass last folded the node's properties onto this
@@ -575,6 +583,8 @@ export class LayoutRecord {
     this.contentMatters = true;
     this.relayoutBoundary = false;
     this.placedOnce = false;
+    this.placedTransform = undefined;
+    this.placedTransformKnown = false;
     this.measureDirty = true;
     this.placeDirty = true;
     this.transformDirty = false;

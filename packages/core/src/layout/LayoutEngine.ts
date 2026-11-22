@@ -31,6 +31,7 @@ import { fillSubtreeBounds, refreshSubtreeBounds } from './SubtreeBounds';
 import type { SubtreeBounds } from './SubtreeBounds';
 import { CharacterCountTextMeasurer, fitsWidth, layoutFitsAnyWidth } from './TextMeasurer';
 import type { ParagraphLayout, TextMeasureRequest, TextMeasurer, TextOverflow, TextWrap } from './TextMeasurer';
+import type { LayoutMoves, MovedFrom } from './LayoutMoves';
 import { accumulatedOffsetTo, hasTransformedChain, transformPointsIn, transformPointsOut } from './LayoutTransform';
 import { Constraints, constraintsEqual } from './LayoutTypes';
 import type { LayoutBox, LayoutResult, LayoutStats, Size } from './LayoutTypes';
@@ -44,6 +45,11 @@ const refusedLengths = new WeakMap<UiNode, Set<string>>();
 export const SCROLLBAR_LINGER_MS = 1200;
 /** Portion of the linger during which the scrollbar fades out. */
 export const SCROLLBAR_FADE_MS = 350;
+
+/** Moves kept between two frames before the next is drawn whole instead; see `takeMoves`. */
+const MOVES_LIMIT = 4096;
+/** `recordMove` with no transform of its own: the one the node was laid out with. */
+const KEEP_TRANSFORM = Symbol('keep transform');
 /**
  * How many times a pass re-places anchored nodes that moved because
  * something they are anchored to moved. One pass settles an overlay on
@@ -649,6 +655,13 @@ export class LayoutEngine {
    * been told of: the container is dirty, and it clips the node.
    */
   private readonly scrolledThisFrame = new Set<UiNode>();
+  /**
+   * What moved since a renderer last took it, and where from: see
+   * `LayoutMoves` and `takeMoves`. False in `movesComplete` once
+   * something moved that the map does not describe.
+   */
+  private moves = new Map<UiNode, MovedFrom>();
+  private movesComplete = true;
 
   constructor(textMeasurer: TextMeasurer = new CharacterCountTextMeasurer()) {
     this.textMeasurer = textMeasurer;
@@ -1076,6 +1089,7 @@ export class LayoutEngine {
   layout(node: UiNode, constraints: Constraints): LayoutResult {
     this.layoutPass++;
     this.layoutVersion++;
+    this.movesIncomplete();
     this.boundsWhole = true;
     this.layoutRoot = node;
     this.rootConstraints = constraints;
@@ -1220,6 +1234,17 @@ export class LayoutEngine {
         if ((typeof transform === 'object' && transform !== null) || !rec.scrollable) {
           this.transformMoves++;
           this.boundsMoved.add(node);
+          // Where it was drawn is its extent under the transform it was
+          // laid out with last; one first placed now was drawn nowhere.
+          if (rec.placedOnce) {
+            if (rec.placedTransformKnown) {
+              this.recordMove(node, rec, rec.placedTransform);
+            } else {
+              this.movesIncomplete();
+            }
+          }
+          rec.placedTransform = transform;
+          rec.placedTransformKnown = true;
         }
         if (node.type === UiNodeType.EditableText) {
           rec.transformDirty = true;
@@ -1261,6 +1286,7 @@ export class LayoutEngine {
     // let out, so a box it writes is the only thing it can move.
     if (meaningMayChange) {
       this.layoutVersion++;
+      this.movesIncomplete();
     }
     this.blockResized = false;
     this.resizedBlocks.clear();
@@ -3722,6 +3748,10 @@ export class LayoutEngine {
     this.stats.placed++;
     rec.placeDirty = false;
     rec.placedOnce = true;
+    if (!rec.placedTransformKnown) {
+      rec.placedTransform = node.properties.get('transform');
+      rec.placedTransformKnown = true;
+    }
     if (!node.hasChildren()) {
       return;
     }
@@ -4846,6 +4876,71 @@ export class LayoutEngine {
    * not in question.
    */
   /**
+   * What moved since the last call, and where each was drawn before:
+   * see `LayoutMoves`. The runtime takes it with each frame it renders,
+   * so the moves of several passes between two frames come together,
+   * each node at its oldest place.
+   */
+  takeMoves(): LayoutMoves {
+    const taken: LayoutMoves = { nodes: this.moves, complete: this.movesComplete };
+    this.moves = new Map();
+    this.movesComplete = true;
+    return taken;
+  }
+
+  /** Where `node` is now, for `keepMove` once it has moved. */
+  private snapshot(node: UiNode, rec: LayoutRecord): MovedFrom {
+    return {
+      extentMinX: rec.extentMinX,
+      extentMinY: rec.extentMinY,
+      extentMaxX: rec.extentMaxX,
+      extentMaxY: rec.extentMaxY,
+      x: rec.x,
+      y: rec.y,
+      stickyOffsetX: rec.stickyOffsetX,
+      stickyOffsetY: rec.stickyOffsetY,
+      transform: rec.placedTransformKnown ? rec.placedTransform : node.properties.get('transform')
+    };
+  }
+
+  /**
+   * Notes that `node` is about to move, from where it is now: with the
+   * transform it was laid out with, or with `transform` when that is
+   * what just changed. Allocates only for a node not already noted.
+   */
+  private recordMove(node: UiNode, rec: LayoutRecord, transform: unknown = KEEP_TRANSFORM): void {
+    if (!this.movesComplete || this.moves.has(node)) {
+      return;
+    }
+    if (!rec.placedOnce) {
+      this.movesIncomplete();
+      return;
+    }
+    const before = this.snapshot(node, rec);
+    this.keepMove(node, transform === KEEP_TRANSFORM ? before : { ...before, transform });
+  }
+
+  /** Keeps a node's oldest place since the last `takeMoves`. */
+  private keepMove(node: UiNode, before: MovedFrom): void {
+    if (!this.movesComplete || this.moves.has(node)) {
+      return;
+    }
+    if (this.moves.size >= MOVES_LIMIT) {
+      // A caller that lays out and never takes them; or a frame that
+      // moved so much that drawing all of it is the cheaper answer.
+      this.movesIncomplete();
+      return;
+    }
+    this.moves.set(node, before);
+  }
+
+  /** Something moved that no entry describes: the next frame is drawn whole. */
+  private movesIncomplete(): void {
+    this.movesComplete = false;
+    this.moves.clear();
+  }
+
+  /**
    * Whether a change to `node` is held inside a scroll container that
    * scrolled on this frame, so a renderer drawing that container again
    * draws all of it.
@@ -5042,6 +5137,7 @@ export class LayoutEngine {
    */
   private applySticky(): void {
     this.stickyShifted.clear();
+    const stickyBefore = new Map<UiNode, MovedFrom>();
     for (const node of this.stickyNodes) {
       const rec = this.records.get(node);
       if (rec === undefined) {
@@ -5052,6 +5148,10 @@ export class LayoutEngine {
       this.resolveStickyOffset(node, rec);
       if (rec.stickyOffsetX !== wasX || rec.stickyOffsetY !== wasY) {
         this.stickyShifted.add(node);
+        // Resolving writes only the shift, so the rest is where it was.
+        if (rec.placedOnce) {
+          stickyBefore.set(node, { ...this.snapshot(node, rec), stickyOffsetX: wasX, stickyOffsetY: wasY });
+        }
       }
     }
     if (this.stickyShifted.size > 0) {
@@ -5072,6 +5172,14 @@ export class LayoutEngine {
       }
       if (!held) {
         this.layoutVersion++;
+        for (const node of this.stickyShifted) {
+          const before = stickyBefore.get(node);
+          if (before === undefined) {
+            this.movesIncomplete();
+          } else {
+            this.keepMove(node, before);
+          }
+        }
       }
       if (this.anchorOf.size > 0) {
         this.followStickyShifts();
@@ -5559,8 +5667,13 @@ export class LayoutEngine {
      * spreadsheet's second frozen column, which sticks at the width of
      * the gutter — was drawn one gutter too far to the right.
      */
+    // Reading the reach writes only the reach, so the extent is still
+    // where the node was last drawn until the branches below write it.
     const reachChanged = readPaintReach(node, rec);
     if (rec.x !== x || rec.y !== y || rec.width !== width || rec.height !== height) {
+      if (!this.heldByScroll(node)) {
+        this.recordMove(node, rec);
+      }
       if (rec.width === width && rec.height === height && !rec.placeDirty && !rec.measureDirty && rec.placedOnce) {
         // Moved, and nothing else: its subtree is placed relative to it
         // already, so it moves by the same amount. See `shiftSubtree`.
@@ -5611,7 +5724,10 @@ export class LayoutEngine {
         }
       }
     } else if (reachChanged) {
-      // Same box, new shadows.
+      // Same box, new shadows, which may reach less far than the old.
+      if (rec.placedOnce) {
+        this.recordMove(node, rec);
+      }
       this.updateExtent(node, rec);
     }
   }
@@ -5623,7 +5739,16 @@ export class LayoutEngine {
    */
   private refreshPaintReach(node: UiNode): void {
     const rec = this.records.get(node);
-    if (rec !== undefined && readPaintReach(node, rec)) {
+    if (rec === undefined) {
+      return;
+    }
+    // Reading the reach writes only the reach. A shadow that shrank was
+    // drawn past where the node now reaches, so its extent as it stands
+    // is noted before it is written again.
+    if (readPaintReach(node, rec)) {
+      if (rec.placedOnce) {
+        this.recordMove(node, rec);
+      }
       this.updateExtent(node, rec);
     }
   }
@@ -5703,6 +5828,7 @@ export class LayoutEngine {
     this.stats.shifted++;
     if (!this.heldByScroll(node)) {
       this.layoutVersion++;
+      this.recordMove(node, this.record(node));
     }
     this.boundsShifted.add(node);
     // Absolute nodes left where they were, whose ancestors' extents just

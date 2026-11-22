@@ -4393,7 +4393,10 @@ export class GessoRuntime {
     // scroll listener writes on each one.
     const changes: RenderChanges = {
       frame: withPending(frame, this.graph.getDirtyNodes()),
-      geometryVersion: this.engine.geometryVersion
+      geometryVersion: this.engine.geometryVersion,
+      // Taken with every frame drawn, so what is here is what moved
+      // since the last one: see `LayoutMoves`.
+      moved: this.engine.takeMoves()
     };
     this.phaseTimings.render = this.timePhase(
       () => this.renderer.isReady,

@@ -1,4 +1,5 @@
 import type { UiNode } from '../graph/UiNode';
+import type { LayoutMoves } from '../layout/LayoutMoves';
 import type { LayoutRecord } from '../layout/LayoutRecord';
 import type { TextMeasurer } from '../layout/TextMeasurer';
 import type { OverlayShape } from './OverlayShapes';
@@ -82,4 +83,11 @@ export interface RenderChanges {
    * the previous frame means no box moved anywhere in the tree.
    */
   readonly geometryVersion: number;
+  /**
+   * What moved since the previous frame, and where from
+   * (`LayoutEngine.takeMoves`). When it is complete, a frame whose
+   * geometry changed is drawn where each moved node was and where it
+   * is, rather than whole. Absent, any move draws the whole frame.
+   */
+  readonly moved?: LayoutMoves;
 }

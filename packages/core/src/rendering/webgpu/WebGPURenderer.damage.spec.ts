@@ -371,6 +371,48 @@ describe('WebGPU dirty rectangles', () => {
     });
   });
 
+  it('draws a lifted node a scroll carried where it was and where it is', () => {
+    const tip = box('tip', 20, 20, '#ffff00');
+    set(tip, 'lift', true);
+    graph.appendChild(list.firstChild!, tip);
+    graph.markDirty(list.firstChild!, DirtyFlags.Children | DirtyFlags.Layout);
+    frame();
+    // From inside the list to above it, outside its clip: the list, and
+    // the tip where it is now, under one scissor that holds both.
+    set(list, 'scrollY', 30);
+    frame();
+    expect(log.cleared).toEqual([[0, 164, 416, 292]]);
+  });
+
+  /**
+   * Under a turn, the box that holds the turned corners of what changed:
+   * \`b\`'s extent a spill wider, turned about the root's origin, in
+   * device pixels and cut at the surface's edges.
+   */
+  function turned(rotation: number): number[] {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const x of [-8, 108]) {
+      for (const y of [52, 108]) {
+        xs.push(cos * x - sin * y);
+        ys.push(sin * x + cos * y);
+      }
+    }
+    const left = Math.max(0, Math.floor(Math.min(...xs) * 2));
+    const top = Math.max(0, Math.floor(Math.min(...ys) * 2));
+    return [left, top, Math.ceil(Math.max(...xs) * 2) - left, Math.ceil(Math.max(...ys) * 2) - top];
+  }
+
+  it('draws a change under a turn over the box that holds its turned corners', () => {
+    set(root, 'transform', { rotation: 0.1 });
+    frame();
+    set(b, 'backgroundColor', '#00ff00');
+    frame();
+    expect(log.cleared).toEqual([turned(0.1)]);
+  });
+
   describe('draws the whole surface', () => {
     function expectWhole(): void {
       expect(log.cleared).toEqual([WHOLE]);
@@ -416,14 +458,6 @@ describe('WebGPU dirty rectangles', () => {
       expectWhole();
     });
 
-    it('under a turn', () => {
-      set(root, 'transform', { rotation: 0.1 });
-      frame();
-      set(b, 'backgroundColor', '#00ff00');
-      frame();
-      expectWhole();
-    });
-
     it('while the inspector draws over the frame, and the frame after', () => {
       const shape: OverlayShape = { kind: 'fill', x: 0, y: 0, width: 10, height: 10, color: '#f00' };
       frame({ overlay: [shape] });
@@ -432,17 +466,6 @@ describe('WebGPU dirty rectangles', () => {
       expectWhole();
       frame();
       expect(log.cleared).toEqual([]);
-    });
-
-    it('when a scroll moves a lifted node', () => {
-      const tip = box('tip', 20, 20, '#ffff00');
-      set(tip, 'lift', true);
-      graph.appendChild(list.firstChild!, tip);
-      graph.markDirty(list.firstChild!, DirtyFlags.Children | DirtyFlags.Layout);
-      frame();
-      set(list, 'scrollY', 30);
-      frame();
-      expectWhole();
     });
 
     it('when the damage is most of it', () => {

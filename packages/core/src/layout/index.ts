@@ -5,6 +5,7 @@ export {
   type ScrollAdjustment,
   type ScrollAnchor
 } from './LayoutEngine';
+export type { LayoutMoves, MovedFrom } from './LayoutMoves';
 export {
   scrollbarThumb,
   scrollbarThumbs,

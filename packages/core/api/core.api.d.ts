@@ -15,6 +15,7 @@ import {
   FontMetrics,
   FrameDamageStats,
   LayoutBox,
+  LayoutMoves,
   LayoutRecord,
   LayoutResult,
   LayoutStats,
@@ -3025,6 +3026,8 @@ declare class LayoutEngine {
   private readonly boundsShifted;
   private transformMoves;
   private readonly scrolledThisFrame;
+  private moves;
+  private movesComplete;
   constructor(textMeasurer?: TextMeasurer);
   recordFor(node: UiNode): LayoutRecord | undefined;
   allStickyNodes(): ReadonlySet<UiNode>;
@@ -3166,6 +3169,11 @@ declare class LayoutEngine {
   private placeStack;
   private stackAlignment;
   private stackOffset;
+  takeMoves(): LayoutMoves;
+  private snapshot;
+  private recordMove;
+  private keepMove;
+  private movesIncomplete;
   private heldByScroll;
   private leafLaidOutAlone;
   private markLayoutDirty;
@@ -5723,12 +5731,14 @@ import {
   LABEL_PADDING_X,
   labelOrigin,
   LayoutBox,
+  LayoutMoves,
   LayoutReader,
   LayoutRecord,
   LayoutResult,
   LayoutStats,
   lightColors,
   linear,
+  MovedFrom,
   NodeId,
   NodeProperty,
   normalizeBorderRadius,
@@ -7233,6 +7243,7 @@ export {
   type LayoutBox,
   type LayoutExplanation,
   type LayoutInspectorOptions,
+  type LayoutMoves,
   type LayoutReader,
   type LayoutResult,
   type LayoutStateExplanation,
@@ -7251,6 +7262,7 @@ export {
   type MotionState,
   type MotionStateInput,
   type MotionTiming,
+  type MovedFrom,
   type Mp3Format,
   type Mp3Frame,
   type Mp3Header,
@@ -8677,6 +8689,8 @@ declare class LayoutRecord {
   placeDirty: boolean;
   placedOnce: boolean;
   transformDirty: boolean;
+  placedTransform: unknown;
+  placedTransformKnown: boolean;
   propsPass: number;
   propsBaseWidth: number | undefined;
   propsBaseHeight: number | undefined;
@@ -9035,6 +9049,21 @@ declare class UiFrame {
   isEmpty(): boolean;
   dirtyFlagsFor(node: UiNode): DirtyFlags;
 }
+interface MovedFrom {
+  readonly extentMinX: number;
+  readonly extentMinY: number;
+  readonly extentMaxX: number;
+  readonly extentMaxY: number;
+  readonly x: number;
+  readonly y: number;
+  readonly stickyOffsetX: number;
+  readonly stickyOffsetY: number;
+  readonly transform: unknown;
+}
+interface LayoutMoves {
+  readonly nodes: ReadonlyMap<UiNode, MovedFrom>;
+  readonly complete: boolean;
+}
 type OverlayShape = {
   kind: 'fill';
   x: number;
@@ -9083,6 +9112,7 @@ interface RenderContext {
 interface RenderChanges {
   readonly frame: UiFrame;
   readonly geometryVersion: number;
+  readonly moved?: LayoutMoves;
 }
 type RendererBackend = 'canvas2d' | 'webgpu';
 interface UiRenderer {
@@ -9272,12 +9302,14 @@ export {
   LABEL_PADDING_X,
   labelOrigin,
   LayoutBox,
+  LayoutMoves,
   LayoutReader,
   LayoutRecord,
   LayoutResult,
   LayoutStats,
   lightColors,
   linear,
+  MovedFrom,
   NodeId,
   NodeProperty,
   normalizeBorderRadius,

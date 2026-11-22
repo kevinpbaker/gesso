@@ -172,14 +172,16 @@ capability.
 | Gradient banding   | Whatever the browser draws                                                           | Gradients and shadows dithered by under half a level, so a long, subtle ramp does not step; a flat fill is left exact                                 |
 | Partial redraws    | The rectangles a frame's changes cover, when no box moved; the canvas keeps the rest | The same rectangles, drawn into a texture the renderer keeps, which is copied to the screen on every frame that draws                                 |
 
-Both draw a frame in part when they can. On a frame where no box moved,
-they clear and draw again only the rectangles the changed nodes cover:
-a caret blink, a hover tint or a fading scrollbar costs one control,
-not the screen. A node lifted over the page is drawn again over
-whatever it covers. Any change they cannot hold in a rectangle (a
-resize, a theme, a box that moved, a turn above the change) draws the
-whole frame. The rectangles are the same on both, worked out by one
-piece of code from the same changes.
+Both draw a frame in part when they can. They clear and draw again only
+the rectangles the changed nodes cover: a caret blink, a hover tint or a
+fading scrollbar costs one control, not the screen. A box that moved is
+drawn where it was and where it is, so a spinner turning, a label that
+grew, or a row recycled by a scrolling grid costs about its own size. A
+node lifted over the page is drawn again over whatever it covers, and
+where it was when something carried it away. Any change they cannot hold
+in rectangles (a resize, a theme, a node added or removed, damage over
+half the surface) draws the whole frame. The rectangles are the same on
+both, worked out by one piece of code from the same changes.
 
 A 2D canvas keeps its pixels between frames, so Canvas2D draws over
 the last frame where it is. A WebGPU swap chain hands back a texture

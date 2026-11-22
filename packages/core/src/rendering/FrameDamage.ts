@@ -1,6 +1,7 @@
 import { DirtyFlags } from '../graph/DirtyFlags';
 import type { UiNode } from '../graph/UiNode';
 import { UiNodeType } from '../graph/UiNodeType';
+import type { MovedFrom } from '../layout/LayoutMoves';
 import { parseTransform } from '../properties/UiTransform';
 import type { RenderContext } from './RenderContext';
 import { snapScroll } from './ScrollSnap';
@@ -46,9 +47,16 @@ type LayerRect = DamageRect;
  * scale moves, a caret): drawn again, so it is never left a frame
  * behind.
  *
- * Its own box and no more is enough because nothing moved: a frame in
- * which any box moved (`RenderChanges.geometryVersion`) is drawn whole,
- * so the box a node has now is the box it had when it was last drawn.
+ * Its own box and no more is enough for a node that did not move. One
+ * that did (a box written, a subtree shifted, a sticky node shifting, a
+ * transform, a shadow reaching less far) is drawn where it is and where
+ * it was, from the place `LayoutEngine.takeMoves` says it had: its
+ * extent then, through its own placement then and its ancestors' now.
+ * An ancestor that moved too is in the moves itself. A lifted node is
+ * drawn outside every clip, so where each one landed is noted at the
+ * end of every frame, and a frame that carries one somewhere else (a
+ * scroll, a transform, a move above it, or its removal) is drawn there
+ * too.
  *
  * **When the whole surface is drawn instead.** Whenever the damage is
  * not something this can name, which is:
@@ -57,16 +65,15 @@ type LayerRect = DamageRect;
  *     frame threw part way through;
  *   - the first frame, a resize, a new device pixel ratio, a restored
  *     surface or a font that loaded (`invalidate`);
- *   - any box moved, including a transform changing, a sticky node
- *     shifting, a node added or removed;
+ *   - a box moved that the layout's moves do not describe: a full
+ *     layout, a node added or removed, a clip let go, or moves handed
+ *     over by no one (`RenderChanges.moved` absent);
  *   - the root itself was dirtied, which is how the runtime asks for a
  *     repaint that nothing else describes (a kept subtree drawn sharp,
  *     the inspector) and how a theme changes;
- *   - a turn, a flip or a zero scale above a dirty node, which this
- *     does not carry a box through;
  *   - the inspector's overlay, this frame or the last;
- *   - a scroll above a lifted node, which carries it somewhere its old
- *     pixels do not say; or a lifted node drawn at a lift boundary
+ *   - a lifted node this could not place last frame, carried somewhere
+ *     else; or a lifted node drawn at a lift boundary
  *     rather than over everything, which a walk culled to a rectangle
  *     does not reach from an ancestor the rectangle misses;
  *   - something drawn by the clock inside a layer, a kept subtree or an
@@ -77,8 +84,8 @@ type LayerRect = DamageRect;
  * else and wherever its anchor puts it, so a walk culled to a rectangle
  * may never reach it from its ancestors. The renderer draws the lifted
  * nodes the last whole frame drew over every partial walk, clipped to
- * its rectangles like everything else (\`Canvas2DRenderer.walk\`, the
- * \`lifted\` a WebGPU build is given), and a change to a lifted node's
+ * its rectangles like everything else (`Canvas2DRenderer.walk`, the
+ * `lifted` a WebGPU build is given), and a change to a lifted node's
  * ancestor (an opacity, a colour passed down) damages the lifted node
  * where it is drawn as well as where the ancestor is.
  *
@@ -95,6 +102,17 @@ export class FrameDamage {
   private overlaid = false;
   /** The lifted nodes the last frame drew, nested ones included. */
   private lifted: readonly UiNode[] = [];
+  /**
+   * Where each lifted node the last frame drew was drawn, on the
+   * surface; null for one this could not place. A lifted node is drawn
+   * outside every clip, so when something above it moves it (a scroll,
+   * a transform, an ancestor's box) no other rectangle holds where it
+   * was: this does.
+   */
+  private liftedAt = new Map<UiNode, LayerRect | null | undefined>();
+  /** The tree and context `begin` was handed, for `end` to place the lifted nodes with. */
+  private frameRoot: UiNode | null = null;
+  private frameContext: RenderContext | null = null;
   /** The last frame drew a lifted node at a lift boundary, so the next is drawn whole. */
   private boundaryLifted = false;
   /** Where the last frame drew something that follows the clock, in device pixels. */
@@ -127,6 +145,8 @@ export class FrameDamage {
     this.nextVolatile.length = 0;
     this.nextUnplaced = false;
     const changes = context.changes;
+    this.frameRoot = root;
+    this.frameContext = context;
     const overlaid = context.overlay !== undefined && context.overlay.length > 0;
     const whole =
       this.forced ||
@@ -135,7 +155,11 @@ export class FrameDamage {
       dpr !== this.dpr ||
       width !== this.width ||
       height !== this.height ||
-      changes.geometryVersion !== this.geometry ||
+      (changes.geometryVersion !== this.geometry &&
+        // A box moved. Drawn in part all the same when the layout says
+        // where every moved one was (see `LayoutMoves`), after a frame
+        // this drew with its changes, whose places those were.
+        (Number.isNaN(this.geometry) || changes.moved?.complete !== true)) ||
       overlaid ||
       this.overlaid ||
       this.boundaryLifted ||
@@ -173,13 +197,22 @@ export class FrameDamage {
   }
 
   /**
-   * The frame finished. \`lifted\` is every lifted node it drew over the
-   * rest of the frame; \`boundaryLifted\` whether it drew one at a lift
+   * The frame finished. `lifted` is every lifted node it drew over the
+   * rest of the frame; `boundaryLifted` whether it drew one at a lift
    * boundary instead.
    */
   end(lifted: readonly UiNode[], boundaryLifted: boolean): void {
     this.open = false;
     this.lifted = lifted;
+    const at = new Map<UiNode, LayerRect | null | undefined>();
+    if (this.frameRoot !== null && this.frameContext !== null) {
+      for (const node of lifted) {
+        at.set(node, this.surfaceRect(node, this.frameRoot, this.frameContext));
+      }
+    }
+    this.liftedAt = at;
+    this.frameRoot = null;
+    this.frameContext = null;
     this.boundaryLifted = boundaryLifted;
     this.unplaced = this.nextUnplaced;
     this.volatile = this.nextVolatile.slice();
@@ -214,12 +247,43 @@ export class FrameDamage {
     for (const rect of this.volatile) {
       add(rect);
     }
-    // A lifted node the last whole frame drew that is no longer in the
-    // tree was drawn somewhere no node here says: a tooltip on a row a
-    // virtual list recycled, in a frame that is otherwise held inside
-    // the list (see `LayoutEngine.heldByScroll`).
+    // A moved node is drawn again where it is, and drawn over where it
+    // was: its extent then, through its placement then and its
+    // ancestors' now. An ancestor that moved too is here itself, and
+    // its own extent then holds the child's.
+    if (changes.moved !== undefined) {
+      for (const [node, from] of changes.moved.nodes) {
+        const was = this.surfaceRect(node, root, context, from);
+        const is = this.surfaceRect(node, root, context);
+        if (was === null || is === null) {
+          return null;
+        }
+        if (was !== undefined) {
+          add(was);
+        }
+        if (is !== undefined) {
+          add(is);
+        }
+        // A lifted node under it moved with it, outside the clips that
+        // cut the rectangles above.
+        for (const lifted of this.lifted) {
+          if (lifted !== node && isAncestor(node, lifted)) {
+            const now = this.surfaceRect(lifted, root, context);
+            if (now === null || !this.addWhereLifted(lifted, add)) {
+              return null;
+            }
+            if (now !== undefined) {
+              add(now);
+            }
+          }
+        }
+      }
+    }
+    // A lifted node the last frame drew that is no longer in the tree:
+    // a tooltip on a row a virtual list recycled. No node here says
+    // where it was, so it is drawn over where the last frame noted it.
     for (const lifted of this.lifted) {
-      if (lifted !== root && !isAncestor(root, lifted)) {
+      if (lifted !== root && !isAncestor(root, lifted) && !this.addWhereLifted(lifted, add)) {
         return null;
       }
     }
@@ -245,7 +309,7 @@ export class FrameDamage {
         if (lifted === node || !isAncestor(node, lifted)) {
           continue;
         }
-        if ((flags & DirtyFlags.Transform) !== 0) {
+        if ((flags & DirtyFlags.Transform) !== 0 && !this.addWhereLifted(lifted, add)) {
           return null;
         }
         const reach = this.surfaceRect(lifted, root, context);
@@ -261,11 +325,34 @@ export class FrameDamage {
   }
 
   /**
+   * Adds where the last frame drew a lifted node; false when it could
+   * not say, and the frame is drawn whole.
+   */
+  private addWhereLifted(lifted: UiNode, add: (rect: LayerRect) => void): boolean {
+    if (!this.liftedAt.has(lifted)) {
+      return false;
+    }
+    const was = this.liftedAt.get(lifted);
+    if (was === null) {
+      return false;
+    }
+    if (was !== undefined) {
+      add(was);
+    }
+    return true;
+  }
+
+  /**
    * Where a node's subtree paints on the surface, in whole device
    * pixels: undefined where it paints nothing that shows (no record, out
    * of the tree, clipped away), null where this cannot say.
    */
-  private surfaceRect(node: UiNode, root: UiNode, context: RenderContext): LayerRect | null | undefined {
+  private surfaceRect(
+    node: UiNode,
+    root: UiNode,
+    context: RenderContext,
+    from?: MovedFrom
+  ): LayerRect | null | undefined {
     const layout = context.layout;
     const rec = layout.recordFor(node);
     if (rec === undefined) {
@@ -283,13 +370,12 @@ export class FrameDamage {
       }
       return null;
     }
-    box.left = rec.extentMinX - SPILL;
-    box.top = rec.extentMinY - SPILL;
-    box.right = rec.extentMaxX + SPILL;
-    box.bottom = rec.extentMaxY + SPILL;
-    if (!placeThrough(node, rec, box)) {
-      return null;
-    }
+    const own = from ?? rec;
+    box.left = own.extentMinX - SPILL;
+    box.top = own.extentMinY - SPILL;
+    box.right = own.extentMaxX + SPILL;
+    box.bottom = own.extentMaxY + SPILL;
+    placeThrough(from === undefined ? node.properties.get('transform') : from.transform, own, box);
     // A lifted node is drawn outside every clip above it.
     let unclipped = rec.lifted;
     let reached = node === root;
@@ -320,9 +406,7 @@ export class FrameDamage {
           return undefined;
         }
       }
-      if (!placeThrough(ancestor, above, box)) {
-        return null;
-      }
+      placeThrough(ancestor.properties.get('transform'), above, box);
       if (above.lifted) {
         unclipped = true;
       }
@@ -360,34 +444,62 @@ const box = { left: 0, top: 0, right: 0, bottom: 0 };
 /**
  * Carries the box out through a node's own sticky shift and transform,
  * as `renderNode` applies them: drawn at shift + translate + origin +
- * scale·(p − origin). False for a turn, a flip or a zero scale.
+ * rotate(scale·(p − origin)). A turn or a flip is carried by the four
+ * corners, and the box becomes the one that holds them; a zero scale
+ * collapses it, which is nothing drawn.
  */
 function placeThrough(
-  node: UiNode,
+  raw: unknown,
   rec: { x: number; y: number; stickyOffsetX: number; stickyOffsetY: number },
   into: typeof box
-): boolean {
-  const raw = node.properties.get('transform');
+): void {
   const transform = raw === undefined ? undefined : parseTransform(raw);
   if (transform !== undefined) {
-    if (transform.rotation !== 0 || !(transform.scaleX > 0) || !(transform.scaleY > 0)) {
-      return false;
-    }
     const originX = rec.x + transform.x;
     const originY = rec.y + transform.y;
-    into.left = transform.translateX + originX + transform.scaleX * (into.left - originX);
-    into.right = transform.translateX + originX + transform.scaleX * (into.right - originX);
-    into.top = transform.translateY + originY + transform.scaleY * (into.top - originY);
-    into.bottom = transform.translateY + originY + transform.scaleY * (into.bottom - originY);
+    const toX = transform.translateX + originX;
+    const toY = transform.translateY + originY;
+    if (transform.rotation === 0) {
+      const a = toX + transform.scaleX * (into.left - originX);
+      const b = toX + transform.scaleX * (into.right - originX);
+      const c = toY + transform.scaleY * (into.top - originY);
+      const d = toY + transform.scaleY * (into.bottom - originY);
+      into.left = Math.min(a, b);
+      into.right = Math.max(a, b);
+      into.top = Math.min(c, d);
+      into.bottom = Math.max(c, d);
+    } else {
+      const cos = Math.cos(transform.rotation);
+      const sin = Math.sin(transform.rotation);
+      let left = Infinity;
+      let top = Infinity;
+      let right = -Infinity;
+      let bottom = -Infinity;
+      for (const px of [into.left, into.right]) {
+        for (const py of [into.top, into.bottom]) {
+          const sx = transform.scaleX * (px - originX);
+          const sy = transform.scaleY * (py - originY);
+          const x = toX + cos * sx - sin * sy;
+          const y = toY + sin * sx + cos * sy;
+          left = Math.min(left, x);
+          right = Math.max(right, x);
+          top = Math.min(top, y);
+          bottom = Math.max(bottom, y);
+        }
+      }
+      into.left = left;
+      into.top = top;
+      into.right = right;
+      into.bottom = bottom;
+    }
   }
   into.left += rec.stickyOffsetX;
   into.right += rec.stickyOffsetX;
   into.top += rec.stickyOffsetY;
   into.bottom += rec.stickyOffsetY;
-  return true;
 }
 
-/** Whether \`ancestor\` is above \`node\` in the tree. */
+/** Whether `ancestor` is above `node` in the tree. */
 function isAncestor(ancestor: UiNode, node: UiNode): boolean {
   for (let current = node.parent; current !== null; current = current.parent) {
     if (current === ancestor) {
@@ -449,7 +561,7 @@ export function damageGroups(strips: readonly LayerRect[], reach: number): Layer
   return groups.map(group => group.strips);
 }
 
-/** The smallest rectangle holding every one of \`rects\`, which is not empty. */
+/** The smallest rectangle holding every one of `rects`, which is not empty. */
 export function boundingRect(rects: readonly LayerRect[]): LayerRect {
   let left = Infinity;
   let top = Infinity;

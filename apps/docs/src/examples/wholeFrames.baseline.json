@@ -281,7 +281,7 @@
     "hover": 0,
     "tab": 0,
     "arrows": 0,
-    "type": 1,
+    "type": 0,
     "wheel": 0
   },
   "MirrorExample": {
@@ -363,11 +363,11 @@
     "wheel": 0
   },
   "PulseExample": {
-    "idle": 24,
-    "hover": 82,
-    "tab": 31,
-    "arrows": 24,
-    "wheel": 23
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
   },
   "RadioGroupExample": {
     "idle": 0,
@@ -409,7 +409,7 @@
     "hover": 0,
     "tab": 0,
     "arrows": 0,
-    "type": 6,
+    "type": 0,
     "wheel": 0
   },
   "RecipeTableExample": {
@@ -466,7 +466,7 @@
     "idle": 0,
     "hover": 0,
     "tab": 0,
-    "arrows": 5,
+    "arrows": 0,
     "wheel": 0
   },
   "SelectExample": {
@@ -519,11 +519,11 @@
     "wheel": 0
   },
   "SpinnerExample": {
-    "idle": 7,
-    "hover": 27,
-    "tab": 9,
-    "arrows": 8,
-    "wheel": 8
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
   },
   "SplitPaneExample": {
     "idle": 0,

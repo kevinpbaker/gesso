@@ -7,6 +7,7 @@ import { UiGraphBuilder } from '../composition/UiGraphBuilder';
 import { DirtyFlags } from '../graph/DirtyFlags';
 import { UiGraph } from '../graph/UiGraph';
 import type { UiNode } from '../graph/UiNode';
+import { UiNodeType } from '../graph/UiNodeType';
 import { UiFrame } from '../scheduler/UiFrame';
 import { UiManualFrameClock } from '../scheduler/UiFrameClock';
 import { UiScheduler } from '../scheduler/UiScheduler';
@@ -538,6 +539,57 @@ describe('LayoutEngine invalidation', () => {
       h.graph.updateProperty(scroll.id, 'scrollY', 40, DirtyFlags.Transform);
       h.clock.tick(0);
       expect(h.engine.geometryVersion).not.toBe(before);
+    });
+
+    describe('takeMoves', () => {
+      function rows() {
+        const h = createHarness();
+        h.root = h.builder.build(
+          Column({ x: 'start' }, Box({ width: 50, height: 20 }), Box({ width: 50, height: 20 }))
+        );
+        firstFrame(h);
+        h.engine.takeMoves();
+        return { h, first: h.root.firstChild!, second: h.root.firstChild!.nextSibling! };
+      }
+
+      it('says where a box was drawn before it moved, and its oldest place over two passes', () => {
+        const { h, first, second } = rows();
+        h.graph.updateProperty(first.id, 'height', 30, DirtyFlags.Layout);
+        h.clock.tick(0);
+        h.graph.updateProperty(first.id, 'height', 45, DirtyFlags.Layout);
+        h.clock.tick(0);
+
+        const moves = h.engine.takeMoves();
+        expect(moves.complete).toBe(true);
+        // The second row went from 20 to 30 to 45, and was drawn at 20.
+        expect(moves.nodes.get(second)).toMatchObject({ y: 20, extentMinY: 20, extentMaxY: 40 });
+        expect(h.engine.recordFor(second)!.y).toBe(45);
+        // Taken, so the next frame starts again.
+        expect(h.engine.takeMoves().nodes.size).toBe(0);
+      });
+
+      it('says where a transformed box was drawn, with the transform it had', () => {
+        const { h, first } = rows();
+        h.graph.updateProperty(first.id, 'transform', { translateX: 10 }, DirtyFlags.Paint | DirtyFlags.Transform);
+        h.clock.tick(0);
+        h.engine.takeMoves();
+        h.graph.updateProperty(first.id, 'transform', { translateX: 30 }, DirtyFlags.Paint | DirtyFlags.Transform);
+        h.clock.tick(0);
+
+        expect(h.engine.takeMoves().nodes.get(first)?.transform).toEqual({ translateX: 10 });
+      });
+
+      it('is incomplete when a node is added, which no move describes', () => {
+        const { h } = rows();
+        const added = h.graph.createNode('added', UiNodeType.Box);
+        added.setProperty('width', 10);
+        added.setProperty('height', 10);
+        h.graph.appendChild(h.root, added);
+        h.graph.markDirty(h.root, DirtyFlags.Children | DirtyFlags.Layout);
+        h.clock.tick(0);
+
+        expect(h.engine.takeMoves()).toMatchObject({ complete: false });
+      });
     });
 
     it('moves for a sticky leaf laid out again', () => {
