@@ -58,8 +58,48 @@ can confirm on the person's behalf.
   `mcpHandler` or WebMCP, without the design tools. Those paths are not measured here.
 - **One model and one agent per run.** Pass rates on a few runs mean little. Use `--repeat` before you
   quote a number, and quote the model, the date and the commit that `summary.md` records.
-- **Writing an app is not measured yet.** This eval covers operating an app. The writing half (a
-  fresh agent building an app from `AGENTS.md` in Gesso and in React) is the next piece.
+- **The writing half is one small app.** It shows what a fresh agent pays to build an expense tracker
+  from a starter, not what it pays in a large codebase it did not write.
+
+## Writing an app
+
+```bash
+node scripts/eval-agents.ts --write --dry          # what it would run
+node scripts/eval-agents.ts --write                # both arms, once
+node scripts/eval-agents.ts --write --repeat 3 --model opus
+node scripts/eval-agents.ts --write --no-agent     # the harness alone, on the untouched starters: free
+```
+
+A fresh agent is asked for the same small app in each arm, word for word: an expense tracker with a
+list, a form to add one, a delete that asks the person first, and the total at the top
+(`WRITE_TASK` in `scripts/eval-agents/write.ts`). Each run starts from a copy of a starter installed
+once per eval, in a temporary folder, so there is no other source to read. The agent can read, write
+and edit files and run the project's `npm run typecheck` and `npm run build`, and nothing else.
+
+| Arm     | Starts from                                               | What it has besides                                                                                                                                 |
+| ------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gesso` | `create-gesso-app --local`: the packages in this checkout | The project's `AGENTS.md`, `llms.txt` and its section files in `docs/`, and the dev server's MCP endpoint with a page open: design tools and screen |
+| `react` | `react-starter/`: React 19 and Vite, with a counter       | What the model already knows, and Playwright's MCP server on a page open on the dev server, without its tools that run script in the page           |
+
+When the agent says it is done, the harness scores what it left:
+
+- **Typecheck and build.** Whether `npm run typecheck` and `npm run build` pass, and how many type
+  errors are left.
+- **Wrong guesses.** The typecheck and build runs the agent made that failed, read from the
+  transcript. This is the cost of what the model did not know.
+- **What it wrote.** Files and lines changed against the starter, without the lockfile.
+- **Operable with no extra code.** The tools the running app offers an agent beyond the screen and the
+  design tools, which in Gesso are its channels' and in React are none unless the agent wrote a server.
+  Then a second, fresh agent gets only the arm's MCP server (the dev endpoint, or Playwright) and is
+  asked to add an expense of $4.50 for Coffee. It passes when "Coffee" is then on the screen.
+
+Results go to `results/<date>-<model>-write/`, with `write-summary.md`, `write-summary.json` and both
+agents' transcripts for every run.
+
+What to expect, and what to publish either way: React should cost fewer wrong guesses, because the
+model has seen far more of it. Gesso should be operable with typed tools that nobody wrote, where
+React is operable only through the screen. A run where the Gesso agent writes no channel shows zero
+app tools, which says the scaffold and `AGENTS.md` did not lead it there.
 
 ## Cost
 

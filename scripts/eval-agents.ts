@@ -6,6 +6,7 @@
  *   node scripts/eval-agents.ts --repeat 3            three runs of each
  *   node scripts/eval-agents.ts --arms gesso,react --tasks assign-one,delete
  *   node scripts/eval-agents.ts --model sonnet
+ *   node scripts/eval-agents.ts --write               the writing half: see `eval-agents/write.ts`
  *
  * Three arms, differing only in how the agent reaches the tracker:
  *
@@ -45,11 +46,12 @@ import { fileURLToPath } from 'node:url';
 
 import type { Issue } from '../apps/eval-tracker/src/model.ts';
 import { findChrome, openPage, waitFor, type DevTools } from './lib/devtools.ts';
+import { mcpTool, parse, runClaude } from './eval-agents/claude.ts';
 import { tasks, type Task, type Verdict } from './eval-agents/tasks.ts';
+import { OPERATE_TASK, runWrite, summariseWrite, WRITE_TASK, type WriteArmName } from './eval-agents/write.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PLAYWRIGHT_MCP = '@playwright/mcp@0.0.86';
-const RUN_TIMEOUT_MS = 8 * 60_000;
 
 /** Told before every task, the same in every arm: what is in front of the agent, and how to finish. */
 const PREAMBLE =
@@ -154,38 +156,6 @@ function reactArm(port: number): Arm {
     },
     issues: devtools => devtools.evaluate<Issue[]>('window.__evalTracker()')
   };
-}
-
-/** One MCP tool call's structured result, or null when the endpoint has no such tool yet. */
-async function mcpTool(url: string, name: string): Promise<unknown> {
-  const post = async (body: object, session?: string) => {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json',
-        ...(session ? { 'mcp-session-id': session } : {})
-      },
-      body: JSON.stringify(body)
-    });
-    return {
-      session: response.headers.get('mcp-session-id') ?? session,
-      json: (await response.json()) as Record<string, any>
-    };
-  };
-  const init = await post({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'initialize',
-    params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'eval-checker', version: '1' } }
-  });
-  const call = await post(
-    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: {} } },
-    init.session ?? undefined
-  );
-  const result = call.json.result;
-  if (result === undefined || result.isError === true) return null;
-  return result.structuredContent ?? null;
 }
 
 interface Run {
@@ -342,67 +312,6 @@ async function warm(arm: Arm, devtoolsPort: number): Promise<void> {
   }
 }
 
-/** Runs `claude`, keeping every line it prints in the transcript, and returns them. */
-function runClaude(args: string[], cwd: string, transcript: string): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('claude', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '';
-    let err = '';
-    child.stdout.setEncoding('utf8').on('data', (chunk: string) => (out += chunk));
-    child.stderr.setEncoding('utf8').on('data', (chunk: string) => (err = (err + chunk).slice(-4000)));
-    const timer = setTimeout(() => child.kill(), RUN_TIMEOUT_MS);
-    child.on('exit', code => {
-      clearTimeout(timer);
-      writeFileSync(transcript, out);
-      const lines = out.split('\n').filter(line => line.trim() !== '');
-      if (!lines.some(line => line.includes('"type":"result"'))) {
-        reject(new Error(`claude exited ${code} without a result${err.trim() === '' ? '' : `: ${err.trim()}`}`));
-      } else {
-        resolve(lines);
-      }
-    });
-  });
-}
-
-/** What a run's stream says: its tool calls, its cost, its answer, and whether its MCP server ever came up. */
-function parse(lines: readonly string[]) {
-  const tools: Record<string, number> = {};
-  let toolErrors = 0;
-  let mcpProblem: string | undefined;
-  let result: Record<string, any> = {};
-  for (const line of lines) {
-    let event: Record<string, any>;
-    try {
-      event = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (event.type === 'system' && event.subtype === 'init') {
-      const down = (event.mcp_servers ?? []).filter((server: { status: string }) => server.status !== 'connected');
-      if (down.length > 0) mcpProblem = `MCP server not connected: ${JSON.stringify(down)}`;
-    }
-    for (const part of event.message?.content ?? []) {
-      if (event.type === 'assistant' && part.type === 'tool_use') tools[part.name] = (tools[part.name] ?? 0) + 1;
-      if (event.type === 'user' && part.type === 'tool_result' && part.is_error === true) toolErrors++;
-    }
-    if (event.type === 'result') result = event;
-  }
-  const usage = result.usage ?? {};
-  return {
-    tools,
-    toolCalls: Object.values(tools).reduce((a, b) => a + b, 0),
-    toolErrors,
-    inputTokens:
-      (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0),
-    outputTokens: usage.output_tokens ?? 0,
-    costUsd: result.total_cost_usd ?? 0,
-    durationMs: result.duration_ms ?? 0,
-    turns: result.num_turns ?? 0,
-    answer: typeof result.result === 'string' ? result.result : '',
-    mcpProblem
-  };
-}
-
 const median = (values: readonly number[]) => {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -459,9 +368,49 @@ function option(name: string, fallback: string): string {
   return at === -1 ? fallback : (process.argv[at + 1] ?? fallback);
 }
 
+async function mainWrite(model: string, repeats: number): Promise<void> {
+  const armNames = option('arms', 'gesso,react').split(',') as WriteArmName[];
+  const noAgent = process.argv.includes('--no-agent');
+  console.log(
+    `Writing: ${armNames.length} arms × ${repeats} = ${armNames.length * repeats} runs on ${model}` +
+      `${noAgent ? ', with no agent (the harness alone, on the untouched starters)' : ''}.`
+  );
+  if (process.argv.includes('--dry')) {
+    console.log(`  build: ${WRITE_TASK}\n  then operate: ${OPERATE_TASK}`);
+    return;
+  }
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  const out = join(root, 'evals/agents/results', `${stamp}-${model}-write${noAgent ? '-no-agent' : ''}`);
+  mkdirSync(join(out, 'transcripts'), { recursive: true });
+  const meta = {
+    date: new Date().toISOString().slice(0, 10),
+    model,
+    claude: execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim(),
+    gesso: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+    'playwright mcp': PLAYWRIGHT_MCP,
+    repeats: String(repeats),
+    ...(noAgent ? { agent: 'none: the harness alone' } : {})
+  };
+  const runs = await runWrite({
+    root,
+    model,
+    repeats,
+    arms: armNames,
+    noAgent,
+    keep: process.argv.includes('--keep'),
+    out,
+    meta
+  });
+  console.log(`\n${summariseWrite(runs, meta).split('## Every run')[0]}\nWritten to ${out}`);
+}
+
 async function main(): Promise<void> {
   const model = option('model', 'sonnet');
   const repeats = Number(option('repeat', '1'));
+  if (process.argv.includes('--write')) {
+    await mainWrite(model, repeats);
+    return;
+  }
   const armNames = option('arms', 'gesso,gesso-screen,react').split(',') as ArmName[];
   const all = tasks();
   const wanted = option('tasks', all.map(task => task.id).join(',')).split(',');
