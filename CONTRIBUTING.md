@@ -25,26 +25,27 @@ Node half of CI will pass.
 The rest need a browser and run separately, because they need Chrome and
 because they are slow:
 
-| Command                    | What it proves                                                                                                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `pnpm check:install`       | The packed packages install into a fresh project, typecheck against the published declarations, build and run |
-| `pnpm check:scaffold`      | `create-gesso-app` produces a project that installs, typechecks, builds and counts                            |
-| `pnpm check:a11y`          | Chrome's own computed accessibility tree matches the committed reports, and Tab reaches every control         |
-| `pnpm parity:webgpu`       | Canvas2D and WebGPU draw the same pixels                                                                      |
-| `pnpm fixtures:text:check` | Text still breaks where Chrome breaks                                                                         |
-| `pnpm screenshots:docker`  | Every covered route and docs page still paints its committed baseline                                         |
+| Command                                 | What it proves                                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `pnpm check:install`                    | The packed packages install into a fresh project, typecheck against the published declarations, build and run |
+| `pnpm check:scaffold`                   | `create-gesso-app` produces a project that installs, typechecks, builds and counts                            |
+| `pnpm check:a11y`                       | Chrome's own computed accessibility tree matches the committed reports, and Tab reaches every control         |
+| `pnpm parity:webgpu`                    | Canvas2D and WebGPU draw the same pixels                                                                      |
+| `pnpm fixtures:text:check`              | Text still breaks where Chrome breaks                                                                         |
+| `pnpm screenshots:docker`               | Every covered route and docs page still paints its committed baseline                                         |
+| `pnpm check:browsers --browser firefox` | The playground works in Firefox (or `safari`); see below                                                      |
 
 Run them one at a time. They share Chrome's devtools port.
 
 ### Firefox and Safari
 
-Everything above runs in Chrome. This one asks whether Gesso runs in
+Every other command above runs in Chrome. This one asks whether Gesso runs in
 the other two engines at all:
 
 ```bash
-node scripts/check-browsers.ts --browser firefox
-node scripts/check-browsers.ts --browser firefox --headed   # adds the WebGPU checks
-node scripts/check-browsers.ts --browser safari
+pnpm check:browsers --browser firefox
+pnpm check:browsers --browser firefox --headed   # adds the WebGPU checks
+pnpm check:browsers --browser safari
 ```
 
 In each browser it checks that every playground route mounts and

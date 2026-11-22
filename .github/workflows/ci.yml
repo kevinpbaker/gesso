@@ -17,6 +17,10 @@
 # false failure stalled a release. Their scripts still run locally, and
 # deleting the `if:` line turns a job back on.
 #
+# `firefox` and `safari` run `check:browsers`, the one gate that is not
+# Chrome: the playground in Firefox on this runner and in Safari on a
+# macOS one, which is the only image that has it.
+#
 # `pnpm check` runs the `checks` job's steps locally in the same order.
 #
 # **Every script under `scripts/` that ends in a verdict belongs to a
@@ -345,6 +349,65 @@ jobs:
         run: pnpm check:a11y
         env:
           CHROME_BIN: google-chrome
+
+  firefox:
+    name: the playground works in Firefox
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Firefox's content sandbox uses unprivileged user namespaces too,
+      # and the runner's Firefox is Mozilla's build, with no AppArmor
+      # profile of its own; the same restriction that stops a pinned
+      # Chrome (see the screenshots job) would stop it. Lifted on this
+      # throwaway runner for the same reason, keeping the sandbox on.
+      - name: Let Firefox sandbox itself
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      # Every route mounts and paints with no error, the browser's own
+      # accessibility engine names the reported controls and Tab walks
+      # them in the committed order, a real click and real keys reach the
+      # app, and the rest, touch and video probes pass. Headless Firefox
+      # has no WebGPU adapter, so the WebGPU route and parity are listed
+      # as not checked. Compares no pixels with any baseline. Talks
+      # WebDriver BiDi to Firefox itself, so no geckodriver.
+      - name: The browser check, in Firefox
+        run: pnpm check:browsers --browser firefox
+        env:
+          FIREFOX_BIN: firefox
+
+  safari:
+    name: the playground works in Safari
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # What a person does once per machine, done here without a
+      # password because the runner's sudo needs none.
+      - name: Allow Safari to be automated
+        run: sudo safaridriver --enable
+
+      # The same check as the Firefox job, through safaridriver. Safari
+      # has no headless mode; the runner's desktop session shows the
+      # window, and the check stops and says so if the page is ever
+      # hidden. Desktop safaridriver delivers a touch drag as a mouse, so
+      # the touch probe is listed as not checked.
+      - name: The browser check, in Safari
+        run: pnpm check:browsers --browser safari
 
   screenshots:
     name: route screenshots
