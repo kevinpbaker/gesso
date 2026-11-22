@@ -9,6 +9,7 @@ import {
   type AgentConfirmation,
   type AgentConfirmResult
 } from './AgentSurface';
+import { recordAgentActivity, type AgentActivitySink } from './activity';
 import { AGENT_PORT, combineSurfaces, remoteSurface, serveAgentPort, type AgentConfirm } from './remote';
 import { toolSurface, type AgentToolDefinition } from './tools';
 import { uiSurface, type UiHost } from './ui';
@@ -25,6 +26,8 @@ export interface ApplicationAgentParts {
   readonly tools?: () => readonly AgentToolDefinition[];
   /** How the application asks the person itself, on its own screen (`useAgentConfirm`). */
   readonly confirm?: () => AgentConfirmAsk | undefined;
+  /** Where what agents do is written down for the person: the runtime's `AgentActivityService`. */
+  readonly activity?: () => AgentActivitySink | undefined;
 }
 
 /** What an application's own question to the person is given beside the request; see `AgentConfirmAsk`. */
@@ -78,12 +81,14 @@ export function serveApplicationAgent(port: MessagePort, parts: ApplicationAgent
     const workers = [...parts.workers()]
       .filter(worker => worker.spawned)
       .map(worker => remoteSurface(worker.open(AGENT_PORT), { confirm }));
-    return combineSurfaces([
+    const whole = combineSurfaces([
       agentSurface(parts.channels(), { confirm }),
       ...workers,
       uiSurface(parts.ui, { confirm }),
       ...(parts.tools === undefined ? [] : [toolSurface(parts.tools)])
     ]);
+    const activity = parts.activity;
+    return activity === undefined ? whole : recordAgentActivity(whole, activity);
   });
 }
 

@@ -88,6 +88,11 @@ view tool, no commands, no resource. It is for a channel that is the
 application's own plumbing, such as the barrier between its threads,
 when a channel written for agents sits beside it.
 
+The person sees what an agent did. Each command it sends and each
+control it presses is written down with the agent's name, and
+`AgentActivityToast`, which a new project has already, says each burst
+in a toast: "Claude Code made 9 changes: update ×8, create."
+
 ## And the screen, as a screen reader hears it
 
 Not everything is in a channel: a dialog's buttons, a tab, a field the

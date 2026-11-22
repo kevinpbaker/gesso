@@ -1,4 +1,5 @@
 import { createComponent } from '../createComponent';
+import { AgentActivityService } from './AgentActivityService';
 import type { FrameworkChild } from '../ComponentElement';
 import type { ComponentType } from '../FunctionComponent';
 import type { WorkerHandle } from '../worker/WorkerPorts';
@@ -375,7 +376,8 @@ export class GessoAppBuilder {
         workers: () => this.channelHandle?.workers ?? [],
         ui: () => (this.app === app ? app.uiHost() : undefined),
         tools: () => this.agentTools,
-        confirm: () => this.agentConfirm
+        confirm: () => this.agentConfirm,
+        activity: () => (this.app === app ? app.services.get(AgentActivityService) : undefined)
       })
     );
     return pair.port1;

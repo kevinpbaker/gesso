@@ -247,6 +247,36 @@ Without `confirm`, a `@confirm` command is refused and the agent is
 told to ask the person to do it, which is the safe reading of a
 contract that asked for a person.
 
+## What agents did
+
+Every runtime keeps a record of what AI agents have done to the app:
+`AgentActivityService`. The agent bridge writes an entry for each call
+of a tool that can change something (a command, a screen action, a
+tool the app offers that is not read-only), with the agent that made
+it, as its client names itself, and what came of it: `changed`,
+`unchanged`, `declined`, `unasked` or `failed`. Reading a view, a
+query or the screen is not recorded.
+
+To show the person, put `AgentActivityToast` from `gesso-components`
+anywhere in the app. Once an agent has been quiet for a moment, it says
+the burst of changes in one toast:
+
+```text
+Claude Code made 9 changes: update ×8, create.
+```
+
+A new project has one already. For a history of your own, inject the
+service: `entries` is everything kept (the last 500), `latest` is each
+entry as it is recorded, and `describeAgentActivity(entries)` says a
+run of them in that sentence.
+
+A server records the same way, by wrapping its surface:
+
+```ts
+const activity = new AgentActivityService();
+mcpHandler(recordAgentActivity(agentSurface(channels), activity), { name: 'notes' });
+```
+
 ## Operating the interface
 
 Channels are the application's own vocabulary, and the right way in for

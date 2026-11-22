@@ -132,6 +132,16 @@ the screen's own controls rather than in the middle of them. With
 `dismissible={false}` there is no button and no tab stop, which is only
 safe alongside a duration that closes it.
 
+## What an AI agent did
+
+`AgentActivityToast` is a toast that shows itself. It says what an AI
+agent just did to the app, once the agent has been quiet for
+`quietMs` (1200 by default): "Claude Code made 9 changes: update ×8,
+create." Put one anywhere in the app. It takes `quietMs`, `duration`
+(6000 by default) and `placement`.
+[What agents did](/structure/agents-and-mcp#what-agents-did) says where
+the record comes from.
+
 ## Semantics
 
 | What    | Value                                                            |

@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 
 import { darkTheme, lightTheme, percent } from 'gesso-core';
-import { Button, ContextMenus, FindBar, Switch } from 'gesso-components';
+import { AgentActivityToast, Button, ContextMenus, FindBar, Switch } from 'gesso-components';
 import { internalState, ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Clicks } from './clicks';
 
@@ -82,6 +82,9 @@ export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
         top corner of the nearest positioned box, which is this column.
       */}
         <FindBar />
+
+        {/* Says what an AI agent just did here: "Claude Code made 3 changes: add ×3." */}
+        <AgentActivityToast />
       </column>
     </ContextMenus>
   );

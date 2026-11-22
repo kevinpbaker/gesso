@@ -91,6 +91,7 @@ export { StatusBar, zoomStep, type StatusBarItem, type StatusBarProps, type Stat
 export { FindBar, type FindBarProps } from './FindBar';
 export { Dialog, type DialogProps } from './Dialog';
 export { agentConfirmDialog, type AgentConfirmDialogOptions } from './AgentConfirmDialog';
+export { AgentActivityToast, type AgentActivityToastProps } from './AgentActivityToast';
 export { Drawer, type DrawerProps, type DrawerSide } from './Drawer';
 export { ColorPalette, normalizeHex, PALETTE, type ColorPaletteProps, type PaletteColor } from './ColorPalette';
 export { ColorPicker, hexOfHsv, hsvOfHex, type ColorPickerProps, type Hsv } from './ColorPicker';

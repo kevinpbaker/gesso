@@ -997,6 +997,26 @@ interface AgentConfirmDialogOptions {
   readonly width?: number;
 }
 declare function agentConfirmDialog(options?: AgentConfirmDialogOptions): AgentConfirmAsk;
+interface ToastProps {
+  open?: boolean;
+  onClose?: () => void;
+  message?: string;
+  tone?: 'info' | 'error';
+  duration?: number;
+  dismissible?: boolean;
+  action?: string;
+  onAction?: () => void;
+  placement?: ToastPlacement;
+  offset?: number;
+}
+type ToastPlacement = 'bottom-start' | 'bottom' | 'bottom-end';
+declare function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChild;
+interface AgentActivityToastProps {
+  quietMs?: number;
+  duration?: number;
+  placement?: ToastPlacement;
+}
+declare function AgentActivityToast(inputs: Inputs<AgentActivityToastProps>, ctx: ComponentContext): UiChild;
 type DrawerSide = 'start' | 'end' | 'top' | 'bottom';
 interface DrawerProps {
   open?: boolean;
@@ -1335,20 +1355,6 @@ declare function tooltip(ctx: ComponentContext, options: TooltipModifierOptions)
 interface TooltipArgs extends TooltipModifierOptions {
   readonly overlay: OverlayHandle;
 }
-interface ToastProps {
-  open?: boolean;
-  onClose?: () => void;
-  message?: string;
-  tone?: 'info' | 'error';
-  duration?: number;
-  dismissible?: boolean;
-  action?: string;
-  onAction?: () => void;
-  placement?: ToastPlacement;
-  offset?: number;
-}
-type ToastPlacement = 'bottom-start' | 'bottom' | 'bottom-end';
-declare function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChild;
 interface LazyListProps extends ControlLayoutProps {
   ref?: UiNodeRef;
   count: number;
@@ -1929,6 +1935,7 @@ export {
   Accordion,
   addDays,
   addMonths,
+  AgentActivityToast,
   agentConfirmDialog,
   Alert,
   allOf,
@@ -2078,6 +2085,7 @@ export {
   Tree,
   type AccordionProps,
   type AccordionSection,
+  type AgentActivityToastProps,
   type AgentConfirmDialogOptions,
   type AlertProps,
   type AlertTone,

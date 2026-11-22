@@ -7,6 +7,7 @@
 // ==== agent/index.d.ts ====
 import {
   AGENT_CONFIRM_MS,
+  AgentActivitySink,
   agentAnswer,
   AgentAnswer,
   AgentCallContext,
@@ -33,7 +34,10 @@ import {
   DesignThemes,
   fillQuestion,
   JsonSchema,
+  OUTCOME_META,
+  outcomeOf,
   outline,
+  recordAgentActivity,
   RenderDependencies,
   renderModule,
   RenderRequest,
@@ -236,9 +240,12 @@ export {
   MCP_PROTOCOL_VERSIONS,
   mcpHandler,
   OPERATE_INSTRUCTIONS,
+  OUTCOME_META,
+  outcomeOf,
   outline,
   pageModelContext,
   promptMessages,
+  recordAgentActivity,
   registerWebMcpTools,
   remoteSurface,
   renderModule,
@@ -250,6 +257,7 @@ export {
   serveApplicationAgent,
   themeTokens,
   toolSurface,
+  type AgentActivitySink,
   type AgentAnswer,
   type AgentCallContext,
   type AgentConfirmAsk,
@@ -472,6 +480,7 @@ interface AgentToolResult {
   readonly content: readonly AgentContent[];
   readonly structuredContent?: Record<string, unknown>;
   readonly isError: boolean;
+  readonly _meta?: Readonly<Record<string, unknown>>;
 }
 interface AgentQuestion {
   readonly title: string;
@@ -633,6 +642,33 @@ declare class UiRefs {
 declare function uiSurface(host: () => UiHost | undefined, options?: UiSurfaceOptions): AgentSurface;
 declare function outline(tree: UiSemanticsMap, focused: string | null, refs?: UiRefs, asks?: (id: string) => unknown): string;
 declare function resolveTarget(tree: UiSemanticsMap, args: Readonly<Record<string, unknown>>, refs?: UiRefs): UiSemanticsRecord | string;
+type AgentOutcome = 'changed' | 'unchanged' | 'declined' | 'unasked' | 'failed';
+interface AgentActivityEntry {
+  readonly id: number;
+  readonly at: number;
+  readonly agent?: string;
+  readonly tool: string;
+  readonly title?: string;
+  readonly arguments: Readonly<Record<string, unknown>>;
+  readonly outcome: AgentOutcome;
+}
+declare class AgentActivityService {
+  private readonly all;
+  private readonly added;
+  private next;
+  readonly entries: Observable<readonly AgentActivityEntry[]>;
+  readonly latest: Observable<AgentActivityEntry>;
+  current(): readonly AgentActivityEntry[];
+  record(entry: Omit<AgentActivityEntry, 'id'>): AgentActivityEntry;
+  clear(): void;
+}
+declare function describeAgentActivity(entries: readonly AgentActivityEntry[]): string;
+declare const OUTCOME_META = "gesso/outcome";
+interface AgentActivitySink {
+  record(entry: Omit<AgentActivityEntry, 'id'>): unknown;
+}
+declare function recordAgentActivity(surface: AgentSurfaceLike, sink: AgentActivitySink | (() => AgentActivitySink | undefined)): AgentSurfaceLike;
+declare function outcomeOf(result: AgentToolResult): AgentOutcome;
 interface AgentToolDefinition {
   readonly name: string;
   readonly title?: string;
@@ -654,6 +690,7 @@ interface ApplicationAgentParts {
   readonly ui: () => UiHost | undefined;
   readonly tools?: () => readonly AgentToolDefinition[];
   readonly confirm?: () => AgentConfirmAsk | undefined;
+  readonly activity?: () => AgentActivitySink | undefined;
 }
 interface AgentConfirmContext {
   inject<T extends object>(service: new () => T): T;
@@ -665,6 +702,9 @@ declare const AGENT_CONFIRM_MS = 110000;
 declare function serveApplicationAgent(port: MessagePort, parts: ApplicationAgentParts): () => void;
 export {
   AGENT_CONFIRM_MS,
+  AgentActivityEntry,
+  AgentActivityService,
+  AgentActivitySink,
   agentAnswer,
   AgentAnswer,
   AgentCallContext,
@@ -675,6 +715,7 @@ export {
   AgentContent,
   agentError,
   agentImages,
+  AgentOutcome,
   AgentQuestion,
   AgentResource,
   agentSurface,
@@ -697,6 +738,7 @@ export {
   CommandSchema,
   ComponentElement,
   ConfirmWording,
+  describeAgentActivity,
   describeChannel,
   designedTheme,
   DesignThemes,
@@ -709,6 +751,8 @@ export {
   JsonSchema,
   MessageEndpoint,
   observeColorScheme,
+  OUTCOME_META,
+  outcomeOf,
   outline,
   PictureCanvas,
   portHandle,
@@ -718,6 +762,7 @@ export {
   ProvidedChannel,
   QueryHandlers,
   QuerySchema,
+  recordAgentActivity,
   RenderDependencies,
   RenderedFrame,
   renderFrame,
@@ -4237,6 +4282,9 @@ import {
   ViewOf
 } from "./FunctionComponent.js";
 import {
+  AgentActivityEntry,
+  AgentActivityService,
+  AgentOutcome,
   APPLICATION_WORKER,
   ChannelRegistry,
   channelSchema,
@@ -4247,6 +4295,7 @@ import {
   CommandSchema,
   ComponentElement,
   ConfirmWording,
+  describeAgentActivity,
   describeChannel,
   FrameworkChild,
   isComponentElement,
@@ -4552,6 +4601,7 @@ import {
   writeClipboardImage
 } from "./index.js";
 export {
+  AgentActivityService,
   AnimationService,
   APPLICATION_WORKER,
   applyPatch,
@@ -4585,6 +4635,7 @@ export {
   Define,
   defineChannel,
   derive,
+  describeAgentActivity,
   describeChannel,
   describeStream,
   diffProjection,
@@ -4707,6 +4758,8 @@ export {
   treeText,
   type ActionCause,
   type ActionEntry,
+  type AgentActivityEntry,
+  type AgentOutcome,
   type AnimateOptions,
   type AppLogicEndpoint,
   type AudioAction,

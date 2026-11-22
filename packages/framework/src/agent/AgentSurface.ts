@@ -3,6 +3,7 @@ import type { Subscription } from 'rxjs';
 
 import { channelSchema, type CommandSchema, type JsonSchema, type QuerySchema } from '../channel/ChannelSchema';
 import type { ServedChannel } from '../channel/serveChannels';
+import { OUTCOME_META } from './activity';
 import { decodeBinary } from './binary';
 import { validate, repairedArguments } from './validate';
 
@@ -99,6 +100,12 @@ export interface AgentToolResult {
   readonly content: readonly AgentContent[];
   readonly structuredContent?: Record<string, unknown>;
   readonly isError: boolean;
+  /**
+   * MCP's own place for what is not in its schema. Gesso puts
+   * `gesso/outcome` here, what came of the call (`AgentOutcome`), for
+   * the activity the person is shown.
+   */
+  readonly _meta?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -472,10 +479,11 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
         entry,
         `Sent ${command} to ${channel}, and the view is the same as before. Either the command had nothing to act on ` +
           '(an id that matches nothing, a value it already had), or what it changed is not in this view, or it is ' +
-          `still working after ${settleMs} ms. The view:`
+          `still working after ${settleMs} ms. The view:`,
+        'unchanged'
       );
     }
-    return viewResult(entry, `Sent ${command} to ${channel}. The view afterwards:`);
+    return viewResult(entry, `Sent ${command} to ${channel}. The view afterwards:`, 'changed');
   };
 
   return {
@@ -611,13 +619,19 @@ export function refusal(answer: AgentAnswer, what: string): AgentToolResult | nu
     return null;
   }
   if (answer === 'declined') {
-    return failure(`The person declined ${what}. Do not send it again unless they ask.`);
+    return {
+      ...failure(`The person declined ${what}. Do not send it again unless they ask.`),
+      _meta: { [OUTCOME_META]: 'declined' }
+    };
   }
   const why = answer === 'unavailable' ? 'there was no way to show them the question' : answer.unavailable;
-  return failure(
-    `Nobody could be asked to approve ${what}: ${why}. The person did not decline it. Ask them ` +
-      "to bring the app's window forward and call it again, or to do it themselves."
-  );
+  return {
+    ...failure(
+      `Nobody could be asked to approve ${what}: ${why}. The person did not decline it. Ask them ` +
+        "to bring the app's window forward and call it again, or to do it themselves."
+    ),
+    _meta: { [OUTCOME_META]: 'unasked' }
+  };
 }
 
 /** The URI of a channel's view. */
@@ -724,14 +738,15 @@ function withoutKeys(schema: JsonSchema, keys: readonly string[]): JsonSchema {
   return { ...schema, properties, ...(required === undefined ? {} : { required }) };
 }
 
-function viewResult(entry: Entry, lead: string): AgentToolResult {
+function viewResult(entry: Entry, lead: string, outcome?: 'changed' | 'unchanged'): AgentToolResult {
   const view = shown(entry);
   return {
     // Compact: the same view is in structuredContent, and indenting a
     // large one doubles what the agent reads for nothing.
     content: [{ type: 'text', text: `${lead}\n${JSON.stringify(view)}` }],
     structuredContent: view,
-    isError: false
+    isError: false,
+    ...(outcome === undefined ? {} : { _meta: { [OUTCOME_META]: outcome } })
   };
 }
 

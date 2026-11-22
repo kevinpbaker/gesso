@@ -137,6 +137,7 @@ import {
 import { createComponent } from '../createComponent';
 import { OverlayLayer } from '../overlay/OverlayLayer';
 import { OverlayService } from '../overlay/OverlayService';
+import { AgentActivityService } from './AgentActivityService';
 import type { ColorScheme } from './colorScheme';
 import { ShellService, type ShellFileResult, type ShellRequest, type ShellStorageResult } from './ShellService';
 import { AudioService, type AudioAction, type AudioRequest, type AudioSample } from './AudioService';
@@ -786,6 +787,11 @@ export class GessoRuntime {
     // nodes, so it could not leave this thread even if asked.
     if (!this.services.has(OverlayService)) {
       this.services.register(OverlayService);
+    }
+    // And the record of what AI agents have done, which the agent bridge
+    // writes and a component shows the person.
+    if (!this.services.has(AgentActivityService)) {
+      this.services.register(AgentActivityService);
     }
     // And the shell's services: clipboard and URLs, which only the host
     // thread can reach.

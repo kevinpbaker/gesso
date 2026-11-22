@@ -1,4 +1,5 @@
 import type { FrameworkChild } from '../../ComponentElement';
+import { AgentActivityService } from '../AgentActivityService';
 import { createComponent } from '../../createComponent';
 import type { ComponentType } from '../../FunctionComponent';
 import { APPLICATION_WORKER, portHandle, servePorts, type PortHost, type WorkerHandle } from '../../worker/WorkerPorts';
@@ -469,6 +470,7 @@ export class RenderWorkerApp {
       },
       tools: () => this.agentTools,
       confirm: () => this.agentConfirm,
+      activity: () => this.runtime?.services.get(AgentActivityService),
       ui: () => {
         const runtime = this.runtime;
         if (runtime === undefined) {
