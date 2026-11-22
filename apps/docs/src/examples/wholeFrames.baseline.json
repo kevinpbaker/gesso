@@ -1,0 +1,657 @@
+{
+  "AccordionExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "AlertExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "AppearanceExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "AvatarExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "BadgeExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "BarrierExample": "not mounted alone: ReferenceError: wire is not defined",
+  "BreadcrumbExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "CanvasEditingExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 8,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "CellsExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "CheckboxExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ChipExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ComboboxExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ContextMenusExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "type": 0,
+    "wheel": 0
+  },
+  "CounterExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "DataGridExample": {
+    "idle": 0,
+    "hover": 1,
+    "tab": 2,
+    "arrows": 0,
+    "wheel": 6
+  },
+  "DataTableExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "DatePickerExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 2,
+    "wheel": 0
+  },
+  "DialogExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "DrawerExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "EditingExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "type": 0,
+    "wheel": 0
+  },
+  "ExplainExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "FindBarExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "FindExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "FlexExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "FocusTrapExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "FormExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 2,
+    "arrows": 0,
+    "type": 0,
+    "wheel": 0
+  },
+  "GesturesExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "GridExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "IconExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ImageExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "InspectorExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "KeyboardExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "LayoutExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "LazyListExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "LinkExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "MediaIconsExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "MediaImagesExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "MediaVideoExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "MenuBarExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 4,
+    "wheel": 0
+  },
+  "MenuExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "MeterExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "type": 1,
+    "wheel": 0
+  },
+  "MirrorExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "type": 0,
+    "wheel": 0
+  },
+  "ModifiersExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "MotionExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "NavigationRailExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 1,
+    "wheel": 0
+  },
+  "NumberInputExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "PaginationExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "PointerExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "PopoverExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "PositionExample": {
+    "idle": 1,
+    "hover": 1,
+    "tab": 1,
+    "arrows": 46,
+    "wheel": 1
+  },
+  "PresenceExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ProgressBarExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "PulseExample": {
+    "idle": 24,
+    "hover": 82,
+    "tab": 31,
+    "arrows": 24,
+    "wheel": 23
+  },
+  "RadioGroupExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "RangeSliderExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "RecipeAppearanceExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 4,
+    "wheel": 0
+  },
+  "RecipeDialogExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "RecipeFeedExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "RecipeSettingsExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "type": 6,
+    "wheel": 0
+  },
+  "RecipeTableExample": {
+    "idle": 0,
+    "hover": 2,
+    "tab": 4,
+    "arrows": 0,
+    "wheel": 6
+  },
+  "RichTextEditorExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 45,
+    "type": 0,
+    "wheel": 1
+  },
+  "RichTextExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "RoutingExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "RunsOnceExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ScrollAreaExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 6
+  },
+  "ScrollingExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "SegmentedControlExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 5,
+    "wheel": 0
+  },
+  "SelectExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 2,
+    "wheel": 0
+  },
+  "SelectionExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "SemanticsExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "SharedElementExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ShellServicesExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "SkeletonExample": {
+    "idle": 0,
+    "hover": 1,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "SliderExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "SpinnerExample": {
+    "idle": 7,
+    "hover": 27,
+    "tab": 9,
+    "arrows": 8,
+    "wheel": 8
+  },
+  "SplitPaneExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 2,
+    "wheel": 0
+  },
+  "StateExample": "not mounted alone: Error: Channel 'docs-basket' is not attached. Did you forget useChannel(...)? Attached channels: (none).",
+  "StickyExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "StructureExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "SwitchExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "TabsExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 2,
+    "wheel": 0
+  },
+  "TextExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "TextInputExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "type": 0,
+    "wheel": 0
+  },
+  "ThemesExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ToastExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "ToolbarOverflowExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 8,
+    "arrows": 5,
+    "wheel": 0
+  },
+  "TooltipExample": {
+    "idle": 0,
+    "hover": 2,
+    "tab": 8,
+    "arrows": 1,
+    "wheel": 0
+  },
+  "TourExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 19,
+    "wheel": 0
+  },
+  "TreeExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "TypographyExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "VideoExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "VideoPlayerExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "VirtualizationExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "WorkersExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "type": 0,
+    "wheel": 0
+  }
+}
