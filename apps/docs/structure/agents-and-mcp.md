@@ -42,6 +42,7 @@ For each channel:
 | A resource              | `gesso://<channel>/view` | Holds the view as JSON                                          |
 | A read-only tool        | `<channel>_view`         | Returns the view, for the agents that call tools, not resources |
 | A tool for each command | `<channel>_<command>`    | Sends the command and returns the view once it has settled      |
+| A tool for each query   | `<channel>_<query>`      | Returns what the query answers, and moves nothing on the screen |
 
 Returning the view after a command means an agent sees what its call
 did without asking again. The call waits for the view to change and
@@ -56,6 +57,60 @@ it sent matched nothing.
 The view's JSON Schema is the `<channel>_view` tool's `outputSchema`.
 Command tools return the same view but do not repeat its schema, which
 would make the tool list as many times larger as there are commands.
+
+### Queries: reading without moving the screen
+
+A command returns nothing, and its effect is the view the person sees.
+So an agent that can only send commands has to change the person's
+screen to read anything the view does not hold: it sets the list's
+filter to find the issues it wants, and the person is left looking at a
+filter they never chose. A channel's view also usually holds only what
+is on screen, such as the 60 rows a list draws.
+
+A query answers the agent alone. Declare it beside the commands, as a
+function that returns data:
+
+```ts
+export const Issues = defineChannel('issues', {
+  view: { rows: [] as readonly IssueRow[] },
+  commands: {} as { update(id: string, patch: IssuePatch): void },
+  queries: {} as {
+    /**
+     * Issues that match a filter, without changing the person's list.
+     * @param limit At most this many; 50 if left out.
+     * @returns The issues, newest first.
+     */
+    find(filter: IssueFilter, limit?: number): readonly IssueRow[];
+    /** One issue by id, or null. */
+    get(id: string): IssueRow | null;
+  }
+});
+```
+
+Answer it where the data is, in `serve` (or `useChannel`'s `source`):
+
+```ts
+serve(Issues, {
+  view: { rows: list.rows$ },
+  commands: { update: (id, patch) => store.update(id, patch) },
+  queries: { find: (filter, limit = 50) => store.find(filter, limit), get: id => store.get(id) ?? null }
+});
+```
+
+`channel<View, Commands, Queries>(name, initial)` declares the same
+thing. A query returns plain data, or a promise of it. The agent gets
+`issues_find`, marked read-only and safe to repeat, with its input from
+the parameters and its description from the JSDoc and `@returns`. The
+answer comes back as JSON, and as `structuredContent` (wrapped as
+`{ result }` when it is not an object). It has no `outputSchema`, for
+the same reason as a command. A query that throws is a failed call
+that the agent reads, and one that has not answered in 30 seconds is
+said to have not answered. `@hidden` keeps a query from agents.
+
+Queries are for agents only. The screen's components already have the
+view, and they do not call queries.
+
+### From the contract
 
 Everything an agent reads about a tool comes from the contract.
 [The Vite plugin](/tooling/vite-plugin#channels-described) writes each

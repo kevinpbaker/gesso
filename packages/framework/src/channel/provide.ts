@@ -6,12 +6,30 @@ import { requirePlainData } from './plainData';
 import { viewKeys, type ChannelToken, type CommandMap } from './ChannelToken';
 
 /** What the owning thread supplies for a channel. */
-export interface ChannelSource<View extends object, Commands extends object> {
+export interface ChannelSource<View extends object, Commands extends object, Queries extends object = object> {
   /** One observable per declared view key. */
   view: { readonly [K in keyof View]: Observable<View[K]> };
   /** One handler per declared command. */
   commands?: Commands;
+  /**
+   * One answer per declared query: the data, or a promise of it. Asked
+   * by AI agents only, through the channel's agent tools, never by the
+   * render thread, so a query reads what it likes on this thread
+   * without anything crossing until an agent asks.
+   */
+  queries?: QueryHandlers<Queries>;
 }
+
+/**
+ * The functions that answer a channel's queries: each takes what the
+ * query declares and returns what it declares, or a promise of it, so
+ * an answer that has to wait on storage need not be declared async.
+ */
+export type QueryHandlers<Queries extends object> = {
+  readonly [K in keyof Queries]: Queries[K] extends (...args: infer A) => infer R
+    ? (...args: A) => R | Promise<Awaited<R>>
+    : never;
+};
 
 /**
  * Publishes a channel from the thread that owns its data.

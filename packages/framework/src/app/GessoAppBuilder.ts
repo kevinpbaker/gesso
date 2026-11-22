@@ -68,9 +68,9 @@ export class GessoAppBuilder {
    * cross the same kind of port, so a channel can be moved into a
    * worker later without a view noticing.
    */
-  useChannel<V extends object, C extends object>(
-    token: ChannelToken<V, C>,
-    options: { worker?: WorkerHandle | (() => Worker); source?: ChannelSource<V, C> }
+  useChannel<V extends object, C extends object, Q extends object = object>(
+    token: ChannelToken<V, C, Q>,
+    options: { worker?: WorkerHandle | (() => Worker); source?: ChannelSource<V, C, Q> }
   ): this {
     this.channelRegistrations.push({
       token: token as unknown as ChannelToken<never, never>,

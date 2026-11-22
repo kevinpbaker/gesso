@@ -104,4 +104,21 @@ describe('agentReadiness', () => {
       'None of its 11 commands has JSDoc, so an agent reads only their names: c0, c1, c2, c3, c4, c5, c6, c7 and 3 more.'
     );
   });
+
+  it('counts an undescribed query with the commands, and never asks to confirm one', () => {
+    const schema: ChannelSchemaOut = {
+      view: { type: 'object' },
+      commands: { add: { description: 'Adds one.', parameters: [], input: empty } },
+      queries: {
+        removed: { parameters: [], input: empty },
+        find: { description: 'Finds some.', parameters: [], input: empty },
+        internal: { parameters: [], input: empty, hidden: true }
+      }
+    };
+    const [message] = agentReadiness(new Map([['Shelf', schema]]), 'src/shelf.ts');
+    expect(message).toContain(
+      '1 of its 3 commands and queries has no JSDoc, so an agent reads only its name: removed.'
+    );
+    expect(message).not.toContain('may not be undone');
+  });
 });

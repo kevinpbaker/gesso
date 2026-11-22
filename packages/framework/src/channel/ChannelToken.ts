@@ -55,8 +55,26 @@ export type Command = (...args: never[]) => void;
  */
 export type CommandMap = Record<string, Command>;
 
+/**
+ * A query an AI agent can ask a channel: a function that returns data,
+ * plain data or a promise of it, and changes nothing.
+ *
+ * A command returns nothing, because its effect comes back as a patch
+ * to the view, and the view is what the person sees. So an agent that
+ * could only send commands had to change the person's screen to read
+ * anything the view did not already hold: set the list's query to find
+ * the issues it wanted, and leave the person looking at a filter they
+ * never chose. A query answers the agent alone, on the thread that owns
+ * the data, and nothing on the screen moves.
+ */
+export type Query = (...args: never[]) => unknown;
+
 /** The declared barrier for one area of an application. */
-export interface ChannelToken<View extends object, Commands extends object = Record<string, never>> {
+export interface ChannelToken<
+  View extends object,
+  Commands extends object = Record<string, never>,
+  Queries extends object = object
+> {
   readonly name: string;
   /**
    * What every view key holds before the first patch arrives.
@@ -69,6 +87,8 @@ export interface ChannelToken<View extends object, Commands extends object = Rec
   readonly initial: View;
   /** Phantom, carrying the command types to `send`. Never read. */
   readonly commands?: Commands;
+  /** Phantom, carrying the query types to `serve`. Never read. */
+  readonly queries?: Queries;
 }
 
 /**
@@ -78,18 +98,19 @@ export interface ChannelToken<View extends object, Commands extends object = Rec
  * stable; unlike a class name it survives minification, which is why
  * it is written out rather than derived.
  */
-export function channel<View extends object, Commands extends object = Record<string, never>>(
-  name: string,
-  initial: View
-): ChannelToken<View, Commands> {
+export function channel<
+  View extends object,
+  Commands extends object = Record<string, never>,
+  Queries extends object = object
+>(name: string, initial: View): ChannelToken<View, Commands, Queries> {
   if (name.length === 0) {
     throw new Error('A channel needs a name: it is how the two threads agree on which one this is.');
   }
   return { name, initial };
 }
 
-/** A channel written as one object: the view with its values, and the commands. */
-export interface ChannelSpec<View extends object, Commands extends object> {
+/** A channel written as one object: the view with its values, the commands, and the queries. */
+export interface ChannelSpec<View extends object, Commands extends object, Queries extends object = object> {
   /**
    * Every view key with the value it holds before the first patch.
    *
@@ -106,6 +127,13 @@ export interface ChannelSpec<View extends object, Commands extends object> {
    * to `provide`, so what belongs in the token is only their shape.
    */
   readonly commands?: Commands;
+  /**
+   * The queries an AI agent can ask, as a type, the way `commands` is:
+   * `{} as { find(filter: IssueFilter): readonly IssueRow[] }`. Each
+   * returns plain data, or a promise of it, and is answered on the
+   * thread that owns the data (`serve(token, { queries })`). See `Query`.
+   */
+  readonly queries?: Queries;
 }
 
 /**
@@ -141,18 +169,22 @@ export interface ChannelSpec<View extends object, Commands extends object> {
  * shared with something else or because the initial values are built
  * elsewhere, has nothing to migrate.
  */
-export function defineChannel<View extends object, Commands extends object = Record<string, never>>(
-  name: string,
-  spec: ChannelSpec<View, Commands>
-): ChannelToken<View, Commands> {
-  return channel<View, Commands>(name, spec.view);
+export function defineChannel<
+  View extends object,
+  Commands extends object = Record<string, never>,
+  Queries extends object = object
+>(name: string, spec: ChannelSpec<View, Commands, Queries>): ChannelToken<View, Commands, Queries> {
+  return channel<View, Commands, Queries>(name, spec.view);
 }
 
 /** The view type of a channel token, for an application that wants to name it. */
-export type ViewOf<T> = T extends ChannelToken<infer View, object> ? View : never;
+export type ViewOf<T> = T extends ChannelToken<infer View, object, object> ? View : never;
 
 /** The command type of a channel token. */
-export type CommandsOf<T> = T extends ChannelToken<object, infer Commands> ? Commands : never;
+export type CommandsOf<T> = T extends ChannelToken<object, infer Commands, object> ? Commands : never;
+
+/** The query type of a channel token. */
+export type QueriesOf<T> = T extends ChannelToken<object, object, infer Queries> ? Queries : never;
 
 /**
  * The keys a channel publishes.

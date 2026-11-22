@@ -7,6 +7,8 @@ export {
   type Command,
   type CommandMap,
   type CommandsOf,
+  type QueriesOf,
+  type Query,
   type ViewOf
 } from './ChannelToken';
 export {
@@ -21,9 +23,10 @@ export {
   describeChannel,
   type ChannelSchema,
   type CommandSchema,
-  type JsonSchema
+  type JsonSchema,
+  type QuerySchema
 } from './ChannelSchema';
-export { provide, ProvidedChannel, type ChannelSource } from './provide';
+export { provide, ProvidedChannel, type ChannelSource, type QueryHandlers } from './provide';
 export { ChannelReplica } from './ChannelReplica';
 export { ChannelRegistry } from './ChannelRegistry';
 export { findUnplainPath, requirePlainData } from './plainData';

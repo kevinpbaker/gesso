@@ -291,19 +291,23 @@ import {
 } from "gesso-core";
 type Command = (...args: never[]) => void;
 type CommandMap = Record<string, Command>;
-interface ChannelToken<View extends object, Commands extends object = Record<string, never>> {
+type Query = (...args: never[]) => unknown;
+interface ChannelToken<View extends object, Commands extends object = Record<string, never>, Queries extends object = object> {
   readonly name: string;
   readonly initial: View;
   readonly commands?: Commands;
+  readonly queries?: Queries;
 }
-declare function channel<View extends object, Commands extends object = Record<string, never>>(name: string, initial: View): ChannelToken<View, Commands>;
-interface ChannelSpec<View extends object, Commands extends object> {
+declare function channel<View extends object, Commands extends object = Record<string, never>, Queries extends object = object>(name: string, initial: View): ChannelToken<View, Commands, Queries>;
+interface ChannelSpec<View extends object, Commands extends object, Queries extends object = object> {
   readonly view: View;
   readonly commands?: Commands;
+  readonly queries?: Queries;
 }
-declare function defineChannel<View extends object, Commands extends object = Record<string, never>>(name: string, spec: ChannelSpec<View, Commands>): ChannelToken<View, Commands>;
-type ViewOf<T> = T extends ChannelToken<infer View, object> ? View : never;
-type CommandsOf<T> = T extends ChannelToken<object, infer Commands> ? Commands : never;
+declare function defineChannel<View extends object, Commands extends object = Record<string, never>, Queries extends object = object>(name: string, spec: ChannelSpec<View, Commands, Queries>): ChannelToken<View, Commands, Queries>;
+type ViewOf<T> = T extends ChannelToken<infer View, object, object> ? View : never;
+type CommandsOf<T> = T extends ChannelToken<object, infer Commands, object> ? Commands : never;
+type QueriesOf<T> = T extends ChannelToken<object, object, infer Queries> ? Queries : never;
 declare function viewKeys(token: {
   initial: object;
 }): string[];
@@ -493,6 +497,8 @@ export {
   OutputTarget,
   Patch,
   PatchPath,
+  QueriesOf,
+  Query,
   ReadableCell,
   viewKeys,
   ViewOf
@@ -2662,9 +2668,9 @@ declare class GessoAppBuilder {
   private colorSchemePreference;
   private textSizeMode;
   constructor(root: FrameworkChild | ComponentType);
-  useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options: {
+  useChannel<V extends object, C extends object, Q extends object = object>(token: ChannelToken<V, C, Q>, options: {
     worker?: WorkerHandle | (() => Worker);
-    source?: ChannelSource<V, C>;
+    source?: ChannelSource<V, C, Q>;
   }): this;
   useService(ServiceClass: new () => object): this;
   useAgentTools(tools: readonly AgentToolDefinition[]): this;
@@ -3347,9 +3353,9 @@ declare class RenderWorkerApp {
   reload(root: FrameworkChild | ComponentType, services?: readonly (new () => object)[]): void;
   loadModulesWith(load: (path: string) => Promise<Record<string, unknown>>): this;
   renderThemesWith(themes: () => DesignThemes): this;
-  useChannel<V extends object, C extends object>(token: ChannelToken<V, C>, options?: {
+  useChannel<V extends object, C extends object, Q extends object = object>(token: ChannelToken<V, C, Q>, options?: {
     worker?: WorkerHandle | (() => Worker);
-    source?: ChannelSource<V, C>;
+    source?: ChannelSource<V, C, Q>;
   }): this;
   useService(ServiceClass: new () => object): this;
   useAgentTools(tools: readonly AgentToolDefinition[]): this;
@@ -3748,6 +3754,8 @@ import {
   OutputTarget,
   Patch,
   PatchPath,
+  QueriesOf,
+  Query,
   ReadableCell,
   viewKeys,
   ViewOf
@@ -3777,6 +3785,8 @@ import {
   PortHost,
   provide,
   ProvidedChannel,
+  QueryHandlers,
+  QuerySchema,
   RenderedFrame,
   renderFrame,
   RenderFrameOptions,
@@ -4332,6 +4342,10 @@ export {
   type PortHandshake,
   type PortHost,
   type PresenceProps,
+  type QueriesOf,
+  type Query,
+  type QueryHandlers,
+  type QuerySchema,
   type ReadableCell,
   type ReadSource,
   type RenderedFrame,
@@ -4612,7 +4626,8 @@ import {
   ChannelToken,
   Command,
   CommandMap,
-  ComponentType
+  ComponentType,
+  Query
 } from "./FunctionComponent.js";
 import {
   Observable
@@ -4640,6 +4655,14 @@ interface CommandSchema {
   readonly confirm?: true;
   readonly hidden?: true;
 }
+interface QuerySchema {
+  readonly description?: string;
+  readonly returns?: string;
+  readonly parameters: readonly string[];
+  readonly rest?: true;
+  readonly input: JsonSchema;
+  readonly hidden?: true;
+}
 interface ChannelSchema {
   readonly description?: string;
   readonly view: JsonSchema;
@@ -4647,6 +4670,9 @@ interface ChannelSchema {
   readonly internal?: true;
   readonly commands: {
     readonly [name: string]: CommandSchema;
+  };
+  readonly queries?: {
+    readonly [name: string]: QuerySchema;
   };
 }
 declare function describeChannel(token: ChannelToken<object, object>, schema: ChannelSchema): void;
@@ -4689,10 +4715,12 @@ interface PortErrorMessage {
 }
 declare function isPortErrorMessage(value: unknown): value is PortErrorMessage;
 declare function servePorts(onPort: (key: string, port: MessagePort) => boolean, names: () => readonly string[], host?: PortHost): () => void;
-interface ChannelSource<View extends object, Commands extends object> {
+interface ChannelSource<View extends object, Commands extends object, Queries extends object = object> {
   view: { readonly [K in keyof View]: Observable<View[K]>; };
   commands?: Commands;
+  queries?: QueryHandlers<Queries>;
 }
+type QueryHandlers<Queries extends object> = { readonly [K in keyof Queries]: Queries[K] extends ((...args: infer A) => infer R) ? (...args: A) => R | Promise<Awaited<R>> : never; };
 declare function provide<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>, port: ChannelPort): ProvidedChannel;
 declare class ProvidedChannel {
   private readonly token;
@@ -4726,9 +4754,10 @@ interface ServedChannel {
   source: {
     view: Record<string, Observable<unknown>>;
     commands?: Record<string, Command>;
+    queries?: Record<string, Query>;
   };
 }
-declare function serve<View extends object, Commands extends object>(token: ChannelToken<View, Commands>, source: ChannelSource<View, Commands>): ServedChannel;
+declare function serve<View extends object, Commands extends object, Queries extends object = object>(token: ChannelToken<View, Commands, Queries>, source: ChannelSource<View, Commands, Queries>): ServedChannel;
 declare function serveChannels(channels: readonly ServedChannel[], host?: PortHost): () => void;
 interface AgentTool {
   readonly name: string;
@@ -4960,6 +4989,8 @@ export {
   PortHost,
   provide,
   ProvidedChannel,
+  QueryHandlers,
+  QuerySchema,
   RenderDependencies,
   RenderedFrame,
   renderFrame,

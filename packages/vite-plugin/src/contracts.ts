@@ -29,6 +29,9 @@ import { blankLiterals, findCalls, importSources } from './source.ts';
  *   - `@param name text` describes a parameter.
  *   - `@destructive`, `@idempotent`, `@confirm` and `@hidden` on a
  *     command are its annotations; `CommandSchema` says what each means.
+ *   - A query (the token's third type argument, `ChannelSpec.queries`)
+ *     is read as a command is, with its `@returns` text, and its answer
+ *     is checked as plain data; `@hidden` keeps it from an agent.
  *   - `@hidden` on a view key keeps that key from an agent; see
  *     `ChannelSchema.hidden`. On the token, it keeps the whole channel
  *     from one; see `ChannelSchema.internal`. Such a channel is read and
@@ -51,6 +54,16 @@ export interface ChannelSchemaOut {
   view: JsonSchema;
   hidden?: string[];
   commands: Record<string, CommandSchemaOut>;
+  queries?: Record<string, QuerySchemaOut>;
+}
+
+interface QuerySchemaOut {
+  description?: string;
+  returns?: string;
+  parameters: string[];
+  rest?: true;
+  input: JsonSchema;
+  hidden?: true;
 }
 
 interface CommandSchemaOut {
@@ -292,8 +305,8 @@ export class ContractReader {
       if (type === undefined || type.getSymbol()?.name !== 'ChannelToken') {
         continue;
       }
-      const [view, commands] = checker.getTypeArguments(type as TsApi.TypeReference);
-      channels.set(exported.name, describer.channel(exported, view, commands));
+      const [view, commands, queries] = checker.getTypeArguments(type as TsApi.TypeReference);
+      channels.set(exported.name, describer.channel(exported, view, commands, queries));
     }
     return { channels, warnings: describer.warnings };
   }
@@ -670,7 +683,12 @@ class Describer {
     return type.isUnionType() ? (type.getTypes() ?? []).some(isNull) : isNull(type);
   }
 
-  channel(token: TsApi.Symbol, view: TsApi.Type, commands: TsApi.Type | undefined): ChannelSchemaOut {
+  channel(
+    token: TsApi.Symbol,
+    view: TsApi.Type,
+    commands: TsApi.Type | undefined,
+    queries?: TsApi.Type
+  ): ChannelSchemaOut {
     const out: ChannelSchemaOut = { view: this.root(view, `${token.name}.view`), commands: {} };
     const description = this.checker.getDocumentationCommentOfSymbol(token);
     if (description !== '') {
@@ -692,6 +710,13 @@ class Describer {
         if (described !== null) {
           out.commands[command.name] = described;
         }
+      }
+    }
+    // A token declared without queries has `object` as its third type argument, which has no properties.
+    for (const query of queries === undefined ? [] : this.checker.getPropertiesOfType(queries)) {
+      const described = this.query(query, `${token.name}.queries.${query.name}`);
+      if (described !== null) {
+        (out.queries ??= {})[query.name] = described;
       }
     }
     // A channel kept from agents is read whole all the same, so what in it
@@ -719,11 +744,47 @@ class Describer {
     return schema;
   }
 
-  private command(symbol: TsApi.Symbol, path: string): CommandSchemaOut | null {
+  /**
+   * A query: a command's parameters, read the same way, and what it
+   * answers with, which is checked as plain data (a promise's value,
+   * for a query that waits) though only its `@returns` text is kept.
+   */
+  private query(symbol: TsApi.Symbol, path: string): QuerySchemaOut | null {
+    const read = this.command(symbol, path, 'query an agent can ask');
+    if (read === null) {
+      return null;
+    }
+    const type = this.checker.getTypeOfSymbol(symbol);
+    const signature =
+      type === undefined ? undefined : this.checker.getSignaturesOfType(type, this.ts.SignatureKind.Call)[0];
+    const answer = signature === undefined ? undefined : this.checker.getReturnTypeOfSignature(signature);
+    if (answer !== undefined) {
+      const awaited =
+        answer.getSymbol()?.name === 'Promise'
+          ? this.checker.getTypeArguments(answer as TsApi.TypeReference)[0]
+          : answer;
+      this.defs = new Map();
+      if (awaited !== undefined) this.describe(awaited, `${path}()`);
+    }
+    const returns = this.checker
+      .getJsDocTagsOfSymbol(symbol)
+      .find(tag => (tag.name === 'returns' || tag.name === 'return') && (tag.text ?? '').trim() !== '');
+    const { description, parameters, rest, input, hidden } = read;
+    return {
+      ...(description === undefined ? {} : { description }),
+      ...(returns === undefined ? {} : { returns: returns.text!.trim() }),
+      parameters,
+      ...(rest === undefined ? {} : { rest }),
+      input,
+      ...(hidden === undefined ? {} : { hidden })
+    };
+  }
+
+  private command(symbol: TsApi.Symbol, path: string, what = 'command an agent can send'): CommandSchemaOut | null {
     const type = this.checker.getTypeOfSymbol(symbol);
     const signatures = type === undefined ? [] : this.checker.getSignaturesOfType(type, this.ts.SignatureKind.Call);
     if (signatures.length === 0) {
-      this.warnings.push(`${path} is not a function, so it is not a command an agent can send.`);
+      this.warnings.push(`${path} is not a function, so it is not a ${what}.`);
       return null;
     }
     if (signatures.length > 1) {

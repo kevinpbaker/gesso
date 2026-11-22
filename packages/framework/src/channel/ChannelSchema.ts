@@ -51,6 +51,22 @@ export interface CommandSchema {
   readonly hidden?: true;
 }
 
+/** One query, described: a command's parameters, and what it answers with. */
+export interface QuerySchema {
+  /** The query's JSDoc summary. */
+  readonly description?: string;
+  /** What its `@returns` tag says it answers with. */
+  readonly returns?: string;
+  /** The parameter names, in order, as `CommandSchema.parameters`. */
+  readonly parameters: readonly string[];
+  /** The last parameter is a rest parameter. */
+  readonly rest?: true;
+  /** An object schema, one property per parameter. */
+  readonly input: JsonSchema;
+  /** `@hidden`: not offered to an agent. */
+  readonly hidden?: true;
+}
+
 /** A channel, described. */
 export interface ChannelSchema {
   /** The token's JSDoc summary. */
@@ -75,6 +91,8 @@ export interface ChannelSchema {
    */
   readonly internal?: true;
   readonly commands: { readonly [name: string]: CommandSchema };
+  /** The queries an agent can ask (`ChannelSpec.queries`), absent when there are none. */
+  readonly queries?: { readonly [name: string]: QuerySchema };
 }
 
 /**

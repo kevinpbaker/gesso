@@ -272,6 +272,12 @@ four tags annotate a command:
 | `@confirm`     | A person should approve it before anything else sends it |
 | `@hidden`      | For the application's own components, not for an agent   |
 
+A channel's queries (its third type argument, or `queries` in
+`defineChannel`) are read the same way as its commands, into
+`ChannelSchema.queries`. Each one keeps its `@returns` text, and what it
+returns is checked as plain data: a promise's value, for a query that
+waits. `@hidden` is the only tag a query takes.
+
 `@hidden` on a view key is read too: the key stays in the schema, and
 `ChannelSchema.hidden` lists it, so an agent is given the view without
 it. On the exported token it marks the whole channel

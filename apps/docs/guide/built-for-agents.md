@@ -60,6 +60,13 @@ Four tags decide how far an agent may go:
 | `@idempotent`  | The tool is marked safe to repeat                                     |
 | `@hidden`      | The command is not offered to agents at all                           |
 
+A channel can also declare queries: functions that return data, such
+as `find(filter): IssueRow[]`. An agent asks them as read-only tools,
+so it can look through all of the person's issues without changing the
+list that the person is looking at.
+[Queries](/structure/agents-and-mcp#queries-reading-without-moving-the-screen)
+has the detail.
+
 `@hidden` on a view key keeps that key out of everything an agent
 reads: geometry for the screen, a clipboard, the text of a file being
 saved. An agent is handed the rest of the view after every command, so

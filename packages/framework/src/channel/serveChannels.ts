@@ -5,7 +5,7 @@ import { AGENT_PORT, serveAgentPort } from '../agent/remote';
 import { servePorts, type PortHost } from '../worker/WorkerPorts';
 import { provide, type ChannelSource, ProvidedChannel } from './provide';
 import type { ChannelPort } from './ChannelProtocol';
-import type { ChannelToken, Command, CommandMap } from './ChannelToken';
+import type { ChannelToken, Command, CommandMap, Query } from './ChannelToken';
 
 /**
  * One channel a worker offers: its token and what feeds it.
@@ -20,6 +20,7 @@ export interface ServedChannel {
   source: {
     view: Record<string, Observable<unknown>>;
     commands?: Record<string, Command>;
+    queries?: Record<string, Query>;
   };
 }
 
@@ -42,9 +43,9 @@ export interface ServedChannel {
  * is often the domain object itself when its properties are named
  * after the keys. Only the declared keys are read from it.
  */
-export function serve<View extends object, Commands extends object>(
-  token: ChannelToken<View, Commands>,
-  source: ChannelSource<View, Commands>
+export function serve<View extends object, Commands extends object, Queries extends object = object>(
+  token: ChannelToken<View, Commands, Queries>,
+  source: ChannelSource<View, Commands, Queries>
 ): ServedChannel {
   return { token, source: source as unknown as ServedChannel['source'] };
 }

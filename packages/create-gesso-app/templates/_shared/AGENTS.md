@@ -131,6 +131,11 @@ export const Notes = defineChannel('notes', {
   threads read without copying (the page must be cross-origin isolated).
 - Commands return `void`. The effect comes back as a change to the view,
   never as a return value.
+- For an AI agent to read what the view does not hold (a search, one
+  record by id) without changing the person's screen, add
+  `queries: {} as { find(text: string): readonly NoteRow[] }` and answer
+  them in the source as `queries: { find }`. Each returns plain data or a
+  promise of it. Agents call queries; components use the view.
 - A component reads `ctx.channel(Notes).view.rows` like any other cell
   and calls `ctx.channel(Notes).send.open(id)`.
 - **Register it** with what feeds it. In a web project that is the

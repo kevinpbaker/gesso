@@ -65,6 +65,19 @@ export const Catalog = defineChannel('catalog', {
     debugReset(): void;
     /** A picture of the product, as the file it came from. */
     attach(file: { name: string; bytes: Uint8Array }, thumbnail: ArrayBuffer | null): void;
+  },
+  queries: {} as {
+    /**
+     * Products whose name holds the text, without moving the shelf.
+     * @param text What to look for.
+     * @returns The products, best match first.
+     */
+    search(text: string, limit?: number): readonly ProductRow[];
+    /** How many are in stock. */
+    stock(id: string): Promise<number>;
+    /** @hidden */
+    debugDump(): string;
+    restocked(id: string): Date;
   }
 });
 
@@ -332,10 +345,32 @@ describe('a contract, read by the checker', () => {
     expect(catalog.warnings.some(warning => warning.includes('attach'))).toBe(false);
   });
 
+  it('describes each query as a command, with what it returns, and checks its answer is plain data', () => {
+    const { search, stock, debugDump, restocked } = catalog.channels.get('Catalog')!.queries!;
+    expect(search).toEqual({
+      description: 'Products whose name holds the text, without moving the shelf.',
+      returns: 'The products, best match first.',
+      parameters: ['text', 'limit'],
+      input: {
+        type: 'object',
+        properties: { text: { type: 'string', description: 'What to look for.' }, limit: { type: 'number' } },
+        additionalProperties: false,
+        required: ['text']
+      }
+    });
+    // A query that waits is checked by what it waits for, and a promise is not a warning.
+    expect(stock).toMatchObject({ description: 'How many are in stock.', parameters: ['id'] });
+    expect(debugDump).toMatchObject({ hidden: true });
+    expect(restocked.parameters).toEqual(['id']);
+    // A token with no queries has none written.
+    expect(legacy.channels.get('Counter')!.queries).toBeUndefined();
+  });
+
   it('names what it could not describe, and where', () => {
     expect(catalog.warnings).toEqual([
       expect.stringContaining('Catalog.view.forgotten[] is never'),
-      'Catalog.view.when is a Date, which is not plain data and cannot cross a channel.'
+      'Catalog.view.when is a Date, which is not plain data and cannot cross a channel.',
+      'Catalog.queries.restocked() is a Date, which is not plain data and cannot cross a channel.'
     ]);
   });
 

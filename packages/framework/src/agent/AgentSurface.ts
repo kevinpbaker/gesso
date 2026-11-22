@@ -1,7 +1,7 @@
 import { describeSharedMemory } from '../channel/plainData';
 import type { Subscription } from 'rxjs';
 
-import { channelSchema, type CommandSchema, type JsonSchema } from '../channel/ChannelSchema';
+import { channelSchema, type CommandSchema, type JsonSchema, type QuerySchema } from '../channel/ChannelSchema';
 import type { ServedChannel } from '../channel/serveChannels';
 import { decodeBinary } from './binary';
 import { validate, repairedArguments } from './validate';
@@ -26,7 +26,11 @@ import { validate, repairedArguments } from './validate';
  *   - a tool per command, `<channel>_<command>`, whose input schema is
  *     the command's parameters by name. Calling it sends the command,
  *     waits for the view to settle, and returns the view as it now is,
- *     so the agent sees what its call did without a second round trip.
+ *     so the agent sees what its call did without a second round trip;
+ *   - a tool per query, `<channel>_<query>`, marked read-only, whose
+ *     answer is whatever the query returns. Nothing on the person's
+ *     screen moves, so an agent reads what the view does not hold
+ *     without changing what the person is looking at.
  *
  * The descriptions come from `channelSchema(token)`, which
  * `gesso-vite-plugin` writes from the contract's JSDoc. A command
@@ -152,6 +156,9 @@ export interface AgentSurface extends AgentSurfaceLike {
 /** The longest tool name MCP clients accept. */
 const MAX_NAME = 64;
 
+/** How long a query may take to answer before the agent is told it did not, in milliseconds. */
+const QUERY_MS = 30_000;
+
 interface Entry {
   readonly served: ServedChannel;
   readonly name: string;
@@ -161,6 +168,7 @@ interface Entry {
   /** View keys kept from the agent. */
   readonly hidden: ReadonlySet<string>;
   readonly commands: ReadonlyMap<string, CommandSchema | null>;
+  readonly queries: ReadonlyMap<string, QuerySchema | null>;
   /**
    * Every change this channel's view has seen, and when the last was,
    * so a command can tell its own effect from what came before it.
@@ -253,6 +261,13 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
         commands.set(command, described ?? null);
       }
     }
+    const queries = new Map<string, QuerySchema | null>();
+    for (const query of Object.keys(served.source.queries ?? {})) {
+      const described = schema?.queries?.[query];
+      if (described?.hidden !== true) {
+        queries.set(query, described ?? null);
+      }
+    }
     const entry: Entry = {
       served,
       name,
@@ -261,6 +276,7 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
       view: { ...(served.token.initial as Record<string, unknown>) },
       hidden: new Set(schema?.hidden ?? []),
       commands,
+      queries,
       changes: 0,
       lastChange: 0
     };
@@ -285,7 +301,51 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
     for (const [command, described] of commands) {
       add(commandTool(entry, command, described), args => send(entry, command, described, args));
     }
+    for (const [query, described] of queries) {
+      add(queryTool(entry, query, described), args => ask(entry, query, described, args));
+    }
   }
+
+  /** Answers a query: its arguments checked as a command's are, and what it returns handed back as it is. */
+  const ask = async (
+    entry: Entry,
+    query: string,
+    described: QuerySchema | null,
+    args: Readonly<Record<string, unknown>> | undefined
+  ): Promise<AgentToolResult> => {
+    const channel = entry.served.token.name;
+    const positional = positionalArguments(described, args);
+    if (!Array.isArray(positional)) {
+      return positional;
+    }
+    const handler = entry.served.source.queries?.[query] as ((...values: unknown[]) => unknown) | undefined;
+    if (handler === undefined) {
+      return failure(`${channel} has no query ${query}.`);
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const late = Symbol('late');
+      const answer = await Promise.race([
+        Promise.resolve(handler(...positional)),
+        new Promise<typeof late>(resolve => {
+          timer = setTimeout(() => resolve(late), QUERY_MS);
+        })
+      ]);
+      if (answer === late) {
+        return failure(`${channel}.${query} did not answer within ${QUERY_MS / 1000} seconds.`);
+      }
+      const value = describeSharedMemory(answer === undefined ? null : answer);
+      return {
+        content: [{ type: 'text', text: `${channel}.${query} answered:\n${JSON.stringify(value)}` }],
+        structuredContent: isRecord(value) ? value : { result: value },
+        isError: false
+      };
+    } catch (error) {
+      return failure(`${channel}.${query} failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 
   const send = async (
     entry: Entry,
@@ -295,34 +355,14 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
   ): Promise<AgentToolResult> => {
     follow();
     const channel = entry.served.token.name;
+    const positional = positionalArguments(described, args);
+    if (!Array.isArray(positional)) {
+      return positional;
+    }
     const input = (described === null ? (args ?? {}) : repairedArguments(described.input, args ?? {})) as Readonly<
       Record<string, unknown>
     >;
-    let positional: unknown[];
-    if (described === null) {
-      const list = input.arguments ?? [];
-      if (!Array.isArray(list)) {
-        return failure('arguments must be an array of the values the command takes, in order.');
-      }
-      positional = list;
-    } else {
-      const problem = validate(described.input, input);
-      if (problem !== null) {
-        return failure(problem);
-      }
-      // Bytes arrive as base64, which is all JSON can carry, and leave
-      // as the typed array or buffer the command was written to take.
-      const properties = (described.input.properties as Record<string, JsonSchema> | undefined) ?? {};
-      positional = described.parameters.map(parameter =>
-        decodeBinary(properties[parameter], input[parameter], described.input)
-      );
-      if (described.rest === true) {
-        const spread = positional.pop();
-        positional.push(...(Array.isArray(spread) ? spread : []));
-      }
-      while (positional.length > 0 && positional[positional.length - 1] === undefined) {
-        positional.pop();
-      }
+    if (described !== null) {
       if (described.confirm === true) {
         if (options.confirm === undefined) {
           return failure(
@@ -402,6 +442,43 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
   };
 }
 
+/**
+ * A tool call's named arguments as the positional list a command or a
+ * query takes, or the failure that says why they do not fit.
+ */
+function positionalArguments(
+  described: { readonly parameters: readonly string[]; readonly rest?: true; readonly input: JsonSchema } | null,
+  args: Readonly<Record<string, unknown>> | undefined
+): unknown[] | AgentToolResult {
+  if (described === null) {
+    const list = (args ?? {}).arguments ?? [];
+    return Array.isArray(list) ? list : failure('arguments must be an array of the values it takes, in order.');
+  }
+  const input = repairedArguments(described.input, args ?? {}) as Readonly<Record<string, unknown>>;
+  const problem = validate(described.input, input);
+  if (problem !== null) {
+    return failure(problem);
+  }
+  // Bytes arrive as base64, which is all JSON can carry, and leave
+  // as the typed array or buffer the command was written to take.
+  const properties = (described.input.properties as Record<string, JsonSchema> | undefined) ?? {};
+  const positional = described.parameters.map(parameter =>
+    decodeBinary(properties[parameter], input[parameter], described.input)
+  );
+  if (described.rest === true) {
+    const spread = positional.pop();
+    positional.push(...(Array.isArray(spread) ? spread : []));
+  }
+  while (positional.length > 0 && positional[positional.length - 1] === undefined) {
+    positional.pop();
+  }
+  return positional;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && !ArrayBuffer.isView(value);
+}
+
 /** The URI of a channel's view. */
 export function resourceUri(channel: string): string {
   return `gesso://${encodeURIComponent(channel)}/view`;
@@ -441,6 +518,32 @@ function commandTool(entry: Entry, command: string, described: CommandSchema | n
       ...(described?.idempotent === true ? { idempotentHint: true } : {}),
       openWorldHint: false
     }
+  };
+}
+
+function queryTool(entry: Entry, query: string, described: QuerySchema | null): AgentTool {
+  const channel = entry.served.token.name;
+  const lines = [described?.description ?? `Asks the ${channel} channel ${query}.`];
+  if (described?.returns !== undefined) {
+    lines.push(`Returns ${described.returns}`);
+  }
+  if (described === null) {
+    lines.push('This query was not described, so its arguments are a positional list.');
+  }
+  lines.push("It changes nothing, and nothing on the person's screen moves.");
+  return {
+    name: toolName(`${channel}_${query}`),
+    title: `${channel}: ${query}`,
+    description: lines.join('\n\n'),
+    inputSchema:
+      described?.input ??
+      ({
+        type: 'object',
+        properties: { arguments: { type: 'array', description: 'The arguments, in order.' } },
+        additionalProperties: false
+      } satisfies JsonSchema),
+    // No `outputSchema`, as for a command: a row type repeated on every query is what made tool lists heavy.
+    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false }
   };
 }
 

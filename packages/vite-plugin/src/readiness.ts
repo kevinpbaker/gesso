@@ -16,7 +16,7 @@ import type { ChannelSchemaOut } from './contracts.ts';
  * Three things, each of which made an agent guess or could cost the
  * person their work:
  *
- *   - a command with no description;
+ *   - a command or a query with no description;
  *   - one of those whose name says it may not be undone (`reset`,
  *     `remove`, `delete` …) and that is not marked `@destructive`,
  *     `@confirm` or `@hidden`. A described command is left alone: its
@@ -59,7 +59,12 @@ export function agentReadiness(channels: ReadonlyMap<string, ChannelSchemaOut>, 
 }
 
 function channelProblems(schema: ChannelSchemaOut): string[] {
-  const offered = Object.entries(schema.commands).filter(([, command]) => command.hidden !== true);
+  const commands = Object.entries(schema.commands).filter(([, command]) => command.hidden !== true);
+  const queries = Object.entries(schema.queries ?? {}).filter(([, query]) => query.hidden !== true);
+  // Queries are counted with the commands: to an agent both are tools it reads the JSDoc of.
+  const offered: [string, { description?: string; input: JsonSchema }][] = [...commands, ...queries];
+  const kind = queries.length === 0 ? 'command' : commands.length === 0 ? 'query' : 'command and query';
+  const kinds = queries.length === 0 ? 'commands' : commands.length === 0 ? 'queries' : 'commands and queries';
   const undescribed = offered.filter(([, command]) => (command.description ?? '').trim() === '');
   const problems: string[] = [];
 
@@ -69,16 +74,16 @@ function channelProblems(schema: ChannelSchemaOut): string[] {
     const count =
       k === n
         ? n === 1
-          ? 'Its one command has no JSDoc'
-          : `None of its ${n} commands has JSDoc`
-        : `${k} of its ${n} commands ${k === 1 ? 'has' : 'have'} no JSDoc`;
+          ? `Its one ${kind} has no JSDoc`
+          : `None of its ${n} ${kinds} has JSDoc`
+        : `${k} of its ${n} ${kinds} ${k === 1 ? 'has' : 'have'} no JSDoc`;
     problems.push(
       `${count}, so an agent reads only ${k === 1 ? 'its name' : 'their names'}: ${names}. ` +
         `Write a sentence on ${k === 1 ? 'it' : 'each'}, for someone who has never seen the code.`
     );
   }
 
-  for (const [command, described] of undescribed) {
+  for (const [command, described] of commands.filter(([, each]) => (each.description ?? '').trim() === '')) {
     if (!FINAL.has(firstWord(command))) continue;
     if (described.destructive === true || described.confirm === true) continue;
     problems.push(
