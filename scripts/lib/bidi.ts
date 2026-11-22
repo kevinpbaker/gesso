@@ -240,6 +240,9 @@ export async function openFirefox(options: OpenOptions): Promise<BrowserPage> {
       const reply = await bidi.send<{ data: string }>('browsingContext.captureScreenshot', { context });
       return Buffer.from(reply.data, 'base64');
     },
+    async bringToFront() {
+      await bidi.send('browsingContext.activate', { context });
+    },
     async perform(sources: readonly InputSource[]) {
       await bidi.send('input.performActions', { context, actions: sources });
       await bidi.send('input.releaseActions', { context });

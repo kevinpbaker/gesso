@@ -45,7 +45,6 @@ the other two engines at all:
 node scripts/check-browsers.ts --browser firefox
 node scripts/check-browsers.ts --browser firefox --headed   # adds the WebGPU checks
 node scripts/check-browsers.ts --browser safari
-node scripts/check-browsers.ts --browser ios                # Safari in a booted iOS Simulator
 ```
 
 In each browser it checks that every playground route mounts and
@@ -72,11 +71,20 @@ Safari has to be allowed to be automated, once per machine. In Safari,
 turn on Settings > Advanced > "Show features for web developers", then
 Settings > Developer > "Allow remote automation". Then run
 `safaridriver --enable`, which asks for your password. Safari has no
-headless mode, so a window opens while the check runs. `--browser ios`
-uses the same driver against a booted simulator (`--device "iPhone 17"`
-picks one). In the simulator, turn on Settings > Safari > Advanced >
-Remote Automation first. The simulator runs WebKit on iOS with real touch,
-but on the Mac's GPU and memory, so it is not an iPhone.
+headless mode, so a window opens while the check runs, and it has to
+stay uncovered: a covered window's page is hidden and gets no frames and
+no input, and the check stops and says so rather than report failures
+that are not Gesso's. Desktop Safari's driver delivers a touch drag as a
+mouse, so the touch probe is reported as not checked there.
+
+`--browser ios` asks the same driver for Safari in a booted iOS
+Simulator. On macOS 27 with the iOS 27 simulator it has not worked: the
+driver finds no session host, with Safari running in the simulator and
+no Remote Automation switch in its settings to turn on. Until it does,
+check iOS by hand: `xcrun simctl openurl booted http://localhost:5173`
+with `pnpm dev` running, and Web Inspector attached from Safari's
+Develop menu. The simulator runs WebKit on iOS with real touch, but on
+the Mac's GPU and memory, so it is not an iPhone either.
 
 What no script here can check, and what to do by hand before a release:
 

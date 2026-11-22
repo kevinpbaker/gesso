@@ -33,7 +33,7 @@
  *
  *   node scripts/check-browsers.ts --browser firefox
  *   node scripts/check-browsers.ts --browser safari
- *   node scripts/check-browsers.ts --browser ios --device "iPhone 17"
+ *   node scripts/check-browsers.ts --browser ios --device "iPhone 17"   # not yet working; see CONTRIBUTING
  *   node scripts/check-browsers.ts --browser firefox --headed --only routes,input --route example-notes
  *   node scripts/check-browsers.ts --browser firefox --only routes --shots /tmp/shots   # what each route drew
  *
@@ -160,12 +160,19 @@ const PAGE_LOADED = `(() => {
  * yet, being transparent, passed as a painted frame; that is how the
  * first version of this check passed every route before any had drawn.
  */
-const PREVIEW_BOX = `(() => {
+const PREVIEW_BOX = `(async () => {
   if (!document.getElementById('gesso-check-backdrop')) {
     const style = document.createElement('style');
     style.id = 'gesso-check-backdrop';
     style.textContent = '.pg-preview { background: rgb(255, 0, 255) !important; }';
     document.head.append(style);
+    // Until the page has repainted, a screenshot still shows the grid:
+    // Safari's next capture did. Two frames, or half a second if frames
+    // are not being run at all.
+    await Promise.race([
+      new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      new Promise(resolve => setTimeout(resolve, 500))
+    ]);
   }
   const root = document.querySelector('.pg-preview') ?? document.querySelector('#app') ?? document.body;
   let el = root;
@@ -263,12 +270,35 @@ async function sleep(ms: number): Promise<void> {
 async function open(page: BrowserPage, url: string): Promise<void> {
   await page.navigate('about:blank');
   await page.navigate(url);
+  await ensureVisible(page);
   await waitFor(
     'the page to load its fonts and images',
     async () => (await page.evaluate<boolean>(PAGE_LOADED)) || undefined,
     30_000
   );
 }
+
+/**
+ * Stops the run when the page is hidden. Safari has no headless mode,
+ * and when its window was covered part-way through a run the page went
+ * hidden: frames and input stopped, and the rest of the run reported a
+ * blank route, a click and keys that did nothing, and a video that never
+ * decoded, all of which read like Gesso failing in Safari.
+ */
+async function ensureVisible(page: BrowserPage): Promise<void> {
+  const visible = async (): Promise<true | undefined> =>
+    (await page.evaluate<string>('document.visibilityState')) === 'visible' ? true : undefined;
+  if (await visible()) return;
+  await page.bringToFront().catch(() => undefined);
+  await waitFor('the page to be visible', visible, 5_000).catch(() => {
+    throw new HiddenWindow(
+      `${page.name}'s window is hidden, so the page gets no frames and no input and nothing it reports means ` +
+        'anything. Keep the window uncovered while the check runs (or give it a Space of its own), and run it again.'
+    );
+  });
+}
+
+class HiddenWindow extends Error {}
 
 async function pageErrors(page: BrowserPage): Promise<string[]> {
   const trapped = await page.evaluate<string[] | undefined>('window.__gessoErrors');
@@ -296,25 +326,34 @@ async function checkRoutes(page: BrowserPage, base: string): Promise<void> {
       await open(page, `${base}?still#${view.id}`);
       let painted = 0;
       let shot: Uint8Array | undefined;
+      const measure = async (): Promise<number> => {
+        const box = await page.evaluate<{ x: number; y: number; width: number; height: number; innerWidth: number }>(
+          PREVIEW_BOX
+        );
+        shot = await page.screenshot();
+        const pixels = decodePng(shot);
+        const scale = pixels.width / box.innerWidth;
+        return paintedFraction(pixels, {
+          x: box.x * scale,
+          y: box.y * scale,
+          width: box.width * scale,
+          height: box.height * scale
+        });
+      };
       await waitFor(
         `#${view.id} to paint`,
-        async () => {
-          const box = await page.evaluate<{ x: number; y: number; width: number; height: number; innerWidth: number }>(
-            PREVIEW_BOX
-          );
-          shot = await page.screenshot();
-          const pixels = decodePng(shot);
-          const scale = pixels.width / box.innerWidth;
-          painted = paintedFraction(pixels, {
-            x: box.x * scale,
-            y: box.y * scale,
-            width: box.width * scale,
-            height: box.height * scale
-          });
-          return painted >= MIN_PAINTED ? true : undefined;
-        },
+        async () => ((painted = await measure()) >= MIN_PAINTED ? true : undefined),
         30_000
       ).catch(() => undefined);
+      // The first painted frame is not the route's frame. Safari presented
+      // the animation board with its columns drawn and its cards not yet,
+      // and a check that stopped there reported 1.7% painted and a
+      // picture of an empty board. So the frame a moment later is the one
+      // judged, and saved.
+      if (painted >= MIN_PAINTED) {
+        await sleep(1_500);
+        painted = await measure();
+      }
       if (values.shots !== undefined && shot !== undefined) {
         mkdirSync(values.shots, { recursive: true });
         writeFileSync(join(values.shots, `${BROWSER}-${view.id.replaceAll('/', '-')}.png`), shot);
@@ -344,6 +383,7 @@ async function checkRoutes(page: BrowserPage, base: string): Promise<void> {
         fail(`#${view.id}: ${problems.join('\n      ')}`);
       }
     } catch (error) {
+      if (error instanceof HiddenWindow) throw error;
       fail(`#${view.id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -478,6 +518,7 @@ async function checkAccessibility(page: BrowserPage, base: string): Promise<void
         );
       }
     } catch (error) {
+      if (error instanceof HiddenWindow) throw error;
       fail(`#${report.route}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -505,6 +546,7 @@ async function checkInput(page: BrowserPage, base: string): Promise<void> {
       if (counted) pass('#example-signin: a click on the key 5 entered one digit');
       else fail('#example-signin: a click on the key 5 did not reach the app; the passcode still counts no digits');
     } catch (error) {
+      if (error instanceof HiddenWindow) throw error;
       fail(`#example-signin: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -541,6 +583,7 @@ async function checkInput(page: BrowserPage, base: string): Promise<void> {
         fail(`#example-notes: typed "zq7" into the title and the note does not contain it (focus is on ${active})`);
       }
     } catch (error) {
+      if (error instanceof HiddenWindow) throw error;
       fail(`#example-notes: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -591,6 +634,7 @@ async function checkParity(page: BrowserPage, base: string): Promise<void> {
     if (percent <= PARITY_MAX_PERCENT && gross <= PARITY_MAX_GROSS_PERCENT) pass(line);
     else fail(line);
   } catch (error) {
+    if (error instanceof HiddenWindow) throw error;
     fail(`parity: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -601,6 +645,7 @@ async function checkProbes(page: BrowserPage): Promise<void> {
   let served = await serve(repo('scripts', 'rest-probe'));
   try {
     await page.navigate(served.base);
+    await ensureVisible(page);
     const seen = await waitFor(
       'the worker to answer the command',
       async () => {
@@ -618,6 +663,7 @@ async function checkProbes(page: BrowserPage): Promise<void> {
       );
     }
   } catch (error) {
+    if (error instanceof HiddenWindow) throw error;
     fail(`rest: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
     await served.server.close();
@@ -626,27 +672,38 @@ async function checkProbes(page: BrowserPage): Promise<void> {
   served = await serve(repo('scripts', 'touch-probe'));
   try {
     await page.navigate(served.base);
+    await ensureVisible(page);
     await waitFor(
       'the surface to mount',
       async () => (await page.evaluate<boolean>('typeof window.gessoScroll === "object"')) || undefined,
       30_000
     );
+    // What the page is handed is recorded, because a driver may accept a
+    // touch pointer and deliver something else: safaridriver on macOS
+    // turns it into a mouse (pointerType 'mouse', no touch events), and a
+    // mouse drag correctly does not pan a scroll view.
+    await page.evaluate(
+      `(addEventListener('pointerdown', event => { window.gessoPointerType ??= event.pointerType; }, true), true)`
+    );
     // Past the recognizer's 12 px slop, as `check-touch-scroll.ts` drags.
     await page.perform(touchDrag([300, 220], [300 - 12 - 70, 220 - 12 - 70]));
     await sleep(200);
     const offset = await page.evaluate<{ x: number; y: number }>('window.gessoScroll');
-    if (offset.x >= 40 && offset.y >= 40) {
+    const delivered = await page.evaluate<string | undefined>('window.gessoPointerType');
+    if (delivered !== 'touch') {
+      skip(
+        `touch: the driver delivered a touch drag as ${delivered === undefined ? 'nothing at all' : `a ${delivered} pointer`}, ` +
+          `so this browser's touch path is not reached from here${BROWSER === 'safari' ? '; CONTRIBUTING says how to check touch by hand' : ''}`
+      );
+    } else if (offset.x >= 40 && offset.y >= 40) {
       pass(`touch: a diagonal drag scrolled both axes, to (${offset.x.toFixed(0)}, ${offset.y.toFixed(0)})`);
     } else {
       fail(`touch: a diagonal drag of 82 px each way scrolled to (${offset.x.toFixed(0)}, ${offset.y.toFixed(0)})`);
     }
   } catch (error) {
+    if (error instanceof HiddenWindow) throw error;
     const message = error instanceof Error ? error.message : String(error);
-    if (/unsupported|not supported|invalid argument/i.test(message) && BROWSER === 'safari') {
-      skip(`touch: desktop Safari's driver has no touch pointer (${message.split('\n')[0]}); --browser ios covers it`);
-    } else {
-      fail(`touch: ${message}`);
-    }
+    fail(`touch: ${message}`);
   } finally {
     await served.server.close();
   }
@@ -658,6 +715,7 @@ async function checkProbes(page: BrowserPage): Promise<void> {
   served = await serve(repo(), [], 'scripts/fixtures/video-decode/index.html');
   try {
     await page.navigate(`${served.base}scripts/fixtures/video-decode/index.html`);
+    await ensureVisible(page);
     const result = await waitFor(
       'the decode check to finish',
       async () =>
@@ -678,7 +736,14 @@ async function checkProbes(page: BrowserPage): Promise<void> {
           | undefined
         >('window.videoCheck')) ?? undefined,
       120_000
-    );
+    ).catch(async error => {
+      // A page that is not visible may have its decoding and frames
+      // throttled, so whether it was is part of the reason.
+      const state = await page
+        .evaluate<string>(`document.visibilityState + ', focus ' + document.hasFocus()`)
+        .catch(() => 'unknown');
+      throw new Error(`${error instanceof Error ? error.message : String(error)} (the page was ${state})`);
+    });
     if (!result.canDecode || result.sources.length === 0) {
       fail(`video: ${result.error ?? 'this browser has no WebCodecs VideoDecoder'}`);
     }
@@ -700,6 +765,7 @@ async function checkProbes(page: BrowserPage): Promise<void> {
       else fail(`video, ${source.name}: ${problems.join('; ')}`);
     }
   } catch (error) {
+    if (error instanceof HiddenWindow) throw error;
     fail(`video: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
     await served.server.close();

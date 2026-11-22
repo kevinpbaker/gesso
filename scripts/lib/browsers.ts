@@ -56,6 +56,12 @@ export interface BrowserPage {
   screenshot(): Promise<Uint8Array>;
   perform(sources: readonly InputSource[]): Promise<void>;
   /**
+   * Brings the window to the front. A page whose window is covered is
+   * hidden, and a hidden page is given no frames and no input, so every
+   * check on it fails for a reason that has nothing to do with Gesso.
+   */
+  bringToFront(): Promise<void>;
+  /**
    * Whether the browser's own accessibility engine computes `role` and
    * `name` for the element `selector` matches.
    *

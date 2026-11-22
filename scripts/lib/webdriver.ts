@@ -13,9 +13,10 @@
  * then `safaridriver --enable` in a terminal, which asks for a
  * password. The error below says the same when a session is refused.
  *
- * With `simulator`, the same driver runs Safari in a booted iOS
- * Simulator. That is WebKit on iOS with real touch, on the Mac's GPU and
- * memory: closer to an iPhone than desktop Safari, and still not one.
+ * With `simulator`, the same driver is asked for Safari in a booted iOS
+ * Simulator: WebKit on iOS with real touch, on the Mac's GPU and memory.
+ * On macOS 27 with the iOS 27 simulator the driver has found no session
+ * host, so this path is written and not yet seen to work.
  *
  * Set `SAFARIDRIVER_BIN` to choose the driver (Safari Technology
  * Preview carries its own, inside its app bundle).
@@ -96,6 +97,16 @@ export async function openSafari(options: OpenOptions & { readonly simulator: bo
       if (error instanceof Error && /remote automation|--enable|authenticat/i.test(error.message)) {
         throw new Error(`${SETUP}\n(${error.message})`);
       }
+      if (options.simulator && error instanceof Error && /session hosts/i.test(error.message)) {
+        // Seen on macOS 27 with an iOS 27 simulator booted and Safari
+        // running in it, and its Safari settings have no Remote
+        // Automation switch to turn on. CONTRIBUTING says how to check
+        // iOS by hand meanwhile.
+        throw new Error(
+          `safaridriver found no iOS Simulator Safari to drive. Boot one and open Safari in it; on macOS 27 with ` +
+            `the iOS 27 simulator this has not worked yet, and CONTRIBUTING says how to check iOS by hand.\n(${error.message})`
+        );
+      }
       throw error;
     }
     session = created.sessionId;
@@ -155,6 +166,11 @@ export async function openSafari(options: OpenOptions & { readonly simulator: bo
     evaluate,
     async screenshot() {
       return Buffer.from(await call<string>('GET', at('/screenshot')), 'base64');
+    },
+    async bringToFront() {
+      // Switching to the window it is already on is how classic
+      // WebDriver asks for it to be focused.
+      await call('POST', at('/window'), { handle: await call<string>('GET', at('/window')) });
     },
     async perform(sources: readonly InputSource[]) {
       await call('POST', at('/actions'), { actions: sources });
