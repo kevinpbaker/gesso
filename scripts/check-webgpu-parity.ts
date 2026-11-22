@@ -14,7 +14,7 @@
  * honour. No browser-automation dependency, as with
  * gen-layout-fixtures.ts.
  *
- *   pnpm parity:webgpu                   # thresholds PARITY_MAX_PERCENT (0.03) and PARITY_MAX_GROSS_PERCENT (0.02)
+ *   pnpm parity:webgpu                   # thresholds PARITY_MAX_PERCENT (0.08) and PARITY_MAX_GROSS_PERCENT (0.02)
  *   CHROME_BIN=/path/to/chrome pnpm parity:webgpu
  */
 import { spawn, type ChildProcess } from 'node:child_process';
