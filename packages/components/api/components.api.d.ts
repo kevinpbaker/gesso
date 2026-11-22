@@ -25,6 +25,7 @@ import {
   UiNodeRef,
   UiPointerEvent,
   UiSelfAlignment,
+  UiShortcutBinding,
   UiShortcutRegistry,
   UiThemeExtension,
   UiTrackSize,
@@ -1205,6 +1206,39 @@ interface ComboboxProps extends ControlLayoutProps {
 declare function comboboxRank(option: ComboboxOption, query: string): number;
 declare function filterCombobox(options: readonly ComboboxOption[], query: string): ComboboxOption[];
 declare function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): UiChild;
+interface KeyCapProps extends ControlLayoutProps {
+  keys: string;
+  compact?: boolean;
+}
+declare function KeyCap(inputs: Inputs<KeyCapProps>, _ctx: ComponentContext): UiChild;
+interface ShortcutSheetEntry {
+  readonly label: string;
+  readonly keys: string | readonly string[];
+  readonly group?: string;
+}
+interface ShortcutSheetRow {
+  readonly label: string;
+  readonly keys: readonly string[];
+  readonly name: string;
+}
+interface ShortcutSheetSection {
+  readonly group: string;
+  readonly rows: readonly ShortcutSheetRow[];
+}
+interface ShortcutSheetProps {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  registry?: UiShortcutRegistry;
+  entries?: readonly ShortcutSheetEntry[];
+  shortcut?: string;
+  title?: string;
+  generalLabel?: string;
+  width?: number;
+}
+declare function shortcutSections(bindings: readonly UiShortcutBinding[], entries?: readonly ShortcutSheetEntry[], general?: string): ShortcutSheetSection[];
+declare function filterShortcutSections(sections: readonly ShortcutSheetSection[], query: string): ShortcutSheetSection[];
+declare function ShortcutSheet(inputs: Inputs<ShortcutSheetProps>, ctx: ComponentContext): UiChild;
 interface CommandPaletteItem {
   readonly value: string;
   readonly label: string;
@@ -1896,6 +1930,7 @@ export {
   fieldArray,
   filterCombobox,
   filterCommands,
+  filterShortcutSections,
   FindBar,
   followTransport,
   form,
@@ -1914,6 +1949,7 @@ export {
   isFormulaError,
   isMenuBarSubmenu,
   isoDate,
+  KeyCap,
   keymap,
   LazyList,
   Link,
@@ -1968,6 +2004,8 @@ export {
   Select,
   sharedValue,
   shortcutCommands,
+  shortcutSections,
+  ShortcutSheet,
   Skeleton,
   SkeletonText,
   Slider,
@@ -2081,6 +2119,7 @@ export {
   type ImageProps,
   type InspectorRowProps,
   type InspectorSectionProps,
+  type KeyCapProps,
   type Keymap,
   type LazyListProps,
   type LinkProps,
@@ -2143,6 +2182,10 @@ export {
   type SelectOption,
   type SelectProps,
   type SharedValue,
+  type ShortcutSheetEntry,
+  type ShortcutSheetProps,
+  type ShortcutSheetRow,
+  type ShortcutSheetSection,
   type SkeletonProps,
   type SkeletonTextProps,
   type SliderProps,

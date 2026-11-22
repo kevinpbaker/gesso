@@ -174,6 +174,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Select', link: '/components/select' },
       { text: 'Combobox', link: '/components/combobox' },
       { text: 'CommandPalette', link: '/components/command-palette' },
+      { text: 'ShortcutSheet and KeyCap', link: '/components/shortcut-sheet' },
       { text: 'DatePicker', link: '/components/date-picker' },
       { text: 'Tooltip', link: '/components/tooltip' },
       { text: 'Popover', link: '/components/popover' },
