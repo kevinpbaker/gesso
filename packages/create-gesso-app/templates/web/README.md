@@ -12,17 +12,29 @@ pnpm dev
 Then `pnpm build` for a production bundle, `pnpm preview` to serve it,
 and `pnpm typecheck` to check the types without building.
 
-## The three files
+## The files
 
-| File            | What it is                                               |
-| --------------- | -------------------------------------------------------- |
-| `src/main.ts`   | The main thread: create the app and mount it into `#app` |
-| `src/worker.ts` | The render worker: name the root component               |
-| `src/App.tsx`   | The screen                                               |
+| File            | What it is                                                       |
+| --------------- | ---------------------------------------------------------------- |
+| `src/main.ts`   | The main thread: create the app and mount it into `#app`         |
+| `src/worker.ts` | The render worker: name the root component, and feed the channel |
+| `src/App.tsx`   | The screen                                                       |
+| `src/clicks.ts` | The `clicks` channel: the count, and what can be asked of it     |
 
-There are three rather than two because a component cannot cross
-`postMessage`, so the root has to be named on the worker's side of the
-barrier.
+`main.ts` and `worker.ts` are two files rather than one because a
+component cannot cross `postMessage`, so the root has to be named on the
+worker's side of the barrier.
+
+## An AI agent can use it
+
+`pnpm dev` prints an address and the line to add it to Claude Code,
+Codex or Gemini CLI. With the app open in a browser, an agent connected
+there can read the count (`clicks_view`), add to it (`clicks_add`), and
+reset it (`clicks_reset`), which asks you first because `clicks.ts`
+marks it `@confirm`. It can also read and press anything on screen, the
+way a screen reader does (`ui_snapshot`, `ui_press`). The comments in
+`clicks.ts` are what it reads to know what each command does, and the
+dev server says when one is missing.
 
 `main.ts` names no worker, and that is `gesso-vite-plugin` in
 `vite.config.ts`. It finds `worker.ts` beside `main.ts` and writes the
@@ -86,6 +98,6 @@ view has stopped arriving.
   Code at it.
 - `App.tsx` is commented with what each part of it is doing.
 - `gesso-components` has the controls: inputs, overlays, structure,
-  data and media. `Switch` in `App.tsx` is one of them.
+  data and media. `Button` and `Switch` in `App.tsx` are two of them.
 - Every prop takes a value or an Observable of that value. That is the
   whole binding model, and it is why the component body runs once.

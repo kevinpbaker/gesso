@@ -240,7 +240,9 @@ export class ComponentCatalog {
       }
     }
     for (const library of (await this.options.libraries?.()) ?? []) {
-      for (const [name, schema] of reader.readComponents(library.file).components) {
+      // Through the project's own tsconfig: an installed package's declarations belong to no project of
+      // their own, only to the one that imports them, so read alone they gave no components at all.
+      for (const [name, schema] of reader.readComponents(library.file, this.options.tsconfig).components) {
         found.push({ name, from: library.name, library: library.name, schema });
       }
     }
@@ -291,7 +293,9 @@ function formatOverview(entries: readonly CatalogEntry[]): string {
   const own = entries.filter(entry => entry.library === undefined);
   const lines = [
     `${own.length} component${own.length === 1 ? '' : 's'} in this project` +
-      (own.length === entries.length ? '' : `, and ${entries.length - own.length} from libraries it names`) +
+      (own.length === entries.length
+        ? ''
+        : `, and ${entries.length - own.length} from ${[...new Set(entries.flatMap(entry => entry.library ?? []))].join(' and ')}`) +
       '. library_get gives one in full.',
     ''
   ];

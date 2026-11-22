@@ -346,10 +346,13 @@ The same endpoint offers the project's own components, read by the
 checker from the files its tsconfig includes, so an agent designing a
 screen uses what is there instead of drawing it again from boxes.
 [Designing with what the project has](/structure/agents-and-mcp#designing-with-what-the-project-has)
-has the tools. A library joins them only when named:
+has the tools. `gesso-components` joins them whenever the project has
+it, so an agent told to use what is there finds `Button` and `Select`
+too. Name the libraries to offer others, or `[]` for the project's own
+alone:
 
 ```ts
-gesso({ catalog: { libraries: ['gesso-components'] } });
+gesso({ catalog: { libraries: ['gesso-components', 'my-design-system'] } });
 ```
 
 `catalog: false` leaves them out, `catalog: { tsconfig }` names a
@@ -377,7 +380,7 @@ a desktop app's main process, opens the same catalog from
 | `agentInstructions` | none           | What an agent is told when it connects, after what the catalog says      |
 | `agentPrompts`      | none           | Prompts the person runs in their agent, as slash commands                |
 | `agentReadiness`    | `true`         | Warn where a channel's contract leaves an agent guessing                 |
-| `catalog`           | `true`         | Offer the project's components on that endpoint, and any libraries named |
+| `catalog`           | `true`         | Offer the project's components on that endpoint, and `gesso-components`' |
 
 ## Is it required?
 

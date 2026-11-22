@@ -216,8 +216,9 @@ editor designs its project, names the themes it designs in with
 the dark, because the editor's own chrome is not what the agent is
 designing; `theme: "app"` still asks for the application's own.
 
-A library's components join the project's only when the plugin names
-it: `gesso({ catalog: { libraries: ['gesso-components'] } })`.
+`gesso-components`' components join the project's whenever the project
+has the package. Other libraries join when the plugin names them, and
+`gesso({ catalog: { libraries: [] } })` offers the project's own alone.
 
 ### Seeing what it built
 

@@ -180,8 +180,9 @@ export interface GessoPluginOptions {
    * Offer the project's components to an agent over the same endpoint,
    * as `library_overview`, `library_search` and `library_get` (default
    * true while `agent` is on). The components are the project's own,
-   * read from the files its tsconfig includes; name a library in
-   * `libraries` to offer its components too, such as `gesso-components`.
+   * read from the files its tsconfig includes, and `gesso-components`'
+   * when the project has it; name libraries in `libraries` to offer
+   * others instead.
    */
   readonly catalog?:
     | boolean
@@ -194,7 +195,12 @@ export interface GessoPluginOptions {
         readonly root?: string;
         /** The tsconfig whose files are the project's source (default `tsconfig.json` in `root`). */
         readonly tsconfig?: string;
-        /** Packages whose components join the project's own, by the name they are imported by. */
+        /**
+         * Packages whose components join the project's own, by the name
+         * they are imported by (default `['gesso-components']`, left out
+         * without a word when the project does not have it). `[]` offers
+         * the project's own alone.
+         */
         readonly libraries?: readonly string[];
         /** Folders under the root that are not the project's components nor uses of them: generated code, say. */
         readonly exclude?: readonly string[];
@@ -380,7 +386,12 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
           ? null
           : new ComponentCatalog(() => readerFor(message => server.config.logger.warn(message)), catalogRoot, {
               tsconfig: absolute(catalogRoot, catalogOptions.tsconfig ?? 'tsconfig.json'),
-              libraries: () => resolveLibraries(server, root, catalogOptions.libraries ?? []),
+              // Gesso's own components by default: an agent told to use what the project has was otherwise
+              // told there is no Button. A project without the package is not warned about one it never named.
+              libraries: () =>
+                resolveLibraries(server, root, catalogOptions.libraries ?? DEFAULT_LIBRARIES, {
+                  quiet: catalogOptions.libraries === undefined
+                }),
               ...(catalogOptions.exclude === undefined ? {} : { exclude: catalogOptions.exclude })
             });
       if (catalogRoot !== root) {
@@ -561,29 +572,45 @@ function absolute(root: string, path: string): string {
   return path.startsWith('/') ? path : `${root.replace(/\/+$/, '')}/${path.replace(/^\.\//, '')}`;
 }
 
+/** The libraries whose components join a project's own when `catalog.libraries` names none. */
+const DEFAULT_LIBRARIES = ['gesso-components'];
+
 /**
- * Where each named library's components are declared: the module Vite
- * resolves its name to, or the declaration file beside it when that is
+ * Where each named library's components are declared: the module its
+ * name resolves to, or the declaration file beside it when that is
  * built JavaScript, which says nothing about types. A name that does
- * not resolve is reported and left out.
+ * not resolve is reported and left out, unless `quiet`.
+ *
+ * Resolved with a resolver of the config's own rather than the dev
+ * server's: the server hands an installed package back as its
+ * pre-bundled copy in `node_modules/.vite/deps`, which has no
+ * declarations beside it, so every installed library was read as
+ * having no components. Only a workspace link, which is not
+ * pre-bundled, ever worked.
  */
 async function resolveLibraries(
-  server: { pluginContainer: { resolveId(id: string, importer?: string): Promise<{ id: string } | null> } } & {
-    config: { logger: { warn(message: string): void } };
+  server: {
+    config: {
+      createResolver(): (id: string, importer?: string) => Promise<string | undefined>;
+      logger: { warn(message: string): void };
+    };
   },
   root: string,
-  names: readonly string[]
+  names: readonly string[],
+  { quiet = false }: { readonly quiet?: boolean } = {}
 ): Promise<CatalogLibrary[]> {
+  const resolve = server.config.createResolver();
   const out: CatalogLibrary[] = [];
   for (const name of names) {
-    const resolved = await server.pluginContainer.resolveId(name, absolute(root, 'index.html'));
-    if (resolved === null) {
+    const resolved = await resolve(name, absolute(root, 'index.html'));
+    if (resolved === undefined) {
+      if (quiet) continue;
       server.config.logger.warn(
         `[gesso] The catalog library ${name} does not resolve from ${root}, so it is left out.`
       );
       continue;
     }
-    out.push({ name, file: resolved.id.replace(/\?.*$/, '').replace(/\.([cm]?)js$/, '.d.$1ts') });
+    out.push({ name, file: resolved.replace(/\?.*$/, '').replace(/\.([cm]?)js$/, '.d.$1ts') });
   }
   return out;
 }

@@ -1,8 +1,9 @@
 import { map } from 'rxjs/operators';
 
-import { percent } from 'gesso-core';
-import { ContextMenus, FindBar, Switch } from 'gesso-components';
-import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
+import { darkTheme, lightTheme, percent } from 'gesso-core';
+import { Button, ContextMenus, FindBar, Switch } from 'gesso-components';
+import { internalState, ShellService, type ComponentContext, type Inputs } from 'gesso-framework';
+import { Clicks } from './clicks';
 
 /**
  * The screen.
@@ -12,32 +13,39 @@ import { internalState, type ComponentContext, type Inputs } from 'gesso-framewo
  * changes, because `text` is bound to an Observable, so one property on
  * one node is written and the next frame is drawn from it.
  *
- * Three things are worth knowing before you change them.
+ * Four things are worth knowing before you change them.
  *
- *   - `internalState(0)` is state this component owns. Writing
- *     `count.value++` marks exactly the bindings that read it, and
- *     nothing else.
- *   - A bound property costs what it touches. `text` is content and
- *     `opacity` is paint, so neither re-runs layout; a bound `width` or
- *     `gap` would.
- *   - No colour here is a hex value. `primary`, `background` and
- *     `textMuted` are names looked up on whichever theme the node
- *     inherits, so this screen follows a theme it never mentions.
+ *   - The count is a channel's (`clicks.ts`), read as
+ *     `clicks.view.count` and changed with `clicks.send.add()`. That is
+ *     what lets an AI agent read and press it too.
+ *   - `internalState(true)` is state this component owns, which no one
+ *     else needs: whether the hint shows.
+ *   - A canvas inherits nothing from the page, light or dark included.
+ *     The root maps the shell's colour scheme onto a theme, and gives
+ *     text its type scale, so everything below follows the person's
+ *     setting without knowing about it.
+ *   - No colour here is a hex value and no size is a number of points.
+ *     `primary`, `background` and `textMuted` are colours, and
+ *     `headline` and `bodySmall` text styles, looked up on whichever
+ *     theme the node inherits.
  *
  * The elements are lowercase because they are intrinsic, resolved by
  * `jsxImportSource` in `tsconfig.json`, the same way `<div>` needs no
- * import in React. `Switch` is capitalised because it is a component
- * from `gesso-components`, so it is imported like any other value.
+ * import in React. `Button` and `Switch` are capitalised because they
+ * are components from `gesso-components`, so they are imported.
  */
-export function App(_inputs: Inputs<{}>, _context: ComponentContext) {
-  const count = internalState(0);
+export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
+  const clicks = ctx.channel(Clicks);
   const hinted = internalState(true);
+  const theme = ctx.inject(ShellService).colorScheme.pipe(map(scheme => (scheme === 'dark' ? darkTheme : lightTheme)));
 
   // `ContextMenus` puts back the menu a right-click opens in a browser:
   // Cut, Copy and Paste in a field, Copy on selected text, and a link's.
   return (
     <ContextMenus>
       <column
+        theme={theme}
+        textStyle={theme.pipe(map(value => value.typography.body))}
         gap={16}
         x="center"
         y="center"
@@ -45,24 +53,19 @@ export function App(_inputs: Inputs<{}>, _context: ComponentContext) {
         height={percent(100)}
         backgroundColor="background"
         position="relative">
-        <text text="Hello from a render worker" fontSize={22} fontWeight="bold" />
+        <text text="Hello from a render worker" textStyle="headline" />
 
         <row gap={12} y="center">
-          <text text={count.pipe(map(value => `Clicks: ${value}`))} fontSize={16} />
-          <button
-            label="Add one"
-            onClick={() => count.value++}
-            padding={8}
-            borderRadius={6}
-            backgroundColor="primary"
-            cursor="pointer">
-            <text text="+1" color="background" fontSize={14} />
-          </button>
+          <text text={clicks.view.count.pipe(map(value => `Clicks: ${value}`))} textStyle="title" />
+          <Button label="Add one" onClick={() => clicks.send.add()} />
+          <Button label="Reset" variant="outlined" onClick={() => clicks.send.reset()} />
         </row>
 
         <text
-          text={count.pipe(map(value => (value === 0 ? 'Press the button.' : 'Nothing was rebuilt to do that.')))}
-          fontSize={12}
+          text={clicks.view.count.pipe(
+            map(value => (value === 0 ? 'Press the button, or ask an agent to.' : 'Nothing was rebuilt to do that.'))
+          )}
+          textStyle="bodySmall"
           color="textMuted"
           opacity={hinted.pipe(map(showing => (showing ? 1 : 0)))}
         />
