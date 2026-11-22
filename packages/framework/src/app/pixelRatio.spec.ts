@@ -20,7 +20,7 @@ function fakeWindow(ratio: number) {
     moveTo(next: number) {
       const was = `(resolution: ${view.devicePixelRatio}dppx)`;
       view.devicePixelRatio = next;
-      for (const q of queries.filter(q => q.media === was)) for (const listener of [...q.listeners]) listener();
+      for (const q of queries.filter(q => q.media === was)) for (const listener of Array.from(q.listeners)) listener();
     },
     queries
   };

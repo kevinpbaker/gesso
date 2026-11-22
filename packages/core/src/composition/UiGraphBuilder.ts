@@ -1208,7 +1208,8 @@ const NO_NODES: ReadonlySet<UiNode> = new Set();
  */
 function longestIncreasing(values: readonly number[]): number[] {
   const tops: number[] = [];
-  const previous: number[] = new Array(values.length);
+  // Filled in order, one entry an index, so it is never holey.
+  const previous: number[] = [];
   for (let index = 0; index < values.length; index++) {
     const value = values[index]!;
     let low = 0;

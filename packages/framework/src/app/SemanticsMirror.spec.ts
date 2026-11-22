@@ -64,14 +64,17 @@ class FakeElement {
    */
   get firstChild(): { nodeType: number; nodeValue: string } | FakeElement | null {
     if (this.text !== '') {
-      const self = this;
+      const read = (): string => this.text;
+      const write = (value: string): void => {
+        this.text = value;
+      };
       return {
         nodeType: 3,
         get nodeValue() {
-          return self.text;
+          return read();
         },
         set nodeValue(value: string) {
-          self.text = value;
+          write(value);
         }
       };
     }

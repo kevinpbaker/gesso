@@ -355,6 +355,6 @@ describe("an application's own agent tools", () => {
       'input.regions[0].length is not expected; the fields are text, beam. length belongs inside beam: {beam: {length: …}}.'
     );
     // A short name is never taken for another: x is not y.
-    expect(await said({ regions: [], q: 1 })).toContain('the fields are regions, expression, unitSystem.\"');
+    expect(await said({ regions: [], q: 1 })).toContain('the fields are regions, expression, unitSystem."');
   });
 });

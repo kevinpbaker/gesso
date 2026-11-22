@@ -4291,7 +4291,9 @@ export class GessoRuntime {
     }
     const time = now();
     const points: HeldPoint[] = [];
-    for (const hold of [...this.holds]) {
+    // Deleting the entry being visited is safe in a Set's own iteration,
+    // and nothing is added here.
+    for (const hold of this.holds) {
       if (hold.until === null) {
         this.holds.delete(hold);
       } else if (hold.until < time) {

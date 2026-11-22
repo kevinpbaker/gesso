@@ -161,11 +161,11 @@ describe('buildRenderList geometry', () => {
     });
     h.graph.appendChild(root, node);
     const list = layoutAndBuild(h, root);
-    const o = 0 * INSTANCE_STRIDE_FLOATS;
-    expect(Array.from(list.instanceData.slice(o + 24, o + 28))).toEqual([20, 20, 4, 0]);
+    // The box is the list's first instance and its first clip, so each
+    // one's floats start at zero.
+    expect(Array.from(list.instanceData.slice(24, 28))).toEqual([20, 20, 4, 0]);
     expect(readInstance(list, 0).radius).toBe(20);
-    const clip = 0 * CLIP_STRIDE_FLOATS;
-    expect(Array.from(list.clipData.slice(clip + 16, clip + 20))).toEqual([20, 20, 4, 0]);
+    expect(Array.from(list.clipData.slice(16, 20))).toEqual([20, 20, 4, 0]);
   });
 
   it('emits background then border for a bordered box', () => {

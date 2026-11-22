@@ -133,7 +133,8 @@ export class IconRasterizer {
       return;
     }
     this.scale = scale;
-    for (const listener of [...this.scaleListeners]) {
+    // A copy: a listener may stop listening, or start, as it is told.
+    for (const listener of Array.from(this.scaleListeners)) {
       listener();
     }
   }

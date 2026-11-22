@@ -367,7 +367,7 @@ describe('group opacity', () => {
     expect([layer.width, layer.height]).toEqual([124, 44]);
     const end = gpu.commands.find((command): command is EndLayerCommand => command.kind === CommandKind.EndLayer)!;
     const o = end.instance! * TEXTURED_STRIDE_FLOATS;
-    expect([...gpu.texturedData.slice(o, o + 4)]).toEqual([18, 18, 124, 44]);
+    expect(Array.from(gpu.texturedData.slice(o, o + 4))).toEqual([18, 18, 124, 44]);
     expect(end.scissor).toBeNull();
 
     // A second frame draws into the same canvas rather than making another.
