@@ -77,6 +77,13 @@
     "arrows": 0,
     "wheel": 0
   },
+  "CommandPaletteExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
   "ContextMenusExample": {
     "idle": 0,
     "hover": 0,
@@ -276,6 +283,13 @@
     "arrows": 0,
     "wheel": 0
   },
+  "MenuSearchExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
   "MeterExample": {
     "idle": 0,
     "hover": 0,
@@ -325,6 +339,13 @@
     "hover": 0,
     "tab": 0,
     "arrows": 0,
+    "wheel": 0
+  },
+  "PanelGroupExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 2,
     "wheel": 0
   },
   "PointerExample": {
@@ -548,6 +569,13 @@
     "wheel": 0
   },
   "SwitchExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
+  "TabBarExample": {
     "idle": 0,
     "hover": 0,
     "tab": 0,
