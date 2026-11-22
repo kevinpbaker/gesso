@@ -128,7 +128,9 @@ describe("the project's components, as tools", () => {
     expect(await catalog.checkRender({ module: 'StatusPill', width: 200 })).toBe(
       'StatusPill needs label (string) in inputs, and was not given it. library_get StatusPill lists every input it takes.'
     );
-    expect(await catalog.checkRender({ module: './StatusPill.ts', inputs: { label: 'Open' }, width: 200 })).toBeUndefined();
+    expect(
+      await catalog.checkRender({ module: './StatusPill.ts', inputs: { label: 'Open' }, width: 200 })
+    ).toBeUndefined();
     expect(await catalog.checkRender({ module: 'PageHeader', width: 200 })).toBe(
       'PageHeader needs title (string) in inputs, and was not given it. library_get PageHeader lists every input it takes.'
     );

@@ -115,10 +115,10 @@ export async function renderModule(request: RenderRequest, deps: RenderDependenc
       ? ' It drew nothing but the background. A popup or dialog may be closed until an input opens it, or it may ' +
         'need data a channel has not sent; give inputs that show it, or draw a part of it.'
       : frame.clipped
-      ? ` It is taller than that and is cut off; give a height, or draw a part of it.`
-      : request.height === undefined
-        ? ' As tall as its content; give a height to draw a whole screen that fills the window.'
-        : '';
+        ? ` It is taller than that and is cut off; give a height, or draw a part of it.`
+        : request.height === undefined
+          ? ' As tall as its content; give a height to draw a whole screen that fills the window.'
+          : '';
   return {
     content: [
       { type: 'image', data, mimeType: 'image/png' },

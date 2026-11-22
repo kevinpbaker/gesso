@@ -243,7 +243,10 @@ export class ComponentCatalog {
     if (chosen.length !== 1 || entry === undefined) return undefined;
     const inputs = entry.schema.inputs;
     const properties = (inputs.properties ?? {}) as Record<string, Record<string, unknown>>;
-    const given = (typeof args.inputs === 'object' && args.inputs !== null ? args.inputs : {}) as Record<string, unknown>;
+    const given = (typeof args.inputs === 'object' && args.inputs !== null ? args.inputs : {}) as Record<
+      string,
+      unknown
+    >;
     const missing = ((inputs.required ?? []) as string[]).filter(
       name =>
         given[name] === undefined &&

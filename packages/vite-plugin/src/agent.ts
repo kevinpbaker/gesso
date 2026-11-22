@@ -527,14 +527,13 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
         const relayed = () =>
           relay(message).then(answer => (local === undefined ? answer : mergeLocal(message, answer, local)));
         const checking = refusal(message);
-        void (checking === undefined ? relayed() : checking.then(refused => refused ?? relayed()))
-          .then(answer => {
-            if (answer === null || answer === undefined) {
-              send(response, 202);
-            } else {
-              send(response, 200, 'application/json', JSON.stringify(answer));
-            }
-          });
+        void (checking === undefined ? relayed() : checking.then(refused => refused ?? relayed())).then(answer => {
+          if (answer === null || answer === undefined) {
+            send(response, 202);
+          } else {
+            send(response, 200, 'application/json', JSON.stringify(answer));
+          }
+        });
       });
     }
   };

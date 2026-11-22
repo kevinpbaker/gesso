@@ -263,7 +263,12 @@ describe('the agent endpoint', () => {
     );
 
     const call = (args: object) =>
-      JSON.stringify({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'render_frame', arguments: args } });
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/call',
+        params: { name: 'render_frame', arguments: args }
+      });
     const refused = JSON.parse((await request(bridge, { body: call({ module: 'src/Pill' }) })).body!);
     expect(refused.result).toEqual({ content: [{ type: 'text', text: 'Pill needs label.' }], isError: true });
     await request(bridge, { body: call({ module: 'src/Pill', inputs: { label: 'Open' } }) });

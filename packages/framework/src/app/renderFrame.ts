@@ -234,7 +234,9 @@ export async function renderFrame(root: FrameworkChild, options: RenderFrameOpti
  */
 function oneColour(canvas: PictureCanvas, width: number, height: number): boolean {
   const context = (
-    canvas as { getContext?: (kind: '2d') => { getImageData(x: number, y: number, w: number, h: number): ImageData } | null }
+    canvas as {
+      getContext?: (kind: '2d') => { getImageData(x: number, y: number, w: number, h: number): ImageData } | null;
+    }
   ).getContext?.('2d');
   if (context === null || context === undefined || width < 1 || height < 1) {
     return false;
