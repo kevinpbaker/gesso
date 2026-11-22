@@ -237,7 +237,14 @@ It costs three things:
   an opaque canvas Canvas2D keeps neither and draws the glyphs instead.
   Scrolling a list of 300 lines in Chrome on macOS, about 25 of them on
   screen, the render phase took a median of 0.9 ms a frame see-through
-  and 1.0 to 1.2 ms opaque.
+  and 1.0 to 1.2 ms opaque. The cost grows with how much text a frame
+  draws again. Over a 640 by 600 table of about 270 texts in four
+  families, with a bar moving across the top so that every frame is
+  drawn whole, keeping text took 1.22 ms a frame against 1.44 drawn
+  directly in Chrome 157, and 2.05 against 2.77 in Safari 27, both on
+  macOS at 2x. Changing one row's background a frame, which draws that
+  row again, was 0.60 against 0.63 in Chrome and 0.98 against 1.13 in
+  Safari.
 - **Some text is still grayscale.** Text inside an opacity group, or in
   a subtree kept with `rasterize`, is drawn into a see-through canvas
   first. WebGPU draws every glyph from a grayscale atlas, so the option
