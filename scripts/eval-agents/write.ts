@@ -55,6 +55,16 @@ export const WRITE_TASK =
   'of your choosing. Keep `npm run typecheck` passing, and look at what you built before you call it done. When ' +
   'you are done, reply with one sentence saying so.';
 
+/**
+ * What the build agent is told of its shell, in both arms. It may run
+ * `npm run typecheck`, `npm run build` and commands that only read; a
+ * file written through the shell is refused, and an agent refused once
+ * gave up on the shell and never typechecked (the first full run).
+ */
+export const SHELL_NOTE =
+  ' Write and change files with the Write and Edit tools. The shell runs `npm run typecheck`, `npm run build` ' +
+  'and commands that only read, from the project folder as it is.';
+
 /** What a second agent is asked of the result, in both arms. */
 export const OPERATE_TASK =
   'An expense tracker is open in front of the person, and your tools reach it. Add an expense of $4.50 in the ' +
@@ -78,6 +88,7 @@ const BUILD_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash(npm run type
 const BROWSER_SCRIPT_TOOLS = [
   'mcp__browser__browser_evaluate',
   'mcp__browser__browser_run_code',
+  'mcp__browser__browser_run_code_unsafe',
   'mcp__browser__browser_install',
   'mcp__browser__browser_file_upload'
 ];
@@ -286,7 +297,7 @@ async function writeOnce(
     let built = { ...parse([]), checks: 0, wrongGuesses: 0 };
     if (!options.noAgent) {
       const lines = await agent(
-        arm.preamble + WRITE_TASK,
+        arm.preamble + WRITE_TASK + SHELL_NOTE,
         [...BUILD_TOOLS, ...arm.allowed],
         'Read,Write,Edit,Glob,Grep,Bash',
         'build'
@@ -326,6 +337,16 @@ async function writeOnce(
       const text = await screenText(arm, devtools);
       if (!text.includes('Add one'))
         throw new Error(`The screen could not be read: it says ${JSON.stringify(text.slice(0, 200))}.`);
+      if (arm.name === 'gesso') {
+        // What the build agent looks at its work with: the screen tools must answer on the starter.
+        const snapshot = await mcpRequest(`http://localhost:${arm.port}/__gesso/mcp`, 'tools/call', {
+          name: 'ui_snapshot',
+          arguments: {}
+        });
+        const said = (snapshot?.content?.[0]?.text ?? JSON.stringify(snapshot)) as string;
+        if (snapshot?.isError === true || !said.includes('Add one'))
+          throw new Error(`ui_snapshot could not read the starter: it says ${JSON.stringify(said.slice(0, 200))}.`);
+      }
     } else {
       operate = parse(await agent(OPERATE_TASK, arm.allowed, '', 'operate'));
       operable = (await screenText(arm, devtools)).includes('Coffee');

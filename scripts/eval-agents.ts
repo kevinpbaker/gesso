@@ -143,6 +143,7 @@ function reactArm(port: number): Arm {
     disallowed: [
       'mcp__browser__browser_evaluate',
       'mcp__browser__browser_run_code',
+      'mcp__browser__browser_run_code_unsafe',
       'mcp__browser__browser_install',
       'mcp__browser__browser_file_upload'
     ],
@@ -190,14 +191,18 @@ async function runOnce(
   const work = mkdtempSync(join(tmpdir(), 'gesso-eval-agent-'));
   const transcript = join(out, 'transcripts', `${arm.name}--${task.id}--${repeat}.jsonl`);
   const base = { arm: arm.name, task: task.id, repeat };
-  const { browser, devtools } = await openPage(findChrome(), {
-    url: `http://localhost:${arm.port}/`,
-    devtoolsPort,
-    windowSize: [1280, 900],
-    profileDir: profile
-  });
-  const person = await thePerson(devtoolsPort);
+  let opened: Awaited<ReturnType<typeof openPage>> | undefined;
+  let person: Awaited<ReturnType<typeof thePerson>> | undefined;
   try {
+    // A browser that will not start is this run's harness error, not the end of the eval.
+    opened = await openPage(findChrome(), {
+      url: `http://localhost:${arm.port}/`,
+      devtoolsPort,
+      windowSize: [1280, 900],
+      profileDir: profile
+    });
+    const { devtools } = opened;
+    person = await thePerson(devtoolsPort);
     await arm.ready(devtools);
     const config = join(work, 'mcp.json');
     writeFileSync(config, JSON.stringify(arm.mcp(devtoolsPort)));
@@ -249,9 +254,9 @@ async function runOnce(
       answer: ''
     };
   } finally {
-    person.close();
-    devtools.close();
-    browser.kill();
+    person?.close();
+    opened?.devtools.close();
+    opened?.browser.kill();
     await sleep(300);
     rmSync(profile, { recursive: true, force: true });
     rmSync(work, { recursive: true, force: true });
