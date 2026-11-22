@@ -554,6 +554,14 @@
     "wheel": 0
   },
   "StateExample": "not mounted alone: Error: Channel 'docs-basket' is not attached. Did you forget useChannel(...)? Attached channels: (none).",
+  "StatusBarExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "type": 0,
+    "wheel": 0
+  },
   "StickyExample": {
     "idle": 0,
     "hover": 0,
