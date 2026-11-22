@@ -676,6 +676,7 @@ interface UiSurfaceOptions {
   quietMs?: number;
   settleMs?: number;
   confirm?: (request: AgentConfirmation) => AgentConfirmResult;
+  problem?: () => string | undefined;
 }
 declare const SCREEN_TOOL_NAMES: readonly string[];
 declare class UiRefs {
@@ -737,6 +738,7 @@ interface ApplicationAgentParts {
   readonly tools?: () => readonly AgentToolDefinition[];
   readonly confirm?: () => AgentConfirmAsk | undefined;
   readonly activity?: () => AgentActivitySink | undefined;
+  readonly problem?: () => string | undefined;
 }
 interface AgentConfirmContext {
   inject<T extends object>(service: new () => T): T;
@@ -3915,6 +3917,8 @@ declare class RenderWorkerApp {
   private channels;
   private appLogicWorker;
   private restoreConsole;
+  private loadProblem;
+  private failedInit;
   constructor(root: FrameworkChild | ComponentType, host?: WorkerGlobal);
   private reportUncaught;
   private reportError;

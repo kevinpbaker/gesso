@@ -122,6 +122,19 @@ export class RenderWorkerApp {
   private appLogicWorker: WorkerHandle | undefined;
   /** Undoes `captureConsole` while a devtools panel has the console forwarded. */
   private restoreConsole: (() => void) | null = null;
+  /**
+   * What the application's code threw as it loaded, while that is still
+   * so: as the tree was built for `init`, or as `reload` took in a
+   * change. The screen tools say it to an agent, which otherwise read
+   * an application that never started as one that has not started yet.
+   */
+  private loadProblem: string | undefined;
+  /**
+   * The `init` whose tree threw, kept so a `reload` with the fixed root
+   * starts the application then. The canvas in it is still this
+   * worker's: a throw while building leaves it unused, not given back.
+   */
+  private failedInit: Extract<ShellToRuntimeMessage, { type: 'init' }> | undefined;
 
   constructor(root: FrameworkChild | ComponentType, host: WorkerGlobal = self as unknown as WorkerGlobal) {
     this.root = typeof root === 'function' ? createComponent(root as ComponentType) : root;
@@ -240,7 +253,23 @@ export class RenderWorkerApp {
         this.serviceRegistrations[previous] = ServiceClass;
       }
     }
-    this.runtime?.reload(this.root, services);
+    if (this.runtime === undefined) {
+      // An application whose start threw starts now, on the fixed root;
+      // one that has not been sent `init` yet simply builds this root then.
+      const init = this.failedInit;
+      if (init !== undefined) {
+        this.failedInit = undefined;
+        this.receive(init);
+      }
+      return;
+    }
+    try {
+      this.runtime.reload(this.root, services);
+      this.loadProblem = undefined;
+    } catch (error) {
+      this.loadProblem = thrownProblem(error);
+      throw error;
+    }
   }
 
   /**
@@ -431,6 +460,10 @@ export class RenderWorkerApp {
     try {
       this.dispatch(message);
     } catch (error) {
+      if (message.type === 'init') {
+        this.loadProblem = thrownProblem(error);
+        this.failedInit = message;
+      }
       this.reportError(
         error instanceof Error ? error.message : String(error),
         error instanceof Error ? error.stack : undefined,
@@ -471,6 +504,7 @@ export class RenderWorkerApp {
       tools: () => this.agentTools,
       confirm: () => this.agentConfirm,
       activity: () => this.runtime?.services.get(AgentActivityService),
+      problem: () => this.loadProblem,
       ui: () => {
         const runtime = this.runtime;
         if (runtime === undefined) {
@@ -537,6 +571,8 @@ export class RenderWorkerApp {
         message.url,
         message.opaqueCanvas === true
       );
+      this.loadProblem = undefined;
+      this.failedInit = undefined;
       this.runtime!.setTextInputSource(message.textInput ?? 'keys');
       return;
     }
@@ -758,6 +794,8 @@ export class RenderWorkerApp {
     opaqueCanvas = false
   ): void {
     this.runtime?.dispose();
+    // Cleared before the tree is built: a root that throws leaves no runtime, not a disposed one.
+    this.runtime = undefined;
     this.channels?.dispose();
     this.channels = createChannelRegistry(
       // A channel registered with neither a worker nor a source is
@@ -937,4 +975,22 @@ function locationOf(event: WorkerErrorEvent): string | undefined {
   const line = event.lineno ?? 0;
   const column = event.colno ?? 0;
   return `${event.filename}:${line}:${column}`;
+}
+
+/**
+ * A thrown value as an agent reads it: what it was, and the first places
+ * in the stack, without the dev server's address or Vite's cache query
+ * (`at App (src/App.tsx:88:12)`).
+ */
+function thrownProblem(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+  const at = (error.stack ?? '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.startsWith('at '))
+    .slice(0, 3)
+    .map(line => line.replace(/https?:\/\/[^/\s)]+\//g, '').replace(/\?[^:\s)]*(?=:\d)/g, ''));
+  return `${error.name}: ${error.message}${at.length === 0 ? '' : `\n${at.join('\n')}`}`;
 }

@@ -105,6 +105,14 @@ export interface UiSurfaceOptions {
    * `agentConfirm`. Without it, such an action is refused.
    */
   confirm?: (request: AgentConfirmation) => AgentConfirmResult;
+  /**
+   * What went wrong when the application's code threw as it loaded: as
+   * it started, so there is no screen, or as a change to it was taken
+   * in, so the screen is the one from before the change. Said in place
+   * of "has not started yet", and above the screen it left, so an agent
+   * that just edited the code learns its edit broke the app.
+   */
+  problem?: () => string | undefined;
 }
 
 /** Keys that move around a screen rather than act on what has focus: never put to the person. */
@@ -299,6 +307,16 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
   const settleMs = options.settleMs ?? 1000;
   const refs = new UiRefs();
 
+  /** What a tool says with no screen to act on: why, when the application threw as it started. */
+  const notStarted = (): AgentToolResult => {
+    const problem = options.problem?.();
+    return failure(
+      problem === undefined
+        ? 'The application has not started yet.'
+        : `The application threw as it started, so there is no screen: ${problem}\nFix the code, save, and try again.`
+    );
+  };
+
   /** Waits until two readings of the screen agree, then returns the last. */
   const settled = async (ui: UiHost): Promise<string> => {
     const start = Date.now();
@@ -312,7 +330,10 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
         ui.agentConfirmAt === undefined ? undefined : id => ui.agentConfirmAt!(id)
       );
       if (current === previous || Date.now() - start >= settleMs) {
-        return current;
+        const problem = options.problem?.();
+        return problem === undefined
+          ? current
+          : `The last change to the code threw as it loaded, so this is the screen from before it: ${problem}\n\n${current}`;
       }
       previous = current;
       await new Promise(resolve => setTimeout(resolve, quietMs));
@@ -366,7 +387,7 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
   ): Promise<AgentToolResult> => {
     const ui = host();
     if (ui === undefined) {
-      return failure('The application has not started yet.');
+      return notStarted();
     }
     ui.flush();
     const found = resolveTarget(ui.semanticsTree(), args, refs);
@@ -395,7 +416,7 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
       switch (name) {
         case 'ui_snapshot': {
           const ui = host();
-          return ui === undefined ? failure('The application has not started yet.') : success(await settled(ui));
+          return ui === undefined ? notStarted() : success(await settled(ui));
         }
         case 'ui_press':
           return act(
@@ -430,7 +451,7 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
         case 'ui_key': {
           const ui = host();
           if (ui === undefined) {
-            return failure('The application has not started yet.');
+            return notStarted();
           }
           if (typeof args.key !== 'string' || args.key === '') {
             return failure('ui_key needs key: a KeyboardEvent key name, such as "Enter".');
@@ -460,7 +481,7 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
         case 'tokens_view': {
           const ui = host();
           if (ui === undefined) {
-            return failure('The application has not started yet.');
+            return notStarted();
           }
           if (ui.theme === undefined) {
             return failure('This application does not report its theme to agents.');
@@ -505,7 +526,7 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
         case 'render_frame': {
           const ui = host();
           if (ui === undefined) {
-            return failure('The application has not started yet.');
+            return notStarted();
           }
           if (ui.render === undefined) {
             return failure('This application cannot draw frames for agents.');

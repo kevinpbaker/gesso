@@ -28,6 +28,8 @@ export interface ApplicationAgentParts {
   readonly confirm?: () => AgentConfirmAsk | undefined;
   /** Where what agents do is written down for the person: the runtime's `AgentActivityService`. */
   readonly activity?: () => AgentActivitySink | undefined;
+  /** What the application's code threw as it loaded, while that is still so; see `UiSurfaceOptions.problem`. */
+  readonly problem?: () => string | undefined;
 }
 
 /** What an application's own question to the person is given beside the request; see `AgentConfirmAsk`. */
@@ -84,7 +86,7 @@ export function serveApplicationAgent(port: MessagePort, parts: ApplicationAgent
     const whole = combineSurfaces([
       agentSurface(parts.channels(), { confirm }),
       ...workers,
-      uiSurface(parts.ui, { confirm }),
+      uiSurface(parts.ui, { confirm, ...(parts.problem === undefined ? {} : { problem: parts.problem }) }),
       ...(parts.tools === undefined ? [] : [toolSurface(parts.tools)])
     ]);
     const activity = parts.activity;

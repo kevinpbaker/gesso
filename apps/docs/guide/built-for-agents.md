@@ -110,7 +110,9 @@ interface itself, through the same semantics tree a screen reader reads.
 role and name. A press is the click a pointer makes and typing is the
 edit a keyboard makes, so an agent can do what a person could and no
 more: a disabled control refuses it, and an open dialog's focus trap
-holds it. [Operating the interface](/structure/agents-and-mcp#operating-the-interface)
+holds it. An agent checking code it just wrote is told when that code
+threw, with the error and where, rather than finding the screen missing.
+[Operating the interface](/structure/agents-and-mcp#operating-the-interface)
 has the detail.
 
 These tools act as the person, so an agent could press the Delete in a

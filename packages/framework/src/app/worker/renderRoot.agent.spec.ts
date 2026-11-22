@@ -1,7 +1,7 @@
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Box, type CanvasHost } from 'gesso-core';
+import { Box, Column, Text, type CanvasHost } from 'gesso-core';
 import { createComponent } from '../../createComponent';
 import { defineChannel } from '../../channel/ChannelToken';
 import { serveChannels, serve } from '../../channel/serveChannels';
@@ -111,5 +111,78 @@ describe("render_frame's modules", () => {
 
     expect(result.isError).toBe(true);
     expect(asked[0]).toBe('/mocks/Settings.tsx');
+  });
+});
+
+describe('an application whose code throws as it loads', () => {
+  const init = { type: 'init', canvas: mockCanvas() as unknown as OffscreenCanvas, width: 400, height: 300, dpr: 1 };
+  const text = (result: { content: readonly { type: string; text?: string }[] }) =>
+    result.content.map(part => part.text ?? '').join('');
+
+  it('tells an agent what it threw, not that it has not started, until it starts', async () => {
+    const { host, send, open } = fakeGlobal();
+    let broken = true;
+    new RenderWorkerApp(
+      createComponent(() => {
+        if (broken) throw new ReferenceError('Each is not defined');
+        return Box({ width: 10, height: 10 });
+      }),
+      host as never
+    );
+    send(init as ShellToRuntimeMessage);
+
+    const agent = remoteSurface(open(AGENT_PORT));
+    const failed = await agent.call('ui_snapshot', {});
+    expect(failed.isError).toBe(true);
+    expect(text(failed)).toMatch(
+      /^The application threw as it started, so there is no screen: ReferenceError: Each is not defined\nat /
+    );
+    expect(text(failed)).toMatch(/Fix the code, save, and try again\.$/);
+
+    broken = false;
+    send(init as ShellToRuntimeMessage);
+    const started = await agent.call('ui_snapshot', {});
+    expect(started.isError).toBe(false);
+    expect(text(started)).not.toContain('threw');
+  });
+
+  it('starts when a change fixes the code, the way the dev server swaps in a saved file', async () => {
+    const { host, send, open } = fakeGlobal();
+    const app = new RenderWorkerApp(
+      createComponent(() => {
+        throw new ReferenceError('Each is not defined');
+      }),
+      host as never
+    );
+    send(init as ShellToRuntimeMessage);
+    const agent = remoteSurface(open(AGENT_PORT));
+    expect(text(await agent.call('ui_snapshot', {}))).toContain('Each is not defined');
+
+    app.reload(() => Column(Text({ text: 'Expenses' })));
+    const started = await agent.call('ui_snapshot', {});
+    expect(started.isError).toBe(false);
+    expect(text(started)).toContain('Expenses');
+  });
+
+  it('says the screen is from before a change that threw, and stops once a change loads', async () => {
+    const { host, send, open } = fakeGlobal();
+    const app = new RenderWorkerApp(
+      createComponent(() => Box({ width: 10, height: 10 })),
+      host as never
+    );
+    send(init as ShellToRuntimeMessage);
+    const agent = remoteSurface(open(AGENT_PORT));
+
+    expect(() =>
+      app.reload(() => {
+        throw new TypeError('rows.map is not a function');
+      })
+    ).toThrow('rows.map is not a function');
+    expect(text(await agent.call('ui_snapshot', {}))).toMatch(
+      /^The last change to the code threw as it loaded, so this is the screen from before it: TypeError: rows\.map is not a function/
+    );
+
+    app.reload(() => Box({ width: 20, height: 10 }));
+    expect(text(await agent.call('ui_snapshot', {}))).not.toContain('threw');
   });
 });

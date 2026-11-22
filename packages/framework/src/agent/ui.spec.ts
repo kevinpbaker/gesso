@@ -139,4 +139,15 @@ describe('the screen as tools', () => {
       content: [{ type: 'text', text: 'The application has not started yet.' }]
     });
   });
+
+  it('says what the code threw when the application could not start', async () => {
+    const result = await uiSurface(() => undefined, {
+      problem: () => 'ReferenceError: Each is not defined\nat App (src/App.tsx:88:12)'
+    }).call('ui_press', { role: 'button', name: 'Add' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe(
+      'The application threw as it started, so there is no screen: ReferenceError: Each is not defined\n' +
+        'at App (src/App.tsx:88:12)\nFix the code, save, and try again.'
+    );
+  });
 });

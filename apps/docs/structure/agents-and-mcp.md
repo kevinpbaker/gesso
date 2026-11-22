@@ -318,6 +318,15 @@ a test can find by role and name is one an agent can use.
 These are offered wherever the page's channels are, in the dev server
 endpoint and through WebMCP, after the channel tools.
 
+An agent that edits the code reads its work through these too, so they
+say when the code broke it. If the application threw as it started,
+every one of them answers with what was thrown and where
+(`ReferenceError: Each is not defined at App (src/App.tsx:88:12)`), not
+with "has not started yet", and a saved fix starts it without the page
+being reloaded. If a later change threw as it loaded, the outline still
+comes back, headed with that error and a note that it is the screen from
+before the change.
+
 ### The screen tools act as the person
 
 A press through `ui_press` is the person's click. So an agent can press
