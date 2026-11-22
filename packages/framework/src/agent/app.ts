@@ -81,7 +81,7 @@ export function serveApplicationAgent(port: MessagePort, parts: ApplicationAgent
     return combineSurfaces([
       agentSurface(parts.channels(), { confirm }),
       ...workers,
-      uiSurface(parts.ui),
+      uiSurface(parts.ui, { confirm }),
       ...(parts.tools === undefined ? [] : [toolSurface(parts.tools)])
     ]);
   });

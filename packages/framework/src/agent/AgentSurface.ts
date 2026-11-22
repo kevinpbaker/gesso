@@ -447,15 +447,9 @@ export function agentSurface(channels: readonly ServedChannel[], options: AgentS
       } catch (error) {
         answer = { unavailable: `asking failed: ${error instanceof Error ? error.message : String(error)}` };
       }
-      if (answer === 'declined') {
-        return failure(`The person declined ${channel}.${command}. Do not send it again unless they ask.`);
-      }
-      if (answer !== 'approved') {
-        const why = answer === 'unavailable' ? 'there was no way to show them the question' : answer.unavailable;
-        return failure(
-          `Nobody could be asked to approve ${channel}.${command}: ${why}. The person did not decline it. Ask them ` +
-            "to bring the app's window forward and call it again, or to do it themselves."
-        );
+      const refused = refusal(answer, `${channel}.${command}`);
+      if (refused !== null) {
+        return refused;
       }
     }
     const handler = entry.served.source.commands?.[command] as ((...values: unknown[]) => void) | undefined;
@@ -604,6 +598,26 @@ function positionalArguments(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && !ArrayBuffer.isView(value);
+}
+
+/**
+ * What the agent is told when the person did not approve what it asked
+ * for (`what`: `expenses.remove`), or null when they did: a no, which it
+ * must not ask again, or nobody asked, which it may once the window is
+ * in front of them.
+ */
+export function refusal(answer: AgentAnswer, what: string): AgentToolResult | null {
+  if (answer === 'approved') {
+    return null;
+  }
+  if (answer === 'declined') {
+    return failure(`The person declined ${what}. Do not send it again unless they ask.`);
+  }
+  const why = answer === 'unavailable' ? 'there was no way to show them the question' : answer.unavailable;
+  return failure(
+    `Nobody could be asked to approve ${what}: ${why}. The person did not decline it. Ask them ` +
+      "to bring the app's window forward and call it again, or to do it themselves."
+  );
 }
 
 /** The URI of a channel's view. */

@@ -449,6 +449,10 @@ export const PROPERTY_NOTES: Readonly<Record<string, PropertyNote>> = {
     group: 'Semantics',
     note: 'What a field offers as it is typed into: `list`, `inline` or `both`.'
   },
+  agentConfirm: {
+    group: 'Semantics',
+    note: "An AI agent's press, typing or key on this control, or anything inside it, is put to the person first: a string is the question, `true` asks one written from the control's name, `false` lets a control inside a marked one through. See [the screen tools act as the person](/structure/agents-and-mcp#the-screen-tools-act-as-the-person)."
+  },
   orientation: {
     group: 'Semantics',
     note: 'Which way a tablist, toolbar, list or separator runs, when not the way its role assumes: a column of tabs is `vertical`.'

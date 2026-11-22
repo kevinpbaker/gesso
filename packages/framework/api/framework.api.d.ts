@@ -607,6 +607,7 @@ interface UiHost {
   flush(): void;
   theme?(at?: string): UiTheme | undefined;
   designThemes?(): DesignThemes;
+  agentConfirmAt?(id: string): string | true | undefined;
   render?(request: RenderRequest): Promise<AgentToolResult>;
   agentContext?(): {
     readonly hidden: boolean;
@@ -617,6 +618,7 @@ interface UiHost {
 interface UiSurfaceOptions {
   quietMs?: number;
   settleMs?: number;
+  confirm?: (request: AgentConfirmation) => AgentConfirmResult;
 }
 declare const SCREEN_TOOL_NAMES: readonly string[];
 declare class UiRefs {
@@ -626,7 +628,7 @@ declare class UiRefs {
   idOf(ref: string): string;
 }
 declare function uiSurface(host: () => UiHost | undefined, options?: UiSurfaceOptions): AgentSurface;
-declare function outline(tree: UiSemanticsMap, focused: string | null, refs?: UiRefs): string;
+declare function outline(tree: UiSemanticsMap, focused: string | null, refs?: UiRefs, asks?: (id: string) => unknown): string;
 declare function resolveTarget(tree: UiSemanticsMap, args: Readonly<Record<string, unknown>>, refs?: UiRefs): UiSemanticsRecord | string;
 interface AgentToolDefinition {
   readonly name: string;
@@ -2314,6 +2316,7 @@ declare class GessoRuntime {
   private sendTree;
   themeAt(id?: string): UiTheme | undefined;
   contentNode(): UiNode | undefined;
+  agentConfirmAt(id: string): string | true | undefined;
   isVisible(): boolean;
   private previewProperty;
   private endPreviews;

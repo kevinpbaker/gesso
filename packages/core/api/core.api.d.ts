@@ -1488,6 +1488,7 @@ declare const UiProperties: {
   readonly activeDescendant: UiPropertyDefinition<UiNode | null | undefined>;
   readonly controls: UiPropertyDefinition<UiNode | null | undefined>;
   readonly autocomplete: UiPropertyDefinition<UiAutocomplete | undefined>;
+  readonly agentConfirm: UiPropertyDefinition<string | boolean | undefined>;
   readonly orientation: UiPropertyDefinition<UiOrientation | undefined>;
   readonly level: UiPropertyDefinition<number | undefined>;
   readonly rowIndex: UiPropertyDefinition<number | undefined>;
@@ -1578,7 +1579,7 @@ type PositionProps = PropsOf<'position' | 'top' | 'right' | 'bottom' | 'left' | 
 type PaintProps = PropsOf<'backgroundColor' | 'backgroundGradient' | 'borderColor' | 'borderWidth' | 'borderRadius' | 'opacity' | 'boxShadows' | 'visible' | 'transform' | 'rasterize' | 'holdUnseen'>;
 type TypographyProps = PropsOf<'color' | 'fontFamily' | 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing' | 'textAlign' | 'textDirection' | 'fontStyle' | 'fontStretch' | 'fontVariant' | 'fontKerning' | 'textDecoration'>;
 type InteractionProps = PropsOf<'cursor' | 'pointerEvents' | 'touchEmulation' | 'focusable' | 'tabStop' | 'disabled' | 'hitTestable' | 'visualState' | 'selectable' | 'editingGroup' | 'textInput' | 'overflowAnchor'>;
-type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation'>;
+type SemanticsProps = PropsOf<'role' | 'label' | 'description' | 'live' | 'states' | 'valueNow' | 'valueMin' | 'valueMax' | 'valueText' | 'posInSet' | 'setSize' | 'level' | 'rowIndex' | 'columnIndex' | 'rowCount' | 'columnCount' | 'activeDescendant' | 'controls' | 'autocomplete' | 'orientation' | 'agentConfirm'>;
 type EnvironmentProps = PropsOf<'theme' | 'pointer' | 'textScale' | 'textStyle' | 'contentColor' | 'containerSize' | 'insets' | 'provide'>;
 type ModifierProps = {
   modifiers?: readonly UiModifier[];

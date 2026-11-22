@@ -279,6 +279,32 @@ a test can find by role and name is one an agent can use.
 These are offered wherever the page's channels are, in the dev server
 endpoint and through WebMCP, after the channel tools.
 
+### The screen tools act as the person
+
+A press through `ui_press` is the person's click. So an agent can press
+anything the person can, and that includes the Delete in a confirmation
+that the screen draws. A command whose contract says `@confirm` is put
+to the person when an agent sends it, but a button that sends the same
+command from the screen is not, unless the app says so.
+
+Mark a control with `agentConfirm`, and an agent's press, typing or key
+on it, or on anything inside it, is put to the person first, through
+the same `confirm` as a `@confirm` command (the app's own dialog, when
+it has `useAgentConfirm`):
+
+```tsx
+<box agentConfirm="Delete this expense?">
+  <Button label="Delete" tone="danger" onClick={() => expenses.send.remove(id)} />
+</box>
+```
+
+A string is the question. `true` asks one written from the control's
+name ("Allow pressing button "Delete"?"). `agentConfirm={false}` on a
+control inside a marked one lets that control through. The outline
+says `(asks the person first)` on each control that asks. Focus, Tab,
+Escape and the arrow keys never ask. A person's own clicks are
+untouched, and nothing is drawn or announced differently.
+
 ## In development, with nothing to write
 
 A web application's channels are in its workers, and a browser tab
@@ -511,8 +537,9 @@ served. A window whose modules are served from somewhere else, such as
 an editor serving the project it works on from another folder, says
 where with `renderRoot(App).loadModulesWith(path => import(...))`. Agents operate the window
 attached last. Pressing the screen's buttons is everything the person
-can do, including clicking through a confirmation drawn on the screen,
-so offer it in development, not to every agent holding the token.
+can do, including clicking through a confirmation drawn on the screen
+that is not marked `agentConfirm`, so offer it in development, not to
+every agent holding the token.
 
 Electrobun bundles the main process with its own build, which takes no
 plugins, so the Vite plugin never describes the contracts there.

@@ -242,6 +242,7 @@ export type SemanticsProps = PropsOf<
   | 'controls'
   | 'autocomplete'
   | 'orientation'
+  | 'agentConfirm'
 >;
 
 /** Environment values an element provides to its subtree. */

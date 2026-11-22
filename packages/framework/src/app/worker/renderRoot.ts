@@ -484,6 +484,7 @@ export class RenderWorkerApp {
           },
           flush: () => this.clock?.flush(),
           theme: at => runtime.themeAt(at),
+          agentConfirmAt: id => runtime.agentConfirmAt(id),
           agentContext: () => ({
             hidden: !runtime.isVisible(),
             inject: service => runtime.services.get(service),

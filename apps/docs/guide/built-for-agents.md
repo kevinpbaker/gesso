@@ -108,6 +108,11 @@ more: a disabled control refuses it, and an open dialog's focus trap
 holds it. [Operating the interface](/structure/agents-and-mcp#operating-the-interface)
 has the detail.
 
+These tools act as the person, so an agent could press the Delete in a
+confirmation the screen draws. Mark such a control `agentConfirm="Delete
+this expense?"`, and an agent's press is put to the person first, as a
+`@confirm` command is.
+
 This is the same tree `gesso-testing` queries, so a control a test can
 find by role and name is a control an agent can use. Accessibility, the
 test suite and agents are one investment rather than three.

@@ -203,7 +203,10 @@ what the app is doing:
   view is the same as before" means the command had nothing to act on.
   `ui_snapshot`, `ui_press`, `ui_type` and `ui_key` read and operate the
   screen itself, the way a screen reader does, for anything no channel
-  covers.
+  covers. They act as the person, so put `agentConfirm="Delete this
+note?"` on a control (or a box around it) that an agent must not press
+  without the person's say, such as the button that sends a `@confirm`
+  command.
 - **Finding a component.** The same endpoint lists this project's
   components and `gesso-components`' (`library_search "date picker"`,
   `library_get Button`), with every input each takes, and `tokens_view`

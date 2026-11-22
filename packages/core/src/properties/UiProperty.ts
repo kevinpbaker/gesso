@@ -1497,6 +1497,25 @@ export const UiProperties = {
   }),
 
   /**
+   * An AI agent operating the screen must have the person's approval
+   * before it presses, types into or presses a key on this control, or
+   * on anything inside it. A string is the question the person is asked
+   * ("Delete this expense?"); true asks one written from the control's
+   * name. A person's own clicks are untouched.
+   *
+   * For the confirmation a screen draws itself: an agent can press
+   * anything a person can, so a dialog's Delete would otherwise let it
+   * through a command whose contract says `@confirm`. Read only when an
+   * agent acts, so it changes nothing that is drawn or announced.
+   */
+  agentConfirm: defineProperty<string | boolean | undefined>({
+    name: 'agentConfirm',
+    defaultValue: undefined,
+    inherited: false,
+    affects: DirtyFlags.None
+  }),
+
+  /**
    * Which way a tablist, toolbar, list or separator runs, when not the
    * way its role assumes: a column of tabs. See `aria-orientation`.
    */

@@ -307,6 +307,7 @@ export class GessoApp {
       },
       flush: () => this.flushFrame(),
       theme: at => runtime.themeAt(at),
+      agentConfirmAt: id => runtime.agentConfirmAt(id),
       agentContext: () => ({
         hidden: !runtime.isVisible(),
         inject: service => runtime.services.get(service),

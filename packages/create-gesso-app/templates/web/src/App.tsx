@@ -58,7 +58,10 @@ export function App(_inputs: Inputs<{}>, ctx: ComponentContext) {
         <row gap={12} y="center">
           <text text={clicks.view.count.pipe(map(value => `Clicks: ${value}`))} textStyle="title" />
           <Button label="Add one" onClick={() => clicks.send.add()} />
-          <Button label="Reset" variant="outlined" onClick={() => clicks.send.reset()} />
+          {/* An agent pressing Reset on the screen is asked about, as its reset command is. */}
+          <box agentConfirm="Reset the count to 0?">
+            <Button label="Reset" variant="outlined" onClick={() => clicks.send.reset()} />
+          </box>
         </row>
 
         <text

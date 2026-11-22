@@ -1,7 +1,17 @@
 import type { UiKeyModifiers, UiNode, UiSemanticsAction, UiSemanticsMap, UiSemanticsRecord, UiTheme } from 'gesso-core';
 
 import type { JsonSchema } from '../channel/ChannelSchema';
-import type { AgentSurface, AgentTool, AgentToolResult } from './AgentSurface';
+import {
+  agentAnswer,
+  refusal,
+  type AgentAnswer,
+  type AgentCallContext,
+  type AgentConfirmation,
+  type AgentConfirmResult,
+  type AgentSurface,
+  type AgentTool,
+  type AgentToolResult
+} from './AgentSurface';
 import { designedTheme, type AgentThemeName, type DesignThemes } from './designedTheme';
 import type { RenderRequest } from './render';
 import { formatThemeTokens, themeTokens } from './tokens';
@@ -33,6 +43,14 @@ import { formatThemeTokens, themeTokens } from './tokens';
  *   render_frame  a module of the project drawn to a PNG, at a width
  *
  * Each action answers with the outline as it is afterwards.
+ *
+ * **These act as the person.** A press is the person's click, so an
+ * agent can press anything the person could, a confirmation the screen
+ * draws included. A control that must not be pressed by an agent
+ * without the person's say, a dialog's Delete, carries `agentConfirm`,
+ * and an agent's press, typing or key on it, or on anything inside it,
+ * is put to the person first through `confirm`, as a `@confirm` command
+ * is. The outline marks such a control `(asks the person first)`.
  */
 
 /** What the tools need of the running application. */
@@ -56,6 +74,12 @@ export interface UiHost {
   theme?(at?: string): UiTheme | undefined;
   /** The themes the application designs in, if they are not its own; see `designedTheme`. */
   designThemes?(): DesignThemes;
+  /**
+   * The approval an agent needs to act on a control, by record id: the
+   * nearest `agentConfirm` on it or above it. Optional; without it,
+   * nothing on the screen asks.
+   */
+  agentConfirmAt?(id: string): string | true | undefined;
   /** Draws a module of the project to a PNG; see `renderModule`. Optional, as `theme` is. */
   render?(request: RenderRequest): Promise<AgentToolResult>;
   /**
@@ -75,7 +99,26 @@ export interface UiSurfaceOptions {
   quietMs?: number;
   /** The longest an action waits for that (default 1000 ms). */
   settleMs?: number;
+  /**
+   * Asks the person before an agent acts on a control marked
+   * `agentConfirm`. Without it, such an action is refused.
+   */
+  confirm?: (request: AgentConfirmation) => AgentConfirmResult;
 }
+
+/** Keys that move around a screen rather than act on what has focus: never put to the person. */
+const MOVING_KEYS = new Set([
+  'Tab',
+  'Escape',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown'
+]);
 
 const THEME: JsonSchema = {
   type: 'string',
@@ -98,7 +141,8 @@ const TOOLS: readonly AgentTool[] = [
     description:
       'The screen as an outline of what a screen reader would announce: each control with its role, name, state, ' +
       'value and a ref to act on it by. Read it before acting, and again whenever an action did not do what you ' +
-      'expected. Prefer a channel tool when one covers what you want; these act on the interface.',
+      'expected. Prefer a channel tool when one covers what you want; these act on the interface, as the person ' +
+      'would.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false }
   },
@@ -107,7 +151,9 @@ const TOOLS: readonly AgentTool[] = [
     title: 'Press a control',
     description:
       'Presses a button, link, checkbox, tab or any other control, as a click would. Name it by ref, or by role and ' +
-      'name. Returns the screen afterwards.',
+      'name. Returns the screen afterwards. You act as the person here: a confirmation drawn on the screen is theirs ' +
+      'to press, not yours, unless they asked you to. A control marked (asks the person first) is put to them before ' +
+      'it is pressed.',
     inputSchema: { type: 'object', properties: TARGET, additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
   },
@@ -251,7 +297,12 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
     let previous = '';
     for (;;) {
       ui.flush();
-      const current = outline(ui.semanticsTree(), ui.focusedNodeId(), refs);
+      const current = outline(
+        ui.semanticsTree(),
+        ui.focusedNodeId(),
+        refs,
+        ui.agentConfirmAt === undefined ? undefined : id => ui.agentConfirmAt!(id)
+      );
       if (current === previous || Date.now() - start >= settleMs) {
         return current;
       }
@@ -260,8 +311,49 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
     }
   };
 
+  /**
+   * The person's approval for an agent's action on a control marked
+   * `agentConfirm`, or what the agent is told instead; null to go ahead.
+   */
+  const approval = async (
+    ui: UiHost,
+    record: UiSemanticsRecord,
+    doing: { readonly command: string; readonly verb: string; readonly extra?: Record<string, unknown> },
+    context: AgentCallContext
+  ): Promise<AgentToolResult | null> => {
+    const asks = ui.agentConfirmAt?.(record.id);
+    if (asks === undefined) {
+      return null;
+    }
+    const what = `${doing.verb} ${describe(record)}`;
+    if (options.confirm === undefined) {
+      return failure(
+        `${describe(record)} asks for the person's approval before an agent acts on it, and this application has ` +
+          `given agents no way to ask. Ask the person to do it themselves.`
+      );
+    }
+    let answer: AgentAnswer;
+    try {
+      answer = agentAnswer(
+        await options.confirm({
+          channel: 'screen',
+          command: doing.command,
+          arguments: { control: describe(record), ...doing.extra },
+          destructive: false,
+          question: typeof asks === 'string' ? { title: asks } : { title: `Allow ${what}?` },
+          ...(context.agent === undefined || context.agent === '' ? {} : { agent: context.agent })
+        })
+      );
+    } catch (error) {
+      answer = { unavailable: `asking failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    return refusal(answer, what);
+  };
+
   const act = async (
     args: Readonly<Record<string, unknown>>,
+    doing: { readonly command: string; readonly verb: string; readonly extra?: Record<string, unknown> },
+    context: AgentCallContext,
     perform: (ui: UiHost, record: UiSemanticsRecord) => string | null
   ): Promise<AgentToolResult> => {
     const ui = host();
@@ -276,6 +368,12 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
     if (found.disabled === true) {
       return failure(`${describe(found)} is disabled.`);
     }
+    if (doing.command !== 'focus') {
+      const refused = await approval(ui, found, doing, context);
+      if (refused !== null) {
+        return refused;
+      }
+    }
     const problem = perform(ui, found);
     if (problem !== null) {
       return failure(problem);
@@ -285,27 +383,42 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
 
   return {
     tools: () => TOOLS,
-    call: async (name, args = {}) => {
+    call: async (name, args = {}, context = {}) => {
       switch (name) {
         case 'ui_snapshot': {
           const ui = host();
           return ui === undefined ? failure('The application has not started yet.') : success(await settled(ui));
         }
         case 'ui_press':
-          return act(args, (ui, record) => (ui.applySemanticsAction({ id: record.id, action: 'click' }), null));
+          return act(
+            args,
+            { command: 'press', verb: 'pressing' },
+            context,
+            (ui, record) => (ui.applySemanticsAction({ id: record.id, action: 'click' }), null)
+          );
         case 'ui_focus':
-          return act(args, (ui, record) => (ui.applySemanticsAction({ id: record.id, action: 'focus' }), null));
+          return act(
+            args,
+            { command: 'focus', verb: 'focusing' },
+            context,
+            (ui, record) => (ui.applySemanticsAction({ id: record.id, action: 'focus' }), null)
+          );
         case 'ui_type':
           if (typeof args.text !== 'string') {
             return failure('ui_type needs text: the text the field should hold.');
           }
-          return act(args, (ui, record) => {
-            if (record.states?.includes('readonly')) {
-              return `${describe(record)} is read-only.`;
+          return act(
+            args,
+            { command: 'type', verb: 'typing into', extra: { text: args.text } },
+            context,
+            (ui, record) => {
+              if (record.states?.includes('readonly')) {
+                return `${describe(record)} is read-only.`;
+              }
+              ui.applySemanticsAction({ id: record.id, action: 'setValue', value: args.text as string });
+              return null;
             }
-            ui.applySemanticsAction({ id: record.id, action: 'setValue', value: args.text as string });
-            return null;
-          });
+          );
         case 'ui_key': {
           const ui = host();
           if (ui === undefined) {
@@ -313,6 +426,20 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
           }
           if (typeof args.key !== 'string' || args.key === '') {
             return failure('ui_key needs key: a KeyboardEvent key name, such as "Enter".');
+          }
+          // A key that acts (Enter, Space, a letter) acts on what has focus, so it asks as a press of that would.
+          const focusedId = ui.focusedNodeId();
+          const focusedRecord = focusedId === null ? undefined : ui.semanticsTree().get(focusedId);
+          if (focusedRecord !== undefined && !MOVING_KEYS.has(args.key)) {
+            const refused = await approval(
+              ui,
+              focusedRecord,
+              { command: 'key', verb: `pressing ${args.key} on`, extra: { key: args.key } },
+              context
+            );
+            if (refused !== null) {
+              return refused;
+            }
           }
           ui.key(args.key, {
             shift: args.shift === true,
@@ -405,7 +532,12 @@ export function uiSurface(host: () => UiHost | undefined, options: UiSurfaceOpti
  * of the same tree as JSON. A record with neither a role nor a name is
  * structure, and its children are lifted to its depth.
  */
-export function outline(tree: UiSemanticsMap, focused: string | null, refs: UiRefs = new UiRefs()): string {
+export function outline(
+  tree: UiSemanticsMap,
+  focused: string | null,
+  refs: UiRefs = new UiRefs(),
+  asks?: (id: string) => unknown
+): string {
   const depths = new Map<string, number>();
   const lines: string[] = [];
   for (const record of tree.values()) {
@@ -430,6 +562,9 @@ export function outline(tree: UiSemanticsMap, focused: string | null, refs: UiRe
     parts.push(`[${refs.refOf(record.id)}]`);
     if (record.id === focused) {
       parts.push('(focused)');
+    }
+    if (record.role !== undefined && asks?.(record.id) !== undefined) {
+      parts.push('(asks the person first)');
     }
     lines.push(parts.join(' '));
   }

@@ -1630,6 +1630,23 @@ export class GessoRuntime {
     return node;
   }
 
+  /**
+   * The approval an AI agent needs before it acts on a control, by
+   * semantics record id: the nearest `agentConfirm` on the node or an
+   * ancestor, or undefined when none asks. A link's record inside a
+   * paragraph is looked up from the paragraph.
+   */
+  agentConfirmAt(id: string): string | true | undefined {
+    let node: UiNode | null | undefined =
+      this.graph.getNode(id) ?? this.graph.getNode(id.split(TEXT_RUN_ID_SEPARATOR)[0]);
+    for (; node !== null && node !== undefined; node = node.parent) {
+      const asks = node.properties.get('agentConfirm') as string | boolean | undefined;
+      if (asks === false) return undefined;
+      if (asks === true || (typeof asks === 'string' && asks.trim() !== '')) return asks;
+    }
+    return undefined;
+  }
+
   /** Whether the shell last said the window is visible (`setVisible`). A hidden one draws no frames. */
   isVisible(): boolean {
     return this.visible;
