@@ -100,7 +100,7 @@ and dark toggle without being told either exists.
   Latin, Japanese, Chinese, Korean, Arabic, Hebrew, Hindi and Thai, with
   colour emoji, right-to-left paragraphs and web fonts loaded in the
   worker, on both renderers.
-- **Thirty-nine components.** Inputs, overlays, tables, trees and
+- **<!-- proof:components Words -->Fifty-one<!-- /proof --> components.** Inputs, overlays, tables, trees and
   media, every one of them themed, keyboard operable, and announced to
   assistive technology without you doing anything.
 - **Tests without a browser.** `renderTest` queries the same tree a

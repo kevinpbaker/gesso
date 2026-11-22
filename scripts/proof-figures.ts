@@ -33,6 +33,10 @@
  *   - `shell-budget-kb`: `SHELL_BUDGET` in `check-bundle-size.ts`.
  *   - `parity-max-percent`: the default `PARITY_MAX_PERCENT` in
  *     `check-webgpu-parity.ts`.
+ *   - `components`: the pages under `apps/docs/components`, one per
+ *     component, less the overview and the restyling page.
+ *     `pnpm docs:check` already fails a page the sidebar does not
+ *     reach, so a component with no page is the only way to be missed.
  *
  * What it cannot answer stays typed, because it needs a build, a
  * browser or a GPU: the shell's measured size, a parity reading, the
@@ -127,6 +131,15 @@ function constantIn(script: string, pattern: RegExp): string {
   return match[1];
 }
 
+/** Pages in the Components section that are about the library, not one component. */
+const NOT_A_COMPONENT_PAGE = new Set(['index.md', 'restyling.md']);
+
+function componentPages(): number {
+  return readdirSync(join(root, 'apps/docs/components')).filter(
+    entry => entry.endsWith('.md') && !NOT_A_COMPONENT_PAGE.has(entry)
+  ).length;
+}
+
 function figures(report: VitestReport): Map<string, number> {
   const layoutPinned = layoutCases.filter(layoutCase => layoutCase.divergence !== undefined).length;
   const textPinned = textCases.filter(textCase => textCase.divergence !== undefined).length;
@@ -142,7 +155,8 @@ function figures(report: VitestReport): Map<string, number> {
     ['text-pinned', textPinned],
     ['text-agreeing', textCases.length - textPinned],
     ['shell-budget-kb', shellBudget / 1000],
-    ['parity-max-percent', parityMax]
+    ['parity-max-percent', parityMax],
+    ['components', componentPages()]
   ]);
 }
 
