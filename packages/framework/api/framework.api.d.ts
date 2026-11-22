@@ -2582,6 +2582,12 @@ declare class GessoApp {
   private detachVisibility;
   private detachFileDrop;
   private files;
+  private pickers;
+  private filesModule;
+  private audioModule;
+  private disposed;
+  private loadFiles;
+  private loadAudio;
   private detachFullscreen;
   private fullscreen;
   private detachReducedMotion;

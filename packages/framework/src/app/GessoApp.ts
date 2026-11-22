@@ -15,9 +15,10 @@ import { GessoRuntime, type FrameMetrics, type PatchSource, type RendererChoice 
 import type { UiNodeReport } from './NodeReport';
 import type { DevtoolsEvent, DevtoolsRequest } from './DevtoolsProtocol';
 import { shellFilesUnsupported, type ShellRequest } from './ShellService';
-import { AudioSink } from './AudioSink';
+import type { AudioSink } from './AudioSink';
 import { attachFileDrop } from './fileDrop';
-import { browserFilesHost, ShellFiles } from './shellFiles';
+import type { ShellFiles } from './shellFiles';
+import { openPicker, type ShellPickers, windowPickers } from './shellPicker';
 import { setLeaveWarning } from './shellLeaveWarning';
 import { redirectWith } from './shellRedirect';
 import { EditingProxy, readClipboard, writeClipboard, writeClipboardImage } from './EditingProxy';
@@ -184,6 +185,27 @@ export class GessoApp {
   private detachFileDrop: (() => void) | null = null;
   /** Pickers and remembered handles, made on the first file request. */
   private files: ShellFiles | null = null;
+  /** The window's pickers, opened as a request arrives; see `shellPicker.ts`. */
+  private pickers: ShellPickers | null = null;
+  /**
+   * The modules behind files and sound, loaded after mount rather than
+   * with the app, as `WorkerApp` loads them. Here the engine is in the
+   * same bundle, so the saving is small; the point is that a page using
+   * this and `createApp` both, as a playground or a docs site does, had
+   * a static path to them from here, and that kept them in the first
+   * chunk for the worker configuration too. A file request opens its
+   * picker before waiting on anything, so a slow load never costs the
+   * click that asked.
+   */
+  private filesModule: Promise<typeof import('./shellFiles')> | null = null;
+  private audioModule: Promise<typeof import('./AudioSink')> | null = null;
+  private disposed = false;
+  private loadFiles(): Promise<typeof import('./shellFiles')> {
+    return (this.filesModule ??= import('./shellFiles'));
+  }
+  private loadAudio(): Promise<typeof import('./AudioSink')> {
+    return (this.audioModule ??= import('./AudioSink'));
+  }
   private detachFullscreen: (() => void) | null = null;
   private fullscreen = false;
   private detachReducedMotion: (() => void) | null = null;
@@ -468,6 +490,7 @@ export class GessoApp {
    */
   dispose(): void {
     this.running = false;
+    this.disposed = true;
     // An app that is gone has no work to lose.
     if (isCanvasElement(this.canvas)) {
       setLeaveWarning(this.canvas.ownerDocument.defaultView, false);
@@ -544,11 +567,29 @@ export class GessoApp {
     // Sound, driven directly instead of over the protocol: the same
     // sink the worker configuration uses, which is the point of it not
     // knowing where its requests come from.
-    this.audio = new AudioSink({
-      sample: sample => this.runtime.applyAudioSample(sample),
-      action: action => this.runtime.applyAudioAction(action)
+    // Made on the first request, in the order requests came: each waits
+    // on the same load, and its callbacks run in the order they were added.
+    this.runtime.onAudioRequest(request => {
+      void this.loadAudio().then(({ AudioSink }) => {
+        if (this.disposed) {
+          return;
+        }
+        this.audio ??= new AudioSink({
+          sample: sample => this.runtime.applyAudioSample(sample),
+          action: action => this.runtime.applyAudioAction(action)
+        });
+        this.audio.handle(request);
+      });
     });
-    this.runtime.onAudioRequest(request => this.audio?.handle(request));
+    const prefetch = (): void => {
+      void this.loadFiles();
+      void this.loadAudio();
+    };
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(prefetch, { timeout: 2000 });
+    } else {
+      setTimeout(prefetch, 0);
+    }
     this.attachSemanticsMirror(canvas);
     // Files dragged in from the desktop, handed straight to the
     // runtime: there is no thread to cross, so nothing to transfer.
@@ -745,9 +786,14 @@ export class GessoApp {
         return;
       }
       // The same shell half the worker configuration runs, with no
-      // thread to cross: the answer settles the promise directly.
-      this.files ??= new ShellFiles(browserFilesHost(view as Window & typeof globalThis));
-      void this.files.perform(request.request).then(result => this.runtime.settleFile(request.id, result));
+      // thread to cross: the answer settles the promise directly. The
+      // picker first, while the click that asked is fresh.
+      const window = view as Window & typeof globalThis;
+      const opened = openPicker((this.pickers ??= windowPickers(window)), request.request);
+      void this.loadFiles().then(({ ShellFiles, browserFilesHost }) => {
+        this.files ??= new ShellFiles(browserFilesHost(window));
+        return this.files.perform(request.request, opened).then(result => this.runtime.settleFile(request.id, result));
+      });
       return;
     }
     if (request.type === 'storage') {
