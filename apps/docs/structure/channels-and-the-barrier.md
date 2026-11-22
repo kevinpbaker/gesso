@@ -27,6 +27,18 @@ anything has been sent:
 
 <<< @/src/examples/BarrierExample.tsx#contract
 
+`defineChannel` makes the same token from one object, with the types
+read off it rather than written as interfaces first. New code, and every
+new project, uses it; the two are interchangeable, and `channel` is not
+going away:
+
+```ts
+export const Tasks = defineChannel('docs-tasks', {
+  view: { tasks: [] as readonly TaskRow[], remaining: 'Waiting for the first patch' },
+  commands: {} as { toggle(id: string): void; reset(): void }
+});
+```
+
 That is the contract, and it is all of it. There is no store base
 class, no action type, no reducer, no selector, no dependency
 injection for data. The framework subscribes to observables of plain

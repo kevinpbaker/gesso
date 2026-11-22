@@ -229,11 +229,79 @@ const INTRO = [
   '',
   'Gesso is not React and has no DOM. A component function runs once, state is a cell bound into the tree, layout is `row`, `column` and `box` with typed props, and colour comes from theme tokens. Read "Components run once" and "Cells and bindings" before writing a component.',
   '',
-  `Every page below is also available as markdown at its URL with \`.md\` appended, and the whole site is one file at ${SITE}/llms-full.txt.`
+  `Every page below is also available as markdown at its URL with \`.md\` appended. Each section is also one file, listed under "Whole sections" with its size, so an agent can read the part it needs at once: start with the Guide. The whole site is one file at ${SITE}/llms-full.txt, which is larger than most models can hold.`
 ].join('\n');
 
-/** The `llms.txt` index. */
-export function llmsIndex(pages: readonly LlmsPage[]): string {
+/**
+ * The most characters a section file holds before it is split into
+ * parts: about 75,000 tokens, which leaves a model room to work. A
+ * section is split between pages, never inside one.
+ */
+export const SECTION_LIMIT = 300_000;
+
+/** A section's file, as `llms.txt` lists it. */
+export interface LlmsSection {
+  readonly title: string;
+  readonly fileName: string;
+  readonly text: string;
+}
+
+/** `Guide` → `guide`, `Text and type` → `text-and-type`. */
+function slug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * The site again, one file per sidebar section, in sidebar order:
+ * `llms-guide.txt`, `llms-layout.txt` … A section larger than `limit`
+ * becomes numbered parts, `llms-components-1.txt` and on.
+ *
+ * `llms-full.txt` is every page in one file, and was the only way to
+ * read more than one page at a time; at 1.9 MB, about 470,000 tokens,
+ * no model holds it. A section is the unit an agent asks for anyway:
+ * the guide to write its first screen, the components to find one.
+ */
+export function llmsSections(pages: readonly LlmsPage[], limit = SECTION_LIMIT): LlmsSection[] {
+  const groups: { title: string; pages: LlmsPage[] }[] = [];
+  for (const page of pages) {
+    const last = groups[groups.length - 1];
+    if (last?.title === page.section) {
+      last.pages.push(page);
+    } else {
+      groups.push({ title: page.section, pages: [page] });
+    }
+  }
+  const out: LlmsSection[] = [];
+  for (const group of groups) {
+    const parts: string[][] = [[]];
+    let size = 0;
+    for (const page of group.pages) {
+      const text = `<!-- ${SITE}${page.link} -->\n\n${page.markdown}`;
+      if (size > 0 && size + text.length > limit) {
+        parts.push([]);
+        size = 0;
+      }
+      parts[parts.length - 1]!.push(text);
+      size += text.length;
+    }
+    parts.forEach((part, index) => {
+      const numbered = parts.length === 1 ? '' : `-${index + 1}`;
+      const title = parts.length === 1 ? group.title : `${group.title}, part ${index + 1} of ${parts.length}`;
+      out.push({
+        title,
+        fileName: `llms-${slug(group.title)}${numbered}.txt`,
+        text: [`# Gesso: ${title}`, ...part].join('\n\n---\n\n') + '\n'
+      });
+    });
+  }
+  return out;
+}
+
+/** The `llms.txt` index: every page, then every section's file with its size. */
+export function llmsIndex(pages: readonly LlmsPage[], files: readonly LlmsSection[] = llmsSections(pages)): string {
   const sections: string[] = [INTRO];
   let current: string | null = null;
   for (const page of pages) {
@@ -243,6 +311,13 @@ export function llmsIndex(pages: readonly LlmsPage[]): string {
     }
     const summary = page.description === '' ? '' : `: ${page.description}`;
     sections.push(`- [${page.title}](${SITE}/${sourceOf(page.link)})${summary}`);
+  }
+  if (files.length > 0) {
+    sections.push('', '## Whole sections', '');
+    for (const file of files) {
+      const tokens = Math.max(1, Math.round(file.text.length / 4 / 1000));
+      sections.push(`- [${file.title}](${SITE}/${file.fileName}): about ${tokens},000 tokens`);
+    }
   }
   return sections.join('\n') + '\n';
 }
@@ -277,7 +352,11 @@ export function llmsFiles(sidebar: readonly SidebarItem[]): Plugin {
       for (const page of pages) {
         this.emitFile({ type: 'asset', fileName: sourceOf(page.link), source: page.markdown });
       }
-      this.emitFile({ type: 'asset', fileName: 'llms.txt', source: llmsIndex(pages) });
+      const sections = llmsSections(pages);
+      for (const section of sections) {
+        this.emitFile({ type: 'asset', fileName: section.fileName, source: section.text });
+      }
+      this.emitFile({ type: 'asset', fileName: 'llms.txt', source: llmsIndex(pages, sections) });
       this.emitFile({ type: 'asset', fileName: 'llms-full.txt', source: llmsFull(pages) });
       this.info(`llms.txt: ${pages.length} pages`);
     }

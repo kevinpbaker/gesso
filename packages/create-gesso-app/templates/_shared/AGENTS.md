@@ -8,8 +8,10 @@ on React will get wrong.
 The full documentation is written for a person and also published for a
 model:
 
-- https://gesso-docs.vercel.app/llms.txt, an index of every page
-- https://gesso-docs.vercel.app/llms-full.txt, every page in one file
+- https://gesso-docs.vercel.app/llms.txt, an index of every page and of
+  the section files below, each with its size
+- https://gesso-docs.vercel.app/llms-guide.txt, the guide in one file:
+  read it before writing a first screen
 - any page with `.md` on the end, e.g. https://gesso-docs.vercel.app/guide/counter.md
 
 ## What Gesso is not
@@ -78,8 +80,23 @@ export function Counter(inputs: Inputs<{ label?: string }>, _ctx: ComponentConte
 
 - **No hex colours.** Colours are names from the theme: `background`,
   `surface`, `primary`, `secondary`, `text`, `textMuted`, `border`,
-  `danger` and the `control*` family. A screen written this way follows
-  light and dark without knowing about either.
+  `danger` and the `control*` family.
+- **Light and dark are the root's job, once.** A canvas inherits nothing
+  from the page, not even `prefers-color-scheme`. The root maps the
+  shell's colour scheme onto a theme and gives text the theme's type
+  scale; below that, every screen written with theme names follows
+  without knowing about either. A new project's root `App.tsx` already
+  does this. Keep it when you replace the screen:
+
+  ```tsx
+  const theme = ctx.inject(ShellService).colorScheme.pipe(map(s => (s === 'dark' ? darkTheme : lightTheme)));
+  return (
+    <column theme={theme} textStyle={theme.pipe(map(t => t.typography.body))} backgroundColor="background">
+      …
+    </column>
+  );
+  ```
+
 - **No font sizes where a role exists.** Use `textStyle="title"` (also
   `headline`, `body`, `bodyLarge`, `bodySmall`, `label`).
 - Prefer the controls in `gesso-components` (`Button`, `TextInput`,
@@ -116,12 +133,28 @@ export const Notes = defineChannel('notes', {
   never as a return value.
 - A component reads `ctx.channel(Notes).view.rows` like any other cell
   and calls `ctx.channel(Notes).send.open(id)`.
+- **Register it** with what feeds it. In a web project that is the
+  render root, in `worker.ts`: `renderRoot(App).useChannel(Notes, { source })`,
+  where `source` is `{ view: { rows: rows$, status: status$ }, commands: { open, remove } }`,
+  one Observable per view key and one function per command; the web
+  template's `src/clicks.ts` and `src/worker.ts` are a complete example.
+  Without `source`, `.useChannel(Notes)` expects it from an application
+  worker. A desktop project serves its channels from the main process,
+  as `src/main` does.
+- `defineChannel(name, { view, commands })` and
+  `channel<View, Commands>(name, initialView)` make the same token. The
+  first infers the types from one object; the second, which much of the
+  documentation uses, names them as interfaces. Use `defineChannel` in
+  new code.
 - **Write the JSDoc.** `gesso-vite-plugin` turns each contract into JSON
   Schema on the token, with descriptions taken from those comments. It
   is what an AI agent driving the app reads to understand it. Mark a
   command `@destructive` if it cannot be undone, `@confirm` if a person
   should approve it first, `@idempotent` if repeating it changes
-  nothing, and `@hidden` to keep it from agents.
+  nothing, and `@hidden` to keep it from agents. A field that takes a
+  number code (`priority: 0 | 1 | 2`) needs a comment saying what each
+  number means. The dev server warns about a channel that is missing
+  these.
 
 ## Checking your work
 
@@ -159,9 +192,16 @@ what the app is doing:
   serves MCP at `/__gesso/mcp` and prints the lines to add it to
   Claude Code, Codex or Gemini CLI. Connected, you can read every channel's view and send its
   commands to the page open in the browser, which is the quickest way
-  to check that a command does what it should. `ui_snapshot`, `ui_press`,
-  `ui_type` and `ui_key` read and operate the screen itself, the way a
-  screen reader does, for anything no channel covers.
+  to check that a command does what it should; an answer that says "the
+  view is the same as before" means the command had nothing to act on.
+  `ui_snapshot`, `ui_press`, `ui_type` and `ui_key` read and operate the
+  screen itself, the way a screen reader does, for anything no channel
+  covers.
+- **Finding a component.** The same endpoint lists this project's
+  components and `gesso-components`' (`library_search "date picker"`,
+  `library_get Button`), with every input each takes, and `tokens_view`
+  gives the theme's names. `render_frame` draws a module to a PNG you can
+  look at, in light and dark.
 - **Agents in the browser.** `createApp({ webmcp: true })` registers the
   same tools with WebMCP, for an agent the browser runs. The dev
   server turns it on already; nothing happens in a browser without it.

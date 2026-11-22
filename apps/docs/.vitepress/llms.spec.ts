@@ -4,8 +4,10 @@ import {
   collectPages,
   extractRegion,
   llmsIndex,
+  llmsSections,
   pageMarkdown,
   resolvePath,
+  SECTION_LIMIT,
   SITE,
   sourceOf,
   splitFrontMatter
@@ -96,5 +98,32 @@ describe('the llms.txt pages', () => {
     const index = llmsIndex(pages);
     expect(index).toContain(`- [Your first component](${SITE}/guide/counter.md): `);
     expect(index).toContain('## Components');
+
+    // Every section a file a model can hold, the guide first, and every page in one of them.
+    const sections = llmsSections(pages);
+    expect(sections[0]!.fileName).toBe('llms-guide.txt');
+    expect(sections.every(section => section.text.length <= SECTION_LIMIT + 50_000)).toBe(true);
+    expect(sections.reduce((n, section) => n + section.text.split('\n<!-- https://').length - 1, 0)).toBe(pages.length);
+    expect(index).toContain(`## Whole sections\n\n- [Guide](${SITE}/llms-guide.txt): about `);
+  });
+
+  it('splits a section larger than the limit between pages, into numbered parts', () => {
+    const page = (n: number, section: string) => ({
+      section,
+      title: `Page ${n}`,
+      link: `/x/${n}`,
+      description: '',
+      markdown: 'x'.repeat(40) + '\n'
+    });
+    const sections = llmsSections([page(1, 'Guide'), page(2, 'Big'), page(3, 'Big'), page(4, 'Big')], 200);
+
+    expect(sections.map(section => [section.fileName, section.title])).toEqual([
+      ['llms-guide.txt', 'Guide'],
+      ['llms-big-1.txt', 'Big, part 1 of 2'],
+      ['llms-big-2.txt', 'Big, part 2 of 2']
+    ]);
+    expect(sections[1]!.text).toContain(`<!-- ${SITE}/x/2 -->`);
+    expect(sections[1]!.text).toContain(`<!-- ${SITE}/x/3 -->`);
+    expect(sections[2]!.text).toContain(`<!-- ${SITE}/x/4 -->`);
   });
 });

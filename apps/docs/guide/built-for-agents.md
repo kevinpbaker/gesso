@@ -152,8 +152,9 @@ theme. Gesso meets that head on.
   points Claude Code at it.
 - **The documentation is published for models.**
   [llms.txt](https://gesso-docs.vercel.app/llms.txt) indexes every page,
-  [llms-full.txt](https://gesso-docs.vercel.app/llms-full.txt) is the whole
-  site in one file, and any page is markdown with `.md` on the end of its
+  each section is one file a model can hold, such as
+  [llms-guide.txt](https://gesso-docs.vercel.app/llms-guide.txt), with its
+  size listed, and any page is markdown with `.md` on the end of its
   address.
 - **Mistakes are type errors.** Layout, sizes, alignment and theme tokens
   are typed props, so most wrong guesses fail the typechecker with a
