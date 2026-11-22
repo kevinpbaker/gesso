@@ -525,6 +525,13 @@
     "arrows": 0,
     "wheel": 0
   },
+  "ShortcutSheetExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 0,
+    "arrows": 0,
+    "wheel": 0
+  },
   "SkeletonExample": {
     "idle": 0,
     "hover": 1,
@@ -674,6 +681,13 @@
     "tab": 0,
     "arrows": 0,
     "wheel": 0
+  },
+  "ViewportExample": {
+    "idle": 0,
+    "hover": 0,
+    "tab": 2,
+    "arrows": 0,
+    "wheel": 3
   },
   "VirtualizationExample": {
     "idle": 0,
