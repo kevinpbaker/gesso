@@ -37,10 +37,18 @@ reason.
 ## Does it need to feel like the platform's forms?
 
 Native inputs bring autofill, password managers, the mobile keyboard
-that matches the field, and years of accessibility work. Gesso's inputs
-are good: they edit, compose through the IME, select, find, and are
-announced to a screen reader with the right role and name. They are not
-the platform's, and a sign-up form is better served by the platform's.
+that matches the field, and years of accessibility work. Gesso's own
+inputs are good: they edit, compose through the IME, select, find, and
+are announced to a screen reader with the right role and name. They are
+not the platform's.
+
+When a field must be the platform's, use `NativeInput`. It is a real
+`<input>` that the shell places over a box in the layout, as a
+[DOM island](/guide/dom-islands), so a password manager and the
+browser's autofill fill it. A sign-in or a payment step inside an
+application is fine. A product that is mostly forms is still better
+served by the DOM: each island is main-thread DOM, one frame behind the
+canvas while it scrolls, and islands are checked in Chrome only so far.
 
 ## Where it is at home
 
@@ -62,7 +70,7 @@ the platform's, and a sign-up form is better served by the platform's.
 | If your project is                         | Use                                    | Because                                                                   |
 | ------------------------------------------ | -------------------------------------- | ------------------------------------------------------------------------- |
 | A content site, a blog, documentation      | Astro, Next.js, or plain HTML          | Its value is being indexed, and the DOM is what crawlers and readers read |
-| A form-heavy product page                  | React, Solid, Svelte or Vue on the DOM | Native inputs, autofill and the platform's keyboards                      |
+| A form-heavy product page                  | React, Solid, Svelte or Vue on the DOM | Every field native; Gesso's DOM islands are for a few                     |
 | One codebase for mobile and web            | Flutter                                | Gesso runs in a browser or a webview; it has no mobile runtime            |
 | A screen that must work without JavaScript | Server-rendered HTML                   | A canvas is script or nothing                                             |
 | A busy application with its own interface  | Gesso                                  | The interface never shares a thread with the work                         |

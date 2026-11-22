@@ -124,9 +124,11 @@ site is HTML with Gesso embedded in it rather than a Gesso application.
 - **A document.** Articles, marketing pages, anything whose value is
   being indexed and linked. The DOM is the right tool and it is not
   close.
-- **A form that should feel like the platform's.** Native inputs bring
-  autofill, password managers, mobile keyboards and years of
-  accessibility work. Gesso's inputs are good; they are not those.
+- **A screen that is mostly forms.** Native inputs bring autofill,
+  password managers, mobile keyboards and years of accessibility work.
+  A few fields can be native inside a Gesso application, as
+  [DOM islands](/guide/dom-islands): a sign-in, a card field. A screen
+  of them is better served by the DOM.
 - **A page that must work without JavaScript**, or that a browser
   extension has to be able to read.
 
