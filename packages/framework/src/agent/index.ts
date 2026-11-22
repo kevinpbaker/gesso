@@ -24,6 +24,7 @@ export {
   listedPrompts,
   mcpHandler,
   MCP_PROTOCOL_VERSIONS,
+  OPERATE_INSTRUCTIONS,
   promptMessages,
   type AgentPrompt,
   type JsonRpcResponse,

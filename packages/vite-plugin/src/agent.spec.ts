@@ -5,6 +5,7 @@ import {
   connectLines,
   createAgentBridge,
   EVENTS,
+  OPERATE_BEFORE_PAGE,
   type BridgeClient,
   type BridgeRequest,
   type BridgeResponse,
@@ -99,7 +100,8 @@ describe("the server's own tools", () => {
     );
 
     expect(hello.result.protocolVersion).toBe('2025-06-18');
-    expect(hello.result.instructions).toBe('Read the components first.');
+    // No page has ever answered, so the agent is told what it will get once one does.
+    expect(hello.result.instructions).toBe(`${OPERATE_BEFORE_PAGE}\n\nRead the components first.`);
     expect(listed.result.tools).toEqual([{ name: 'library_overview' }]);
     expect(called).toEqual({
       jsonrpc: '2.0',
@@ -549,5 +551,29 @@ describe('which agent is asking', () => {
     expect(calls.map(call => call.params._meta['gesso/agent'])).toEqual(['Claude Code', undefined]);
 
     expect((await request(bridge, { method: 'DELETE', headers: { 'mcp-session-id': session } })).status).toBe(204);
+  });
+});
+
+describe("the server's name", () => {
+  const rpc = (id: number, method: string, params: Record<string, unknown> = {}) =>
+    JSON.stringify({ jsonrpc: '2.0', id, method, params });
+
+  it('is the one the dev server printed, before a page connects and after, and a first agent is not refused', async () => {
+    const { socket, emit } = fakeSocket();
+    const bridge = createAgentBridge(socket, { name: 'expenses' });
+
+    const before = JSON.parse((await request(bridge, { body: rpc(1, 'initialize') })).body!);
+    expect(before.result.serverInfo.name).toBe('expenses');
+    expect(before.result.instructions).toBe(OPERATE_BEFORE_PAGE);
+
+    const page = fakePage(emit, message => ({
+      jsonrpc: '2.0',
+      id: (message as { id: unknown }).id,
+      result: { serverInfo: { name: 'Expenses: a tab title', version: '1' }, instructions: 'The page.' }
+    }));
+    emit(EVENTS.ready, {}, page);
+    const after = JSON.parse((await request(bridge, { body: rpc(2, 'initialize') })).body!);
+    expect(after.result.serverInfo).toEqual({ name: 'expenses', version: '1' });
+    expect(after.result.instructions).toBe('The page.');
   });
 });

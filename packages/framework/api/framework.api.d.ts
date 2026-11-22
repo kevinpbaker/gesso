@@ -53,11 +53,13 @@ import {
   UiTheme
 } from "gesso-core";
 declare const AGENT_META = "gesso/agent";
+declare const OPERATE_INSTRUCTIONS: string;
 declare const MCP_PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26'];
 interface McpServerInfo {
   name?: string;
   version?: string;
   instructions?: string;
+  operate?: boolean;
   prompts?: readonly AgentPrompt[];
 }
 interface AgentPrompt {
@@ -233,6 +235,7 @@ export {
   listedPrompts,
   MCP_PROTOCOL_VERSIONS,
   mcpHandler,
+  OPERATE_INSTRUCTIONS,
   outline,
   pageModelContext,
   promptMessages,

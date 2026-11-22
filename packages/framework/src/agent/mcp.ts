@@ -35,6 +35,21 @@ import type { AgentCallContext, AgentSurfaceLike } from './AgentSurface';
  */
 export const AGENT_META = 'gesso/agent';
 
+/**
+ * How to operate a Gesso application, told to every agent on
+ * `initialize` after the application's own instructions. The tools say
+ * what each one does; this says how they fit, which an agent otherwise
+ * learns by calling them in the wrong order.
+ */
+export const OPERATE_INSTRUCTIONS =
+  "To operate this app: read a channel's <channel>_view tool first. It holds what the app holds, which is what the " +
+  'person sees. Each command tool answers with the view after it has taken effect, so there is no need to read it ' +
+  'again; an answer that says the view is the same as before means the command had nothing to act on. A query tool ' +
+  "(read-only, beside the commands) reads data without changing the person's screen; prefer it to a command that " +
+  'filters or scrolls when all you want is to read. For anything no channel covers, ui_snapshot reads the screen as ' +
+  'an outline, and ui_press, ui_type, ui_focus and ui_key act on it as the person would. Some commands and controls ' +
+  'ask the person first and wait for their answer; when they decline, do not ask again unless they say so.';
+
 /** The protocol revisions this server speaks, newest first. */
 export const MCP_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'] as const;
 
@@ -44,6 +59,12 @@ export interface McpServerInfo {
   version?: string;
   /** Told to the agent on connecting: what this application is, in a sentence or two. */
   instructions?: string;
+  /**
+   * Whether the agent is also told how to operate a Gesso application
+   * (`OPERATE_INSTRUCTIONS`), after `instructions`. Default true; false
+   * for a server whose tools are not an application's channels.
+   */
+  operate?: boolean;
   /**
    * Prompts the person can run in their agent, which most agents offer
    * as slash commands: the application's ways of working, ready to use,
@@ -177,7 +198,7 @@ async function answerRequest(
         protocolVersion: version,
         capabilities: { tools: {}, resources: {}, ...((info.prompts ?? []).length === 0 ? {} : { prompts: {} }) },
         serverInfo: { name: info.name ?? 'gesso', version: info.version ?? '0.0.0' },
-        ...(info.instructions === undefined ? {} : { instructions: info.instructions })
+        ...instructionsOf(info)
       });
     }
     case 'ping':
@@ -343,6 +364,14 @@ export function mcpHandler(
     if (started !== null) answered.headers.set('mcp-session-id', started.session);
     return answered;
   };
+}
+
+/** What an agent is told on connecting: the application's own words, then how to operate it. */
+function instructionsOf(info: McpServerInfo): { instructions?: string } {
+  const parts = [info.instructions, info.operate === false ? undefined : OPERATE_INSTRUCTIONS].filter(
+    (part): part is string => part !== undefined && part !== ''
+  );
+  return parts.length === 0 ? {} : { instructions: parts.join('\n\n') };
 }
 
 /** The caller a relay named in `_meta`, or an unknown one. */

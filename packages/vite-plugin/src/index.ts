@@ -400,6 +400,7 @@ export function gesso(options: GessoPluginOptions = {}): Plugin {
         server.watcher.add(catalogRoot);
       }
       const bridge = createAgentBridge(server.ws as unknown as BridgeSocket, {
+        name: options.agentName ?? agentName(server.config.root),
         memory: pageMemory(root),
         paths: [...new Set([options.agentPath ?? AGENT_PATH, AGENT_PATH])],
         ...(options.agentGate === undefined ? {} : { gate: options.agentGate }),

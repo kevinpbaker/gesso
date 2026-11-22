@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { defineChannel } from '../channel/ChannelToken';
 import { serve } from '../channel/serveChannels';
 import { agentSurface } from './AgentSurface';
-import { handleMcpMessage, mcpHandler } from './mcp';
+import { handleMcpMessage, mcpHandler, OPERATE_INSTRUCTIONS } from './mcp';
 
 const Counter = defineChannel('counter', { view: { count: 0 }, commands: {} as { add(by: number): void } });
 
@@ -31,11 +31,22 @@ describe('handleMcpMessage', () => {
         protocolVersion: '2025-06-18',
         capabilities: { tools: {}, resources: {} },
         serverInfo: { name: 'counter-app', version: '0.0.0' },
-        instructions: 'A counter.'
+        instructions: `A counter.\n\n${OPERATE_INSTRUCTIONS}`
       }
     });
     const unknown = await handleMcpMessage(surface(), rpc(2, 'initialize', { protocolVersion: '1999-01-01' }));
     expect((unknown as { result: { protocolVersion: string } }).result.protocolVersion).toBe('2025-11-25');
+  });
+
+  it('tells every agent how to operate the app, read the view first, unless the server says it serves no app', async () => {
+    const told = (await handleMcpMessage(surface(), rpc(1, 'initialize'))) as { result: { instructions: string } };
+    expect(told.result.instructions).toBe(OPERATE_INSTRUCTIONS);
+    expect(OPERATE_INSTRUCTIONS).toContain('_view tool first');
+    expect(OPERATE_INSTRUCTIONS).toContain('ui_snapshot');
+    const quiet = (await handleMcpMessage(surface(), rpc(2, 'initialize'), { operate: false })) as {
+      result: Record<string, unknown>;
+    };
+    expect(quiet.result.instructions).toBeUndefined();
   });
 
   it('lists and calls tools, and reads resources', async () => {

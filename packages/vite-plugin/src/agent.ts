@@ -112,7 +112,24 @@ export interface AgentBridgeOptions {
   memory?: PageMemory;
   /** The paths MCP is answered at (default `AGENT_PATH` alone). */
   paths?: readonly string[];
+  /**
+   * The name an agent is told this server has, page or no page: the one
+   * the dev server prints to connect with. Without it, `gesso` until a
+   * page answers, then the page's title.
+   */
+  name?: string;
 }
+
+/**
+ * How to operate a Gesso app, as `gesso-framework/agent`'s
+ * `OPERATE_INSTRUCTIONS`, which the page tells an agent itself. Said
+ * here only while no page has ever answered, with what is missing.
+ */
+export const OPERATE_BEFORE_PAGE =
+  'No window of the app has been opened from this dev server yet, so only the tools the server answers itself are ' +
+  "listed. Once the app is open in a browser, its channels are offered as tools: read a channel's <channel>_view " +
+  'first, a command answers with the view after it, a read-only query reads without changing the screen, and ' +
+  'ui_snapshot with ui_press, ui_type, ui_focus and ui_key operate the screen as the person would.';
 
 /** What a page last told an agent about itself: its tools, and its instructions. */
 export interface RememberedPage {
@@ -371,10 +388,11 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
       return undefined;
     }
     const pageTools = remembered.tools.filter(tool => !localNames.has(tool.name));
-    if (local === undefined && pageTools.length === 0) {
+    // The handshake is answered with no page open whatever else is, so an agent connected first is not refused.
+    if (local === undefined && pageTools.length === 0 && method !== 'initialize') {
       return undefined;
     }
-    const instructions = [remembered.instructions, local?.instructions].filter(
+    const instructions = [remembered.instructions ?? OPERATE_BEFORE_PAGE, local?.instructions].filter(
       (text): text is string => text !== undefined && text !== ''
     );
     switch (method) {
@@ -385,7 +403,7 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           result: {
             protocolVersion: typeof params.protocolVersion === 'string' ? params.protocolVersion : '2025-06-18',
             capabilities: { tools: {}, resources: {}, ...((local?.prompts ?? []).length === 0 ? {} : { prompts: {} }) },
-            serverInfo: { name: 'gesso', version: '0.0.0' },
+            serverInfo: { name: options.name ?? 'gesso', version: '0.0.0' },
             ...(instructions.length === 0 ? {} : { instructions: instructions.join('\n\n') })
           }
         });
@@ -576,7 +594,9 @@ export function createAgentBridge(socket: BridgeSocket, options: AgentBridgeOpti
           return;
         }
         const relayed = () =>
-          relay(message).then(answer => (local === undefined ? answer : mergeLocal(message, answer, local)));
+          relay(message).then(answer =>
+            named(message, local === undefined ? answer : mergeLocal(message, answer, local), options.name)
+          );
         const checking = refusal(message);
         void (checking === undefined ? relayed() : checking.then(refused => refused ?? relayed())).then(answer => {
           if (answer === null || answer === undefined) {
@@ -656,6 +676,16 @@ function asRequest(
     method,
     params: typeof params === 'object' && params !== null ? (params as Record<string, unknown>) : {}
   };
+}
+
+/** A page's `initialize` answer under the name the dev server printed, so the server's name does not change when a page connects. */
+function named(message: unknown, answer: unknown, name: string | undefined): unknown {
+  const result = (answer as { result?: Record<string, unknown> } | null)?.result;
+  if (name === undefined || result === undefined || asRequest(message)?.method !== 'initialize') {
+    return answer;
+  }
+  const serverInfo = typeof result.serverInfo === 'object' && result.serverInfo !== null ? result.serverInfo : {};
+  return { ...(answer as object), result: { ...result, serverInfo: { ...serverInfo, name } } };
 }
 
 /**

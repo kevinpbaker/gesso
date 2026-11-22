@@ -2,6 +2,7 @@ import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import { defineChannel, describeChannel, serve } from 'gesso-framework';
+import { OPERATE_INSTRUCTIONS } from 'gesso-framework/agent';
 
 import { messageBoxConfirm, serveDesktopAgent, type DesktopServe, type ShowMessageBox } from './agent';
 
@@ -142,7 +143,7 @@ describe('serveDesktopAgent, with the catalog', () => {
       result: { content: { text: string }[] };
     };
 
-    expect(hello.result.instructions).toBe('A counter.\n\nRead the components first.');
+    expect(hello.result.instructions).toBe(`A counter.\n\nRead the components first.\n\n${OPERATE_INSTRUCTIONS}`);
     expect(listed.result.tools.map(tool => tool.name)).toEqual([
       'counter_view',
       'counter_add',

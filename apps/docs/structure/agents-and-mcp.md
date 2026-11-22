@@ -33,6 +33,15 @@ Code:
 claude mcp add --transport http notes http://127.0.0.1:7310/mcp
 ```
 
+On connecting, the agent is told `instructions`, then how to operate a
+Gesso app (`OPERATE_INSTRUCTIONS`): read a channel's `_view` first, a
+command answers with the view after it, a query reads without moving
+the screen, and `ui_snapshot` and the other screen tools cover the
+rest. `operate: false` leaves that out, for a server whose tools are
+not an app's channels. The dev server tells an agent the same, under
+the name it printed, both before a window of the app is open and after
+one connects.
+
 ## What the agent sees
 
 For each channel:
