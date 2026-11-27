@@ -9,25 +9,32 @@
  * renderer that pulls in a general-purpose container parser to play a
  * demo video has bought a great deal it does not use.
  *
- * **What it understands.** Progressive (non-fragmented) MP4 with a
- * `moov` and a `mdat`: `stsd` (with `avcC` or `hvcC`), `stts`, `ctts`,
- * `stsc`, `stsz`/`stz2`, `stco`/`co64` and `stss`. That is what every
- * encoder writes by default and what the `-movflags +faststart` files
- * on the web are. Video tracks through `demuxMp4Video`, and audio
- * tracks through `demuxMp4Audio` — which reads the same tables and
- * differs only in which sample entry it understands.
+ * **What it understands.** Progressive MP4 with a `moov` and a `mdat`,
+ * read out of its sample tables: `stsd`, `stts`, `ctts`, `stsc`,
+ * `stsz`/`stz2`, `stco`/`co64` and `stss`. That is what every encoder
+ * writes by default and what the `-movflags +faststart` files on the
+ * web are. Fragmented MP4 too, which is what DASH and HLS segments
+ * are: an `mvex` with its `trex` defaults, then each `moof`'s `tfhd`,
+ * `tfdt` and `trun`. Video tracks through `demuxMp4Video`, with an
+ * `avcC`, `hvcC`, `av1C` or `vpcC` configuration; audio tracks through
+ * `demuxMp4Audio`, with an `esds`, `dOps`, `alac` or `dfLa` one. The
+ * two read the same tables and differ only in which sample entry they
+ * understand.
  *
- * **What it does not.** Fragmented MP4 (`moof`/`traf`/`trun`), which
- * is what DASH and HLS segments are, and which is a different parse
- * rather than a harder one. It is detected and named rather than
+ * **What it does not.** Fetch segments. A fragmented file is read from
+ * the fragments in the buffer it is given, so a manifest and its
+ * segment list are the application's to drive. A fragmented file whose
+ * fragments are not in that buffer is named in the error rather than
  * mis-parsed into silence — a demuxer that returns zero samples for a
  * file the browser plays fine is a bug that takes an afternoon to
- * find.
+ * find. There is no other container.
  *
- * **The whole file is parsed at once**, from one `ArrayBuffer`. Byte
- * ranges and progressive parsing are what you want for an hour of
- * video and are pure cost for the fifteen-second loops this exists
- * for; the seam is `VideoResolver`, which decides what to fetch.
+ * **The whole buffer is parsed at once.** Byte ranges are not this
+ * file's concern: `DefaultVideoResolver` takes a `fetchRange`, finds
+ * the `moov` with a few small requests, demuxes it on its own and
+ * reads media as the decoder asks for it. Without one it fetches the
+ * whole file, which is right for the fifteen-second loops this was
+ * first written for.
  */
 
 /** One encoded frame: where it is in the file, and when it is shown. */
