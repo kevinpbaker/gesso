@@ -333,9 +333,12 @@ page that a spec cannot reach are worth naming rather than implying:
   wants.
 - **The pixels are the browser's.** The example on this page measures
   that the surface reaches the node and that the picture is asked to
-  change on the clip's own cadence. Whether a frame decoded, and
-  whether it looked right, is something only a running browser shows,
-  and nothing on this page measures it.
+  change on the clip's own cadence. Whether a frame decoded is
+  something only a running browser shows: `pnpm check:video` asks
+  Chrome, and `pnpm check:browsers` asks Firefox and Safari, for H.264,
+  VP9 and AV1 and for each container shape. See [Video](/media/video)
+  for what they found. Whether a frame looked right, nothing measures:
+  neither compares pixels.
 
 Substituting a decoder is the same seam as an image's resolver, and it
 has to be in place before the first `Video` is built, so it is

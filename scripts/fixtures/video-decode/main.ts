@@ -20,6 +20,22 @@
  * answers 200 with the whole body, and a reader that believed the
  * response was the range it asked for would index into the wrong
  * bytes. So the ranged pass asks, checks for a 206, and says so.
+ *
+ * **And a second matrix over what the bytes are.** The first one plays
+ * one H.264 clip four ways; the playground's fixtures
+ * (`scripts/gen-video-fixtures.sh`) are the other axis: the same
+ * picture as VP9 and as AV1, whose codec strings are assembled from a
+ * `vpcC` and an `av1C`; as a fragmented file, read from its `moof`s;
+ * with its `moov` at the end; long, with two-second groups of
+ * pictures; and with an AAC track beside it. Each is played, seeked
+ * and read in ranges from this server exactly as the local asset is.
+ *
+ * Whether a browser *has* a decoder for a codec is a fact about the
+ * browser, so each format first asks `VideoDecoder.isConfigSupported`
+ * with the configuration the demuxer read, and a format the browser
+ * cannot decode is reported as that rather than played. Which is also
+ * where a codec string this framework assembled wrongly would show up,
+ * so the scripts decide which browsers must support which codecs.
  */
 // By path rather than by name: this fixture lives at the repository
 // root, where vite serves it, and the root's `node_modules` carries no
@@ -29,12 +45,38 @@
 import {
   canDecodeVideo,
   DefaultVideoResolver,
+  demuxMp4Audio,
+  demuxMp4Video,
   type RangeResponse,
   type VideoPlayback
 } from '../../../packages/core/src/index.ts';
 
 /** Served by vite out of the playground's public directory. */
 const CLIP = '/apps/playground/public/transitions/motion-loop.mp4';
+
+/** Where the playground's codec and container fixtures are served from. */
+const FIXTURES = '/apps/playground/public/video';
+
+/**
+ * What each fixture is, as `scripts/gen-video-fixtures.sh` builds it,
+ * so the scripts compare what was read against the file rather than
+ * against a default. All of them are `testsrc2` at 480x270 and 24
+ * frames a second.
+ */
+const FORMATS: readonly Omit<FormatReport, 'ok'>[] = [
+  { name: 'H.264, moov first', file: 'clip.mp4', family: 'avc1', expected: { durationSeconds: 6 } },
+  { name: 'H.264, moov last', file: 'clip-moov-last.mp4', family: 'avc1', expected: { durationSeconds: 6 } },
+  { name: 'H.264, fragmented', file: 'clip-fragmented.mp4', family: 'avc1', expected: { durationSeconds: 6 } },
+  { name: 'H.264, 30s, 2s GOP', file: 'clip-long.mp4', family: 'avc1', expected: { durationSeconds: 30 } },
+  {
+    name: 'H.264 with AAC',
+    file: 'clip-audio.mp4',
+    family: 'avc1',
+    expected: { durationSeconds: 6, audioCodec: 'mp4a.40.2' }
+  },
+  { name: 'VP9', file: 'clip-vp9.mp4', family: 'vp09', expected: { durationSeconds: 6 } },
+  { name: 'AV1', file: 'clip-av1.mp4', family: 'av01', expected: { durationSeconds: 6 } }
+];
 
 /** Where the second origin is; the script puts the port in the query string. */
 const CROSS_ORIGIN = new URL(location.href).searchParams.get('crossOrigin');
@@ -60,6 +102,13 @@ interface SourceReport {
   ranged?: {
     supported: boolean;
     why?: string;
+    /**
+     * Set when the transport did honour ranges and reading the clip
+     * from them still failed: a failure here, not a fact about the
+     * transport, and reported apart from `why` so nobody reads one as
+     * the other.
+     */
+    error?: string;
     duration?: number;
     drewSomething?: boolean;
     requests?: number;
@@ -69,11 +118,28 @@ interface SourceReport {
   };
 }
 
+/** One of the playground's fixtures: what it is, and what happened to it. */
+interface FormatReport extends SourceReport {
+  file: string;
+  /** The codec family the file was encoded with, the first part of its codec string. */
+  family: 'avc1' | 'vp09' | 'av01';
+  expected: { durationSeconds: number; audioCodec?: string };
+  /** The codec string the demuxer assembled. */
+  codec?: string;
+  /** What `VideoDecoder.isConfigSupported` said about the configuration the demuxer read. */
+  decoderSupports?: boolean;
+  /** The audio track's codec string, where the demuxer found one. */
+  audioCodec?: string;
+  /** What `AudioDecoder.isConfigSupported` said about it, where there is an `AudioDecoder`. */
+  audioDecoderSupports?: boolean;
+}
+
 interface Result {
   ok: boolean;
   canDecode: boolean;
   error?: string;
   sources: SourceReport[];
+  formats: FormatReport[];
 }
 
 /** Lets a decoded frame actually arrive: the decoder is asynchronous. */
@@ -189,12 +255,14 @@ async function exerciseRanged(url: string, report: SourceReport): Promise<void> 
       fileBytes
     };
   } catch (error: unknown) {
-    report.ranged = {
-      supported: false,
-      why: refused ?? (error instanceof Error ? error.message : String(error)),
-      requests,
-      fileBytes
-    };
+    const message = error instanceof Error ? error.message : String(error);
+    // A refused range is the transport's; an error after every range
+    // was honoured is this framework's, and the two used to share one
+    // field, which reported a broken ranged read as "not honoured".
+    report.ranged =
+      refused === null
+        ? { supported: true, error: message, drewSomething: false, requests, bytesFetched, fileBytes }
+        : { supported: false, why: refused, requests, fileBytes };
   } finally {
     resolver.dispose();
   }
@@ -234,9 +302,72 @@ async function sources(): Promise<{ name: string; url: string; revoke?: () => vo
   return list;
 }
 
+/**
+ * Plays one of the playground's fixtures, if this browser can decode it.
+ *
+ * The demuxer is run here as well as inside the resolver, for the
+ * configuration it reads: that is what `isConfigSupported` is asked
+ * about, so "this browser has no AV1 decoder" and "the resolver failed
+ * on an AV1 file" come out as different answers.
+ */
+async function exerciseFormat(format: Omit<FormatReport, 'ok'>): Promise<FormatReport> {
+  const report: FormatReport = { ...format, ok: false };
+  const url = `${FIXTURES}/${format.file}`;
+  try {
+    const bytes = await bytesOf(url);
+    const track = demuxMp4Video(bytes);
+    report.codec = track.codec;
+    const audio = demuxMp4Audio(bytes);
+    if (audio !== null) {
+      report.audioCodec = audio.codec;
+      if (typeof AudioDecoder !== 'undefined') {
+        const support = await AudioDecoder.isConfigSupported({
+          codec: audio.codec,
+          sampleRate: audio.sampleRate,
+          numberOfChannels: audio.channels,
+          ...(audio.description === undefined ? {} : { description: audio.description })
+        });
+        report.audioDecoderSupports = support.supported === true;
+      }
+    }
+    const support = await VideoDecoder.isConfigSupported({
+      codec: track.codec,
+      codedWidth: track.codedWidth,
+      codedHeight: track.codedHeight,
+      ...(track.description === undefined ? {} : { description: track.description })
+    });
+    report.decoderSupports = support.supported === true;
+  } catch (error: unknown) {
+    report.error = error instanceof Error ? error.message : String(error);
+    return report;
+  }
+  if (!report.decoderSupports) {
+    return report;
+  }
+
+  const resolver = new DefaultVideoResolver();
+  try {
+    const playback = await resolver.resolve(url);
+    await exercise(playback, report);
+    report.ok = report.drewSomething === true;
+  } catch (error: unknown) {
+    report.error = error instanceof Error ? error.message : String(error);
+  } finally {
+    resolver.dispose();
+  }
+  await exerciseRanged(url, report);
+  return report;
+}
+
 async function run(): Promise<Result> {
   if (!canDecodeVideo()) {
-    return { ok: false, canDecode: false, error: 'This browser has no WebCodecs VideoDecoder.', sources: [] };
+    return {
+      ok: false,
+      canDecode: false,
+      error: 'This browser has no WebCodecs VideoDecoder.',
+      sources: [],
+      formats: []
+    };
   }
 
   const reports: SourceReport[] = [];
@@ -257,7 +388,17 @@ async function run(): Promise<Result> {
     source.revoke?.();
   }
 
-  return { ok: reports.every(report => report.ok), canDecode: true, sources: reports };
+  const formats: FormatReport[] = [];
+  for (const format of FORMATS) {
+    formats.push(await exerciseFormat(format));
+  }
+
+  return {
+    ok: reports.every(report => report.ok) && formats.every(format => format.ok || format.decoderSupports === false),
+    canDecode: true,
+    sources: reports,
+    formats
+  };
 }
 
 run()
@@ -269,6 +410,7 @@ run()
       ok: false,
       canDecode: false,
       sources: [],
+      formats: [],
       error: error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error)
     };
   });

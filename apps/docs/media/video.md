@@ -195,6 +195,14 @@ camera). The `moov` is then demuxed on its own, which works because the
 offsets in a sample table are absolute positions in the file: the
 tables are as correct read out of a small buffer as out of a large one.
 
+A fragmented file is the exception. Its `moov` promises fragments and
+holds no samples, which are described in the `moof`s spread through
+the file, so the resolver reads a fragmented file whole, in one
+request, and demuxes it as it would without ranges. That is the right
+size of read for what a fragmented file usually is: a segment of a few
+seconds. An application that streams one long fragmented file drives
+its segments itself.
+
 Media then follows the decoder. `ByteSource.read` is **synchronous and
 may answer null**, which is the whole design: the decoder is fed from
 inside a presentation, on the frame clock, and a fill that awaited
@@ -353,9 +361,39 @@ reports rather than asserts, because it is a fact about the platform:
       ranges: honoured. Drew a picture after 1 requests (62% of the file)
 ```
 
-It is not part of `pnpm check`, for the reason the screenshot gates are
-not: it needs Chrome with H.264, which a Chromium build without
-proprietary codecs does not have.
+A second matrix covers what the bytes are. The playground's fixtures,
+built by `scripts/gen-video-fixtures.sh`, are the same `testsrc2`
+picture as H.264 with the `moov` first, with it last, fragmented, 30
+seconds long with two-second groups of pictures, and with an AAC track,
+and as VP9 and AV1. Each is played, seeked and read in ranges from the
+same server. The page first asks `VideoDecoder.isConfigSupported` with
+the configuration the demuxer read, so a browser with no decoder for a
+codec is reported as that, not as a failure. Chrome must decode all
+three codecs, because a "no" from Chrome means a codec string this
+framework assembled wrongly. Every other browser must decode H.264.
+
+`pnpm check:browsers --only probes` runs the same page in Firefox and
+Safari. On 2026-11-27, on a Mac:
+
+| Fixture             | Chrome | Firefox 161 | Safari 27.2 |
+| ------------------- | ------ | ----------- | ----------- |
+| H.264, `moov` first | yes    | yes         | yes         |
+| H.264, `moov` last  | yes    | yes         | yes         |
+| H.264, fragmented   | yes    | yes         | yes         |
+| H.264, 30 s         | yes    | yes         | yes         |
+| H.264 with AAC      | yes    | yes         | yes         |
+| VP9                 | yes    | yes         | yes         |
+| AV1                 | yes    | yes         | no decoder  |
+
+Safari decodes AV1 only where the hardware does, and this Mac's did
+not. The fragmented row failed with ranges until this matrix was added:
+the resolver demuxed the fragmented file's `moov` on its own and found
+no samples.
+
+`check:video` is not part of `pnpm check`, for the reason the screenshot
+gates are not: it needs Chrome with H.264, which a Chromium build
+without proprietary codecs does not have. CI runs it with Google
+Chrome.
 
 What remains unverified is a WebGPU parity fixture for a video frame
 and a budget spec for the per-frame upload; neither exists.

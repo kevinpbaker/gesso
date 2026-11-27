@@ -51,6 +51,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { DevTools, findChrome, openPage, waitFor } from './lib/devtools.ts';
+import { judgeFormat, type CodecFamily, type FormatReport } from './lib/videoFormats.ts';
 
 const VITE_PORT = 9347;
 const CROSS_ORIGIN_PORT = 9348;
@@ -74,6 +75,7 @@ const SEEK_BUDGET_MS = 1500;
 interface RangedReport {
   supported: boolean;
   why?: string;
+  error?: string;
   duration?: number;
   drewSomething?: boolean;
   requests?: number;
@@ -102,7 +104,16 @@ interface Result {
   canDecode: boolean;
   error?: string;
   sources: SourceReport[];
+  formats: FormatReport[];
 }
+
+/**
+ * The codecs Chrome must decode. Google Chrome ships all three, so a
+ * fixture it declines is a codec string assembled wrongly, not a
+ * missing decoder. A Chromium build without proprietary codecs has no
+ * H.264 and fails here, which is why `CHROME_BIN` names Google Chrome.
+ */
+const MUST_DECODE: ReadonlySet<CodecFamily> = new Set(['avc1', 'vp09', 'av01']);
 
 /**
  * A second origin serving the one file, with CORS and with ranges.
@@ -280,7 +291,10 @@ async function main(): Promise<void> {
         // pieces, and how few bytes that took is the interesting part.
         const drew = ranged.drewSomething === true ? 'Drew a picture' : 'Drew nothing';
         console.log(`      ranges: honoured. ${drew} after ${ranged.requests} requests${share}`);
-        if (ranged.drewSomething !== true) {
+        if (ranged.error !== undefined) {
+          failed++;
+          console.log(`      ✗ the ranged read failed: ${ranged.error}`);
+        } else if (ranged.drewSomething !== true) {
           failed++;
           console.log('      ✗ the ranged read decoded nothing');
         }
@@ -290,10 +304,32 @@ async function main(): Promise<void> {
       }
     }
 
-    if (failed > 0) {
-      fail(`${failed} of ${result.sources.length} source${result.sources.length === 1 ? '' : 's'} failed.`);
+    // The second matrix: the playground's codec and container fixtures,
+    // each played, seeked and read in ranges from the same server.
+    console.log('\n  formats');
+    let formatsFailed = 0;
+    for (const report of result.formats) {
+      const verdict = judgeFormat(report, MUST_DECODE);
+      const mark = verdict.outcome === 'passed' ? '✓' : verdict.outcome === 'skipped' ? '-' : '✗';
+      console.log(`  ${mark} ${report.name}`);
+      console.log(`      ${verdict.summary}`);
+      for (const problem of verdict.problems) {
+        console.log(`      ${problem}`);
+      }
+      if (verdict.outcome === 'failed') formatsFailed++;
     }
-    console.log(`\n  All ${result.sources.length} sources decoded.\n`);
+    if (result.formats.length === 0) {
+      formatsFailed++;
+      console.log('  ✗ the page reported no formats');
+    }
+
+    if (failed > 0 || formatsFailed > 0) {
+      fail(
+        `${failed} of ${result.sources.length} source${result.sources.length === 1 ? '' : 's'} and ` +
+          `${formatsFailed} of ${result.formats.length} format${result.formats.length === 1 ? '' : 's'} failed.`
+      );
+    }
+    console.log(`\n  All ${result.sources.length} sources and ${result.formats.length} formats decoded.\n`);
   } finally {
     devtools?.close();
     browser?.kill();

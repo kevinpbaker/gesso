@@ -58,8 +58,12 @@ import {
 } from './lib/browsers.ts';
 import { waitFor } from './lib/devtools.ts';
 import { decodePng, paintedFraction } from './lib/png.ts';
+import { judgeFormat, type CodecFamily, type FormatReport } from './lib/videoFormats.ts';
 
 const SECTIONS = ['routes', 'accessibility', 'input', 'parity', 'probes'] as const;
+
+/** The codecs every browser here must decode; see the video probe below. */
+const VIDEO_MUST_DECODE: ReadonlySet<CodecFamily> = new Set(['avc1']);
 type Section = (typeof SECTIONS)[number];
 
 const { values } = parseArgs({
@@ -732,6 +736,7 @@ async function checkProbes(page: BrowserPage): Promise<void> {
                 width?: number;
                 height?: number;
               }[];
+              formats?: FormatReport[];
             }
           | undefined
         >('window.videoCheck')) ?? undefined,
@@ -763,6 +768,18 @@ async function checkProbes(page: BrowserPage): Promise<void> {
       ];
       if (problems.length === 0) pass(`video, ${source.name}: decoded, advanced and seeked`);
       else fail(`video, ${source.name}: ${problems.join('; ')}`);
+    }
+    // The codec and container fixtures. H.264 is required, as the clip
+    // above already requires it; VP9 and AV1 are this browser's to have
+    // or not (Safari decodes AV1 only where the hardware does), so a
+    // browser without them is reported rather than failed. Chrome, in
+    // `check:video`, is required to decode all three.
+    if ((result.formats ?? []).length === 0) fail('video formats: the page reported none');
+    for (const format of result.formats ?? []) {
+      const verdict = judgeFormat(format, VIDEO_MUST_DECODE);
+      if (verdict.outcome === 'passed') pass(`video format, ${format.name}: ${verdict.summary}`);
+      else if (verdict.outcome === 'skipped') console.log(`  - video format, ${format.name}: ${verdict.summary}`);
+      else fail(`video format, ${format.name}: ${verdict.problems.join('; ')}`);
     }
   } catch (error) {
     if (error instanceof HiddenWindow) throw error;
