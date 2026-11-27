@@ -31,7 +31,9 @@ import { useOverlay } from './overlay';
  * it is at most as wide and as tall as the screen less a margin, and
  * what doesn't fit of the body scrolls under the title. Content that
  * can shrink (a scroll view with a height of its own and `minHeight`
- * 0) is given the room there is instead, and scrolls itself.
+ * 0) is given the room there is instead, and scrolls itself. A
+ * `footer`, the row of buttons that closes it, stays under the body
+ * where it can always be reached, however much of the body scrolls.
  */
 export interface DialogProps {
   open?: boolean;
@@ -40,6 +42,13 @@ export interface DialogProps {
   description?: string;
   /** The body. Buttons and fields go here. */
   content?: UiChild;
+  /**
+   * What stays at the bottom whatever the body does: the row of buttons
+   * that acts or closes. On a short screen the body scrolls between the
+   * title and the footer, so Save is never scrolled out of reach. Read
+   * once, when the dialog opens.
+   */
+  footer?: UiChild;
   /** Escape and the backdrop close it. Both default on. */
   dismissible?: boolean;
   /**
@@ -204,7 +213,11 @@ export function Dialog(inputs: Inputs<DialogProps>, ctx: ComponentContext): UiCh
           padding: 4
         },
         inputs.content.value ?? Row()
-      )
+      ),
+      // Its height kept, as the title's is: the body gives way first.
+      ...(inputs.footer?.value == null
+        ? []
+        : [Column({ width: percent(100), flexShrink: 0, paddingX: 4, paddingTop: 4 }, inputs.footer.value)])
     );
 
   // Opening and closing follow the `open` prop: a dialog is controlled

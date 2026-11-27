@@ -32,16 +32,17 @@ backdrop does nothing either.
 
 ## Props
 
-| Prop          | Type         | Default   | What it does                                                                             |
-| ------------- | ------------ | --------- | ---------------------------------------------------------------------------------------- |
-| `open`        | `boolean`    | none      | Whether the dialog is on screen. The application owns it; a dialog never opens itself.   |
-| `onClose`     | `() => void` | none      | Called when the dialog closes, whatever closed it.                                       |
-| `title`       | `string`     | `''`      | Drawn at the top, and used as the accessible name. An empty title draws no heading.      |
-| `description` | `string`     | `''`      | Drawn under the title, and carried on the record as the description.                     |
-| `content`     | `UiChild`    | empty row | The body: buttons, fields, whatever the dialog is for.                                   |
-| `dismissible` | `boolean`    | `true`    | Whether Escape and a press outside close it. See below; it is more than one thing.       |
-| `scrim`       | `boolean`    | `true`    | Whether the page behind it is dimmed with the theme's `scrim`. Read once, when it opens. |
-| `width`       | `number`     | `360`     | Its width in logical pixels, or less on a narrow screen. Read once, when it opens.       |
+| Prop          | Type         | Default   | What it does                                                                                                           |
+| ------------- | ------------ | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `open`        | `boolean`    | none      | Whether the dialog is on screen. The application owns it; a dialog never opens itself.                                 |
+| `onClose`     | `() => void` | none      | Called when the dialog closes, whatever closed it.                                                                     |
+| `title`       | `string`     | `''`      | Drawn at the top, and used as the accessible name. An empty title draws no heading.                                    |
+| `description` | `string`     | `''`      | Drawn under the title, and carried on the record as the description.                                                   |
+| `content`     | `UiChild`    | empty row | The body: buttons, fields, whatever the dialog is for.                                                                 |
+| `footer`      | `UiChild`    | none      | Kept at the bottom, under the body, however the body scrolls: the buttons that act or close. Read once, when it opens. |
+| `dismissible` | `boolean`    | `true`    | Whether Escape and a press outside close it. See below; it is more than one thing.                                     |
+| `scrim`       | `boolean`    | `true`    | Whether the page behind it is dimmed with the theme's `scrim`. Read once, when it opens.                               |
+| `width`       | `number`     | `360`     | Its width in logical pixels, or less on a narrow screen. Read once, when it opens.                                     |
 
 `Dialog` does not take the shared layout props the rest of the library
 takes, and it has no `rootModifiers`. Nothing is drawn where it is
@@ -170,7 +171,9 @@ bottom, which the same sheet and a new issue form both did.
 
 The title and description keep their height and stay at the top. The
 body gets what is left, and scrolls whatever of `content` does not fit,
-so a long form is scrolled to its buttons rather than cut off. The body
+so a long form is scrolled to its buttons rather than cut off. Put the
+buttons in `footer` instead and they are never scrolled at all: the body
+scrolls between the title and them, and Save is always in reach. The body
 keeps 4 pixels of its own round the content, inside the dialog's
 padding, so the focus ring drawn outside a field at its edge is not cut
 off where the body clips.

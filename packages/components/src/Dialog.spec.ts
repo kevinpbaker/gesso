@@ -107,6 +107,39 @@ describe('Dialog on a short screen', () => {
     expect(roomy.y).toBeCloseTo((1000 - roomy.height) / 2, 5);
   });
 
+  it('keeps its footer in view under the body, which scrolls between the title and it', () => {
+    const open = new BehaviorSubject(false);
+    const ui = renderTest(
+      Box(
+        { width: 375, height: 500 },
+        createComponent(Dialog, {
+          open,
+          title: 'Firm setup',
+          width: 600,
+          content: tall(),
+          footer: Box({ height: 32, label: 'Save' })
+        })
+      ),
+      { width: 375, height: 500 }
+    );
+    open.next(true);
+    ui.frame();
+    const dialog = ui.getLayout(ui.getByRole('dialog', { name: 'Firm setup' }));
+    expect(dialog.height).toBe(500 - 2 * 16);
+    const save = () => ui.getVisibleBox(ui.getByLabel('Save'));
+    // At the bottom, inside the dialog's padding, before and after the body scrolls.
+    const before = save();
+    expect(before.height).toBe(32);
+    expect(before.y + before.height).toBe(dialog.y + dialog.height - 16);
+    ui.frame(1000);
+    ui.fireEvent.wheel({ x: 187, y: 250, deltaY: 1000 });
+    ui.frame();
+    expect(save()).toEqual(before);
+    // The body ends where the footer starts: the last block scrolls to just above it.
+    const last = ui.getVisibleBox(ui.getByLabel('Last'));
+    expect(last.y + last.height).toBeLessThanOrEqual(before.y);
+  });
+
   it('gives content that can shrink the room there is, instead of scrolling it', () => {
     // A list with a height of its own, which may shrink: it gets what's
     // left under the title and the field above it, and scrolls itself,

@@ -987,6 +987,7 @@ interface DialogProps {
   title?: string;
   description?: string;
   content?: UiChild;
+  footer?: UiChild;
   dismissible?: boolean;
   scrim?: boolean;
   width?: number;
