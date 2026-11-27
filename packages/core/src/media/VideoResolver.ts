@@ -1,6 +1,6 @@
 import type { UiVideoSurface } from '../properties/UiVideo';
 import { bufferSource, DEFAULT_BLOCK_SIZE, rangeSource, type ByteSource } from './ByteSource';
-import { demuxMp4Video, type Mp4Sample, type Mp4VideoTrack } from './Mp4Demuxer';
+import { declaresFragments, demuxMp4Video, type Mp4Sample, type Mp4VideoTrack } from './Mp4Demuxer';
 
 /**
  * A playing video: one surface, and the controls over it.
@@ -331,6 +331,14 @@ export class DefaultVideoResolver implements VideoResolver {
    * offsets in a sample table are absolute positions in the file
    * rather than relative to anything: the tables are as correct read
    * out of a two hundred kilobyte buffer as out of a gigabyte one.
+   *
+   * **Except for a fragmented file**, whose `moov` holds no samples at
+   * all: they are described in the `moof`s spread through the file,
+   * and demuxing the `moov` alone found none. Such a file is read
+   * whole, in one request, and demuxed as `openWhole` would. That is
+   * the right size of read for what a fragmented file usually is, a
+   * segment of a few seconds; an application streaming one long
+   * fragmented file drives its segments itself.
    */
   private async openRanged(source: string): Promise<{ track: Mp4VideoTrack; data: ByteSource }> {
     const fetchRange = this.fetchRange!;
@@ -363,6 +371,12 @@ export class DefaultVideoResolver implements VideoResolver {
     // the block it sits in can be evicted.
     const held = bytes.read(moov.start, moov.end - moov.start);
     const header = held === null ? await plain(moov.start, moov.end) : held.slice().buffer;
+    if (declaresFragments(header)) {
+      // A segment short enough to fit in the probe is already here,
+      // and fetching it again doubled the transfer.
+      const whole = first.data.byteLength >= total ? first.data : await plain(0, total);
+      return { track: demuxMp4Video(whole), data: bufferSource(whole) };
+    }
     return { track: demuxMp4Video(header), data: bytes };
   }
 }

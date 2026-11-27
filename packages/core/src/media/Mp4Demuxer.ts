@@ -32,9 +32,10 @@
  * **The whole buffer is parsed at once.** Byte ranges are not this
  * file's concern: `DefaultVideoResolver` takes a `fetchRange`, finds
  * the `moov` with a few small requests, demuxes it on its own and
- * reads media as the decoder asks for it. Without one it fetches the
- * whole file, which is right for the fifteen-second loops this was
- * first written for.
+ * reads media as the decoder asks for it, except for a fragmented file
+ * (`declaresFragments`), whose `moov` holds no samples and which it
+ * reads whole. Without one it fetches the whole file, which is right
+ * for the fifteen-second loops this was first written for.
  */
 
 /** One encoded frame: where it is in the file, and when it is shown. */
@@ -302,7 +303,7 @@ export function demuxMp4Video(data: ArrayBuffer): Mp4VideoTrack {
   const samples = samplesOf(reader, table, moov, moofs);
   if (samples.length === 0) {
     throw new Error(
-      moofs.length > 0
+      moofs.length > 0 || readTrackExtends(reader, moov).size > 0
         ? 'This fragmented MP4 has no samples for its video track. Its fragments may be in other files: ' +
             'this reads the fragments in the buffer it was given, not an index of segments to fetch.'
         : 'This MP4 video track has no samples.'
@@ -830,6 +831,20 @@ function readElementaryStreamDescriptor(reader: Reader, esds: BoxHeader, table: 
     }
     reader.offset = payloadEnd;
   }
+}
+
+/**
+ * Whether a file is built from fragments, from its `moov` alone.
+ *
+ * What a ranged read needs to know before it trusts the `moov` to hold
+ * the samples: a progressive file's are in its sample tables, but a
+ * fragmented file's `moov` only promises fragments, and its samples
+ * are described in the `moof`s that follow. `mvex` is the promise; see
+ * `readTrackExtends`.
+ */
+export function declaresFragments(moov: ArrayBuffer): boolean {
+  const { reader, moov: header } = openMp4(moov);
+  return header !== null && readTrackExtends(reader, header).size > 0;
 }
 
 /**

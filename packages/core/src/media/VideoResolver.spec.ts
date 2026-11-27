@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DefaultVideoResolver, type VideoPlayback } from './VideoResolver';
 import { DEFAULT_BLOCK_SIZE } from './ByteSource';
-import { buildMp4, FakeVideoDecoder, mdatStart, type TrackSpec } from './Mp4TestUtils';
+import { buildFragmentedMp4, buildMp4, FakeVideoDecoder, mdatStart, type TrackSpec } from './Mp4TestUtils';
 
 /**
  * The playback, and the arithmetic of getting to a position.
@@ -273,6 +273,49 @@ describe('DefaultVideoResolver reading a file in ranges', () => {
 
     const playback = await resolver.resolve('camera.mp4');
     expect(playback.duration).toBeCloseTo(6);
+    resolver.dispose();
+  });
+
+  it('plays a fragmented file, whose samples are in its fragments rather than its moov', async () => {
+    // A fragmented file's moov promises fragments and holds no samples,
+    // so demuxing the moov on its own, which is what a ranged read
+    // does for a progressive file, found nothing: "This MP4 video
+    // track has no samples", for a file the same resolver played
+    // without ranges. Found by `check:video` playing the playground's
+    // `clip-fragmented.mp4` both ways.
+    const data = buildFragmentedMp4({
+      trackId: 1,
+      timescale: 1000,
+      width: 320,
+      height: 240,
+      fragments: [
+        {
+          baseMediaDecodeTime: 0,
+          samples: [
+            { duration: 100, size: 40, isKey: true },
+            { duration: 100, size: 10, isKey: false }
+          ]
+        },
+        {
+          baseMediaDecodeTime: 200,
+          samples: [
+            { duration: 100, size: 30, isKey: true },
+            { duration: 100, size: 10, isKey: false }
+          ]
+        }
+      ]
+    });
+    const { fetchRange, ranges } = serve(data);
+    const resolver = new DefaultVideoResolver({ fetchRange });
+
+    const playback = await resolver.resolve('segment.mp4');
+    expect(playback.duration).toBeCloseTo(0.4);
+    // The whole segment fits in the probe, so it is read once, not
+    // fetched a second time to be demuxed whole.
+    expect(ranges).toEqual([[0, DEFAULT_BLOCK_SIZE]]);
+    playback.present(0);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(FakeVideoDecoder.submitted.length).toBeGreaterThan(0);
     resolver.dispose();
   });
 
