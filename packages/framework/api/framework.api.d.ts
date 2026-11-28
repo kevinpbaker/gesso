@@ -932,6 +932,7 @@ import {
   UiPointer,
   UiPointerController,
   UiPointerDevice,
+  UiProvision,
   UiReducedMotionPolicy,
   UiRole,
   UiRole as UiRole$1,
@@ -3116,6 +3117,78 @@ interface IslandProps<P, E> extends IslandBoxProps {
   onStandIn?: (showing: boolean) => void;
 }
 declare function Island<P, E>(inputs: Inputs<IslandProps<P, E>>, ctx: ComponentContext): UiChild;
+type MessageValue = string | number | boolean | Date | null | undefined;
+type MessageValues = Readonly<Record<string, MessageValue>>;
+declare class MessageFormatError extends Error {
+  readonly source: string;
+  readonly offset: number;
+  constructor(message: string, source: string, offset: number);
+}
+interface CompiledMessage {
+  readonly names: readonly string[];
+  format(values: MessageValues, locale: string, problems?: (problem: string) => void): string;
+}
+declare function compileMessage(source: string): CompiledMessage;
+type Catalog = Readonly<Record<string, string>>;
+type Translations<Source extends Catalog> = { readonly [K in keyof Source]: string; };
+type CatalogSource = Catalog | (() => Promise<Catalog>);
+interface MessageRef {
+  readonly id: string;
+  readonly values?: MessageValues;
+}
+declare function defineMessages<const M extends Record<string, string>>(messages: M): M;
+declare function formatMessage(catalog: Catalog, id: string, values: MessageValues, locale: string): string;
+type MessageInput = MessageValue | Observable<MessageValue>;
+type MessageInputs = Readonly<Record<string, MessageInput>>;
+interface I18nOptions<Source extends Catalog> {
+  readonly source: Source;
+  readonly sourceLocale?: string;
+  readonly locales?: Readonly<Record<string, CatalogSource>>;
+  readonly components?: Readonly<Record<string, CatalogSource>>;
+  readonly locale?: string;
+  readonly languages?: () => readonly string[];
+  readonly onMissing?: (problem: string) => void;
+}
+declare function createI18n<Source extends Catalog>(options: I18nOptions<Source>): I18n<Source>;
+declare class I18n<Source extends Catalog = Catalog> {
+  private readonly options;
+  readonly locale: ReadableCell<string>;
+  readonly direction: ReadableCell<'ltr' | 'rtl'>;
+  readonly loading: ReadableCell<string | null>;
+  readonly available: readonly string[];
+  private readonly active;
+  private readonly loadingState;
+  private readonly sourceLocale;
+  private readonly loaded;
+  private readonly compiled;
+  private readonly reported;
+  private readonly onMissing;
+  private readonly languages;
+  private following;
+  private request;
+  constructor(options: I18nOptions<Source>);
+  setLocale(locale: string, options?: {
+    readonly follow?: boolean;
+  }): Promise<void>;
+  message(id: keyof Source & string, values?: MessageInputs): ComputedCell<string>;
+  text(ref: MessageRef | Observable<MessageRef | null> | null): ComputedCell<string>;
+  format(id: keyof Source & string, values?: MessageValues): string;
+  lookup(id: string, values: MessageInputs | undefined, defaults: Catalog): ComputedCell<string>;
+  number(value: MessageInput, options?: Intl.NumberFormatOptions): ComputedCell<string>;
+  date(value: MessageInput, options?: Intl.DateTimeFormatOptions): ComputedCell<string>;
+  list(values: readonly string[] | Observable<readonly string[]>, options?: Intl.ListFormatOptions): ComputedCell<string>;
+  relativeTime(value: number | Observable<number>, unit: Intl.RelativeTimeFormatUnit, options?: Intl.RelativeTimeFormatOptions): ComputedCell<string>;
+  negotiate(wanted: readonly string[]): string;
+  private formatNow;
+  private compile;
+  private report;
+}
+declare function fallbackChain(locale: string): string[];
+declare const I18nKey: UiEnvironmentKey<I18n | null>;
+declare function provideI18n(i18n: I18n<Catalog>): UiProvision;
+declare function i18nFrom(ctx: {
+  environment<T>(key: UiEnvironmentKey<T>): T;
+}): I18n;
 type UiDuration = UiDurationToken | number;
 type UiEasingChoice = UiEasingToken | UiEasing;
 interface AnimateOptions {
@@ -3833,12 +3906,16 @@ export {
   bind,
   BoundStream,
   buildPath,
+  Catalog,
+  CatalogSource,
   Channel,
   ChannelErrorEntry,
   ChannelRegistration,
   ChannelRegistryHandle,
   classifyStorageError,
   CommandEntry,
+  CompiledMessage,
+  compileMessage,
   ComponentHost,
   ComponentHostResolver,
   computed,
@@ -3852,10 +3929,12 @@ export {
   CreateAppOptions,
   createChannelRegistry,
   createComponent,
+  createI18n,
   createShellHistory,
   createSyncApp,
   debounced,
   Define,
+  defineMessages,
   derive,
   DeriveOptions,
   describeStream,
@@ -3872,6 +3951,7 @@ export {
   EditingState$1,
   elementIsland,
   Equality,
+  fallbackChain,
   FanCell,
   FanKey,
   fanOut,
@@ -3887,6 +3967,7 @@ export {
   FontHost,
   FontService,
   formatAge,
+  formatMessage,
   formatNodePath,
   formatNodeReport,
   formatSourceLocation,
@@ -3901,6 +3982,10 @@ export {
   GessoAppOptions,
   GessoRuntime,
   GessoRuntimeOptions,
+  I18n,
+  i18nFrom,
+  I18nKey,
+  I18nOptions,
   IndexedDbStorage,
   IndexedDbStorageOptions,
   Inject,
@@ -3937,6 +4022,12 @@ export {
   MediaService,
   MediaSessionLike,
   MemoryStorage,
+  MessageFormatError,
+  MessageInput,
+  MessageInputs,
+  MessageRef,
+  MessageValue,
+  MessageValues,
   mutate,
   MutateOptions,
   Mutation,
@@ -3974,6 +4065,7 @@ export {
   Presence,
   PresenceProps,
   printPropValue,
+  provideI18n,
   provideIsland,
   ReadSource,
   registerUndoShortcuts,
@@ -4052,6 +4144,7 @@ export {
   ThemeTokenCell,
   throttled,
   to,
+  Translations,
   treeText,
   UI_FRAME_PHASES,
   UI_ROLES,
@@ -4465,12 +4558,16 @@ import {
   bind,
   BoundStream,
   buildPath,
+  Catalog,
+  CatalogSource,
   Channel,
   ChannelErrorEntry,
   ChannelRegistration,
   ChannelRegistryHandle,
   classifyStorageError,
   CommandEntry,
+  CompiledMessage,
+  compileMessage,
   ComponentHost,
   ComponentHostResolver,
   computed,
@@ -4484,10 +4581,12 @@ import {
   CreateAppOptions,
   createChannelRegistry,
   createComponent,
+  createI18n,
   createShellHistory,
   createSyncApp,
   debounced,
   Define,
+  defineMessages,
   derive,
   DeriveOptions,
   describeStream,
@@ -4504,6 +4603,7 @@ import {
   EditingState,
   elementIsland,
   Equality,
+  fallbackChain,
   FanCell,
   FanKey,
   fanOut,
@@ -4519,6 +4619,7 @@ import {
   FontHost,
   FontService,
   formatAge,
+  formatMessage,
   formatNodePath,
   formatNodeReport,
   formatSourceLocation,
@@ -4533,6 +4634,10 @@ import {
   GessoAppOptions,
   GessoRuntime,
   GessoRuntimeOptions,
+  I18n,
+  i18nFrom,
+  I18nKey,
+  I18nOptions,
   IndexedDbStorage,
   IndexedDbStorageOptions,
   Inject,
@@ -4569,6 +4674,12 @@ import {
   MediaService,
   MediaSessionLike,
   MemoryStorage,
+  MessageFormatError,
+  MessageInput,
+  MessageInputs,
+  MessageRef,
+  MessageValue,
+  MessageValues,
   mutate,
   MutateOptions,
   Mutation,
@@ -4606,6 +4717,7 @@ import {
   Presence,
   PresenceProps,
   printPropValue,
+  provideI18n,
   provideIsland,
   ReadSource,
   registerUndoShortcuts,
@@ -4684,6 +4796,7 @@ import {
   ThemeTokenCell,
   throttled,
   to,
+  Translations,
   treeText,
   UI_FRAME_PHASES,
   UI_ROLES,
@@ -4739,6 +4852,7 @@ export {
   ChannelReplica,
   channelSchema,
   classifyStorageError,
+  compileMessage,
   Component,
   ComponentHost,
   ComponentHostResolver,
@@ -4748,11 +4862,13 @@ export {
   createApp,
   createChannelRegistry,
   createComponent,
+  createI18n,
   createShellHistory,
   createSyncApp,
   debounced,
   Define,
   defineChannel,
+  defineMessages,
   derive,
   describeAgentActivity,
   describeChannel,
@@ -4763,6 +4879,7 @@ export {
   EditingProxy,
   EditingService,
   elementIsland,
+  fallbackChain,
   FanCell,
   fanOut,
   FanOut,
@@ -4771,6 +4888,7 @@ export {
   FocusService,
   FontService,
   formatAge,
+  formatMessage,
   formatNodePath,
   formatNodeReport,
   formatSourceLocation,
@@ -4780,6 +4898,9 @@ export {
   GessoApp,
   GessoAppBuilder,
   GessoRuntime,
+  I18n,
+  i18nFrom,
+  I18nKey,
   IndexedDbStorage,
   Inject,
   input,
@@ -4809,6 +4930,7 @@ export {
   measureSpan,
   MediaService,
   MemoryStorage,
+  MessageFormatError,
   mutate,
   nativeInputIsland,
   NativeInputIsland,
@@ -4834,6 +4956,7 @@ export {
   printPropValue,
   provide,
   ProvidedChannel,
+  provideI18n,
   provideIsland,
   registerUndoShortcuts,
   rememberedDirectory,
@@ -4891,6 +5014,8 @@ export {
   type AudioState,
   type AudioStatus,
   type BoundStream,
+  type Catalog,
+  type CatalogSource,
   type ChannelClientMessage,
   type ChannelErrorEntry,
   type ChannelHostMessage,
@@ -4909,6 +5034,7 @@ export {
   type CommandMap,
   type CommandSchema,
   type CommandsOf,
+  type CompiledMessage,
   type ComponentContext,
   type ComponentElement,
   type ComponentProps,
@@ -4944,6 +5070,7 @@ export {
   type FunctionComponent,
   type GessoAppOptions,
   type GessoRuntimeOptions,
+  type I18nOptions,
   type IndexedDbStorageOptions,
   type Inputs,
   type InputValue,
@@ -4968,6 +5095,11 @@ export {
   type MediaOptions,
   type MediaSessionLike,
   type MessageEndpoint,
+  type MessageInput,
+  type MessageInputs,
+  type MessageRef,
+  type MessageValue,
+  type MessageValues,
   type MutateOptions,
   type Mutation,
   type NativeInputIslandEvent,
@@ -5043,6 +5175,7 @@ export {
   type StorageAdapter,
   type StorageOutcome,
   type StorageRead,
+  type Translations,
   type UiDuration,
   type UiEasingChoice,
   type UiEnvironmentReport,
@@ -5305,19 +5438,28 @@ import {
   servePorts
 } from "../app.js";
 import {
+  Catalog,
   classifyStorageError,
+  CompiledMessage,
+  compileMessage,
   computed,
   ComputedCell,
   ComputedOptions,
   ConsoleEntry,
   debounced,
+  defineMessages,
   derive,
   DeriveOptions,
   Equality,
   findUnplainPath,
+  formatMessage,
   IndexedDbStorage,
   IndexedDbStorageOptions,
   MemoryStorage,
+  MessageFormatError,
+  MessageRef,
+  MessageValue,
+  MessageValues,
   mutate,
   MutateOptions,
   Mutation,
@@ -5348,6 +5490,7 @@ import {
   storageReadValue,
   structurallyEqual,
   throttled,
+  Translations,
   undoable,
   UndoableOptions,
   UndoStack,
@@ -5424,12 +5567,15 @@ export {
   captureConsole,
   channel,
   classifyStorageError,
+  compileMessage,
   computed,
   ComputedCell,
   debounced,
   defineChannel,
+  defineMessages,
   derive,
   findUnplainPath,
+  formatMessage,
   IndexedDbStorage,
   internalState,
   InternalState,
@@ -5439,6 +5585,7 @@ export {
   isPortHandshake,
   isSupervisionMessage,
   MemoryStorage,
+  MessageFormatError,
   mutate,
   OpfsStorage,
   persisted,
@@ -5462,6 +5609,7 @@ export {
   SupervisedWorker,
   superviseSelf,
   throttled,
+  type Catalog,
   type ChannelClientMessage,
   type ChannelHostMessage,
   type ChannelPort,
@@ -5471,6 +5619,7 @@ export {
   type Command,
   type CommandMap,
   type CommandsOf,
+  type CompiledMessage,
   type ComputedOptions,
   type ConsoleEntryBody,
   type ConsoleLevel,
@@ -5478,6 +5627,9 @@ export {
   type Equality,
   type IndexedDbStorageOptions,
   type MessageEndpoint,
+  type MessageRef,
+  type MessageValue,
+  type MessageValues,
   type MutateOptions,
   type Mutation,
   type OpfsDirectory,
@@ -5503,6 +5655,7 @@ export {
   type SupervisedState,
   type SupervisedStatus,
   type SupervisedWorkerOptions,
+  type Translations,
   type UndoableOptions,
   type UndoStackOptions,
   type UndoTransaction,

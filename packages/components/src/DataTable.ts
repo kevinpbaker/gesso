@@ -30,6 +30,7 @@ import {
 } from './internals';
 import { movedBetween, NO_STATES, rowCells, SELECTED_STATES } from './rowCells';
 import { stepIndex, virtualList } from './virtual';
+import { wordsFor } from './messages';
 
 /**
  * A table of any length whose rows share their columns with the header.
@@ -259,7 +260,7 @@ export function DataTable<T>(inputs: Inputs<DataTableProps<T>>, ctx: ComponentCo
       zIndex: 1,
       backgroundColor: 'surface',
       role: 'row',
-      label: 'Column headers'
+      label: wordsFor(ctx)('gesso.columnHeaders')
     },
     ...columns.map(column => headerCell(column, sort.value, () => toggleSort(column)))
   );

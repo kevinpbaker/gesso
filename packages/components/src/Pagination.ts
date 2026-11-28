@@ -24,6 +24,7 @@ import { Button } from './Button';
 import { controlled } from './controlled';
 import { CONTROL_FOCUS_RING, foregroundToken, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 import { controlTokens, type ButtonPaint, type ButtonSize, type ButtonSizeTokens, type ControlTokens } from './tokens';
+import { orWord, type Say, wordsFor } from './messages';
 
 /**
  * A strip of page numbers, for a set of rows shown a page at a time.
@@ -191,8 +192,9 @@ export interface PaginationProps extends ControlLayoutProps {
   size?: ButtonSize;
 }
 
-export function Pagination(inputs: Inputs<PaginationProps>, _ctx: ComponentContext): UiChild {
-  const label = input(inputs.label, 'Pagination');
+export function Pagination(inputs: Inputs<PaginationProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
+  const label = orWord(inputs.label, say('gesso.pagination.label'));
   const disabled = input(inputs.disabled, false);
   const siblings = input(inputs.siblings, DEFAULT_SIBLINGS);
   const boundaries = input(inputs.boundaries, true);
@@ -256,15 +258,17 @@ export function Pagination(inputs: Inputs<PaginationProps>, _ctx: ComponentConte
 
   const draw = (item: PaginationItem): UiChild => {
     if (item === 'previous') {
-      return endButton('Previous page', PREVIOUS_GLYPH, size, off(atFirst), () => go(currentNow() - 1));
+      return endButton(say('gesso.pagination.previous'), PREVIOUS_GLYPH, size, off(atFirst), () =>
+        go(currentNow() - 1)
+      );
     }
     if (item === 'next') {
-      return endButton('Next page', NEXT_GLYPH, size, off(atLast), () => go(currentNow() + 1));
+      return endButton(say('gesso.pagination.next'), NEXT_GLYPH, size, off(atLast), () => go(currentNow() + 1));
     }
     if (item === 'gapBefore' || item === 'gapAfter') {
       return elision(size, tokens);
     }
-    return pageButton(item, size, tokens, current, disabled, () => go(item));
+    return pageButton(item, size, tokens, current, disabled, () => go(item), say);
   };
 
   return Row(
@@ -399,7 +403,8 @@ function pageButton(
   tokens: ThemeTokenCell<ControlTokens>,
   current: Observable<number>,
   disabled: Observable<boolean>,
-  press: () => void
+  press: () => void,
+  say: Say
 ): UiElement {
   const chosen = current.pipe(
     map(value => value === page),
@@ -454,7 +459,7 @@ function pageButton(
       role: 'button',
       // The name is a sentence and the text is the numeral: "3" read
       // aloud in a list of numerals says nothing about what it does.
-      label: `Page ${page}`,
+      label: say('gesso.pagination.page', { page }),
       states: chosen.pipe(map(mine => (mine ? CURRENT : NO_STATES))),
       onClick: press
     },
@@ -478,7 +483,7 @@ function pageButton(
  * which is a bound property rather than a built-in variant.
  */
 function endButton(
-  name: string,
+  name: Observable<string>,
   glyph: string,
   size: ButtonSize,
   disabled: Observable<boolean>,

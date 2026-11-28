@@ -37,6 +37,7 @@ import {
 } from './internals';
 import { useOverlay } from './overlay';
 import { movedBetween, NO_STATES, rowCells, SELECTED_STATES } from './rowCells';
+import { orWord, type Say, wordsFor } from './messages';
 
 export interface ComboboxOption {
   readonly value: string;
@@ -147,6 +148,7 @@ export function filterCombobox(options: readonly ComboboxOption[], query: string
 const NONE: readonly string[] = [];
 
 export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const label = input(inputs.label, '');
   const labelHidden = inputs.labelHidden?.value === true;
   const placeholder = input(inputs.placeholder, '');
@@ -154,7 +156,7 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
   const error = input(inputs.error, '');
   const disabled = input(inputs.disabled, false);
   const required = input(inputs.required, false);
-  const emptyText = input(inputs.emptyText, 'No matches');
+  const emptyText = orWord(inputs.emptyText, say('gesso.combobox.noMatches'));
   const listHeight = inputs.listHeight?.value ?? 280;
   const multiple = inputs.multiple?.value === true;
   const filtering = inputs.filter?.value !== false;
@@ -530,7 +532,7 @@ export function Combobox(inputs: Inputs<ComboboxProps>, ctx: ComponentContext): 
                 role: 'list',
                 label: label.pipe(map(text => `${text}, chosen`))
               },
-              ...values.map(value => token(value, labelOf(value), remove, disabled))
+              ...values.map(value => token(value, labelOf(value), remove, disabled, say))
             )
           ]
     )
@@ -645,7 +647,13 @@ function optionRow(
 }
 
 /** A chosen value in `multiple`, with a button that takes it off. */
-function token(value: string, text: string, remove: (value: string) => void, disabled: Observable<boolean>): UiElement {
+function token(
+  value: string,
+  text: string,
+  remove: (value: string) => void,
+  disabled: Observable<boolean>,
+  say: Say
+): UiElement {
   return Row(
     {
       key: value,
@@ -665,7 +673,7 @@ function token(value: string, text: string, remove: (value: string) => void, dis
     Text({ text, textStyle: 'bodySmall', color: foregroundToken(disabled), selectable: false }),
     Button(
       {
-        label: `Remove ${text}`,
+        label: say('gesso.combobox.remove', { item: text }),
         disabled,
         modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
         width: 16,

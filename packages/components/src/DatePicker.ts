@@ -1,6 +1,6 @@
 import { BehaviorSubject, combineLatest, distinctUntilChanged, map, type Observable } from 'rxjs';
 
-import { controlled, FocusService, input, type ComponentContext, type Inputs } from 'gesso-framework';
+import { controlled, FocusService, i18nFrom, input, type ComponentContext, type Inputs } from 'gesso-framework';
 import {
   autoFocus,
   Box,
@@ -30,6 +30,7 @@ import {
   modifiersOf
 } from './internals';
 import { useOverlay } from './overlay';
+import { orWord, wordsFor } from './messages';
 
 /**
  * A calendar date, chosen from a month.
@@ -71,9 +72,9 @@ export interface DatePickerProps extends ControlLayoutProps {
   max?: string;
   /**
    * The day weeks start on: 0 for Sunday, 1 for Monday, up to 6 for
-   * Saturday. Default: the one the platform's locale starts them on
-   * (Sunday in the US and Canada, Monday in most of Europe), or Monday
-   * where the platform cannot say.
+   * Saturday. Default: the one `locale` starts them on (Sunday in the
+   * US and Canada, Monday in most of Europe), or Monday where the
+   * platform cannot say.
    */
   weekStart?: number;
   /** Offers Clear, to go back to no date. Default true. */
@@ -85,7 +86,11 @@ export interface DatePickerProps extends ControlLayoutProps {
    * month every time passes one.
    */
   today?: string;
-  /** A language tag for the names of days and months; the runtime's by default. */
+  /**
+   * A language tag for the names of days and months. By default, the
+   * language of the `I18n` the picker is placed under, else the
+   * runtime's. Read when the picker mounts.
+   */
   locale?: string;
   /** Receives the trigger. */
   ref?: UiNodeRef;
@@ -97,9 +102,10 @@ const MONTH_NAME: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long' 
 const WEEKDAY_SHORT: Intl.DateTimeFormatOptions = { weekday: 'short' };
 
 export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const label = input(inputs.label, '');
   const labelHidden = inputs.labelHidden?.value === true;
-  const placeholder = input(inputs.placeholder, 'No date');
+  const placeholder = orWord(inputs.placeholder, say('gesso.datePicker.noDate'));
   const description = input(inputs.description, '');
   const error = input(inputs.error, '');
   const disabled = input(inputs.disabled, false);
@@ -107,8 +113,8 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
   const min = input(inputs.min, '');
   const max = input(inputs.max, '');
   const clearable = input(inputs.clearable, true);
-  const weekStart = inputs.weekStart?.value ?? localeWeekStart();
-  const locale = inputs.locale?.value;
+  const locale = inputs.locale?.value ?? i18nFrom(ctx).locale.value;
+  const weekStart = inputs.weekStart?.value ?? localeWeekStart(locale);
   const today = (): string => inputs.today?.value ?? todayIso();
   const invalid = combineLatest([input(inputs.invalid, false), error]).pipe(
     map(([marked, message]) => marked || message.length > 0)
@@ -224,7 +230,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
       },
       Row(
         { y: 'center', gap: 4 },
-        stepButton('‹', 'Previous month', () => moveTo(addMonths(cursor.value, -1))),
+        stepButton('‹', say('gesso.datePicker.previousMonth'), () => moveTo(addMonths(cursor.value, -1))),
         Text({
           text: monthLabel,
           live: 'polite',
@@ -233,7 +239,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
           textAlign: 'center',
           selectable: false
         }),
-        stepButton('›', 'Next month', () => moveTo(addMonths(cursor.value, 1)))
+        stepButton('›', say('gesso.datePicker.nextMonth'), () => moveTo(addMonths(cursor.value, 1)))
       ),
       Column(
         {
@@ -301,7 +307,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
       ),
       Row(
         { gap: 6, x: 'end' },
-        textButton('Today', 'Today', () => {
+        textButton('today', say('gesso.datePicker.today'), say('gesso.datePicker.today'), () => {
           const now = today();
           if (inRange(now)) {
             choose(now);
@@ -313,7 +319,7 @@ export function DatePicker(inputs: Inputs<DatePickerProps>, ctx: ComponentContex
           map(([can, chosen]) =>
             can && chosen !== ''
               ? [
-                  textButton('Clear', 'Clear date', () => {
+                  textButton('clear', say('gesso.datePicker.clear'), say('gesso.datePicker.clearDate'), () => {
                     value.change('');
                     close();
                   })
@@ -459,7 +465,7 @@ function dayCell(
   );
 }
 
-function stepButton(glyph: string, name: string, onClick: () => void): UiElement {
+function stepButton(glyph: string, name: Observable<string>, onClick: () => void): UiElement {
   return Button(
     {
       label: name,
@@ -475,10 +481,10 @@ function stepButton(glyph: string, name: string, onClick: () => void): UiElement
   );
 }
 
-function textButton(text: string, name: string, onClick: () => void): UiElement {
+function textButton(key: string, text: Observable<string>, name: Observable<string>, onClick: () => void): UiElement {
   return Button(
     {
-      key: name,
+      key,
       label: name,
       modifiers: [CONTROL_INTERACTION, CONTROL_FOCUS_RING],
       paddingLeft: 10,

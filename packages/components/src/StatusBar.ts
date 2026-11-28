@@ -19,6 +19,7 @@ import { Spinner } from './Media';
 import type { NavigationIcon } from './NavigationRail';
 import { useOverlay } from './overlay';
 import { tooltipOn } from './Tooltip';
+import { wordsFor } from './messages';
 
 /** How an item's text is coloured: muted by default, as a status line's is. */
 export type StatusBarTone = 'muted' | 'default' | 'primary' | 'danger';
@@ -265,7 +266,7 @@ export function StatusBar(inputs: Inputs<StatusBarProps>, ctx: ComponentContext)
     ? []
     : [
         Row(
-          { key: 'zoom', role: 'group', label: 'Zoom', gap: 0, y: 'center', flexShrink: 0 },
+          { key: 'zoom', role: 'group', label: wordsFor(ctx)('gesso.zoom'), gap: 0, y: 'center', flexShrink: 0 },
           button('zoom-out', 'Zoom out', () => zoom.change(zoomStep(zoom.current(), -1, steps())), [
             Text({ text: '−', color: 'textMuted', textStyle: 'bodySmall', selectable: false })
           ]),

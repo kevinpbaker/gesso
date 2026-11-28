@@ -21,6 +21,7 @@ import {
 } from 'gesso-core';
 import { Dialog } from './Dialog';
 import { keyCaps } from './KeyCap';
+import { wordsFor } from './messages';
 
 /** A shortcut the registry doesn't hold: an editor's own keys, which it handles itself. */
 export interface ShortcutSheetEntry {
@@ -153,6 +154,7 @@ export function filterShortcutSections(
 }
 
 export function ShortcutSheet(inputs: Inputs<ShortcutSheetProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const title = input(inputs.title, 'Keyboard shortcuts');
   const general = input(inputs.generalLabel, 'General');
   const width = input(inputs.width, 520);
@@ -231,7 +233,7 @@ export function ShortcutSheet(inputs: Inputs<ShortcutSheetProps>, ctx: Component
     EditableText({
       modifiers: [autoFocus()],
       value: query,
-      placeholder: 'Filter shortcuts…',
+      placeholder: say('gesso.shortcutSheet.filterPlaceholder'),
       textWrap: 'none',
       color: 'text',
       padding: 8,
@@ -240,7 +242,7 @@ export function ShortcutSheet(inputs: Inputs<ShortcutSheetProps>, ctx: Component
       borderWidth: 1,
       borderRadius: 6,
       role: 'searchbox',
-      label: 'Filter shortcuts',
+      label: say('gesso.shortcutSheet.filter'),
       onInput: (event: UiTextChangeEvent) => {
         // In a browser the character arrives as typing as well as a key,
         // and the key's preventDefault doesn't stop the typing, so the
@@ -262,7 +264,15 @@ export function ShortcutSheet(inputs: Inputs<ShortcutSheetProps>, ctx: Component
         filtered.pipe(
           map(list =>
             list.length === 0
-              ? [Text({ key: '∅', text: 'No shortcut matches', color: 'textMuted', padding: 4, selectable: false })]
+              ? [
+                  Text({
+                    key: '∅',
+                    text: say('gesso.shortcutSheet.noMatches'),
+                    color: 'textMuted',
+                    padding: 4,
+                    selectable: false
+                  })
+                ]
               : list.map(section => sectionElement(section))
           )
         )

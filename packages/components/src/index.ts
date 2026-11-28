@@ -241,3 +241,4 @@ export {
   type VideoControlsProps,
   type VideoReadout
 } from './VideoControls';
+export { componentMessages, type ComponentMessageId, type ComponentMessages } from './messages';

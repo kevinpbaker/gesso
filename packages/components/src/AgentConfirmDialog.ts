@@ -4,6 +4,7 @@ import { Column, percent, Row, Text } from 'gesso-core';
 
 import { Button } from './Button';
 import { Dialog } from './Dialog';
+import { wordsAt } from './messages';
 
 export interface AgentConfirmDialogOptions {
   /** The word on the button that declines. Default `Cancel`. */
@@ -47,7 +48,12 @@ export function agentConfirmDialog(options: AgentConfirmDialogOptions = {}): Age
         return;
       }
       const { question } = request;
-      const asker = `Asked by ${request.agent ?? 'an AI agent'}.${request.destructive ? ' This cannot be undone.' : ''}`;
+      const say = wordsAt(environment);
+      const asker = say('gesso.agentConfirm.askedBy', {
+        named: request.agent !== undefined,
+        agent: request.agent ?? '',
+        destructive: request.destructive === true
+      });
       overlays.open({
         id,
         top: 0,
@@ -65,12 +71,12 @@ export function agentConfirmDialog(options: AgentConfirmDialogOptions = {}): Age
             Row(
               { width: percent(100), gap: 8, x: 'end' },
               createComponent(Button, {
-                label: options.cancelLabel ?? 'Cancel',
+                label: options.cancelLabel ?? say('gesso.agentConfirm.cancel'),
                 variant: 'outlined',
                 onClick: () => answer('declined')
               }),
               createComponent(Button, {
-                label: question.action ?? 'Allow',
+                label: question.action ?? say('gesso.agentConfirm.allow'),
                 tone: request.destructive ? 'danger' : 'accent',
                 onClick: () => answer('approved')
               })

@@ -24,6 +24,7 @@ import { Button } from './Button';
 import { controlled } from './controlled';
 import { keymap } from './internals';
 import { useOverlay } from './overlay';
+import { wordsFor } from './messages';
 
 /**
  * Which edge of the window a drawer comes in from.
@@ -449,7 +450,7 @@ export function Drawer(inputs: Inputs<DrawerProps>, ctx: ComponentContext): UiCh
         ? createComponent(Button, {
             // The pointer's way out, which on a phone, where the drawer
             // can be the whole width of the window, is the only one.
-            label: 'Close',
+            label: wordsFor(ctx)('gesso.close'),
             variant: 'plain',
             size: 'small',
             onClick: requestClose,

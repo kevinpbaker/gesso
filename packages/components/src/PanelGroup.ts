@@ -16,6 +16,7 @@ import {
 } from 'gesso-core';
 import { controlled } from './controlled';
 import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
+import { wordsFor } from './messages';
 
 /** One region of a `PanelGroup`: a sidebar, the editor, a bottom panel. */
 export interface PanelGroupPanel {
@@ -116,7 +117,8 @@ function fillIndex(panels: readonly PanelGroupPanel[]): number {
   return unsized !== -1 ? unsized : panels.length - 1;
 }
 
-export function PanelGroup(inputs: Inputs<PanelGroupProps>, _ctx: ComponentContext): UiChild {
+export function PanelGroup(inputs: Inputs<PanelGroupProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const panels = inputs.panels.value;
   const horizontal = (inputs.direction?.value ?? 'row') === 'row';
   const line = inputs.divider?.value !== 'bar';
@@ -271,7 +273,7 @@ export function PanelGroup(inputs: Inputs<PanelGroupProps>, _ctx: ComponentConte
         y: 'center',
         cursor: horizontal ? 'col-resize' : 'row-resize',
         role: 'separator',
-        label: `Resize ${name}`,
+        label: say('gesso.panelGroup.resize', { panel: name }),
         valueNow: value,
         valueMin: target.collapsible === true ? 0 : minOf(target),
         ...(target.maxSize === undefined ? {} : { valueMax: target.maxSize }),

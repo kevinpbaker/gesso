@@ -27,6 +27,7 @@ import {
 import { Button } from './Button';
 import { Icon } from './Media';
 import { Slider } from './Slider';
+import { either, wordsFor } from './messages';
 
 /**
  * The glyphs, as path data in a 24 unit box.
@@ -233,6 +234,7 @@ export interface VideoControlsProps {
  * controls inside it keep their own roles.
  */
 export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const options = inputs.options.value ?? {};
   const readout = followTransport(ctx, inputs.transport);
   const act = (run: (transport: VideoTransport) => void): (() => void) => {
@@ -272,7 +274,7 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
         {
           // The label is the *action*, which is what a screen reader
           // should hear and what the glyph would say if it could.
-          label: readout.paused.pipe(map(paused => (paused ? 'Play' : 'Pause'))),
+          label: either(readout.paused, say('gesso.video.play'), say('gesso.video.pause')),
           variant: 'plain',
           size: 'small',
           // One `Icon` with a bound path, not a new `Icon` per state.
@@ -297,7 +299,7 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
       createComponent(
         Slider,
         {
-          label: 'Seek',
+          label: say('gesso.video.seek'),
           labelHidden: true,
           // The full width of the bar rather than a share of the row.
           // A seek bar is the control people aim at, and aiming is
@@ -369,7 +371,7 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
       createComponent(
         Button,
         {
-          label: readout.muted.pipe(map(muted => (muted ? 'Unmute' : 'Mute'))),
+          label: either(readout.muted, say('gesso.video.unmute'), say('gesso.video.mute')),
           variant: 'plain',
           size: 'small',
           children: createComponent(Icon, {
@@ -384,7 +386,7 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
       createComponent(
         Slider,
         {
-          label: 'Volume',
+          label: say('gesso.video.volume'),
           labelHidden: true,
           thumb: options.thumb !== false,
           width: 64,
@@ -411,7 +413,7 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
       createComponent(
         Button,
         {
-          label: inputs.fullscreenActive.pipe(map(active => (active === true ? 'Leave fullscreen' : 'Fullscreen'))),
+          label: either(inputs.fullscreenActive, say('gesso.video.leaveFullscreen'), say('gesso.video.fullscreen')),
           variant: 'plain',
           size: 'small',
           children: createComponent(Icon, {
@@ -467,7 +469,7 @@ export function VideoControls(inputs: Inputs<VideoControlsProps>, ctx: Component
       opacity: shown,
       transition: shown === undefined ? undefined : { opacity: 160 },
       role: 'toolbar',
-      label: 'Video controls'
+      label: say('gesso.video.controls')
     },
     Column(
       { width: percent(100) },

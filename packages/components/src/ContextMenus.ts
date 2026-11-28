@@ -10,6 +10,7 @@ import {
 
 import { followedChildren, layoutOf, type ControlLayoutProps } from './internals';
 import { Menu, type MenuItem } from './Menu';
+import { ENGLISH, type ComponentMessageId, wordNow, wordsFor } from './messages';
 
 /**
  * What a link offers on a right-click, registered by `Link` against its
@@ -70,7 +71,7 @@ export function ContextMenus(inputs: Inputs<ContextMenusProps>, ctx: ComponentCo
       // is about, so it takes the focus, and its selection with it.
       focus.focus(field);
     }
-    const offered = menuFor(field, link, editing.selectedText());
+    const offered = menuFor(field, link, editing.selectedText(), wordNow(ctx));
     if (offered.length === 0) {
       return;
     }
@@ -123,18 +124,27 @@ export function ContextMenus(inputs: Inputs<ContextMenusProps>, ctx: ComponentCo
       at,
       items,
       onSelect: choose,
-      label: 'Context menu'
+      label: wordsFor(ctx)('gesso.contextMenu.label')
     })
   );
 }
 
-/** The rows for what was right-clicked; empty when there is nothing to offer. */
-export function menuFor(field: UiNode | null, link: LinkMenuEntry | null, selected: string): readonly MenuItem[] {
+/**
+ * The rows for what was right-clicked; empty when there is nothing to
+ * offer. `word` says each row's name, in English unless given: the menu
+ * passes the words of the language it is placed under.
+ */
+export function menuFor(
+  field: UiNode | null,
+  link: LinkMenuEntry | null,
+  selected: string,
+  word: (id: ComponentMessageId) => string = ENGLISH
+): readonly MenuItem[] {
   const rows: MenuItem[] = [];
   if (link !== null) {
-    rows.push({ value: 'openLink', label: 'Open Link in New Tab' });
+    rows.push({ value: 'openLink', label: word('gesso.contextMenu.openLinkInNewTab') });
     if (link.url !== undefined) {
-      rows.push({ value: 'copyLink', label: 'Copy Link' });
+      rows.push({ value: 'copyLink', label: word('gesso.contextMenu.copyLink') });
     }
   }
   // A rule is drawn above the item that carries `separator`, so the
@@ -146,13 +156,18 @@ export function menuFor(field: UiNode | null, link: LinkMenuEntry | null, select
     const secret = field.properties.get('secret') === true;
     const hasSelection = selected.length > 0;
     rows.push(
-      { value: 'cut', label: 'Cut', disabled: !editable || secret || !hasSelection, separator: grouped },
-      { value: 'copy', label: 'Copy', disabled: secret || !hasSelection },
-      { value: 'paste', label: 'Paste', disabled: !editable },
-      { value: 'selectAll', label: 'Select All', separator: true }
+      {
+        value: 'cut',
+        label: word('gesso.contextMenu.cut'),
+        disabled: !editable || secret || !hasSelection,
+        separator: grouped
+      },
+      { value: 'copy', label: word('gesso.contextMenu.copy'), disabled: secret || !hasSelection },
+      { value: 'paste', label: word('gesso.contextMenu.paste'), disabled: !editable },
+      { value: 'selectAll', label: word('gesso.contextMenu.selectAll'), separator: true }
     );
   } else if (selected.length > 0) {
-    rows.push({ value: 'copy', label: 'Copy', separator: grouped });
+    rows.push({ value: 'copy', label: word('gesso.contextMenu.copy'), separator: grouped });
   }
   return rows;
 }

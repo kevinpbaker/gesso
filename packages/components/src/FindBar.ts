@@ -1,6 +1,6 @@
-import { combineLatest, map } from 'rxjs';
+import type { Observable } from 'rxjs';
 
-import { input, type ComponentContext, type Inputs, FindService, internalState } from 'gesso-framework';
+import { computed, input, type ComponentContext, type Inputs, FindService, internalState } from 'gesso-framework';
 import {
   Button,
   EditableText,
@@ -13,6 +13,7 @@ import {
 } from 'gesso-core';
 import { CONTROL_FOCUS_RING, keymap } from './internals';
 import { trackFocus } from './focus';
+import { orWord, wordsFor } from './messages';
 
 /**
  * The bar Ctrl/Cmd+F opens.
@@ -32,7 +33,8 @@ export interface FindBarProps {
 
 export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): UiChild {
   const inset = input(inputs.inset, 12);
-  const placeholder = input(inputs.placeholder, 'Find on page');
+  const say = wordsFor(ctx);
+  const placeholder = orWord(inputs.placeholder, say('gesso.findBar.label'));
   const find = ctx.inject(FindService);
   const query = internalState('');
   const focus = trackFocus(ctx);
@@ -65,9 +67,9 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
     field = null;
   };
 
-  const counter = combineLatest([find.activeMatch, find.matchCount]).pipe(
-    map(([active, total]) => (total === 0 ? 'No results' : `${active} of ${total}`))
-  );
+  const noResults = say('gesso.findBar.noResults');
+  const stepOf = say('gesso.stepOf', { step: find.activeMatch, count: find.matchCount });
+  const counter = computed(read => (read(find.matchCount) === 0 ? noResults.value : stepOf.value));
 
   return Row(
     {
@@ -83,7 +85,7 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
       borderWidth: 1,
       borderRadius: 8,
       role: 'search',
-      label: 'Find on page'
+      label: say('gesso.findBar.label')
     },
     EditableText({
       // The store keeps the node until the runtime installs the
@@ -95,7 +97,7 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
       },
       modifiers: [CONTROL_FOCUS_RING],
       value: query,
-      placeholder: placeholder.value,
+      placeholder,
       textWrap: 'none',
       minWidth: 160,
       padding: 6,
@@ -105,7 +107,7 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
       backgroundColor: 'controlBackground',
       color: 'controlForeground',
       role: 'searchbox',
-      label: 'Find',
+      label: say('gesso.findBar.field'),
       onInput: (event: UiTextChangeEvent) => search(event.value),
       // Enter is the app's in a single-line field, so it steps.
       onKeyDown: (event: UiKeyboardEvent) =>
@@ -115,9 +117,9 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
         })(event)
     }),
     Text({ text: counter, color: 'textMuted', textStyle: 'bodySmall', selectable: false }),
-    step('‹', 'Previous match', () => find.previous()),
-    step('›', 'Next match', () => find.next()),
-    step('✕', 'Close find', () => find.close())
+    step('‹', say('gesso.findBar.previous'), () => find.previous()),
+    step('›', say('gesso.findBar.next'), () => find.next()),
+    step('✕', say('gesso.findBar.close'), () => find.close())
   );
 }
 
@@ -131,7 +133,7 @@ export function FindBar(inputs: Inputs<FindBarProps>, ctx: ComponentContext): Ui
  */
 const registered = new WeakMap<FindService, UiNode>();
 
-function step(glyph: string, label: string, press: () => void) {
+function step(glyph: string, label: Observable<string>, press: () => void) {
   return Button({
     text: glyph,
     width: 26,

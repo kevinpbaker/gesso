@@ -13,6 +13,7 @@ import { computed, createComponent, input, show, type ComponentContext, type Inp
 
 import { followedChildren, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 import { Button } from './Button';
+import { wordsFor } from './messages';
 
 /**
  * An alert: a banner that stays where it was put.
@@ -202,7 +203,7 @@ export interface AlertProps extends ControlLayoutProps {
 }
 
 /** An alert: a banner that stays where it was put. */
-export function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChild {
+export function Alert(inputs: Inputs<AlertProps>, ctx: ComponentContext): UiChild {
   const title = input(inputs.title, '');
   const message = input(inputs.message, '');
   const tone = input(inputs.tone, 'neutral');
@@ -275,8 +276,9 @@ export function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChi
         // and "button" is all a nameless one can be announced as. The
         // word is fixed because the surface has no prop for it; an
         // application that needs another one builds its own banner or
-        // passes its own control as `children`.
-        label: 'Dismiss',
+        // passes its own control as `children`. It is translated with
+        // the other built-in words, as `gesso.dismiss`.
+        label: wordsFor(ctx)('gesso.dismiss'),
         // The quietest variant there is. A dismiss button that competed
         // with the message would be the loudest thing in a banner whose
         // point is the message.

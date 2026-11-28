@@ -20,6 +20,7 @@ import {
 } from 'gesso-core';
 import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 import { zoomStep } from './StatusBar';
+import { wordsFor } from './messages';
 
 /**
  * Where a viewport looks: the content's point at its top-left corner,
@@ -448,7 +449,7 @@ export function Viewport(inputs: Inputs<ViewportProps>, ctx: ComponentContext): 
         borderWidth: 1,
         borderRadius: 6,
         role: 'group',
-        label: 'Zoom'
+        label: wordsFor(ctx)('gesso.zoom')
       },
       button('Zoom out', '−', () => zoomTo(step(-1))),
       button(percent.pipe(map(p => `Zoom ${p}, reset to 100%`)), percent, () => zoomTo(1)),

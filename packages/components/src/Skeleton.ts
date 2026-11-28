@@ -19,6 +19,7 @@ import {
   type UiSemanticState
 } from 'gesso-core';
 import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
+import { orWord, wordsFor } from './messages';
 
 /**
  * A grey stand-in with the same box as the content it is waiting for.
@@ -141,7 +142,7 @@ export interface SkeletonProps extends ControlLayoutProps {
  * is announced rather than silent by an oversight.
  */
 export function Skeleton(inputs: Inputs<SkeletonProps>, ctx: ComponentContext): UiChild {
-  const label = input(inputs.label, 'Loading');
+  const label = orWord(inputs.label, wordsFor(ctx)('gesso.loading'));
   const announce = input(inputs.announce, true);
   // Read once, like `Chip`'s axes: each decides the *shape* of the
   // element built in this body, and a body runs a single time. A
@@ -214,7 +215,7 @@ const FULL_LINE = percent(100);
  * run costs.
  */
 export function SkeletonText(inputs: Inputs<SkeletonTextProps>, ctx: ComponentContext): UiChild {
-  const label = input(inputs.label, 'Loading');
+  const label = orWord(inputs.label, wordsFor(ctx)('gesso.loading'));
   const announce = input(inputs.announce, true);
   // Read once: the number of bars decides how many elements this body
   // builds, and the body runs a single time.

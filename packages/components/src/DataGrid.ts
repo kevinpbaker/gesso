@@ -41,6 +41,7 @@ import {
 } from './formula';
 import { CONTROL_EDGE, CONTROL_FOCUS_RING, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 import { controlTokens } from './tokens';
+import { wordsFor } from './messages';
 
 /**
  * An editable grid of any size, windowed on both axes.
@@ -295,6 +296,7 @@ const EDGE_GRIP = 6;
 
 /** An editable grid of any size, windowed on both axes. */
 export function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const label = input(inputs.label, 'Grid');
   const readOnly = input(inputs.readOnly, false);
   const disabled = input(inputs.disabled, false);
@@ -1663,7 +1665,7 @@ export function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): 
     Box({
       key: 'corner',
       role: 'columnheader',
-      label: 'Row',
+      label: say('gesso.dataGrid.row'),
       columnIndex: 1,
       width: gutter,
       height: headerHeight,
@@ -1849,7 +1851,7 @@ export function DataGrid(inputs: Inputs<DataGridProps>, ctx: ComponentContext): 
             zIndex: 3,
             role: 'row',
             rowIndex: 1,
-            label: 'Column headers',
+            label: say('gesso.columnHeaders'),
             backgroundColor: 'surface'
           },
           ...(gutter > 0 ? [cornerCell()] : []),

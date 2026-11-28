@@ -34,6 +34,7 @@ import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, layoutOf, modifiersOf, type Co
 import { glyph } from './glyph';
 import { Menu, type MenuItem } from './Menu';
 import type { NavigationIcon } from './NavigationRail';
+import { type Say, wordsFor } from './messages';
 
 /** One open thing: a document, a file, a sheet. */
 export interface TabBarTab {
@@ -116,6 +117,7 @@ const GLYPH = 16;
 let bars = 0;
 
 export function TabBar(inputs: Inputs<TabBarProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const label = input(inputs.label, 'Tabs');
   const addLabel = input(inputs.addLabel, 'New tab');
   const dragType = inputs.dragType?.value ?? `gesso/tab-bar-${bars++}`;
@@ -419,7 +421,8 @@ export function TabBar(inputs: Inputs<TabBarProps>, ctx: ComponentContext): UiCh
                   renameField(
                     tab,
                     text => finishRename(tab.value, text),
-                    (node, length) => editing.select({ node, offset: 0 }, { node, offset: length })
+                    (node, length) => editing.select({ node, offset: 0 }, { node, offset: length }),
+                    say
                   )
                 )
               : tabElement(tab, index)
@@ -479,7 +482,7 @@ export function TabBar(inputs: Inputs<TabBarProps>, ctx: ComponentContext): UiCh
       label,
       items: listItems,
       searchable: true,
-      searchPlaceholder: label.pipe(map(name => `Search ${name.toLowerCase()}`)),
+      searchPlaceholder: say('gesso.tabBar.search', { name: label.pipe(map(name => name.toLowerCase())) }),
       onSelect: (key: string) => select(key)
     }),
     inputs.onAdd.pipe(
@@ -556,7 +559,8 @@ function closeButton(
 function renameField(
   tab: TabBarTab,
   done: (text: string | null) => void,
-  selectAll: (node: UiNode, length: number) => void
+  selectAll: (node: UiNode, length: number) => void,
+  say: Say
 ): UiElement {
   let text = tab.label;
   let finished = false;
@@ -580,7 +584,7 @@ function renameField(
     paddingX: 4,
     minWidth: 80,
     role: 'textbox',
-    label: `Rename ${tab.label}`,
+    label: say('gesso.tabBar.rename', { tab: tab.label }),
     onInput: (event: UiTextChangeEvent) => (text = event.value),
     onKeyDown: (event: UiKeyboardEvent) => {
       if (event.key === 'Enter') {

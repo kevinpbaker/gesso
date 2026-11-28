@@ -38,6 +38,7 @@ import { layoutOf, type ControlLayoutProps, modifiersOf } from './internals';
 import { useOverlay } from './overlay';
 import { paintedFill, snapped } from './sliderTrack';
 import { VideoControls, type VideoControlsOptions } from './VideoControls';
+import { orWord, wordsFor } from './messages';
 
 /**
  * The Media tier.
@@ -696,7 +697,7 @@ export function Spinner(inputs: Inputs<SpinnerProps>, ctx: ComponentContext): Ui
   // or turns `danger` when the wait has gone on too long, is the same
   // spinner, and neither is a reason to key a new one.
   const size = input(inputs.size, 20);
-  const label = input(inputs.label, 'Loading');
+  const label = orWord(inputs.label, wordsFor(ctx)('gesso.loading'));
   const color = input(inputs.color, 'controlAccent' as UiColorValue);
   const step = internalState(0);
 

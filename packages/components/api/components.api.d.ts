@@ -162,7 +162,7 @@ interface AlertProps extends ControlLayoutProps {
   onDismiss?: () => void;
   children?: UiChild;
 }
-declare function Alert(inputs: Inputs<AlertProps>, _ctx: ComponentContext): UiChild;
+declare function Alert(inputs: Inputs<AlertProps>, ctx: ComponentContext): UiChild;
 type MeterOptimum = 'low' | 'high';
 interface MeterProps extends ControlLayoutProps {
   value: number;
@@ -216,7 +216,7 @@ interface PaginationProps extends ControlLayoutProps {
   disabled?: boolean;
   size?: ButtonSize;
 }
-declare function Pagination(inputs: Inputs<PaginationProps>, _ctx: ComponentContext): UiChild;
+declare function Pagination(inputs: Inputs<PaginationProps>, ctx: ComponentContext): UiChild;
 type ChipVariant = 'filled' | 'outlined';
 type ChipSize = 'small' | 'medium';
 interface ChipProps extends ControlLayoutProps {
@@ -952,7 +952,7 @@ interface PanelGroupProps extends ControlLayoutProps {
   onCollapsedChange?: (collapsed: readonly string[]) => void;
   divider?: 'line' | 'bar';
 }
-declare function PanelGroup(inputs: Inputs<PanelGroupProps>, _ctx: ComponentContext): UiChild;
+declare function PanelGroup(inputs: Inputs<PanelGroupProps>, ctx: ComponentContext): UiChild;
 type StatusBarTone = 'muted' | 'default' | 'primary' | 'danger';
 interface StatusBarItem {
   readonly key: string;
@@ -1133,6 +1133,68 @@ interface MenuProps {
   emptyText?: string;
 }
 declare function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild;
+declare const componentMessages: {
+  readonly 'gesso.dismiss': "Dismiss";
+  readonly 'gesso.close': "Close";
+  readonly 'gesso.loading': "Loading";
+  readonly 'gesso.zoom': "Zoom";
+  readonly 'gesso.columnHeaders': "Column headers";
+  readonly 'gesso.stepOf': "{step, number} of {count, number}";
+  readonly 'gesso.agentConfirm.cancel': "Cancel";
+  readonly 'gesso.agentConfirm.allow': "Allow";
+  readonly 'gesso.agentConfirm.askedBy': "{named, select, true {Asked by {agent}.} other {Asked by an AI agent.}}{destructive, select, true { This cannot be undone.} other {}}";
+  readonly 'gesso.breadcrumb.showHidden': "{count, plural, one {Show # hidden step} other {Show # hidden steps}}";
+  readonly 'gesso.combobox.noMatches': "No matches";
+  readonly 'gesso.combobox.remove': "Remove {item}";
+  readonly 'gesso.contextMenu.label': "Context menu";
+  readonly 'gesso.contextMenu.openLinkInNewTab': "Open Link in New Tab";
+  readonly 'gesso.contextMenu.copyLink': "Copy Link";
+  readonly 'gesso.contextMenu.cut': "Cut";
+  readonly 'gesso.contextMenu.copy': "Copy";
+  readonly 'gesso.contextMenu.paste': "Paste";
+  readonly 'gesso.contextMenu.selectAll': "Select All";
+  readonly 'gesso.dataGrid.row': "Row";
+  readonly 'gesso.datePicker.noDate': "No date";
+  readonly 'gesso.datePicker.previousMonth': "Previous month";
+  readonly 'gesso.datePicker.nextMonth': "Next month";
+  readonly 'gesso.datePicker.today': "Today";
+  readonly 'gesso.datePicker.clear': "Clear";
+  readonly 'gesso.datePicker.clearDate': "Clear date";
+  readonly 'gesso.findBar.label': "Find on page";
+  readonly 'gesso.findBar.field': "Find";
+  readonly 'gesso.findBar.noResults': "No results";
+  readonly 'gesso.findBar.previous': "Previous match";
+  readonly 'gesso.findBar.next': "Next match";
+  readonly 'gesso.findBar.close': "Close find";
+  readonly 'gesso.menu.search': "Search";
+  readonly 'gesso.pagination.label': "Pagination";
+  readonly 'gesso.pagination.previous': "Previous page";
+  readonly 'gesso.pagination.next': "Next page";
+  readonly 'gesso.pagination.page': "Page {page, number}";
+  readonly 'gesso.panelGroup.resize': "Resize {panel}";
+  readonly 'gesso.scrollArea.backToTop': "Back to top";
+  readonly 'gesso.shortcutSheet.filterPlaceholder': "Filter shortcuts…";
+  readonly 'gesso.shortcutSheet.filter': "Filter shortcuts";
+  readonly 'gesso.shortcutSheet.noMatches': "No shortcut matches";
+  readonly 'gesso.toolbar.more': "More";
+  readonly 'gesso.tabBar.search': "Search {name}";
+  readonly 'gesso.tabBar.rename': "Rename {tab}";
+  readonly 'gesso.tour.done': "Done";
+  readonly 'gesso.tour.end': "End tour";
+  readonly 'gesso.tour.back': "Back";
+  readonly 'gesso.tour.next': "Next";
+  readonly 'gesso.video.controls': "Video controls";
+  readonly 'gesso.video.play': "Play";
+  readonly 'gesso.video.pause': "Pause";
+  readonly 'gesso.video.seek': "Seek";
+  readonly 'gesso.video.mute': "Mute";
+  readonly 'gesso.video.unmute': "Unmute";
+  readonly 'gesso.video.volume': "Volume";
+  readonly 'gesso.video.fullscreen': "Fullscreen";
+  readonly 'gesso.video.leaveFullscreen': "Leave fullscreen";
+};
+type ComponentMessages = typeof componentMessages;
+type ComponentMessageId = keyof ComponentMessages & string;
 interface ContextMenusProps extends ControlLayoutProps {
   children?: UiChild;
 }
@@ -1965,6 +2027,7 @@ export {
   comboboxRank,
   CommandPalette,
   commandPaletteMatch,
+  componentMessages,
   ContextMenus,
   controlDescription,
   controlled,
@@ -2133,6 +2196,8 @@ export {
   type CommandMatch,
   type CommandPaletteItem,
   type CommandPaletteProps,
+  type ComponentMessageId,
+  type ComponentMessages,
   type ContextMenusProps,
   type ControlFocus,
   type ControlLayoutProps,

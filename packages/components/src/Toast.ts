@@ -3,6 +3,7 @@ import { distinctUntilChanged, map, skip } from 'rxjs';
 import { FocusService, input, show, type ComponentContext, type Inputs } from 'gesso-framework';
 import { Button, Row, Text, type UiChild, type UiNode } from 'gesso-core';
 import { useOverlay } from './overlay';
+import { wordsFor } from './messages';
 
 /**
  * A message that announces itself and goes away.
@@ -59,6 +60,7 @@ export interface ToastProps {
 export type ToastPlacement = 'bottom-start' | 'bottom' | 'bottom-end';
 
 export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const message = input(inputs.message, '');
   const tone = input(inputs.tone, 'info');
   const duration = input(inputs.duration, 4000);
@@ -181,7 +183,7 @@ export function Toast(inputs: Inputs<ToastProps>, ctx: ComponentContext): UiChil
             borderRadius: 4,
             color: 'textMuted',
             role: 'button',
-            label: 'Dismiss',
+            label: say('gesso.dismiss'),
             onClick: close
           }),
         () => Row({ width: 0 })

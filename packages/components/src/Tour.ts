@@ -32,6 +32,7 @@ import { controlled } from './controlled';
 import { keymap } from './internals';
 import { useOverlay } from './overlay';
 import { controlTokens } from './tokens';
+import { orWord, wordsFor } from './messages';
 
 /**
  * An element a tour can point at: give it `ref={target.ref}`, and name
@@ -119,7 +120,8 @@ const BEYOND = 10000;
  */
 export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild {
   const padding = input(inputs.padding, 8);
-  const doneLabel = input(inputs.doneLabel, 'Done');
+  const say = wordsFor(ctx);
+  const doneLabel = orWord(inputs.doneLabel, say('gesso.tour.done'));
   const modal = input(inputs.modal, true);
   const focus = ctx.inject(FocusService);
   const inspection = ctx.inject(InspectionService);
@@ -244,7 +246,7 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
         Text({ text: current.title, textStyle: 'title', color: 'text', flex: 1, minWidth: 0 }),
         // The pointer's way out at any step, beside Escape for the keyboard.
         createComponent(Button, {
-          label: 'End tour',
+          label: say('gesso.tour.end'),
           variant: 'plain',
           size: 'small',
           onClick: () => go(null),
@@ -254,14 +256,26 @@ export function Tour(inputs: Inputs<TourProps>, ctx: ComponentContext): UiChild 
       ...(current.body === undefined ? [] : [Text({ text: current.body, textStyle: 'body', color: 'textMuted' })]),
       Row(
         { y: 'center', gap: 8, paddingTop: 4 },
-        Text({ text: `${at + 1} of ${all.length}`, textStyle: 'bodySmall', color: 'textMuted', flex: 1 }),
+        Text({
+          text: say('gesso.stepOf', { step: at + 1, count: all.length }),
+          textStyle: 'bodySmall',
+          color: 'textMuted',
+          flex: 1
+        }),
         ...(at === 0
           ? []
-          : [createComponent(Button, { label: 'Back', size: 'small', variant: 'plain', onClick: () => go(at - 1) })]),
+          : [
+              createComponent(Button, {
+                label: say('gesso.tour.back'),
+                size: 'small',
+                variant: 'plain',
+                onClick: () => go(at - 1)
+              })
+            ]),
         doneLabel.pipe(
           map(done =>
             createComponent(Button, {
-              label: last ? done : 'Next',
+              label: last ? done : say('gesso.tour.next'),
               size: 'small',
               variant: 'filled',
               onClick: () => go(last ? null : at + 1)

@@ -26,6 +26,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Rich text', link: '/guide/rich-text' },
       { text: 'Using components', link: '/guide/using-components' },
       { text: 'Forms', link: '/guide/forms' },
+      { text: 'Translating', link: '/guide/translating' },
       { text: 'Light and dark', link: '/guide/appearance' },
       { text: 'State and services', link: '/guide/state-and-services' },
       { text: 'Workers', link: '/guide/workers' },

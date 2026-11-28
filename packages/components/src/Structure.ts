@@ -15,6 +15,7 @@ import {
   modifiersOf,
   followedChildren
 } from './internals';
+import { orWord, wordsFor } from './messages';
 
 /**
  * The pieces a screen is assembled from: a surface, a rule, a row of
@@ -180,7 +181,7 @@ export function Toolbar(inputs: Inputs<ToolbarProps>, ctx: ComponentContext): Ui
       ...toolbarItems(ctx, {
         items: input(inputs.items, []),
         onSelect: value => inputs.onSelect.emit(value),
-        moreLabel: input(inputs.moreLabel, 'More'),
+        moreLabel: orWord(inputs.moreLabel, wordsFor(ctx)('gesso.toolbar.more')),
         shortcutBadges: inputs.shortcutBadges.value === true,
         keepFocus: inputs.keepFocus.value === true,
         wrap: inputs.wrap.value === true,

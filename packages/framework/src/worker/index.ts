@@ -98,3 +98,17 @@ export {
 } from '../storage/OpfsStorage';
 export { IndexedDbStorage, type IndexedDbStorageOptions } from '../storage/IndexedDbStorage';
 export { persisted, PersistedState, type PersistedOptions } from '../storage/persisted';
+// The catalog and the formatter, without the render thread's `I18n`:
+// a data layer names messages, and words one only when it leaves the app.
+export {
+  compileMessage,
+  defineMessages,
+  formatMessage,
+  MessageFormatError,
+  type Catalog,
+  type CompiledMessage,
+  type MessageRef,
+  type MessageValue,
+  type MessageValues,
+  type Translations
+} from '../i18n/workerEntry';

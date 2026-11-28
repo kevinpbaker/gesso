@@ -277,3 +277,25 @@ export type {
   IslandStandIn,
   IslandUpdate
 } from './islands/IslandProtocol';
+export {
+  compileMessage,
+  createI18n,
+  defineMessages,
+  fallbackChain,
+  formatMessage,
+  I18n,
+  i18nFrom,
+  I18nKey,
+  MessageFormatError,
+  provideI18n,
+  type Catalog,
+  type CatalogSource,
+  type CompiledMessage,
+  type I18nOptions,
+  type MessageInput,
+  type MessageInputs,
+  type MessageRef,
+  type MessageValue,
+  type MessageValues,
+  type Translations
+} from './i18n';

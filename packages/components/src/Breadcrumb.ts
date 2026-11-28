@@ -24,6 +24,7 @@ import {
 
 import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
 import { followRoute, middlePress, opensElsewhere } from './follow';
+import { type Say, wordsFor } from './messages';
 
 export interface BreadcrumbItem {
   readonly value: string;
@@ -236,6 +237,7 @@ export interface BreadcrumbProps extends ControlLayoutProps {
 }
 
 export function Breadcrumb(inputs: Inputs<BreadcrumbProps>, ctx: ComponentContext): UiChild {
+  const say = wordsFor(ctx);
   const label = input(inputs.label, 'Breadcrumb');
   const separator = input(inputs.separator, SOLIDUS);
   const maxItems = input(inputs.maxItems, 0);
@@ -295,7 +297,7 @@ export function Breadcrumb(inputs: Inputs<BreadcrumbProps>, ctx: ComponentContex
     map(([items, limit, unfolded]) => {
       const steps = planOf(items, limit, unfolded === trailKey(items));
       return steps.map((step, at) =>
-        listItem(step, items.length, at < steps.length - 1, separator, activate, expand, track)
+        listItem(step, items.length, at < steps.length - 1, separator, activate, expand, track, say)
       );
     })
   );
@@ -375,7 +377,8 @@ function listItem(
   separator: InputCell<string>,
   activate: (item: BreadcrumbItem, elsewhere: boolean) => void,
   expand: () => void,
-  track: (value: string, node: UiNode | null) => void
+  track: (value: string, node: UiNode | null) => void,
+  say: Say
 ): UiElement {
   // Both children are keyed, and the crumb's key is *what it is*
   // rather than where it sits. A crumb that stops being a link — which
@@ -384,7 +387,7 @@ function listItem(
   // and the tree keeps the properties the old element set: the first
   // draft turned the new current crumb into the separator that used to
   // follow it, announced as a nameless rule with the page's name in it.
-  const children: UiElement[] = [body(crumb, activate, expand, track)];
+  const children: UiElement[] = [body(crumb, activate, expand, track, say)];
   if (separated) {
     children.push(separatorMark(separator));
   }
@@ -409,10 +412,11 @@ function body(
   crumb: Crumb,
   activate: (item: BreadcrumbItem, elsewhere: boolean) => void,
   expand: () => void,
-  track: (value: string, node: UiNode | null) => void
+  track: (value: string, node: UiNode | null) => void,
+  say: Say
 ): UiElement {
   if (crumb.kind === 'ellipsis') {
-    return fold(crumb.hidden ?? 0, expand);
+    return fold(crumb.hidden ?? 0, expand, say);
   }
   const item = crumb.item as BreadcrumbItem;
   const middle = middlePress();
@@ -471,7 +475,7 @@ function body(
 }
 
 /** The fold: a button, because it does something. */
-function fold(hidden: number, expand: () => void): UiElement {
+function fold(hidden: number, expand: () => void, say: Say): UiElement {
   return Row(
     {
       key: 'ellipsis',
@@ -486,7 +490,7 @@ function fold(hidden: number, expand: () => void): UiElement {
       // a name here is the only thing that says what pressing it does.
       // `button` makes its children presentational, so the glyph is
       // not announced after the name.
-      label: `Show ${hidden} hidden ${hidden === 1 ? 'step' : 'steps'}`,
+      label: say('gesso.breadcrumb.showHidden', { count: hidden }),
       states: COLLAPSED,
       onClick: expand
     },

@@ -26,6 +26,7 @@ import {
 import { fuzzyMatch, matchSpans } from './fuzzy';
 import { CONTROL_FOCUS_RING, CONTROL_INTERACTION, keymap, menuBadge } from './internals';
 import { useOverlay, type OverlayPlacement } from './overlay';
+import { orWord, wordsFor } from './messages';
 
 export interface MenuItem {
   readonly value: string;
@@ -134,7 +135,7 @@ export function Menu(inputs: Inputs<MenuProps>, ctx: ComponentContext): UiChild 
   const overlay = useOverlay(ctx, 'menu');
   const compact = inputs.compact.value === true;
   const searchable = inputs.searchable?.value === true;
-  const searchPlaceholder = input(inputs.searchPlaceholder, 'Search');
+  const searchPlaceholder = orWord(inputs.searchPlaceholder, wordsFor(ctx)('gesso.menu.search'));
   const emptyText = input(inputs.emptyText, 'Nothing matches');
   /** What is typed in a searchable menu's field; always '' in one that isn't. */
   const query = new BehaviorSubject('');

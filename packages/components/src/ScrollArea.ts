@@ -24,6 +24,7 @@ import {
 } from 'gesso-framework';
 import { Button } from './Button';
 import { followedChildren, layoutOf, modifiersOf, type ControlLayoutProps } from './internals';
+import { orWord, wordsFor } from './messages';
 
 /**
  * A scrolling region that says where it is: a fade over the edge its
@@ -86,7 +87,7 @@ const AT_EDGE = 1;
 export function ScrollArea(inputs: Inputs<ScrollAreaProps>, ctx: ComponentContext): UiChild {
   const fade = input(inputs.fade, 24);
   const fadeColor = input(inputs.fadeColor, 'background' as UiColorValue);
-  const label = input(inputs.backToTopLabel, 'Back to top');
+  const label = orWord(inputs.backToTopLabel, wordsFor(ctx)('gesso.scrollArea.backToTop'));
   const animations = ctx.inject(AnimationService);
   // Where it is drawn: a design tool's board settles the scroll back, its player may slow it.
   const clock = ctx.environment(UiEnvironmentKeys.clock);
