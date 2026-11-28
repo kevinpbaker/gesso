@@ -94,6 +94,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'Shell services', link: '/structure/shell-services' },
       { text: 'Undo and redo', link: '/structure/undo' },
       { text: 'Remembering state', link: '/structure/persistence' },
+      { text: 'Editing together', link: '/structure/collaboration' },
       { text: 'Errors and the overlay', link: '/structure/errors-and-the-overlay' },
       { text: 'Desktop windows', link: '/structure/desktop-windows' },
       { text: 'Gesso on Electrobun', link: '/structure/gesso-on-electrobun' },

@@ -1,4 +1,4 @@
-# Publishing the eight packages.
+# Publishing the nine packages.
 #
 # The shape of this file is decided by one conflict. The packages'
 # `exports` point at `src/*.ts` so the workspace and the documentation
@@ -136,7 +136,7 @@ jobs:
             private=$(node -p "require('./$dir/package.json').private === true")
             [ "$private" = "true" ] && { echo "skipping $name (private)"; continue; }
 
-            # The eight libraries declare `publishConfig.exports`, which is
+            # The nine libraries declare `publishConfig.exports`, which is
             # the rewrite this step exists to prove happened. A package
             # without one has no rewrite to verify: `create-gesso-app` is a
             # CLI with a `bin` and no `exports` at all, and is packed by the

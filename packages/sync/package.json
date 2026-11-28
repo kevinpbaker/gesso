@@ -1,0 +1,65 @@
+{
+  "name": "gesso-sync",
+  "version": "0.9.0",
+  "description": "Collaborative Gesso channels: a Yjs document in the application worker, projected to the view as plain data, with presence, reconnect, offline storage and undo of your own edits.",
+  "license": "MIT",
+  "author": "Kevin Baker",
+  "homepage": "https://gesso-docs.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinpbaker/gesso.git",
+    "directory": "packages/sync"
+  },
+  "bugs": {
+    "url": "https://github.com/kevinpbaker/gesso/issues"
+  },
+  "keywords": [
+    "gesso",
+    "yjs",
+    "crdt",
+    "collaboration",
+    "realtime",
+    "offline",
+    "presence",
+    "web-worker"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "access": "public"
+  },
+  "files": [
+    "README.md",
+    "CHANGELOG.md",
+    "dist",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "gesso-framework": "workspace:^"
+  },
+  "peerDependencies": {
+    "lib0": "^0.2.0",
+    "rxjs": "^7.8.2",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.0"
+  },
+  "devDependencies": {
+    "lib0": "^0.2.120",
+    "rxjs": "^7.8.2",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.33"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prepublishOnly": "node ../../scripts/guard-publish.ts"
+  }
+}

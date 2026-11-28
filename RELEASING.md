@@ -6,9 +6,9 @@ registry.
 
 ## What a release is
 
-Eight packages at one version: `gesso-core`, `gesso-framework`,
+Nine packages at one version: `gesso-core`, `gesso-framework`,
 `gesso-components`, `gesso-testing`, `gesso-devtools`,
-`gesso-vite-plugin`, `gesso-electrobun` and `gesso-react`. They are a changesets
+`gesso-vite-plugin`, `gesso-electrobun`, `gesso-react` and `gesso-sync`. They are a changesets
 `fixed` group, so they move together whether or not each one changed.
 `.changeset/README.md` has the reasoning and the pre-1.0 policy: a
 breaking change bumps the minor, everything else the patch.
@@ -18,7 +18,7 @@ version` moves it with the others, and the release workflow publishes
 it too, by a route of its own and last. Its templates name the version
 being released, so a scaffold run before the libraries were on the
 registry would ask for packages that are not there; the workflow uploads
-it only once all eight have been accepted, and skips it if that version
+it only once all nine have been accepted, and skips it if that version
 is already published.
 
 It is packed with **npm** rather than pnpm, because it has no
@@ -173,7 +173,7 @@ with `--provenance`, so the pieces are in place. What is not done yet is
 the registry side: until a trusted publisher is configured, the workflow
 authenticates with the `NPM_TOKEN` secret.
 
-To finish it, for each of the eight packages and `create-gesso-app` on
+To finish it, for each of the nine packages and `create-gesso-app` on
 npmjs.com, add a trusted publisher pointing at `kevinpbaker/gesso` and
 `release.yml`. Then delete
 the `NPM_TOKEN` secret and revoke the token. After that no long-lived

@@ -11,6 +11,7 @@
       "gesso-devtools",
       "gesso-vite-plugin",
       "gesso-electrobun",
+      "gesso-sync",
       "gesso-react",
       "create-gesso-app"
     ]
