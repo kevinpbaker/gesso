@@ -104,8 +104,15 @@ export class ComputedCell<T> extends Observable<T> implements ReadableCell<T> {
       if (this.upstream === null) {
         this.attach();
       }
-      subscriber.next(this.cached);
+      const given = this.cached;
+      subscriber.next(given);
       const following = this.changes.subscribe(subscriber);
+      // What the subscriber did with the first value may have changed this
+      // cell (a row of a list, mounting, adds to the list): that change was
+      // told before it followed, so it is told now.
+      if (!Object.is(this.cached, given) && !subscriber.closed) {
+        subscriber.next(this.cached);
+      }
       return () => {
         following.unsubscribe();
         this.subscribers--;
@@ -459,8 +466,13 @@ class StreamCell<T> extends Observable<T> implements ReadableCell<T> {
       if (this.upstream === null) {
         this.attach();
       }
-      subscriber.next(this.last);
+      const given = this.last;
+      subscriber.next(given);
       const following = this.changes.subscribe(subscriber);
+      // A change made while the first value was handled was told before the subscriber followed.
+      if (!Object.is(this.last, given) && !subscriber.closed) {
+        subscriber.next(this.last);
+      }
       return () => {
         following.unsubscribe();
         this.followers--;
