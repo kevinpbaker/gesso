@@ -10,11 +10,11 @@ writes the changelogs and updates the ranges between the packages.
 
 ## The versioning policy, before 1.0
 
-The seven published packages are a `fixed` group: they always carry the
+The eight published packages are a `fixed` group: they always carry the
 same version. They depend on each other by range and are released
 together, so a reader never has to work out which `gesso-core` a given
 `gesso-framework` wants. The cost is that a fix in one package moves
-all seven, which is the right trade while the surface is still moving.
+all eight, which is the right trade while the surface is still moving.
 
 While the major is 0:
 

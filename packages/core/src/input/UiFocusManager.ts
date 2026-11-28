@@ -115,6 +115,15 @@ export class UiFocusManager {
   private isBound: ((node: UiNode) => boolean) | null = null;
   /** The field of each editing group that last had focus, where Tab back into the group lands. */
   private readonly groupEntries = new WeakMap<UiNode, UiNode>();
+  /**
+   * Called, after focus is dropped, when Tab moves past the last stop
+   * (1) or Shift+Tab before the first (-1) with no trap active. Null,
+   * the default, wraps around, which is right for an application that
+   * is the whole page. An application embedded among other controls
+   * sets it so the keyboard can leave: without it, Tab cycles inside
+   * the canvas forever, which is a keyboard trap.
+   */
+  edgeExit: ((direction: 1 | -1) => void) | null = null;
 
   constructor(
     root: UiNode,
@@ -437,6 +446,17 @@ export class UiFocusManager {
       // Nothing focused, or focus sits outside the active scope: move
       // to the first (next) or last (previous).
       index = delta > 0 ? focusables.length - 1 : 0;
+    } else if (this.edgeExit !== null && !this.trapped) {
+      const beyond = index + delta;
+      if (beyond < 0 || beyond >= focusables.length) {
+        // Past the last stop (or before the first) of an application
+        // that is one part of a page: the page has the next stop, so
+        // focus leaves rather than wrapping. A trap still wraps, as a
+        // dialog does on any page.
+        this.blur();
+        this.edgeExit(delta > 0 ? 1 : -1);
+        return false;
+      }
     }
     let next = focusables[(index + delta + focusables.length) % focusables.length]!;
     const into = this.groupOf(next);

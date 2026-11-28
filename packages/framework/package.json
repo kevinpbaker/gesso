@@ -40,7 +40,8 @@
     "./jsx-dev-runtime": "./src/jsx/jsx-dev-runtime.ts",
     "./testing": "./src/testing.ts",
     "./agent": "./src/agent/index.ts",
-    "./remote": "./src/remote/index.ts"
+    "./remote": "./src/remote/index.ts",
+    "./embed": "./src/embed/index.ts"
   },
   "publishConfig": {
     "exports": {
@@ -67,6 +68,10 @@
       "./remote": {
         "types": "./dist/remote/index.d.ts",
         "default": "./dist/remote/index.js"
+      },
+      "./embed": {
+        "types": "./dist/embed/index.d.ts",
+        "default": "./dist/embed/index.js"
       }
     },
     "access": "public"

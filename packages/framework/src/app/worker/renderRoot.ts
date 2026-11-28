@@ -574,6 +574,9 @@ export class RenderWorkerApp {
       this.loadProblem = undefined;
       this.failedInit = undefined;
       this.runtime!.setTextInputSource(message.textInput ?? 'keys');
+      if (message.tabExit === true) {
+        this.runtime!.onTabExit(direction => this.host.postMessage({ type: 'tabExit', direction }));
+      }
       return;
     }
 

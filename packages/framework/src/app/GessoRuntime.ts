@@ -1768,6 +1768,17 @@ export class GessoRuntime {
     }
   }
 
+  /**
+   * Lets Tab leave the application at either end of its tab order:
+   * past the last stop, or before the first, focus is dropped and the
+   * listener hears which way it went. Null, the default, wraps, which is
+   * right for an application that is the whole page. See
+   * `UiFocusManager.edgeExit`.
+   */
+  onTabExit(listener: ((direction: 1 | -1) => void) | null): void {
+    this.focusManager.edgeExit = listener;
+  }
+
   /** The scrolling keys the application will use at its current focus. */
   claimedKeys(): string[] {
     const focused = this.focusManager.focusedNode;
@@ -2614,6 +2625,7 @@ export class GessoRuntime {
     this.cursorListener = null;
     this.scrollabilityListener = null;
     this.claimedKeysListener = null;
+    this.focusManager.edgeExit = null;
     this.rendererErrorListener = null;
     this.frameErrorListener = null;
     this.scheduler.stop();

@@ -194,3 +194,23 @@ describe('FocusService', () => {
     expect(runtime.input.focus.focusedNode?.properties.get('text')).toBe('Confirm');
   });
 });
+
+describe('GessoRuntime.onTabExit', () => {
+  it('lets Tab leave past the last stop instead of wrapping, for an app that is one part of a page', () => {
+    const { runtime } = mount(FocusHostApp);
+    const exits: number[] = [];
+    runtime.onTabExit(direction => exits.push(direction));
+
+    runtime.input.keyboard.keyDown('Tab');
+    expect(runtime.input.focus.focusedNode).toBe(app().opener);
+    const stops = runtime.services.get(FocusService).tabStops().length;
+    for (let pressed = 1; pressed < stops; pressed += 1) {
+      runtime.input.keyboard.keyDown('Tab');
+    }
+    expect(exits).toEqual([]);
+    runtime.input.keyboard.keyDown('Tab');
+
+    expect(exits).toEqual([1]);
+    expect(runtime.input.focus.focusedNode).toBeNull();
+  });
+});

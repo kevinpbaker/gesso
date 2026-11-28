@@ -1,0 +1,65 @@
+{
+  "name": "gesso-react",
+  "version": "0.9.0",
+  "description": "Mount a Gesso app inside a React app, one panel at a time: a component for the surface and a hook for the channels it reads.",
+  "license": "MIT",
+  "author": "Kevin Baker",
+  "homepage": "https://gesso-docs.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinpbaker/gesso.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/kevinpbaker/gesso/issues"
+  },
+  "keywords": [
+    "gesso",
+    "canvas",
+    "ui",
+    "typescript",
+    "react",
+    "embed",
+    "web-worker",
+    "offscreencanvas"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "access": "public"
+  },
+  "files": [
+    "README.md",
+    "CHANGELOG.md",
+    "dist",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "gesso-framework": "workspace:^"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0 || ^19.0.0",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
+    "happy-dom": "^20.14.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "rxjs": "^7.8.2"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prepublishOnly": "node ../../scripts/guard-publish.ts"
+  }
+}

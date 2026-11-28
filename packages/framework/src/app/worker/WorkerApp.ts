@@ -29,6 +29,7 @@ import { attachFileDrop } from '../fileDrop';
 import type { ShellFiles } from '../shellFiles';
 import { openPicker, type ShellPickers, windowPickers } from '../shellPicker';
 import { setLeaveWarning } from '../shellLeaveWarning';
+import { tabbableBeside } from '../tabExit';
 import { redirectWith } from '../shellRedirect';
 import { portHandle, type WorkerHandle } from '../../worker/WorkerPorts';
 import { EditingProxy, readClipboard, writeClipboard, writeClipboardImage } from '../EditingProxy';
@@ -233,6 +234,30 @@ export interface WorkerAppOptions {
    * pressed on that page isn't its.
    */
   pageKeys?: boolean;
+  /**
+   * Tab past the app's last stop, or Shift+Tab before its first, moves
+   * the page's focus to the control beside the host (default false).
+   * Tabbing in from the page lands on the app's first or last stop.
+   *
+   * Off, Tab wraps inside the app, which is right for an app that is
+   * the page. An app embedded among other controls turns it on, or a
+   * person who tabbed into it could never tab out. A trap (a dialog)
+   * wraps either way. `embedSurface` turns it on.
+   */
+  tabExit?: boolean;
+  /**
+   * Receives the title the app asks for (`ShellService.setTitle`), in
+   * place of `document.title`. An app embedded in a page that is not
+   * its own passes this, so the page keeps its title.
+   */
+  onTitle?: (title: string) => void;
+  /**
+   * Receives the app's request to warn before the page is left
+   * (`ShellService.warnOnLeave`), in place of the window's
+   * `beforeunload`. An app embedded in a page that is not its own
+   * passes this, so the page decides whether leaving it needs a warning.
+   */
+  onLeaveWarning?: (on: boolean) => void;
   /**
    * Receives errors thrown inside the render worker: while handling a
    * message, uncaught during a frame, from the renderer, or from a
@@ -467,6 +492,8 @@ export class WorkerApp {
   private devicePixels: DevicePixelSize | null = null;
   private stopDevicePixels: (() => void) | null = null;
   private detachInput: (() => void) | null = null;
+  /** Removes `attachTabEntry`'s listeners; null without `tabExit`. */
+  private detachTabEntry: (() => void) | null = null;
   /** Pickers and remembered handles, made on the first file request. */
   private files: ShellFiles | null = null;
   /** The window's pickers, opened as a request arrives; see `shellPicker.ts`. */
@@ -683,7 +710,8 @@ export class WorkerApp {
         accessibility: this.options.accessibility !== false,
         frameMetrics: this.options.onFrame !== undefined,
         appPort,
-        url
+        url,
+        ...(this.options.tabExit === true ? { tabExit: true } : {})
       } as ShellToRuntimeMessage,
       transfer
     );
@@ -739,6 +767,10 @@ export class WorkerApp {
         },
         this.proxy
       );
+    }
+
+    if (this.options.tabExit === true) {
+      this.detachTabEntry = this.attachTabEntry(canvas, element);
     }
 
     const islands = this.options.islands ?? [];
@@ -900,6 +932,80 @@ export class WorkerApp {
       at: epochFromEvent(event),
       textFollows: viaProxy
     });
+  }
+
+  /**
+   * Whether an element is the app's own: the canvas, or the editing
+   * proxy and the semantics mirror, which hold DOM focus for it while
+   * a node has focus and live outside the host.
+   */
+  private ownsElement(target: EventTarget | null): boolean {
+    const node = target as Node | null;
+    return (
+      node !== null &&
+      (this.host?.contains(node) === true || node === this.proxy?.element || this.mirror?.owns(node) === true)
+    );
+  }
+
+  /**
+   * Moves the page's focus out of the app after Tab left its tab order
+   * (`tabExit`): to the control beside the host, or, with none there,
+   * off the app entirely, so the next Tab is the browser's.
+   */
+  private leaveByTab(direction: 1 | -1): void {
+    const host = this.host;
+    if (host === undefined) {
+      return;
+    }
+    const next = tabbableBeside(host, direction, document);
+    if (next !== null) {
+      next.focus();
+    } else if (this.ownsElement(document.activeElement)) {
+      (document.activeElement as HTMLElement).blur();
+    }
+  }
+
+  /**
+   * Tabbing into the app from the page lands on its first stop, and
+   * Shift+Tab on its last, as tabbing into any widget would, rather
+   * than on a canvas with nothing focused that takes one more key.
+   *
+   * The browser's Tab moves focus to the canvas; the shell saw the key
+   * go down outside the app and, when the canvas takes focus from
+   * something that is not the app's, sends the worker that Tab again.
+   */
+  private attachTabEntry(canvas: HTMLCanvasElement, host: HTMLElement): () => void {
+    const doc = host.ownerDocument;
+    let entering: 0 | 1 | -1 = 0;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      entering = event.key === 'Tab' && !this.ownsElement(event.target) ? (event.shiftKey ? -1 : 1) : 0;
+    };
+    const onKeyUp = (): void => {
+      entering = 0;
+    };
+    const onFocus = (event: FocusEvent): void => {
+      const direction = entering;
+      entering = 0;
+      if (direction === 0 || this.ownsElement(event.relatedTarget)) {
+        return;
+      }
+      // From nothing focused, so Tab lands on the first stop and
+      // Shift+Tab on the last: a node the app kept focused while the
+      // page had the keyboard (the row clicked before the search field
+      // was) is not where the keyboard comes back in.
+      this.post({ type: 'blur' });
+      const modifiers = { shift: direction < 0, ctrl: false, alt: false, meta: false };
+      this.post({ type: 'keyDown', key: 'Tab', code: 'Tab', modifiers, at: epochNow(), textFollows: false });
+      this.post({ type: 'keyUp', key: 'Tab', code: 'Tab', modifiers, at: epochNow() });
+    };
+    doc.addEventListener('keydown', onKeyDown, true);
+    doc.addEventListener('keyup', onKeyUp, true);
+    canvas.addEventListener('focus', onFocus);
+    return () => {
+      doc.removeEventListener('keydown', onKeyDown, true);
+      doc.removeEventListener('keyup', onKeyUp, true);
+      canvas.removeEventListener('focus', onFocus);
+    };
   }
 
   private forwardKeyUp(event: KeyboardEvent): void {
@@ -1101,6 +1207,8 @@ export class WorkerApp {
     this.ownsHistory = false;
     this.detachInput?.();
     this.detachInput = null;
+    this.detachTabEntry?.();
+    this.detachTabEntry = null;
     this.audio?.dispose();
     this.audio = null;
     this.resizeObserver?.disconnect();
@@ -1262,11 +1370,23 @@ export class WorkerApp {
       return;
     }
     if (message.type === 'leaveWarning') {
-      setLeaveWarning(window, message.on);
+      if (this.options.onLeaveWarning === undefined) {
+        setLeaveWarning(window, message.on);
+      } else {
+        this.options.onLeaveWarning(message.on);
+      }
       return;
     }
     if (message.type === 'title') {
-      document.title = message.title;
+      if (this.options.onTitle === undefined) {
+        document.title = message.title;
+      } else {
+        this.options.onTitle(message.title);
+      }
+      return;
+    }
+    if (message.type === 'tabExit') {
+      this.leaveByTab(message.direction);
       return;
     }
     if (message.type === 'findShortcut') {

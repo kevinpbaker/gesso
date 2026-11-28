@@ -393,6 +393,11 @@ export class SemanticsMirror implements IslandMirrorLink {
     }
   }
 
+  /** Whether a DOM node is one of the mirror's, which hold focus for the app's nodes. */
+  owns(node: Node): boolean {
+    return this.container.contains(node);
+  }
+
   dispose(): void {
     this.disposed = true;
     this.detach();

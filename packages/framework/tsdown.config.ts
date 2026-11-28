@@ -13,6 +13,7 @@ export default defineConfig({
     'src/worker/index.ts',
     'src/agent/index.ts',
     'src/remote/index.ts',
+    'src/embed/index.ts',
     'src/jsx/jsx-runtime.ts',
     'src/jsx/jsx-dev-runtime.ts'
   ],

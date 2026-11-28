@@ -838,235 +838,7 @@ export {
   workerHandle,
   WorkerHandle
 };
-// ==== FunctionComponent.d.ts ====
-import {
-  BehaviorSubject,
-  Observable,
-  Subject,
-  Subscription
-} from "rxjs";
-import {
-  LayoutBox,
-  Reactive,
-  UiChild,
-  UiEnvironmentKey,
-  UiModifier
-} from "gesso-core";
-type Command = (...args: never[]) => void;
-type CommandMap = Record<string, Command>;
-type Query = (...args: never[]) => unknown;
-interface ChannelToken<View extends object, Commands extends object = Record<string, never>, Queries extends object = object> {
-  readonly name: string;
-  readonly initial: View;
-  readonly commands?: Commands;
-  readonly queries?: Queries;
-}
-declare function channel<View extends object, Commands extends object = Record<string, never>, Queries extends object = object>(name: string, initial: View): ChannelToken<View, Commands, Queries>;
-interface ChannelSpec<View extends object, Commands extends object, Queries extends object = object> {
-  readonly view: View;
-  readonly commands?: Commands;
-  readonly queries?: Queries;
-}
-declare function defineChannel<View extends object, Commands extends object = Record<string, never>, Queries extends object = object>(name: string, spec: ChannelSpec<View, Commands, Queries>): ChannelToken<View, Commands, Queries>;
-type ViewOf<T> = T extends ChannelToken<infer View, object, object> ? View : never;
-type CommandsOf<T> = T extends ChannelToken<object, infer Commands, object> ? Commands : never;
-type QueriesOf<T> = T extends ChannelToken<object, object, infer Queries> ? Queries : never;
-declare function viewKeys(token: {
-  initial: object;
-}): string[];
-type PatchPath = readonly (string | number)[];
-type Patch = {
-  op: 'set';
-  projection: string;
-  path: PatchPath;
-  value: unknown;
-} | {
-  op: 'delete';
-  projection: string;
-  path: PatchPath;
-} | {
-  op: 'splice';
-  projection: string;
-  path: PatchPath;
-  index: number;
-  deleteCount: number;
-  items: readonly unknown[];
-};
-declare function diffProjection(projection: string, previous: unknown, current: unknown): Patch[];
-declare function applyPatches(root: unknown, patches: readonly Patch[]): unknown;
-declare function applyPatch(root: unknown, patch: Patch): unknown;
-interface ChannelPort {
-  postMessage(message: unknown): void;
-  onmessage: ((event: {
-    data: unknown;
-  }) => void) | null;
-}
-type ChannelClientMessage = {
-  type: 'channel:sync';
-} | {
-  type: 'channel:command';
-  command: string;
-  payload: unknown;
-  rest?: unknown[];
-};
-type ChannelHostMessage = {
-  type: 'channel:patch';
-  patches: Patch[];
-} | {
-  type: 'channel:error';
-  message: string;
-  stack?: string;
-};
-declare function isChannelClientMessage(value: unknown): value is ChannelClientMessage;
-declare function isChannelHostMessage(value: unknown): value is ChannelHostMessage;
-declare class InputCell<T> extends BehaviorSubject<T> {
-  label: string | undefined;
-  private snapshotBy;
-  private warnedStale;
-  private emitted;
-  constructor(initialValue: T);
-  emit(...args: EmitArgs<T>): void;
-  get events(): Observable<EmitValue<T>>;
-  get value(): T;
-  next(value: T): void;
-}
-interface ReadableCell<T> extends Observable<T> {
-  readonly value: T;
-}
-declare function input<T>(initialValue: T): InputCell<T>;
-declare function input<T>(source: InputCell<T | undefined>, fallback: T): InputCell<T>;
-type EmitArgs<T> = NonNullable<T> extends ((...args: infer A) => void) ? A : never;
-type EmitValue<T> = NonNullable<T> extends ((first: infer V, ...rest: never[]) => void) ? V : void;
-type OutputCell<A extends unknown[]> = InputCell<((...args: A) => void) | undefined>;
-declare function output<A extends unknown[]>(): OutputCell<A>;
-declare const OUTPUT_TARGET: unique symbol;
-interface OutputTarget<V> {
-  readonly [OUTPUT_TARGET]: {
-    next(value: V): void;
-  };
-}
-declare function into<V>(target: {
-  next(value: V): void;
-}): OutputTarget<V>;
-declare function isOutputTarget(value: unknown): value is OutputTarget<unknown>;
-declare class ChannelReplica<View extends object, Commands extends object> {
-  private readonly token;
-  private readonly port;
-  private readonly cells;
-  private readonly commandProxy;
-  private errorListener;
-  private pending;
-  private scheduleFlush;
-  constructor(token: ChannelToken<View, Commands>, port: ChannelPort);
-  get view(): { readonly [K in keyof View]: InputCell<View[K]>; };
-  get send(): Commands;
-  private readonly viewProxy;
-  private createCommandProxy;
-  onError(listener: ((message: string, stack?: string) => void) | null): void;
-  private receive;
-  private report;
-  deferPatches(scheduleFlush: () => void): void;
-  get hasPendingPatches(): boolean;
-  flush(): void;
-  applyPatches(patches: readonly Patch[]): void;
-  private post;
-  dispose(): void;
-}
-declare class InternalState<T> extends BehaviorSubject<T> {
-  label: string | undefined;
-  constructor(initialValue: T);
-  get value(): T;
-  set value(next: T);
-  next(value: T): void;
-}
-declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
-declare class BoundsCell extends InternalState<LayoutBox> {
-  readonly modifier: UiModifier<Subject<LayoutBox>>;
-  constructor();
-  next(box: LayoutBox): void;
-}
-declare function bounds(label?: string): BoundsCell;
-declare abstract class Component {
-  onMount?(): void;
-  onUnmount?(): void;
-  abstract render(): UiChild;
-}
-interface ComponentContext {
-  inject<S extends object>(ServiceClass: new () => S): S;
-  channel<V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C>;
-  onMount(hook: () => void): void;
-  onUnmount(hook: () => void): void;
-  effect<T>(source: Observable<T>, run: (value: T) => void): Subscription;
-  bounds(label?: string): BoundsCell;
-  environment<T>(key: UiEnvironmentKey<T>): T;
-}
-type Inputs<P> = { readonly [K in keyof P]-?: InputCell<InputValue<P[K]>>; };
-type InputValue<V> = [Exclude<V, undefined>] extends [Observable<infer T>] ? T | Extract<V, undefined> : V;
-type FunctionComponent<P = {}> = (inputs: Inputs<P>, context: ComponentContext) => UiChild;
-type ClassComponent = new () => Component;
-type ComponentType = ClassComponent | ((inputs: any, context: ComponentContext) => UiChild);
-type IsAny<T> = 0 extends 1 & T ? true : false;
-type CellValue<C> = C extends InputCell<infer T> ? T : never;
-type OptionalCellKeys<I> = { [K in keyof I]: undefined extends CellValue<I[K]> ? K : never; }[keyof I];
-type PropsForCells<I> = [keyof I] extends [never] ? NoProps : { [K in OptionalCellKeys<I>]?: Passable<CellValue<I[K]>>; } & { [K in Exclude<keyof I, OptionalCellKeys<I>>]: Passable<CellValue<I[K]>>; };
-type Passable<T> = NonNullable<T> extends ((first: infer V, ...rest: never[]) => void) ? Reactive<T> | OutputTarget<V> : Reactive<T>;
-type NoProps = {
-  readonly __noProps?: never;
-};
-type InputFields<I> = { [K in keyof I as I[K] extends InputCell<any> ? K : never]: I[K]; };
-type ComponentProps<C> = C extends ClassComponent ? Partial<PropsForCells<InputFields<InstanceType<C>>>> : C extends ((inputs: infer I, ...rest: any[]) => UiChild) ? IsAny<I> extends true ? Record<string, unknown> : unknown extends I ? NoProps : [I] extends [undefined] ? NoProps : PropsForCells<I> : never;
-type RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K; }[keyof T];
-type ComponentArgs<C> = RequiredKeys<ComponentProps<C>> extends never ? [inputs?: ComponentProps<C>, key?: string | number] : [inputs: ComponentProps<C>, key?: string | number];
-declare function isClassComponent(component: ComponentType): component is ClassComponent;
-export {
-  applyPatch,
-  applyPatches,
-  bounds,
-  BoundsCell,
-  channel,
-  ChannelClientMessage,
-  ChannelHostMessage,
-  ChannelPort,
-  ChannelReplica,
-  ChannelSpec,
-  ChannelToken,
-  ClassComponent,
-  Command,
-  CommandMap,
-  CommandsOf,
-  Component,
-  ComponentArgs,
-  ComponentContext,
-  ComponentProps,
-  ComponentType,
-  defineChannel,
-  diffProjection,
-  EmitArgs,
-  EmitValue,
-  FunctionComponent,
-  input,
-  InputCell,
-  Inputs,
-  InputValue,
-  internalState,
-  InternalState,
-  into,
-  isChannelClientMessage,
-  isChannelHostMessage,
-  isClassComponent,
-  isOutputTarget,
-  output,
-  OutputCell,
-  OutputTarget,
-  Patch,
-  PatchPath,
-  QueriesOf,
-  Query,
-  ReadableCell,
-  viewKeys,
-  ViewOf
-};
-// ==== index.d.ts ====
+// ==== createApp.d.ts ====
 import {
   ChannelToken,
   Command,
@@ -1185,6 +957,314 @@ import {
   VideoClock,
   VideoResolver
 } from "gesso-core";
+interface UiNodeReport {
+  readonly id: string;
+  readonly type: string;
+  readonly box: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+  readonly owners: readonly UiOwnerReport[];
+  readonly props: readonly UiPropReport[];
+  readonly environment: readonly UiEnvironmentReport[];
+  readonly modifiers: readonly string[];
+  readonly listens: readonly string[];
+  readonly beneath: readonly UiBeneathReport[];
+  readonly semantics?: UiSemanticsReport;
+  readonly interaction?: UiInteractionReport;
+  readonly explanation: string;
+  readonly source?: UiSourceLocation;
+}
+interface UiBeneathReport {
+  readonly id: string;
+  readonly type: string;
+  readonly owner?: string;
+  readonly listens: readonly string[];
+}
+interface UiOwnerReport {
+  readonly name: string;
+  readonly anchorId: string;
+  readonly usedAt?: UiSourceLocation;
+  readonly inputs?: Readonly<Record<string, UiOwnerInput>>;
+  readonly live?: Readonly<Record<string, string | number | boolean | null>>;
+}
+type UiOwnerInput = string | number | boolean | null | {
+  readonly element: true;
+};
+interface NodePathTarget {
+  readonly type: string;
+  readonly id: string;
+  readonly label?: string;
+}
+declare function formatNodePath(owners: readonly UiOwnerReport[], node: NodePathTarget): string;
+type UiPropOrigin = 'element' | 'binding' | 'modifier';
+interface UiPropReport {
+  readonly name: string;
+  readonly value: string;
+  readonly origin: UiPropOrigin;
+  readonly source?: string;
+  readonly stream?: UiStreamReport;
+}
+interface UiStreamReport {
+  readonly source: string;
+  readonly kind: 'cell' | 'observable';
+  readonly value: string;
+  readonly emissions: number;
+  readonly emittedAt: number | null;
+  readonly connected: boolean;
+}
+interface BoundStream {
+  readonly id: number;
+  readonly observable: unknown;
+  value(): unknown;
+  emissionCount(): number;
+  emittedAt(): number | null;
+  connected(): boolean;
+}
+declare function describeStream(binding: BoundStream, timeOrigin: number): UiStreamReport;
+declare function formatStream(stream: UiStreamReport, now?: number): string;
+declare function formatAge(ms: number): string;
+interface UiEnvironmentReport {
+  readonly key: string;
+  readonly value: string;
+  readonly provided: boolean;
+}
+interface UiInteractionReport {
+  readonly hovered?: Readonly<Record<string, unknown>>;
+  readonly pressed?: Readonly<Record<string, unknown>>;
+}
+interface UiSemanticsReport {
+  readonly role?: string;
+  readonly label?: string;
+  readonly value?: string;
+  readonly states?: readonly string[];
+}
+declare function printPropValue(value: unknown): string;
+declare function formatSourceLocation(source: UiSourceLocation): string;
+declare function formatNodeReport(report: UiNodeReport): string;
+type ShellRequest = {
+  type: 'clipboard';
+  id: number;
+  text: string;
+  image?: Uint8Array;
+} | {
+  type: 'clipboardRead';
+  id: number;
+} | {
+  type: 'openUrl';
+  url: string;
+} | {
+  type: 'openRoute';
+  url: string;
+} | {
+  type: 'redirect';
+  url: string;
+} | {
+  type: 'fullscreen';
+  enter: boolean;
+} | {
+  type: 'leaveWarning';
+  on: boolean;
+} | {
+  type: 'title';
+  title: string;
+} | {
+  type: 'findShortcut';
+  on: boolean;
+} | {
+  type: 'colorScheme';
+  preference: ColorSchemePreference;
+} | {
+  type: 'popup';
+  id: number;
+  url: string;
+  name: string;
+  width: number;
+  height: number;
+} | {
+  type: 'storage';
+  id: number;
+  op: ShellStorageOp;
+  key: string;
+  value?: string;
+} | {
+  type: 'file';
+  id: number;
+  request: ShellFileRequest;
+} | {
+  type: 'history';
+  action: 'push' | 'replace';
+  url: string;
+} | {
+  type: 'history';
+  action: 'back' | 'forward';
+  url?: undefined;
+};
+interface ShellFileType {
+  readonly description: string;
+  readonly mediaType: string;
+  readonly extensions: readonly string[];
+}
+type ShellFileRequest =
+{
+  readonly op: 'open';
+  readonly accept: readonly ShellFileType[];
+  readonly multiple: boolean;
+} |
+{
+  readonly op: 'reopen';
+  readonly handle: number;
+  readonly mode?: 'read' | 'readwrite';
+} |
+{
+  readonly op: 'openDirectory';
+  readonly mode: 'read' | 'readwrite';
+} |
+{
+  readonly op: 'save';
+  readonly name: string;
+  readonly mediaType: string;
+  readonly text: string;
+  readonly bytes?: Uint8Array<ArrayBuffer>;
+  readonly handle?: number;
+  readonly accept: readonly ShellFileType[];
+  readonly remember?: boolean;
+} |
+{
+  readonly op: 'recent';
+} |
+{
+  readonly op: 'forget';
+  readonly handle: number;
+};
+interface ShellFile {
+  readonly name: string;
+  readonly mediaType: string;
+  readonly lastModified: number;
+  readonly bytes: ArrayBuffer;
+  readonly handle: number | null;
+}
+interface ShellRecentFile {
+  readonly handle: number;
+  readonly name: string;
+  readonly kind: 'file' | 'directory';
+  readonly used: number;
+}
+interface ShellFileResult {
+  readonly outcome: 'ok' | 'cancelled' | 'denied' | 'unsupported' | 'failed';
+  readonly files: readonly ShellFile[];
+  readonly directory: {
+    readonly name: string;
+    readonly handle: number;
+  } | null;
+  readonly saved: {
+    readonly name: string;
+    readonly handle: number | null;
+    readonly via: 'file' | 'download';
+  } | null;
+  readonly recent: readonly ShellRecentFile[];
+  readonly error: string | null;
+}
+type ShellStorageOp = 'read' | 'write' | 'remove' | 'keys';
+interface ShellStorageResult {
+  readonly outcome: 'ok' | 'denied' | 'full' | 'failed';
+  readonly value: string | null;
+  readonly keys: readonly string[];
+  readonly error: string | null;
+}
+declare class ShellService {
+  private handler;
+  private leaving;
+  private titleText;
+  private findClaimed;
+  private preferred;
+  private readonly scheme;
+  private readonly contrastState;
+  private readonly textScaleState;
+  private readonly pointerState;
+  private readonly activeState;
+  private readonly insets;
+  private readonly isFullscreen;
+  private readonly popups;
+  private nextPopupId;
+  private readonly stores;
+  private nextStorageId;
+  private readonly copies;
+  private nextCopyId;
+  private readonly reads;
+  private nextReadId;
+  private readonly files;
+  private nextFileId;
+  readonly colorScheme: ReadableCell<ColorScheme>;
+  readonly contrast: ReadableCell<UiContrast>;
+  readonly pointer: ReadableCell<UiPointer>;
+  readonly windowActive: ReadableCell<boolean>;
+  get currentColorScheme(): ColorScheme;
+  readonly viewportInsets: ReadableCell<UiInsets>;
+  get currentViewportInsets(): UiInsets;
+  setHandler(handler: ((request: ShellRequest) => void) | null): void;
+  applyColorScheme(scheme: ColorScheme): void;
+  applyWindowActive(active: boolean): void;
+  applyPointer(pointer: UiPointer): void;
+  applyTextScale(scale: number): void;
+  readonly textScale: ReadableCell<number>;
+  applyContrast(contrast: UiContrast): void;
+  applyViewportInsets(insets: UiInsets): void;
+  copyText(text: string): Promise<boolean>;
+  copyImage(png: Uint8Array, text?: string): Promise<boolean>;
+  settleClipboard(id: number, copied: boolean): void;
+  readText(): Promise<string | null>;
+  settleClipboardRead(id: number, text: string | null): void;
+  openUrl(url: string): void;
+  openRoute(url: string): void;
+  redirect(url: string): void;
+  readonly fullscreen: ReadableCell<boolean>;
+  requestFullscreen(enter: boolean): void;
+  warnOnLeave(on: boolean): void;
+  claimFindShortcut(on: boolean): void;
+  setTitle(title: string): void;
+  preferColorScheme(preference: ColorSchemePreference): void;
+  applyFullscreen(active: boolean): void;
+  openPopup(request: {
+    readonly url: string;
+    readonly name?: string;
+    readonly width?: number;
+    readonly height?: number;
+  }): Promise<boolean>;
+  settlePopup(id: number, opened: boolean): void;
+  requestStorage(request: {
+    readonly op: ShellStorageOp;
+    readonly key: string;
+    readonly value?: string;
+  }): Promise<ShellStorageResult>;
+  settleStorage(id: number, result: ShellStorageResult): void;
+  openFiles(options?: {
+    readonly accept?: readonly ShellFileType[];
+    readonly multiple?: boolean;
+  }): Promise<ShellFileResult>;
+  reopenFile(handle: number): Promise<ShellFileResult>;
+  saveFile(options: {
+    readonly name: string;
+    readonly text?: string;
+    readonly bytes?: Uint8Array<ArrayBuffer>;
+    readonly mediaType?: string;
+    readonly handle?: number;
+    readonly accept?: readonly ShellFileType[];
+    readonly remember?: boolean;
+  }): Promise<ShellFileResult>;
+  recentFiles(): Promise<ShellFileResult>;
+  openDirectory(options?: {
+    readonly mode?: 'read' | 'readwrite';
+  }): Promise<ShellFileResult>;
+  reopenDirectory(handle: number, options?: {
+    readonly mode?: 'read' | 'readwrite';
+  }): Promise<ShellFileResult>;
+  forgetFile(handle: number): Promise<ShellFileResult>;
+  requestFile(request: ShellFileRequest): Promise<ShellFileResult>;
+  settleFile(id: number, result: ShellFileResult): void;
+}
 type Equality<T> = 'reference' | 'structural' | ((a: T, b: T) => boolean);
 interface DeriveOptions<T> {
   readonly equal?: Equality<T>;
@@ -1638,436 +1718,6 @@ declare class ComponentHostResolver implements ComponentResolver {
   get size(): number;
   hostFor(anchorId: string): ComponentHost | undefined;
 }
-interface UiNodeReport {
-  readonly id: string;
-  readonly type: string;
-  readonly box: {
-    readonly x: number;
-    readonly y: number;
-    readonly width: number;
-    readonly height: number;
-  };
-  readonly owners: readonly UiOwnerReport[];
-  readonly props: readonly UiPropReport[];
-  readonly environment: readonly UiEnvironmentReport[];
-  readonly modifiers: readonly string[];
-  readonly listens: readonly string[];
-  readonly beneath: readonly UiBeneathReport[];
-  readonly semantics?: UiSemanticsReport;
-  readonly interaction?: UiInteractionReport;
-  readonly explanation: string;
-  readonly source?: UiSourceLocation;
-}
-interface UiBeneathReport {
-  readonly id: string;
-  readonly type: string;
-  readonly owner?: string;
-  readonly listens: readonly string[];
-}
-interface UiOwnerReport {
-  readonly name: string;
-  readonly anchorId: string;
-  readonly usedAt?: UiSourceLocation;
-  readonly inputs?: Readonly<Record<string, UiOwnerInput>>;
-  readonly live?: Readonly<Record<string, string | number | boolean | null>>;
-}
-type UiOwnerInput = string | number | boolean | null | {
-  readonly element: true;
-};
-interface NodePathTarget {
-  readonly type: string;
-  readonly id: string;
-  readonly label?: string;
-}
-declare function formatNodePath(owners: readonly UiOwnerReport[], node: NodePathTarget): string;
-type UiPropOrigin = 'element' | 'binding' | 'modifier';
-interface UiPropReport {
-  readonly name: string;
-  readonly value: string;
-  readonly origin: UiPropOrigin;
-  readonly source?: string;
-  readonly stream?: UiStreamReport;
-}
-interface UiStreamReport {
-  readonly source: string;
-  readonly kind: 'cell' | 'observable';
-  readonly value: string;
-  readonly emissions: number;
-  readonly emittedAt: number | null;
-  readonly connected: boolean;
-}
-interface BoundStream {
-  readonly id: number;
-  readonly observable: unknown;
-  value(): unknown;
-  emissionCount(): number;
-  emittedAt(): number | null;
-  connected(): boolean;
-}
-declare function describeStream(binding: BoundStream, timeOrigin: number): UiStreamReport;
-declare function formatStream(stream: UiStreamReport, now?: number): string;
-declare function formatAge(ms: number): string;
-interface UiEnvironmentReport {
-  readonly key: string;
-  readonly value: string;
-  readonly provided: boolean;
-}
-interface UiInteractionReport {
-  readonly hovered?: Readonly<Record<string, unknown>>;
-  readonly pressed?: Readonly<Record<string, unknown>>;
-}
-interface UiSemanticsReport {
-  readonly role?: string;
-  readonly label?: string;
-  readonly value?: string;
-  readonly states?: readonly string[];
-}
-declare function printPropValue(value: unknown): string;
-declare function formatSourceLocation(source: UiSourceLocation): string;
-declare function formatNodeReport(report: UiNodeReport): string;
-type ShellRequest = {
-  type: 'clipboard';
-  id: number;
-  text: string;
-  image?: Uint8Array;
-} | {
-  type: 'clipboardRead';
-  id: number;
-} | {
-  type: 'openUrl';
-  url: string;
-} | {
-  type: 'openRoute';
-  url: string;
-} | {
-  type: 'redirect';
-  url: string;
-} | {
-  type: 'fullscreen';
-  enter: boolean;
-} | {
-  type: 'leaveWarning';
-  on: boolean;
-} | {
-  type: 'title';
-  title: string;
-} | {
-  type: 'findShortcut';
-  on: boolean;
-} | {
-  type: 'colorScheme';
-  preference: ColorSchemePreference;
-} | {
-  type: 'popup';
-  id: number;
-  url: string;
-  name: string;
-  width: number;
-  height: number;
-} | {
-  type: 'storage';
-  id: number;
-  op: ShellStorageOp;
-  key: string;
-  value?: string;
-} | {
-  type: 'file';
-  id: number;
-  request: ShellFileRequest;
-} | {
-  type: 'history';
-  action: 'push' | 'replace';
-  url: string;
-} | {
-  type: 'history';
-  action: 'back' | 'forward';
-  url?: undefined;
-};
-interface ShellFileType {
-  readonly description: string;
-  readonly mediaType: string;
-  readonly extensions: readonly string[];
-}
-type ShellFileRequest =
-{
-  readonly op: 'open';
-  readonly accept: readonly ShellFileType[];
-  readonly multiple: boolean;
-} |
-{
-  readonly op: 'reopen';
-  readonly handle: number;
-  readonly mode?: 'read' | 'readwrite';
-} |
-{
-  readonly op: 'openDirectory';
-  readonly mode: 'read' | 'readwrite';
-} |
-{
-  readonly op: 'save';
-  readonly name: string;
-  readonly mediaType: string;
-  readonly text: string;
-  readonly bytes?: Uint8Array<ArrayBuffer>;
-  readonly handle?: number;
-  readonly accept: readonly ShellFileType[];
-  readonly remember?: boolean;
-} |
-{
-  readonly op: 'recent';
-} |
-{
-  readonly op: 'forget';
-  readonly handle: number;
-};
-interface ShellFile {
-  readonly name: string;
-  readonly mediaType: string;
-  readonly lastModified: number;
-  readonly bytes: ArrayBuffer;
-  readonly handle: number | null;
-}
-interface ShellRecentFile {
-  readonly handle: number;
-  readonly name: string;
-  readonly kind: 'file' | 'directory';
-  readonly used: number;
-}
-interface ShellFileResult {
-  readonly outcome: 'ok' | 'cancelled' | 'denied' | 'unsupported' | 'failed';
-  readonly files: readonly ShellFile[];
-  readonly directory: {
-    readonly name: string;
-    readonly handle: number;
-  } | null;
-  readonly saved: {
-    readonly name: string;
-    readonly handle: number | null;
-    readonly via: 'file' | 'download';
-  } | null;
-  readonly recent: readonly ShellRecentFile[];
-  readonly error: string | null;
-}
-type ShellStorageOp = 'read' | 'write' | 'remove' | 'keys';
-interface ShellStorageResult {
-  readonly outcome: 'ok' | 'denied' | 'full' | 'failed';
-  readonly value: string | null;
-  readonly keys: readonly string[];
-  readonly error: string | null;
-}
-declare class ShellService {
-  private handler;
-  private leaving;
-  private titleText;
-  private findClaimed;
-  private preferred;
-  private readonly scheme;
-  private readonly contrastState;
-  private readonly textScaleState;
-  private readonly pointerState;
-  private readonly activeState;
-  private readonly insets;
-  private readonly isFullscreen;
-  private readonly popups;
-  private nextPopupId;
-  private readonly stores;
-  private nextStorageId;
-  private readonly copies;
-  private nextCopyId;
-  private readonly reads;
-  private nextReadId;
-  private readonly files;
-  private nextFileId;
-  readonly colorScheme: ReadableCell<ColorScheme>;
-  readonly contrast: ReadableCell<UiContrast>;
-  readonly pointer: ReadableCell<UiPointer>;
-  readonly windowActive: ReadableCell<boolean>;
-  get currentColorScheme(): ColorScheme;
-  readonly viewportInsets: ReadableCell<UiInsets>;
-  get currentViewportInsets(): UiInsets;
-  setHandler(handler: ((request: ShellRequest) => void) | null): void;
-  applyColorScheme(scheme: ColorScheme): void;
-  applyWindowActive(active: boolean): void;
-  applyPointer(pointer: UiPointer): void;
-  applyTextScale(scale: number): void;
-  readonly textScale: ReadableCell<number>;
-  applyContrast(contrast: UiContrast): void;
-  applyViewportInsets(insets: UiInsets): void;
-  copyText(text: string): Promise<boolean>;
-  copyImage(png: Uint8Array, text?: string): Promise<boolean>;
-  settleClipboard(id: number, copied: boolean): void;
-  readText(): Promise<string | null>;
-  settleClipboardRead(id: number, text: string | null): void;
-  openUrl(url: string): void;
-  openRoute(url: string): void;
-  redirect(url: string): void;
-  readonly fullscreen: ReadableCell<boolean>;
-  requestFullscreen(enter: boolean): void;
-  warnOnLeave(on: boolean): void;
-  claimFindShortcut(on: boolean): void;
-  setTitle(title: string): void;
-  preferColorScheme(preference: ColorSchemePreference): void;
-  applyFullscreen(active: boolean): void;
-  openPopup(request: {
-    readonly url: string;
-    readonly name?: string;
-    readonly width?: number;
-    readonly height?: number;
-  }): Promise<boolean>;
-  settlePopup(id: number, opened: boolean): void;
-  requestStorage(request: {
-    readonly op: ShellStorageOp;
-    readonly key: string;
-    readonly value?: string;
-  }): Promise<ShellStorageResult>;
-  settleStorage(id: number, result: ShellStorageResult): void;
-  openFiles(options?: {
-    readonly accept?: readonly ShellFileType[];
-    readonly multiple?: boolean;
-  }): Promise<ShellFileResult>;
-  reopenFile(handle: number): Promise<ShellFileResult>;
-  saveFile(options: {
-    readonly name: string;
-    readonly text?: string;
-    readonly bytes?: Uint8Array<ArrayBuffer>;
-    readonly mediaType?: string;
-    readonly handle?: number;
-    readonly accept?: readonly ShellFileType[];
-    readonly remember?: boolean;
-  }): Promise<ShellFileResult>;
-  recentFiles(): Promise<ShellFileResult>;
-  openDirectory(options?: {
-    readonly mode?: 'read' | 'readwrite';
-  }): Promise<ShellFileResult>;
-  reopenDirectory(handle: number, options?: {
-    readonly mode?: 'read' | 'readwrite';
-  }): Promise<ShellFileResult>;
-  forgetFile(handle: number): Promise<ShellFileResult>;
-  requestFile(request: ShellFileRequest): Promise<ShellFileResult>;
-  settleFile(id: number, result: ShellFileResult): void;
-}
-type UiDuration = UiDurationToken | number;
-type UiEasingChoice = UiEasingToken | UiEasing;
-interface AnimateOptions {
-  duration?: UiDuration;
-  easing?: UiEasingChoice;
-  stepMs?: number;
-  repeat?: boolean;
-  reducedMotion?: UiReducedMotionPolicy;
-  delay?: number;
-  clock?: UiClock | null;
-}
-interface SpringOptions {
-  spring?: UiSpringToken | UiSpringSpec;
-  stiffness?: number;
-  damping?: number;
-  mass?: number;
-  velocity?: number;
-  restDelta?: number;
-  reducedMotion?: UiReducedMotionPolicy;
-  delay?: number;
-  clock?: UiClock | null;
-}
-declare class AnimationService {
-  readonly reducedMotion: InternalState<boolean>;
-  private driver;
-  private motionVocabulary;
-  setDriver(driver: AnimationDriver | null): void;
-  setMotion(motion: UiMotion): void;
-  private motionListener;
-  setMotionListener(listener: ((motion: UiMotion) => void) | null): void;
-  get motion(): UiMotion;
-  applyReducedMotion(reduced: boolean): void;
-  animate<T>(cell: AnimatedCell<T>, to: T, options?: AnimateOptions): Observable<T>;
-  spring(cell: AnimatedCell<number>, to: number, options?: SpringOptions): Observable<number>;
-  stop<T>(cell: AnimatedCell<T>): boolean;
-  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
-  private resolveDuration;
-  private resolveEasing;
-}
-interface AudioSample {
-  readonly status: AudioStatus;
-  readonly position: number;
-  readonly duration: number;
-  readonly buffered: number;
-  readonly at: number;
-  readonly error?: string;
-  readonly rate?: number;
-}
-type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
-type AudioRequest =
-{
-  readonly type: 'load';
-  readonly src: string;
-  readonly autoplay: boolean;
-} |
-{
-  readonly type: 'preload';
-  readonly src: string;
-} | {
-  readonly type: 'play';
-} | {
-  readonly type: 'pause';
-} | {
-  readonly type: 'seek';
-  readonly seconds: number;
-} | {
-  readonly type: 'volume';
-  readonly level: number;
-} |
-{
-  readonly type: 'rate';
-  readonly rate: number;
-} |
-{
-  readonly type: 'loop';
-  readonly loop: boolean;
-} | {
-  readonly type: 'metadata';
-  readonly metadata: AudioMetadata | null;
-};
-type AudioAction = 'play' | 'pause' | 'next' | 'previous';
-interface AudioMetadata {
-  readonly title: string;
-  readonly artist: string;
-  readonly album?: string;
-  readonly artwork?: string;
-}
-interface AudioState {
-  readonly status: AudioStatus;
-  readonly position: number;
-  readonly duration: number;
-  readonly buffered: number;
-  readonly rate: number;
-  readonly src: string | null;
-  readonly error?: string;
-}
-declare class AudioService {
-  private handler;
-  private animations;
-  private readonly sample;
-  private readonly source;
-  private readonly position;
-  private readonly actionSubject;
-  readonly state: ComputedCell<AudioState>;
-  readonly actions: Observable<AudioAction>;
-  get current(): AudioState;
-  setHandler(handler: ((request: AudioRequest) => void) | null): void;
-  setAnimations(animations: AnimationService | null): void;
-  applySample(sample: AudioSample): void;
-  applyAction(action: AudioAction): void;
-  load(src: string, options?: {
-    readonly autoplay?: boolean;
-  }): void;
-  preload(src: string): void;
-  play(): void;
-  pause(): void;
-  seek(seconds: number): void;
-  setVolume(level: number): void;
-  setRate(rate: number): void;
-  setLoop(loop: boolean): void;
-  setMetadata(metadata: AudioMetadata | null): void;
-}
 type PatternSegment = {
   readonly kind: 'static';
   readonly text: string;
@@ -2191,6 +1841,38 @@ declare class RouterService {
   private resolve;
   private runGuards;
 }
+type ShellHistoryMode = 'path' | 'hash' | 'memory';
+interface ShellHistoryOptions {
+  readonly mode?: ShellHistoryMode;
+  readonly base?: string;
+  readonly initialUrl?: string;
+}
+interface ShellHistory {
+  readonly url: string;
+  push(url: string): void;
+  replace(url: string): void;
+  back(): void;
+  forward(): void;
+  onChange(listener: (url: string) => void): void;
+  dispose(): void;
+  href?(url: string): string | null;
+}
+interface HistoryWindow {
+  readonly location: {
+    pathname: string;
+    search: string;
+    hash: string;
+  };
+  readonly history: {
+    pushState(data: unknown, title: string, url: string): void;
+    replaceState(data: unknown, title: string, url: string): void;
+    back(): void;
+    forward(): void;
+  };
+  addEventListener(type: string, listener: () => void): void;
+  removeEventListener(type: string, listener: () => void): void;
+}
+declare function createShellHistory(options?: ShellHistoryOptions, host?: HistoryWindow | undefined): ShellHistory;
 interface MediaOptions {
   resolver?: ImageResolver;
   rasterizer?: IconRasterizer;
@@ -2257,972 +1939,6 @@ declare class FontService {
   private loadFace;
   private settle;
 }
-declare const UI_FRAME_PHASES: readonly ['ticks', 'patches', 'environment', 'virtualize', 'layout', 'semantics', 'render'];
-type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
-type FramePhaseTimings = Record<UiFramePhase, number>;
-interface RuntimeInput {
-  readonly dispatcher: UiInputDispatcher;
-  readonly pointer: UiPointerController;
-  readonly wheel: UiWheelController;
-  readonly keyboard: UiKeyboardController;
-  readonly focus: UiFocusManager;
-  readonly editing: UiEditingController;
-  readonly selection: UiSelectionController;
-  readonly find: UiFindController;
-  readonly touchScroll: UiTouchScroller;
-}
-type RendererChoice = RendererBackend | 'auto';
-interface GessoRuntimeOptions {
-  root: FrameworkChild;
-  canvas: CanvasHost;
-  renderer?: RendererChoice;
-  opaqueCanvas?: boolean;
-  measureCanvas?: CanvasHost;
-  textMeasurer?: TextMeasurer;
-  media?: MediaOptions;
-  fonts?: readonly FontFamilyDeclaration[];
-  services?: ServiceRegistry;
-  routes?: RouterRoutes;
-  url?: string;
-  channels?: ChannelRegistry;
-  clock?: UiFrameClockFactory;
-  width?: number;
-  height?: number;
-  dpr?: number;
-}
-declare class GessoRuntime {
-  readonly services: ServiceRegistry;
-  readonly channels: ChannelRegistry;
-  readonly input: RuntimeInput;
-  readonly inspector: LayoutInspector;
-  private readonly resolver;
-  private readonly graph;
-  private readonly previewed;
-  private readonly engine;
-  private readonly builder;
-  private readonly scheduler;
-  private readonly inputLatency;
-  private readonly canvas;
-  private readonly textMeasurer;
-  private canvasSurface;
-  private renderer;
-  private rendererState;
-  readonly rendererReady: Promise<RendererBackend>;
-  private readonly dispatcher;
-  private width;
-  private height;
-  private readonly opaqueCanvas;
-  private root;
-  private appRoot;
-  private viewportInsetValue;
-  private viewportInsetRegistry;
-  private viewportInsetWrite;
-  private detachViewportInsetEnvironment;
-  private selectionScroller;
-  private routerTitle;
-  private findBar;
-  private disposed;
-  private webgpuRecovery;
-  private detachContextRestored;
-  private constraints;
-  private pixelRatio;
-  private lastFrameMs;
-  private earlyFrame;
-  private lastEarlyFrame;
-  private lastDiscreteInput;
-  private heldWheel;
-  private frameTime;
-  private frameBegan;
-  private frameListener;
-  private rendererErrorListener;
-  private frameErrorListener;
-  private gpuTimings;
-  private inspectListener;
-  private lastInspection;
-  private devtoolsListener;
-  private watchingTree;
-  private lastSubscriptions;
-  private watchingFrames;
-  private selectedId;
-  private lastSelectedReport;
-  private cursorListener;
-  private lastCursor;
-  private scrollabilityListener;
-  private lastScrollability;
-  private lastScrollsAnything;
-  private claimedKeysListener;
-  private lastClaimedKeys;
-  private keyScroller;
-  private editingListener;
-  private selectionController;
-  private findController;
-  private readonly focusManager;
-  private hitTester;
-  private readonly layoutNotifier;
-  private readonly smoothScroller;
-  private readonly holds;
-  private visible;
-  private readonly animations;
-  private readonly sharedElements;
-  private readonly focusNotifier;
-  private readonly environmentNotifier;
-  private semantics;
-  private semanticsChildren;
-  private semanticsOrdered;
-  private semanticsListener;
-  private semanticsBoxes;
-  private semanticsMovedAt;
-  private semanticsSweptAt;
-  private semanticsSweepTimer;
-  private readonly semanticsMemory;
-  private lastFocusedId;
-  private focusAfterReload;
-  private restoringFocus;
-  private deferredReveals;
-  private warnedLayoutPasses;
-  private semanticsStale;
-  private lastEditingState;
-  private shellListener;
-  private islandListener;
-  private heldShellRequests;
-  private audioListener;
-  private caretTimer;
-  private scrollbarTimer;
-  private rendererTimer;
-  private inspectorTimer;
-  private animationTimer;
-  private replicas;
-  private phaseTimings;
-  private started;
-  private laidOutOnce;
-  private framesFailed;
-  private readonly holdable;
-  constructor(options: GessoRuntimeOptions);
-  deferPatchesFrom(sources: readonly PatchSource[]): void;
-  start(): void;
-  get rendererBackend(): RendererBackend | 'pending';
-  onRendererError(listener: ((message: string) => void) | null): void;
-  onFrameError(listener: ((message: string, stack?: string) => void) | null): void;
-  private reportFrameError;
-  onListenerError(listener: ((message: string, stack?: string) => void) | null): void;
-  private reportRendererError;
-  private fallBackToCanvas2D;
-  private recoverWebGPU;
-  private surfaceRestored;
-  private requestRepaint;
-  private fontsChanged;
-  resize(width: number, height: number, dpr?: number): void;
-  onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
-  noteInput(at: number | undefined): void;
-  answerInput(): void;
-  wheel(...step: Parameters<UiWheelController['wheel']>): void;
-  releaseWheel(): void;
-  private drawEarly;
-  setInspectorEnabled(enabled: boolean): void;
-  onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
-  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
-  handleDevtools(request: DevtoolsRequest): void;
-  private writeInspectedProperty;
-  snapshotTree(): UiTreeSnapshot;
-  private sendTree;
-  themeAt(id?: string): UiTheme | undefined;
-  contentNode(): UiNode | undefined;
-  agentConfirmAt(id: string): string | true | undefined;
-  isVisible(): boolean;
-  private previewProperty;
-  private endPreviews;
-  inspectNodeById(id: string): UiNodeReport | null;
-  setHighlightedNode(id: string | null): void;
-  onCursor(listener: ((cursor: string | null) => void) | null): void;
-  get cursor(): string | null;
-  onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
-  get scrollability(): UiScrollability;
-  onClaimedKeys(listener: ((keys: readonly string[]) => void) | null): void;
-  claimedKeys(): string[];
-  private sendClaimedKeys;
-  onEditingState(listener: ((state: EditingState | null) => void) | null): void;
-  onIslands(listener: ((update: IslandUpdate) => void) | null): void;
-  applyIslandMessage(message: IslandShellMessage): void;
-  private sendIslands;
-  get editingState(): EditingState | null;
-  private toShell;
-  onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
-  onAudioRequest(listener: ((request: AudioRequest) => void) | null): void;
-  applyAudioSample(sample: AudioSample): void;
-  applyAudioAction(action: AudioAction): void;
-  setTextInputSource(source: 'proxy' | 'keys'): void;
-  setFullscreen(active: boolean): void;
-  setVisible(visible: boolean): void;
-  setReducedMotion(reduced: boolean): void;
-  setUrl(url: string): void;
-  setColorScheme(scheme: ColorScheme): void;
-  setWindowActive(active: boolean): void;
-  setPointer(pointer: UiPointer): void;
-  setContrast(contrast: UiContrast): void;
-  setTextScale(scale: number): void;
-  setViewportInsets(insets: UiInsets): void;
-  private publishViewportInsets;
-  settlePopup(id: number, opened: boolean): void;
-  settleClipboard(id: number, copied: boolean): void;
-  settleClipboardRead(id: number, text: string | null): void;
-  settleStorage(id: number, result: ShellStorageResult): void;
-  settleFile(id: number, result: ShellFileResult): void;
-  get reducedMotion(): boolean;
-  get colorScheme(): ColorScheme;
-  get viewportInsets(): UiInsets;
-  get sharedElementNames(): readonly string[];
-  explain(node: UiNode): LayoutExplanation;
-  inspectNode(node: UiNode): UiNodeReport;
-  private beneathAtPointer;
-  private pathOf;
-  private sourceReport;
-  private interactionOf;
-  private ownersOf;
-  private propsOf;
-  private environmentOf;
-  private semanticsOf;
-  debugRoot(): UiNode;
-  debugLayoutBox(node: UiNode): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  debugVisibleBox(node: UiNode): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  layoutRoot(): UiNode;
-  scrollIntoView(node: UiNode, padding?: number): void;
-  reload(rootDefinition: FrameworkChild, services?: readonly (new () => object)[]): void;
-  private restoreFocusAfterReload;
-  dispose(): void;
-  private buildRoot;
-  private resolveRootElement;
-  private createInput;
-  private keyboardMenuAt;
-  onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
-  focusedNodeId(): string | null;
-  semanticsTree(): UiSemanticsMap;
-  private storeSemantics;
-  private orderedSemantics;
-  private semanticsIndexOf;
-  applyFileDrop(message: UiFileDropMessage): void;
-  applySemanticsAction(action: UiSemanticsAction): void;
-  private actOn;
-  private applyTextRunAction;
-  private updateSemantics;
-  private rebuildSemantics;
-  private rescopeSemantics;
-  private restructureSemantics;
-  private attached;
-  private semanticsOwnerOf;
-  private semanticIdsUnder;
-  private movedSemanticsBoxes;
-  private scheduleSemanticsSweep;
-  private sweepSemanticsBoxes;
-  private focusedSemanticsBox;
-  private collectSemanticsBoxes;
-  private onScreen;
-  private revealBox;
-  private handleHoverChange;
-  private createScrollSink;
-  private wheelScroll;
-  private runPreCollectPhases;
-  private hasVirtualWindows;
-  private updateVirtualWindows;
-  private updateVirtualSheet;
-  private collectVirtualMeasures;
-  private extentOf;
-  private settleLayout;
-  private layoutPending;
-  private finishSettling;
-  private warnLayoutPasses;
-  private updateHolds;
-  private heldPoints;
-  private handleFrame;
-  private scheduleAnimationTick;
-  private scheduleRendererRepaint;
-  private scheduleScrollbarFade;
-  private scheduleCaretBlink;
-  private sendEditingState;
-  private scheduleInspectorRepaint;
-  private sendCursor;
-  private sendScrollability;
-  private sendInspection;
-  private hoveredReport;
-  private sendDevtoolsUpdates;
-  private sendSelectedReport;
-  private timePhase;
-  get lastFrameDurationMs(): number;
-}
-interface PatchSource {
-  readonly hasPendingPatches: boolean;
-  flush(): void;
-  deferPatches(scheduleFlush: () => void): void;
-}
-interface FrameMetrics {
-  frame: number;
-  durationMs: number;
-  nodes: number;
-  measured: number;
-  relayoutRoots: number;
-  layoutPasses: number;
-  phases: FramePhaseTimings;
-  renderer: RendererBackend | 'pending';
-  gpu: GpuStageTimings | null;
-  at: number;
-  inputLatencyMs: number | null;
-  time: number | null;
-  wheelScroll: {
-    readonly x: number;
-    readonly y: number;
-  } | null;
-}
-interface GpuStageTimings {
-  prepare: number;
-  upload: number;
-  encode: number;
-}
-type ShellToRuntimeMessage = {
-  type: 'init';
-  canvas: OffscreenCanvas;
-  width: number;
-  height: number;
-  dpr: number;
-  renderer?: RendererChoice;
-  opaqueCanvas?: boolean;
-  textInput?: 'proxy' | 'keys';
-  appPort?: MessagePort;
-  accessibility?: boolean;
-  frameMetrics?: boolean;
-  url?: string;
-} | {
-  type: 'resize';
-  width: number;
-  height: number;
-  dpr: number;
-} |
-{
-  type: 'devtools';
-  request: DevtoolsRequest;
-} |
-{
-  type: 'pointerDown';
-  x: number;
-  y: number;
-  buttons: number;
-  modifiers: UiKeyModifiers;
-  pointer?: UiPointerDevice;
-  at?: number;
-} | {
-  type: 'pointerMove';
-  x: number;
-  y: number;
-  buttons: number;
-  modifiers: UiKeyModifiers;
-  pointer?: UiPointerDevice;
-  at?: number;
-} | {
-  type: 'pointerUp';
-  x: number;
-  y: number;
-  buttons: number;
-  modifiers: UiKeyModifiers;
-  pointer?: UiPointerDevice;
-  at?: number;
-} | {
-  type: 'pointerCancel';
-  pointer?: UiPointerDevice;
-  at?: number;
-} |
-{
-  type: 'wheel';
-  x: number;
-  y: number;
-  deltaX: number;
-  deltaY: number;
-  modifiers: UiKeyModifiers;
-  deltaMode?: number;
-  wheelDeltaY?: number;
-  at?: number;
-} |
-{
-  type: 'keyDown';
-  key: string;
-  code?: string;
-  modifiers: UiKeyModifiers;
-  at?: number;
-  textFollows?: boolean;
-} | {
-  type: 'keyUp';
-  key: string;
-  code?: string;
-  modifiers: UiKeyModifiers;
-  at?: number;
-} |
-{
-  type: 'beforeInput';
-  inputType: string;
-  data: string | null;
-  at?: number;
-} | {
-  type: 'compositionStart';
-  at?: number;
-} |
-{
-  type: 'compositionUpdate';
-  text: string;
-  caret: number;
-  at?: number;
-} |
-{
-  type: 'compositionEnd';
-  text: string;
-  at?: number;
-} |
-{
-  type: 'paste';
-  text: string;
-  html?: string;
-  at?: number;
-} |
-{
-  type: 'blur';
-} |
-{
-  type: 'visibility';
-  visible: boolean;
-} |
-{
-  type: 'fullscreenChanged';
-  active: boolean;
-} |
-{
-  type: 'reducedMotion';
-  reduced: boolean;
-} |
-{
-  type: 'colorScheme';
-  scheme: ColorScheme;
-} | {
-  type: 'contrast';
-  contrast: UiContrast;
-} |
-{
-  type: 'textScale';
-  scale: number;
-} | {
-  type: 'pointer';
-  pointer: UiPointer;
-} |
-{
-  type: 'windowActive';
-  active: boolean;
-} |
-{
-  type: 'viewportInsets';
-  insets: UiInsets;
-} |
-{
-  type: 'url';
-  url: string;
-} |
-{
-  type: 'popupResult';
-  id: number;
-  opened: boolean;
-} |
-{
-  type: 'clipboardResult';
-  id: number;
-  copied: boolean;
-} |
-{
-  type: 'clipboardReadResult';
-  id: number;
-  text: string | null;
-} |
-{
-  type: 'storageResult';
-  id: number;
-  result: ShellStorageResult;
-} |
-{
-  type: 'fileResult';
-  id: number;
-  result: ShellFileResult;
-} | {
-  type: 'inspector';
-  enabled: boolean;
-} |
-{
-  type: 'semanticsAction';
-  action: UiSemanticsAction;
-} |
-UiFileDropMessage |
-{
-  type: 'audioSample';
-  sample: AudioSample;
-} |
-{
-  type: 'audioAction';
-  action: AudioAction;
-} |
-{
-  type: 'tick';
-  time: number;
-} |
-{
-  type: 'displayInterval';
-  ms: number;
-  origin: number;
-} |
-IslandShellMessage | {
-  type: 'dispose';
-};
-type RuntimeErrorSource = 'message' | 'uncaught' | 'renderer' | 'channel' | 'listener' |
-'frame';
-type RuntimeToShellMessage = {
-  type: 'ready';
-} | {
-  type: 'frame';
-  frame: number;
-  durationMs: number;
-  nodes: number;
-  measured: number;
-  relayoutRoots: number;
-  layoutPasses: number;
-  at: number;
-  inputLatencyMs: number | null;
-  time: number | null;
-  wheelScroll: {
-    readonly x: number;
-    readonly y: number;
-  } | null;
-  phases: FramePhaseTimings;
-  renderer: RendererBackend | 'pending';
-  gpu: GpuStageTimings | null;
-} | {
-  type: 'error';
-  message: string;
-  stack?: string;
-  source: RuntimeErrorSource;
-} |
-{
-  type: 'inspect';
-  report: UiNodeReport | null;
-} |
-{
-  type: 'devtools';
-  event: DevtoolsEvent;
-} |
-{
-  type: 'cursor';
-  cursor: string | null;
-} |
-{
-  type: 'scrollability';
-  scrollability: UiScrollability;
-  scrollsAnything: boolean;
-} |
-{
-  type: 'claimedKeys';
-  keys: readonly string[];
-} |
-{
-  type: 'editing';
-  state: EditingState | null;
-} |
-{
-  type: 'clipboard';
-  id: number;
-  text: string;
-  image?: Uint8Array;
-} |
-{
-  type: 'clipboardRead';
-  id: number;
-} |
-{
-  type: 'openUrl';
-  url: string;
-} |
-{
-  type: 'openRoute';
-  url: string;
-} |
-{
-  type: 'redirect';
-  url: string;
-} | {
-  type: 'fullscreen';
-  enter: boolean;
-} |
-{
-  type: 'leaveWarning';
-  on: boolean;
-} |
-{
-  type: 'title';
-  title: string;
-} |
-{
-  type: 'findShortcut';
-  on: boolean;
-} |
-{
-  type: 'preferColorScheme';
-  preference: ColorSchemePreference;
-} |
-{
-  type: 'popup';
-  id: number;
-  url: string;
-  name: string;
-  width: number;
-  height: number;
-} |
-{
-  type: 'storage';
-  id: number;
-  op: ShellStorageOp;
-  key: string;
-  value?: string;
-} |
-{
-  type: 'file';
-  id: number;
-  request: ShellFileRequest;
-} |
-{
-  type: 'history';
-  action: 'push' | 'replace' | 'back' | 'forward';
-  url?: string;
-} |
-{
-  type: 'audio';
-  request: AudioRequest;
-} |
-{
-  type: 'frameLoop';
-  running: boolean;
-} |
-{
-  type: 'resized';
-  width: number;
-  height: number;
-  dpr: number;
-} | {
-  type: 'semantics';
-  update: UiSemanticsUpdate;
-} |
-{
-  type: 'islands';
-  update: IslandUpdate;
-};
-interface UiTreeNode {
-  readonly id: string;
-  readonly type: string;
-  readonly component?: string;
-  readonly text?: string;
-  readonly subscriptions?: number;
-  readonly children: readonly UiTreeNode[];
-}
-interface UiTreeSnapshot {
-  readonly root: UiTreeNode;
-  readonly nodes: number;
-  readonly subscriptions: number;
-}
-interface ActionCause {
-  readonly id: number;
-  readonly label: string;
-}
-interface ActionEntryBase {
-  readonly seq: number;
-  readonly at: number;
-  readonly cause?: ActionCause;
-}
-interface CommandEntry extends ActionEntryBase {
-  readonly kind: 'command';
-  readonly channel: string;
-  readonly command: string;
-  readonly payload: unknown;
-}
-interface PatchEntry extends ActionEntryBase {
-  readonly kind: 'patch';
-  readonly channel: string;
-  readonly patches: readonly Patch[];
-  readonly keys: readonly string[];
-}
-interface ChannelErrorEntry extends ActionEntryBase {
-  readonly kind: 'error';
-  readonly channel: string;
-  readonly message: string;
-}
-interface FrameEntry extends ActionEntryBase {
-  readonly kind: 'frame';
-  readonly frame: number;
-}
-type ActionEntry = CommandEntry | PatchEntry | ChannelErrorEntry | FrameEntry;
-interface ConsoleEntry {
-  readonly thread: 'render' | 'app';
-  readonly level: 'log' | 'info' | 'warn' | 'error' | 'debug';
-  readonly args: readonly string[];
-  readonly at: number;
-}
-type DevtoolsRequest =
-{
-  kind: 'tree';
-} |
-{
-  kind: 'watchTree';
-  enabled: boolean;
-} |
-{
-  kind: 'inspect';
-  id: string;
-} |
-{
-  kind: 'select';
-  id: string | null;
-} |
-{
-  kind: 'highlight';
-  id: string | null;
-} |
-{
-  kind: 'console';
-  enabled: boolean;
-} |
-{
-  kind: 'watchFrames';
-  enabled: boolean;
-} |
-{
-  kind: 'inspector';
-  enabled: boolean;
-} |
-{
-  kind: 'setProp';
-  id: string;
-  name: string;
-  value: unknown;
-} |
-{
-  kind: 'marks';
-  enabled: boolean;
-};
-type DevtoolsEvent = {
-  kind: 'tree';
-  tree: UiTreeSnapshot;
-} | {
-  kind: 'report';
-  id: string;
-  report: UiNodeReport | null;
-} | {
-  kind: 'console';
-  entry: ConsoleEntry;
-} | {
-  kind: 'frame';
-  metrics: FrameMetrics;
-} |
-{
-  kind: 'action';
-  entry: ActionEntry;
-} |
-{
-  kind: 'hover';
-  report: UiNodeReport | null;
-} |
-{
-  kind: 'error';
-  message: string;
-  stack?: string;
-  source: RuntimeErrorSource;
-};
-declare function treeText(text: unknown): string | undefined;
-interface IslandToken<P, E> {
-  readonly kind: string;
-  readonly types?: {
-    readonly props: P;
-    readonly event: E;
-  };
-}
-declare function island<P = Record<string, never>, E = never>(kind: string): IslandToken<P, E>;
-interface IslandContext<E> {
-  readonly document: Document;
-  emit(event: E): void;
-  form(name: string): HTMLFormElement;
-}
-interface IslandUpdateInfo {
-  readonly current: boolean;
-}
-interface IslandInstance<P> {
-  readonly element: HTMLElement;
-  update?(props: P, info: IslandUpdateInfo): void;
-  receive?(message: unknown): void;
-  focus?(): void;
-  dispose?(): void;
-  readonly wheel?: 'forward' | 'own';
-}
-interface IslandFactory<P, E> {
-  create(props: P, context: IslandContext<E>): IslandInstance<P>;
-}
-interface IslandRegistration {
-  readonly kind: string;
-  readonly load: IslandFactory<any, any> | (() => Promise<IslandFactory<any, any>>);
-}
-declare function provideIsland<P, E>(token: IslandToken<P, E>, factory: IslandFactory<P, E> | (() => Promise<IslandFactory<P, E>>)): IslandRegistration;
-declare function elementIsland<P, E>(create: (context: IslandContext<E>, props: P) => HTMLElement, update?: (element: HTMLElement, props: P, info: IslandUpdateInfo) => void): IslandFactory<P, E>;
-type ShellHistoryMode = 'path' | 'hash' | 'memory';
-interface ShellHistoryOptions {
-  readonly mode?: ShellHistoryMode;
-  readonly base?: string;
-  readonly initialUrl?: string;
-}
-interface ShellHistory {
-  readonly url: string;
-  push(url: string): void;
-  replace(url: string): void;
-  back(): void;
-  forward(): void;
-  onChange(listener: (url: string) => void): void;
-  dispose(): void;
-  href?(url: string): string | null;
-}
-interface HistoryWindow {
-  readonly location: {
-    pathname: string;
-    search: string;
-    hash: string;
-  };
-  readonly history: {
-    pushState(data: unknown, title: string, url: string): void;
-    replaceState(data: unknown, title: string, url: string): void;
-    back(): void;
-    forward(): void;
-  };
-  addEventListener(type: string, listener: () => void): void;
-  removeEventListener(type: string, listener: () => void): void;
-}
-declare function createShellHistory(options?: ShellHistoryOptions, host?: HistoryWindow | undefined): ShellHistory;
-interface AppLogicEndpoint {
-  postMessage(message: unknown, transfer?: Transferable[]): void;
-  addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
-  removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
-  start?: () => void;
-  colorSchemePreference?: (preference: ColorSchemePreference) => void;
-}
-interface WorkerAppOptions {
-  renderWorker: (() => Worker) | URL | string;
-  renderer?: RendererChoice;
-  opaqueCanvas?: boolean;
-  onFrame?: (metrics: FrameMetrics) => void;
-  appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
-  onOpenUrl?: (url: string) => void;
-  onOpenRoute?: (url: string) => void;
-  onRedirect?: (url: string) => void;
-  webmcp?: boolean | {
-    confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
-  };
-  pageKeys?: boolean;
-  onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
-  onInspect?: (report: UiNodeReport | null) => void;
-  interceptFind?: boolean;
-  interceptKey?: (event: KeyboardEvent) => boolean;
-  colorScheme?: ColorSchemePreference;
-  accessibility?: boolean;
-  textSize?: 'browser' | 'fixed';
-  history?: ShellHistoryOptions | ShellHistory;
-  islands?: readonly IslandRegistration[];
-}
-declare class WorkerApp {
-  private readonly options;
-  private renderWorker;
-  private appLogicWorker;
-  private devtoolsListener;
-  private consoleForwarding;
-  private ownsAppLogicWorker;
-  private canvas;
-  private host;
-  private findClaimed;
-  private resizeObserver;
-  private hostSize;
-  private stopPixelRatio;
-  private devicePixels;
-  private stopDevicePixels;
-  private detachInput;
-  private files;
-  private pickers;
-  private proxy;
-  private mirror;
-  private islandHost;
-  private heldIslands;
-  private islandInput;
-  private audio;
-  private filesModule;
-  private audioModule;
-  private loadFiles;
-  private loadAudio;
-  private scrollability;
-  private claimedKeys;
-  private history;
-  private ownsHistory;
-  private ready;
-  private disposed;
-  private frameHandle;
-  private detachColorScheme;
-  private detachViewportInsets;
-  private colorSchemePreference;
-  private platformColorScheme;
-  private resizeInFlight;
-  private heldResize;
-  private canvasOrigin;
-  private fullscreen;
-  private pendingMove;
-  private moveFrame;
-  constructor(options: WorkerAppOptions);
-  get appLogic(): WorkerHandle | undefined;
-  openRenderPort(key: string): MessagePort | undefined;
-  mount(host: HTMLElement | string): () => void;
-  private disconnectWebMcp;
-  private handleWorkerFailure;
-  private handleAppWorkerFailure;
-  private report;
-  private forwardKeyDown;
-  private forwardKeyUp;
-  setInspector(enabled: boolean): void;
-  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
-  devtools(request: DevtoolsRequest): void;
-  setColorScheme(preference: ColorSchemePreference): void;
-  setPlatformColorScheme(scheme: ColorScheme): void;
-  private reportColorScheme;
-  private setFrameLoop;
-  private measureDisplay;
-  dispose(): void;
-  private readonly handleAppWorkerMessage;
-  private readonly handleWorkerMessage;
-  private attachHistory;
-  private openPopup;
-  private applyHistory;
-  private post;
-  private observeResize;
-  private requestResize;
-  private handleResized;
-  private wouldConsumeWheel;
-  private readCanvasOrigin;
-  private flushPendingMove;
-  private dropPendingMove;
-  private attachInput;
-}
-interface CreateAppOptions extends Omit<WorkerAppOptions, 'renderWorker'> {
-  renderWorker?: WorkerAppOptions['renderWorker'];
-  workerName?: string;
-}
-declare function createApp(options?: CreateAppOptions): WorkerApp;
 interface WebMcpChoice {
   confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
 }
@@ -3836,6 +2552,39 @@ declare class EditingProxy {
 }
 declare function writeClipboardImage(png: Uint8Array, text?: string): Promise<boolean>;
 declare function writeClipboard(text: string, doc?: Document): Promise<boolean>;
+interface IslandToken<P, E> {
+  readonly kind: string;
+  readonly types?: {
+    readonly props: P;
+    readonly event: E;
+  };
+}
+declare function island<P = Record<string, never>, E = never>(kind: string): IslandToken<P, E>;
+interface IslandContext<E> {
+  readonly document: Document;
+  emit(event: E): void;
+  form(name: string): HTMLFormElement;
+}
+interface IslandUpdateInfo {
+  readonly current: boolean;
+}
+interface IslandInstance<P> {
+  readonly element: HTMLElement;
+  update?(props: P, info: IslandUpdateInfo): void;
+  receive?(message: unknown): void;
+  focus?(): void;
+  dispose?(): void;
+  readonly wheel?: 'forward' | 'own';
+}
+interface IslandFactory<P, E> {
+  create(props: P, context: IslandContext<E>): IslandInstance<P>;
+}
+interface IslandRegistration {
+  readonly kind: string;
+  readonly load: IslandFactory<any, any> | (() => Promise<IslandFactory<any, any>>);
+}
+declare function provideIsland<P, E>(token: IslandToken<P, E>, factory: IslandFactory<P, E> | (() => Promise<IslandFactory<P, E>>)): IslandRegistration;
+declare function elementIsland<P, E>(create: (context: IslandContext<E>, props: P) => HTMLElement, update?: (element: HTMLElement, props: P, info: IslandUpdateInfo) => void): IslandFactory<P, E>;
 interface IslandMirrorLink {
   readonly element: HTMLElement;
   linkIslands(target: IslandMirrorTarget | null): void;
@@ -3879,6 +2628,7 @@ declare class SemanticsMirror implements IslandMirrorLink {
   refreshIsland(id: string): void;
   elementFor(id: string): HTMLElement | undefined;
   apply(update: UiSemanticsUpdate): void;
+  owns(node: Node): boolean;
   dispose(): void;
   private upsert;
   private describeEditing;
@@ -3892,6 +2642,348 @@ declare class SemanticsMirror implements IslandMirrorLink {
   private idOf;
   private trackCanvas;
 }
+type ShellToRuntimeMessage = {
+  type: 'init';
+  canvas: OffscreenCanvas;
+  width: number;
+  height: number;
+  dpr: number;
+  renderer?: RendererChoice;
+  opaqueCanvas?: boolean;
+  textInput?: 'proxy' | 'keys';
+  appPort?: MessagePort;
+  accessibility?: boolean;
+  frameMetrics?: boolean;
+  url?: string;
+  tabExit?: boolean;
+} | {
+  type: 'resize';
+  width: number;
+  height: number;
+  dpr: number;
+} |
+{
+  type: 'devtools';
+  request: DevtoolsRequest;
+} |
+{
+  type: 'pointerDown';
+  x: number;
+  y: number;
+  buttons: number;
+  modifiers: UiKeyModifiers;
+  pointer?: UiPointerDevice;
+  at?: number;
+} | {
+  type: 'pointerMove';
+  x: number;
+  y: number;
+  buttons: number;
+  modifiers: UiKeyModifiers;
+  pointer?: UiPointerDevice;
+  at?: number;
+} | {
+  type: 'pointerUp';
+  x: number;
+  y: number;
+  buttons: number;
+  modifiers: UiKeyModifiers;
+  pointer?: UiPointerDevice;
+  at?: number;
+} | {
+  type: 'pointerCancel';
+  pointer?: UiPointerDevice;
+  at?: number;
+} |
+{
+  type: 'wheel';
+  x: number;
+  y: number;
+  deltaX: number;
+  deltaY: number;
+  modifiers: UiKeyModifiers;
+  deltaMode?: number;
+  wheelDeltaY?: number;
+  at?: number;
+} |
+{
+  type: 'keyDown';
+  key: string;
+  code?: string;
+  modifiers: UiKeyModifiers;
+  at?: number;
+  textFollows?: boolean;
+} | {
+  type: 'keyUp';
+  key: string;
+  code?: string;
+  modifiers: UiKeyModifiers;
+  at?: number;
+} |
+{
+  type: 'beforeInput';
+  inputType: string;
+  data: string | null;
+  at?: number;
+} | {
+  type: 'compositionStart';
+  at?: number;
+} |
+{
+  type: 'compositionUpdate';
+  text: string;
+  caret: number;
+  at?: number;
+} |
+{
+  type: 'compositionEnd';
+  text: string;
+  at?: number;
+} |
+{
+  type: 'paste';
+  text: string;
+  html?: string;
+  at?: number;
+} |
+{
+  type: 'blur';
+} |
+{
+  type: 'visibility';
+  visible: boolean;
+} |
+{
+  type: 'fullscreenChanged';
+  active: boolean;
+} |
+{
+  type: 'reducedMotion';
+  reduced: boolean;
+} |
+{
+  type: 'colorScheme';
+  scheme: ColorScheme;
+} | {
+  type: 'contrast';
+  contrast: UiContrast;
+} |
+{
+  type: 'textScale';
+  scale: number;
+} | {
+  type: 'pointer';
+  pointer: UiPointer;
+} |
+{
+  type: 'windowActive';
+  active: boolean;
+} |
+{
+  type: 'viewportInsets';
+  insets: UiInsets;
+} |
+{
+  type: 'url';
+  url: string;
+} |
+{
+  type: 'popupResult';
+  id: number;
+  opened: boolean;
+} |
+{
+  type: 'clipboardResult';
+  id: number;
+  copied: boolean;
+} |
+{
+  type: 'clipboardReadResult';
+  id: number;
+  text: string | null;
+} |
+{
+  type: 'storageResult';
+  id: number;
+  result: ShellStorageResult;
+} |
+{
+  type: 'fileResult';
+  id: number;
+  result: ShellFileResult;
+} | {
+  type: 'inspector';
+  enabled: boolean;
+} |
+{
+  type: 'semanticsAction';
+  action: UiSemanticsAction;
+} |
+UiFileDropMessage |
+{
+  type: 'audioSample';
+  sample: AudioSample;
+} |
+{
+  type: 'audioAction';
+  action: AudioAction;
+} |
+{
+  type: 'tick';
+  time: number;
+} |
+{
+  type: 'displayInterval';
+  ms: number;
+  origin: number;
+} |
+IslandShellMessage | {
+  type: 'dispose';
+};
+type RuntimeErrorSource = 'message' | 'uncaught' | 'renderer' | 'channel' | 'listener' |
+'frame';
+type RuntimeToShellMessage = {
+  type: 'ready';
+} | {
+  type: 'frame';
+  frame: number;
+  durationMs: number;
+  nodes: number;
+  measured: number;
+  relayoutRoots: number;
+  layoutPasses: number;
+  at: number;
+  inputLatencyMs: number | null;
+  time: number | null;
+  wheelScroll: {
+    readonly x: number;
+    readonly y: number;
+  } | null;
+  phases: FramePhaseTimings;
+  renderer: RendererBackend | 'pending';
+  gpu: GpuStageTimings | null;
+} | {
+  type: 'error';
+  message: string;
+  stack?: string;
+  source: RuntimeErrorSource;
+} |
+{
+  type: 'inspect';
+  report: UiNodeReport | null;
+} |
+{
+  type: 'devtools';
+  event: DevtoolsEvent;
+} |
+{
+  type: 'cursor';
+  cursor: string | null;
+} |
+{
+  type: 'scrollability';
+  scrollability: UiScrollability;
+  scrollsAnything: boolean;
+} |
+{
+  type: 'claimedKeys';
+  keys: readonly string[];
+} |
+{
+  type: 'tabExit';
+  direction: 1 | -1;
+} |
+{
+  type: 'editing';
+  state: EditingState | null;
+} |
+{
+  type: 'clipboard';
+  id: number;
+  text: string;
+  image?: Uint8Array;
+} |
+{
+  type: 'clipboardRead';
+  id: number;
+} |
+{
+  type: 'openUrl';
+  url: string;
+} |
+{
+  type: 'openRoute';
+  url: string;
+} |
+{
+  type: 'redirect';
+  url: string;
+} | {
+  type: 'fullscreen';
+  enter: boolean;
+} |
+{
+  type: 'leaveWarning';
+  on: boolean;
+} |
+{
+  type: 'title';
+  title: string;
+} |
+{
+  type: 'findShortcut';
+  on: boolean;
+} |
+{
+  type: 'preferColorScheme';
+  preference: ColorSchemePreference;
+} |
+{
+  type: 'popup';
+  id: number;
+  url: string;
+  name: string;
+  width: number;
+  height: number;
+} |
+{
+  type: 'storage';
+  id: number;
+  op: ShellStorageOp;
+  key: string;
+  value?: string;
+} |
+{
+  type: 'file';
+  id: number;
+  request: ShellFileRequest;
+} |
+{
+  type: 'history';
+  action: 'push' | 'replace' | 'back' | 'forward';
+  url?: string;
+} |
+{
+  type: 'audio';
+  request: AudioRequest;
+} |
+{
+  type: 'frameLoop';
+  running: boolean;
+} |
+{
+  type: 'resized';
+  width: number;
+  height: number;
+  dpr: number;
+} | {
+  type: 'semantics';
+  update: UiSemanticsUpdate;
+} |
+{
+  type: 'islands';
+  update: IslandUpdate;
+};
 interface WorkerErrorEvent {
   message?: string;
   error?: unknown;
@@ -4024,6 +3116,700 @@ interface IslandProps<P, E> extends IslandBoxProps {
   onStandIn?: (showing: boolean) => void;
 }
 declare function Island<P, E>(inputs: Inputs<IslandProps<P, E>>, ctx: ComponentContext): UiChild;
+type UiDuration = UiDurationToken | number;
+type UiEasingChoice = UiEasingToken | UiEasing;
+interface AnimateOptions {
+  duration?: UiDuration;
+  easing?: UiEasingChoice;
+  stepMs?: number;
+  repeat?: boolean;
+  reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
+  clock?: UiClock | null;
+}
+interface SpringOptions {
+  spring?: UiSpringToken | UiSpringSpec;
+  stiffness?: number;
+  damping?: number;
+  mass?: number;
+  velocity?: number;
+  restDelta?: number;
+  reducedMotion?: UiReducedMotionPolicy;
+  delay?: number;
+  clock?: UiClock | null;
+}
+declare class AnimationService {
+  readonly reducedMotion: InternalState<boolean>;
+  private driver;
+  private motionVocabulary;
+  setDriver(driver: AnimationDriver | null): void;
+  setMotion(motion: UiMotion): void;
+  private motionListener;
+  setMotionListener(listener: ((motion: UiMotion) => void) | null): void;
+  get motion(): UiMotion;
+  applyReducedMotion(reduced: boolean): void;
+  animate<T>(cell: AnimatedCell<T>, to: T, options?: AnimateOptions): Observable<T>;
+  spring(cell: AnimatedCell<number>, to: number, options?: SpringOptions): Observable<number>;
+  stop<T>(cell: AnimatedCell<T>): boolean;
+  animationFor<T>(cell: AnimatedCell<T>): UiAnimation<T> | undefined;
+  private resolveDuration;
+  private resolveEasing;
+}
+interface AudioSample {
+  readonly status: AudioStatus;
+  readonly position: number;
+  readonly duration: number;
+  readonly buffered: number;
+  readonly at: number;
+  readonly error?: string;
+  readonly rate?: number;
+}
+type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
+type AudioRequest =
+{
+  readonly type: 'load';
+  readonly src: string;
+  readonly autoplay: boolean;
+} |
+{
+  readonly type: 'preload';
+  readonly src: string;
+} | {
+  readonly type: 'play';
+} | {
+  readonly type: 'pause';
+} | {
+  readonly type: 'seek';
+  readonly seconds: number;
+} | {
+  readonly type: 'volume';
+  readonly level: number;
+} |
+{
+  readonly type: 'rate';
+  readonly rate: number;
+} |
+{
+  readonly type: 'loop';
+  readonly loop: boolean;
+} | {
+  readonly type: 'metadata';
+  readonly metadata: AudioMetadata | null;
+};
+type AudioAction = 'play' | 'pause' | 'next' | 'previous';
+interface AudioMetadata {
+  readonly title: string;
+  readonly artist: string;
+  readonly album?: string;
+  readonly artwork?: string;
+}
+interface AudioState {
+  readonly status: AudioStatus;
+  readonly position: number;
+  readonly duration: number;
+  readonly buffered: number;
+  readonly rate: number;
+  readonly src: string | null;
+  readonly error?: string;
+}
+declare class AudioService {
+  private handler;
+  private animations;
+  private readonly sample;
+  private readonly source;
+  private readonly position;
+  private readonly actionSubject;
+  readonly state: ComputedCell<AudioState>;
+  readonly actions: Observable<AudioAction>;
+  get current(): AudioState;
+  setHandler(handler: ((request: AudioRequest) => void) | null): void;
+  setAnimations(animations: AnimationService | null): void;
+  applySample(sample: AudioSample): void;
+  applyAction(action: AudioAction): void;
+  load(src: string, options?: {
+    readonly autoplay?: boolean;
+  }): void;
+  preload(src: string): void;
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+  setVolume(level: number): void;
+  setRate(rate: number): void;
+  setLoop(loop: boolean): void;
+  setMetadata(metadata: AudioMetadata | null): void;
+}
+declare const UI_FRAME_PHASES: readonly ['ticks', 'patches', 'environment', 'virtualize', 'layout', 'semantics', 'render'];
+type UiFramePhase = (typeof UI_FRAME_PHASES)[number];
+type FramePhaseTimings = Record<UiFramePhase, number>;
+interface RuntimeInput {
+  readonly dispatcher: UiInputDispatcher;
+  readonly pointer: UiPointerController;
+  readonly wheel: UiWheelController;
+  readonly keyboard: UiKeyboardController;
+  readonly focus: UiFocusManager;
+  readonly editing: UiEditingController;
+  readonly selection: UiSelectionController;
+  readonly find: UiFindController;
+  readonly touchScroll: UiTouchScroller;
+}
+type RendererChoice = RendererBackend | 'auto';
+interface GessoRuntimeOptions {
+  root: FrameworkChild;
+  canvas: CanvasHost;
+  renderer?: RendererChoice;
+  opaqueCanvas?: boolean;
+  measureCanvas?: CanvasHost;
+  textMeasurer?: TextMeasurer;
+  media?: MediaOptions;
+  fonts?: readonly FontFamilyDeclaration[];
+  services?: ServiceRegistry;
+  routes?: RouterRoutes;
+  url?: string;
+  channels?: ChannelRegistry;
+  clock?: UiFrameClockFactory;
+  width?: number;
+  height?: number;
+  dpr?: number;
+}
+declare class GessoRuntime {
+  readonly services: ServiceRegistry;
+  readonly channels: ChannelRegistry;
+  readonly input: RuntimeInput;
+  readonly inspector: LayoutInspector;
+  private readonly resolver;
+  private readonly graph;
+  private readonly previewed;
+  private readonly engine;
+  private readonly builder;
+  private readonly scheduler;
+  private readonly inputLatency;
+  private readonly canvas;
+  private readonly textMeasurer;
+  private canvasSurface;
+  private renderer;
+  private rendererState;
+  readonly rendererReady: Promise<RendererBackend>;
+  private readonly dispatcher;
+  private width;
+  private height;
+  private readonly opaqueCanvas;
+  private root;
+  private appRoot;
+  private viewportInsetValue;
+  private viewportInsetRegistry;
+  private viewportInsetWrite;
+  private detachViewportInsetEnvironment;
+  private selectionScroller;
+  private routerTitle;
+  private findBar;
+  private disposed;
+  private webgpuRecovery;
+  private detachContextRestored;
+  private constraints;
+  private pixelRatio;
+  private lastFrameMs;
+  private earlyFrame;
+  private lastEarlyFrame;
+  private lastDiscreteInput;
+  private heldWheel;
+  private frameTime;
+  private frameBegan;
+  private frameListener;
+  private rendererErrorListener;
+  private frameErrorListener;
+  private gpuTimings;
+  private inspectListener;
+  private lastInspection;
+  private devtoolsListener;
+  private watchingTree;
+  private lastSubscriptions;
+  private watchingFrames;
+  private selectedId;
+  private lastSelectedReport;
+  private cursorListener;
+  private lastCursor;
+  private scrollabilityListener;
+  private lastScrollability;
+  private lastScrollsAnything;
+  private claimedKeysListener;
+  private lastClaimedKeys;
+  private keyScroller;
+  private editingListener;
+  private selectionController;
+  private findController;
+  private readonly focusManager;
+  private hitTester;
+  private readonly layoutNotifier;
+  private readonly smoothScroller;
+  private readonly holds;
+  private visible;
+  private readonly animations;
+  private readonly sharedElements;
+  private readonly focusNotifier;
+  private readonly environmentNotifier;
+  private semantics;
+  private semanticsChildren;
+  private semanticsOrdered;
+  private semanticsListener;
+  private semanticsBoxes;
+  private semanticsMovedAt;
+  private semanticsSweptAt;
+  private semanticsSweepTimer;
+  private readonly semanticsMemory;
+  private lastFocusedId;
+  private focusAfterReload;
+  private restoringFocus;
+  private deferredReveals;
+  private warnedLayoutPasses;
+  private semanticsStale;
+  private lastEditingState;
+  private shellListener;
+  private islandListener;
+  private heldShellRequests;
+  private audioListener;
+  private caretTimer;
+  private scrollbarTimer;
+  private rendererTimer;
+  private inspectorTimer;
+  private animationTimer;
+  private replicas;
+  private phaseTimings;
+  private started;
+  private laidOutOnce;
+  private framesFailed;
+  private readonly holdable;
+  constructor(options: GessoRuntimeOptions);
+  deferPatchesFrom(sources: readonly PatchSource[]): void;
+  start(): void;
+  get rendererBackend(): RendererBackend | 'pending';
+  onRendererError(listener: ((message: string) => void) | null): void;
+  onFrameError(listener: ((message: string, stack?: string) => void) | null): void;
+  private reportFrameError;
+  onListenerError(listener: ((message: string, stack?: string) => void) | null): void;
+  private reportRendererError;
+  private fallBackToCanvas2D;
+  private recoverWebGPU;
+  private surfaceRestored;
+  private requestRepaint;
+  private fontsChanged;
+  resize(width: number, height: number, dpr?: number): void;
+  onFrame(listener: ((metrics: FrameMetrics) => void) | null): void;
+  noteInput(at: number | undefined): void;
+  answerInput(): void;
+  wheel(...step: Parameters<UiWheelController['wheel']>): void;
+  releaseWheel(): void;
+  private drawEarly;
+  setInspectorEnabled(enabled: boolean): void;
+  onInspect(listener: ((report: UiNodeReport | null) => void) | null): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  handleDevtools(request: DevtoolsRequest): void;
+  private writeInspectedProperty;
+  snapshotTree(): UiTreeSnapshot;
+  private sendTree;
+  themeAt(id?: string): UiTheme | undefined;
+  contentNode(): UiNode | undefined;
+  agentConfirmAt(id: string): string | true | undefined;
+  isVisible(): boolean;
+  private previewProperty;
+  private endPreviews;
+  inspectNodeById(id: string): UiNodeReport | null;
+  setHighlightedNode(id: string | null): void;
+  onCursor(listener: ((cursor: string | null) => void) | null): void;
+  get cursor(): string | null;
+  onScrollability(listener: ((scrollability: UiScrollability, scrollsAnything: boolean) => void) | null): void;
+  get scrollability(): UiScrollability;
+  onClaimedKeys(listener: ((keys: readonly string[]) => void) | null): void;
+  onTabExit(listener: ((direction: 1 | -1) => void) | null): void;
+  claimedKeys(): string[];
+  private sendClaimedKeys;
+  onEditingState(listener: ((state: EditingState | null) => void) | null): void;
+  onIslands(listener: ((update: IslandUpdate) => void) | null): void;
+  applyIslandMessage(message: IslandShellMessage): void;
+  private sendIslands;
+  get editingState(): EditingState | null;
+  private toShell;
+  onShellRequest(listener: ((request: ShellRequest) => void) | null): void;
+  onAudioRequest(listener: ((request: AudioRequest) => void) | null): void;
+  applyAudioSample(sample: AudioSample): void;
+  applyAudioAction(action: AudioAction): void;
+  setTextInputSource(source: 'proxy' | 'keys'): void;
+  setFullscreen(active: boolean): void;
+  setVisible(visible: boolean): void;
+  setReducedMotion(reduced: boolean): void;
+  setUrl(url: string): void;
+  setColorScheme(scheme: ColorScheme): void;
+  setWindowActive(active: boolean): void;
+  setPointer(pointer: UiPointer): void;
+  setContrast(contrast: UiContrast): void;
+  setTextScale(scale: number): void;
+  setViewportInsets(insets: UiInsets): void;
+  private publishViewportInsets;
+  settlePopup(id: number, opened: boolean): void;
+  settleClipboard(id: number, copied: boolean): void;
+  settleClipboardRead(id: number, text: string | null): void;
+  settleStorage(id: number, result: ShellStorageResult): void;
+  settleFile(id: number, result: ShellFileResult): void;
+  get reducedMotion(): boolean;
+  get colorScheme(): ColorScheme;
+  get viewportInsets(): UiInsets;
+  get sharedElementNames(): readonly string[];
+  explain(node: UiNode): LayoutExplanation;
+  inspectNode(node: UiNode): UiNodeReport;
+  private beneathAtPointer;
+  private pathOf;
+  private sourceReport;
+  private interactionOf;
+  private ownersOf;
+  private propsOf;
+  private environmentOf;
+  private semanticsOf;
+  debugRoot(): UiNode;
+  debugLayoutBox(node: UiNode): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  debugVisibleBox(node: UiNode): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  layoutRoot(): UiNode;
+  scrollIntoView(node: UiNode, padding?: number): void;
+  reload(rootDefinition: FrameworkChild, services?: readonly (new () => object)[]): void;
+  private restoreFocusAfterReload;
+  dispose(): void;
+  private buildRoot;
+  private resolveRootElement;
+  private createInput;
+  private keyboardMenuAt;
+  onSemantics(listener: ((update: UiSemanticsUpdate) => void) | null): void;
+  focusedNodeId(): string | null;
+  semanticsTree(): UiSemanticsMap;
+  private storeSemantics;
+  private orderedSemantics;
+  private semanticsIndexOf;
+  applyFileDrop(message: UiFileDropMessage): void;
+  applySemanticsAction(action: UiSemanticsAction): void;
+  private actOn;
+  private applyTextRunAction;
+  private updateSemantics;
+  private rebuildSemantics;
+  private rescopeSemantics;
+  private restructureSemantics;
+  private attached;
+  private semanticsOwnerOf;
+  private semanticIdsUnder;
+  private movedSemanticsBoxes;
+  private scheduleSemanticsSweep;
+  private sweepSemanticsBoxes;
+  private focusedSemanticsBox;
+  private collectSemanticsBoxes;
+  private onScreen;
+  private revealBox;
+  private handleHoverChange;
+  private createScrollSink;
+  private wheelScroll;
+  private runPreCollectPhases;
+  private hasVirtualWindows;
+  private updateVirtualWindows;
+  private updateVirtualSheet;
+  private collectVirtualMeasures;
+  private extentOf;
+  private settleLayout;
+  private layoutPending;
+  private finishSettling;
+  private warnLayoutPasses;
+  private updateHolds;
+  private heldPoints;
+  private handleFrame;
+  private scheduleAnimationTick;
+  private scheduleRendererRepaint;
+  private scheduleScrollbarFade;
+  private scheduleCaretBlink;
+  private sendEditingState;
+  private scheduleInspectorRepaint;
+  private sendCursor;
+  private sendScrollability;
+  private sendInspection;
+  private hoveredReport;
+  private sendDevtoolsUpdates;
+  private sendSelectedReport;
+  private timePhase;
+  get lastFrameDurationMs(): number;
+}
+interface PatchSource {
+  readonly hasPendingPatches: boolean;
+  flush(): void;
+  deferPatches(scheduleFlush: () => void): void;
+}
+interface FrameMetrics {
+  frame: number;
+  durationMs: number;
+  nodes: number;
+  measured: number;
+  relayoutRoots: number;
+  layoutPasses: number;
+  phases: FramePhaseTimings;
+  renderer: RendererBackend | 'pending';
+  gpu: GpuStageTimings | null;
+  at: number;
+  inputLatencyMs: number | null;
+  time: number | null;
+  wheelScroll: {
+    readonly x: number;
+    readonly y: number;
+  } | null;
+}
+interface GpuStageTimings {
+  prepare: number;
+  upload: number;
+  encode: number;
+}
+interface UiTreeNode {
+  readonly id: string;
+  readonly type: string;
+  readonly component?: string;
+  readonly text?: string;
+  readonly subscriptions?: number;
+  readonly children: readonly UiTreeNode[];
+}
+interface UiTreeSnapshot {
+  readonly root: UiTreeNode;
+  readonly nodes: number;
+  readonly subscriptions: number;
+}
+interface ActionCause {
+  readonly id: number;
+  readonly label: string;
+}
+interface ActionEntryBase {
+  readonly seq: number;
+  readonly at: number;
+  readonly cause?: ActionCause;
+}
+interface CommandEntry extends ActionEntryBase {
+  readonly kind: 'command';
+  readonly channel: string;
+  readonly command: string;
+  readonly payload: unknown;
+}
+interface PatchEntry extends ActionEntryBase {
+  readonly kind: 'patch';
+  readonly channel: string;
+  readonly patches: readonly Patch[];
+  readonly keys: readonly string[];
+}
+interface ChannelErrorEntry extends ActionEntryBase {
+  readonly kind: 'error';
+  readonly channel: string;
+  readonly message: string;
+}
+interface FrameEntry extends ActionEntryBase {
+  readonly kind: 'frame';
+  readonly frame: number;
+}
+type ActionEntry = CommandEntry | PatchEntry | ChannelErrorEntry | FrameEntry;
+interface ConsoleEntry {
+  readonly thread: 'render' | 'app';
+  readonly level: 'log' | 'info' | 'warn' | 'error' | 'debug';
+  readonly args: readonly string[];
+  readonly at: number;
+}
+type DevtoolsRequest =
+{
+  kind: 'tree';
+} |
+{
+  kind: 'watchTree';
+  enabled: boolean;
+} |
+{
+  kind: 'inspect';
+  id: string;
+} |
+{
+  kind: 'select';
+  id: string | null;
+} |
+{
+  kind: 'highlight';
+  id: string | null;
+} |
+{
+  kind: 'console';
+  enabled: boolean;
+} |
+{
+  kind: 'watchFrames';
+  enabled: boolean;
+} |
+{
+  kind: 'inspector';
+  enabled: boolean;
+} |
+{
+  kind: 'setProp';
+  id: string;
+  name: string;
+  value: unknown;
+} |
+{
+  kind: 'marks';
+  enabled: boolean;
+};
+type DevtoolsEvent = {
+  kind: 'tree';
+  tree: UiTreeSnapshot;
+} | {
+  kind: 'report';
+  id: string;
+  report: UiNodeReport | null;
+} | {
+  kind: 'console';
+  entry: ConsoleEntry;
+} | {
+  kind: 'frame';
+  metrics: FrameMetrics;
+} |
+{
+  kind: 'action';
+  entry: ActionEntry;
+} |
+{
+  kind: 'hover';
+  report: UiNodeReport | null;
+} |
+{
+  kind: 'error';
+  message: string;
+  stack?: string;
+  source: RuntimeErrorSource;
+};
+declare function treeText(text: unknown): string | undefined;
+interface AppLogicEndpoint {
+  postMessage(message: unknown, transfer?: Transferable[]): void;
+  addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;
+  start?: () => void;
+  colorSchemePreference?: (preference: ColorSchemePreference) => void;
+}
+interface WorkerAppOptions {
+  renderWorker: (() => Worker) | URL | string;
+  renderer?: RendererChoice;
+  opaqueCanvas?: boolean;
+  onFrame?: (metrics: FrameMetrics) => void;
+  appLogicWorker?: Worker | AppLogicEndpoint | (() => Worker) | URL | string;
+  onOpenUrl?: (url: string) => void;
+  onOpenRoute?: (url: string) => void;
+  onRedirect?: (url: string) => void;
+  webmcp?: boolean | {
+    confirm?: (request: AgentConfirmation) => boolean | Promise<boolean>;
+  };
+  pageKeys?: boolean;
+  tabExit?: boolean;
+  onTitle?: (title: string) => void;
+  onLeaveWarning?: (on: boolean) => void;
+  onError?: (message: string, stack: string | undefined, source: RuntimeErrorSource) => void;
+  onInspect?: (report: UiNodeReport | null) => void;
+  interceptFind?: boolean;
+  interceptKey?: (event: KeyboardEvent) => boolean;
+  colorScheme?: ColorSchemePreference;
+  accessibility?: boolean;
+  textSize?: 'browser' | 'fixed';
+  history?: ShellHistoryOptions | ShellHistory;
+  islands?: readonly IslandRegistration[];
+}
+declare class WorkerApp {
+  private readonly options;
+  private renderWorker;
+  private appLogicWorker;
+  private devtoolsListener;
+  private consoleForwarding;
+  private ownsAppLogicWorker;
+  private canvas;
+  private host;
+  private findClaimed;
+  private resizeObserver;
+  private hostSize;
+  private stopPixelRatio;
+  private devicePixels;
+  private stopDevicePixels;
+  private detachInput;
+  private detachTabEntry;
+  private files;
+  private pickers;
+  private proxy;
+  private mirror;
+  private islandHost;
+  private heldIslands;
+  private islandInput;
+  private audio;
+  private filesModule;
+  private audioModule;
+  private loadFiles;
+  private loadAudio;
+  private scrollability;
+  private claimedKeys;
+  private history;
+  private ownsHistory;
+  private ready;
+  private disposed;
+  private frameHandle;
+  private detachColorScheme;
+  private detachViewportInsets;
+  private colorSchemePreference;
+  private platformColorScheme;
+  private resizeInFlight;
+  private heldResize;
+  private canvasOrigin;
+  private fullscreen;
+  private pendingMove;
+  private moveFrame;
+  constructor(options: WorkerAppOptions);
+  get appLogic(): WorkerHandle | undefined;
+  openRenderPort(key: string): MessagePort | undefined;
+  mount(host: HTMLElement | string): () => void;
+  private disconnectWebMcp;
+  private handleWorkerFailure;
+  private handleAppWorkerFailure;
+  private report;
+  private forwardKeyDown;
+  private ownsElement;
+  private leaveByTab;
+  private attachTabEntry;
+  private forwardKeyUp;
+  setInspector(enabled: boolean): void;
+  onDevtools(listener: ((event: DevtoolsEvent) => void) | null): void;
+  devtools(request: DevtoolsRequest): void;
+  setColorScheme(preference: ColorSchemePreference): void;
+  setPlatformColorScheme(scheme: ColorScheme): void;
+  private reportColorScheme;
+  private setFrameLoop;
+  private measureDisplay;
+  dispose(): void;
+  private readonly handleAppWorkerMessage;
+  private readonly handleWorkerMessage;
+  private attachHistory;
+  private openPopup;
+  private applyHistory;
+  private post;
+  private observeResize;
+  private requestResize;
+  private handleResized;
+  private wouldConsumeWheel;
+  private readCanvasOrigin;
+  private flushPendingMove;
+  private dropPendingMove;
+  private attachInput;
+}
+interface CreateAppOptions extends Omit<WorkerAppOptions, 'renderWorker'> {
+  renderWorker?: WorkerAppOptions['renderWorker'];
+  workerName?: string;
+}
+declare function createApp(options?: CreateAppOptions): WorkerApp;
 export {
   ActionCause,
   ActionEntry,
@@ -4299,6 +4085,271 @@ export {
   WorkerAppOptions,
   writeClipboard,
   writeClipboardImage
+};
+// ==== embed/index.d.ts ====
+import {
+  ColorSchemePreference,
+  serve,
+  ServedChannel
+} from "../app.js";
+import {
+  AppLogicEndpoint,
+  CreateAppOptions,
+  WorkerApp,
+  WorkerAppOptions
+} from "../createApp.js";
+interface EmbedOptions extends Omit<CreateAppOptions, 'renderWorker'> {
+  renderWorker: WorkerAppOptions['renderWorker'];
+  channels?: readonly ServedChannel[];
+}
+interface EmbeddedSurface {
+  readonly app: WorkerApp;
+  focus(): void;
+  setColorScheme(preference: ColorSchemePreference): void;
+  dispose(): void;
+}
+declare function embedSurface(host: HTMLElement, options: EmbedOptions): EmbeddedSurface;
+interface HostChannels {
+  readonly endpoint: AppLogicEndpoint;
+  dispose(): void;
+}
+declare function hostChannels(channels: readonly ServedChannel[], appLogic?: AppLogicEndpoint): HostChannels;
+export {
+  embedSurface,
+  hostChannels,
+  serve,
+  type EmbeddedSurface,
+  type EmbedOptions,
+  type HostChannels,
+  type ServedChannel
+};
+// ==== FunctionComponent.d.ts ====
+import {
+  BehaviorSubject,
+  Observable,
+  Subject,
+  Subscription
+} from "rxjs";
+import {
+  LayoutBox,
+  Reactive,
+  UiChild,
+  UiEnvironmentKey,
+  UiModifier
+} from "gesso-core";
+type Command = (...args: never[]) => void;
+type CommandMap = Record<string, Command>;
+type Query = (...args: never[]) => unknown;
+interface ChannelToken<View extends object, Commands extends object = Record<string, never>, Queries extends object = object> {
+  readonly name: string;
+  readonly initial: View;
+  readonly commands?: Commands;
+  readonly queries?: Queries;
+}
+declare function channel<View extends object, Commands extends object = Record<string, never>, Queries extends object = object>(name: string, initial: View): ChannelToken<View, Commands, Queries>;
+interface ChannelSpec<View extends object, Commands extends object, Queries extends object = object> {
+  readonly view: View;
+  readonly commands?: Commands;
+  readonly queries?: Queries;
+}
+declare function defineChannel<View extends object, Commands extends object = Record<string, never>, Queries extends object = object>(name: string, spec: ChannelSpec<View, Commands, Queries>): ChannelToken<View, Commands, Queries>;
+type ViewOf<T> = T extends ChannelToken<infer View, object, object> ? View : never;
+type CommandsOf<T> = T extends ChannelToken<object, infer Commands, object> ? Commands : never;
+type QueriesOf<T> = T extends ChannelToken<object, object, infer Queries> ? Queries : never;
+declare function viewKeys(token: {
+  initial: object;
+}): string[];
+type PatchPath = readonly (string | number)[];
+type Patch = {
+  op: 'set';
+  projection: string;
+  path: PatchPath;
+  value: unknown;
+} | {
+  op: 'delete';
+  projection: string;
+  path: PatchPath;
+} | {
+  op: 'splice';
+  projection: string;
+  path: PatchPath;
+  index: number;
+  deleteCount: number;
+  items: readonly unknown[];
+};
+declare function diffProjection(projection: string, previous: unknown, current: unknown): Patch[];
+declare function applyPatches(root: unknown, patches: readonly Patch[]): unknown;
+declare function applyPatch(root: unknown, patch: Patch): unknown;
+interface ChannelPort {
+  postMessage(message: unknown): void;
+  onmessage: ((event: {
+    data: unknown;
+  }) => void) | null;
+}
+type ChannelClientMessage = {
+  type: 'channel:sync';
+} | {
+  type: 'channel:command';
+  command: string;
+  payload: unknown;
+  rest?: unknown[];
+};
+type ChannelHostMessage = {
+  type: 'channel:patch';
+  patches: Patch[];
+} | {
+  type: 'channel:error';
+  message: string;
+  stack?: string;
+};
+declare function isChannelClientMessage(value: unknown): value is ChannelClientMessage;
+declare function isChannelHostMessage(value: unknown): value is ChannelHostMessage;
+declare class InputCell<T> extends BehaviorSubject<T> {
+  label: string | undefined;
+  private snapshotBy;
+  private warnedStale;
+  private emitted;
+  constructor(initialValue: T);
+  emit(...args: EmitArgs<T>): void;
+  get events(): Observable<EmitValue<T>>;
+  get value(): T;
+  next(value: T): void;
+}
+interface ReadableCell<T> extends Observable<T> {
+  readonly value: T;
+}
+declare function input<T>(initialValue: T): InputCell<T>;
+declare function input<T>(source: InputCell<T | undefined>, fallback: T): InputCell<T>;
+type EmitArgs<T> = NonNullable<T> extends ((...args: infer A) => void) ? A : never;
+type EmitValue<T> = NonNullable<T> extends ((first: infer V, ...rest: never[]) => void) ? V : void;
+type OutputCell<A extends unknown[]> = InputCell<((...args: A) => void) | undefined>;
+declare function output<A extends unknown[]>(): OutputCell<A>;
+declare const OUTPUT_TARGET: unique symbol;
+interface OutputTarget<V> {
+  readonly [OUTPUT_TARGET]: {
+    next(value: V): void;
+  };
+}
+declare function into<V>(target: {
+  next(value: V): void;
+}): OutputTarget<V>;
+declare function isOutputTarget(value: unknown): value is OutputTarget<unknown>;
+declare class ChannelReplica<View extends object, Commands extends object> {
+  private readonly token;
+  private readonly port;
+  private readonly cells;
+  private readonly commandProxy;
+  private errorListener;
+  private pending;
+  private scheduleFlush;
+  constructor(token: ChannelToken<View, Commands>, port: ChannelPort);
+  get view(): { readonly [K in keyof View]: InputCell<View[K]>; };
+  get send(): Commands;
+  private readonly viewProxy;
+  private createCommandProxy;
+  onError(listener: ((message: string, stack?: string) => void) | null): void;
+  private receive;
+  private report;
+  deferPatches(scheduleFlush: () => void): void;
+  get hasPendingPatches(): boolean;
+  flush(): void;
+  applyPatches(patches: readonly Patch[]): void;
+  private post;
+  dispose(): void;
+}
+declare class InternalState<T> extends BehaviorSubject<T> {
+  label: string | undefined;
+  constructor(initialValue: T);
+  get value(): T;
+  set value(next: T);
+  next(value: T): void;
+}
+declare function internalState<T>(initialValue: T, label?: string): InternalState<T>;
+declare class BoundsCell extends InternalState<LayoutBox> {
+  readonly modifier: UiModifier<Subject<LayoutBox>>;
+  constructor();
+  next(box: LayoutBox): void;
+}
+declare function bounds(label?: string): BoundsCell;
+declare abstract class Component {
+  onMount?(): void;
+  onUnmount?(): void;
+  abstract render(): UiChild;
+}
+interface ComponentContext {
+  inject<S extends object>(ServiceClass: new () => S): S;
+  channel<V extends object, C extends object>(token: ChannelToken<V, C>): ChannelReplica<V, C>;
+  onMount(hook: () => void): void;
+  onUnmount(hook: () => void): void;
+  effect<T>(source: Observable<T>, run: (value: T) => void): Subscription;
+  bounds(label?: string): BoundsCell;
+  environment<T>(key: UiEnvironmentKey<T>): T;
+}
+type Inputs<P> = { readonly [K in keyof P]-?: InputCell<InputValue<P[K]>>; };
+type InputValue<V> = [Exclude<V, undefined>] extends [Observable<infer T>] ? T | Extract<V, undefined> : V;
+type FunctionComponent<P = {}> = (inputs: Inputs<P>, context: ComponentContext) => UiChild;
+type ClassComponent = new () => Component;
+type ComponentType = ClassComponent | ((inputs: any, context: ComponentContext) => UiChild);
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type CellValue<C> = C extends InputCell<infer T> ? T : never;
+type OptionalCellKeys<I> = { [K in keyof I]: undefined extends CellValue<I[K]> ? K : never; }[keyof I];
+type PropsForCells<I> = [keyof I] extends [never] ? NoProps : { [K in OptionalCellKeys<I>]?: Passable<CellValue<I[K]>>; } & { [K in Exclude<keyof I, OptionalCellKeys<I>>]: Passable<CellValue<I[K]>>; };
+type Passable<T> = NonNullable<T> extends ((first: infer V, ...rest: never[]) => void) ? Reactive<T> | OutputTarget<V> : Reactive<T>;
+type NoProps = {
+  readonly __noProps?: never;
+};
+type InputFields<I> = { [K in keyof I as I[K] extends InputCell<any> ? K : never]: I[K]; };
+type ComponentProps<C> = C extends ClassComponent ? Partial<PropsForCells<InputFields<InstanceType<C>>>> : C extends ((inputs: infer I, ...rest: any[]) => UiChild) ? IsAny<I> extends true ? Record<string, unknown> : unknown extends I ? NoProps : [I] extends [undefined] ? NoProps : PropsForCells<I> : never;
+type RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K; }[keyof T];
+type ComponentArgs<C> = RequiredKeys<ComponentProps<C>> extends never ? [inputs?: ComponentProps<C>, key?: string | number] : [inputs: ComponentProps<C>, key?: string | number];
+declare function isClassComponent(component: ComponentType): component is ClassComponent;
+export {
+  applyPatch,
+  applyPatches,
+  bounds,
+  BoundsCell,
+  channel,
+  ChannelClientMessage,
+  ChannelHostMessage,
+  ChannelPort,
+  ChannelReplica,
+  ChannelSpec,
+  ChannelToken,
+  ClassComponent,
+  Command,
+  CommandMap,
+  CommandsOf,
+  Component,
+  ComponentArgs,
+  ComponentContext,
+  ComponentProps,
+  ComponentType,
+  defineChannel,
+  diffProjection,
+  EmitArgs,
+  EmitValue,
+  FunctionComponent,
+  input,
+  InputCell,
+  Inputs,
+  InputValue,
+  internalState,
+  InternalState,
+  into,
+  isChannelClientMessage,
+  isChannelHostMessage,
+  isClassComponent,
+  isOutputTarget,
+  output,
+  OutputCell,
+  OutputTarget,
+  Patch,
+  PatchPath,
+  QueriesOf,
+  Query,
+  ReadableCell,
+  viewKeys,
+  ViewOf
 };
 // ==== index.d.ts ====
 import {
@@ -4666,7 +4717,7 @@ import {
   WorkerAppOptions,
   writeClipboard,
   writeClipboardImage
-} from "./index.js";
+} from "./createApp.js";
 export {
   AgentActivityService,
   AnimationService,
@@ -5148,7 +5199,7 @@ import {
 } from "../app.js";
 import {
   AppLogicEndpoint
-} from "../index.js";
+} from "../createApp.js";
 declare const DEFAULT_CHUNK_BYTES = 1048576;
 type GessoFrame = {
   readonly kind: 'open';
@@ -5301,7 +5352,7 @@ import {
   UndoStack,
   UndoStackOptions,
   UndoTransaction
-} from "../index.js";
+} from "../createApp.js";
 import {
   BehaviorSubject
 } from "rxjs";

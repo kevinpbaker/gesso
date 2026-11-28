@@ -420,6 +420,7 @@ declare class UiFocusManager {
   private readonly scopes;
   private isBound;
   private readonly groupEntries;
+  edgeExit: ((direction: 1 | -1) => void) | null;
   constructor(root: UiNode, dispatcher: UiInputDispatcher);
   setRoot(root: UiNode): void;
   setFocusBounds(isBound: ((node: UiNode) => boolean) | null): void;

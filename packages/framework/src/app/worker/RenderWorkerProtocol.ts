@@ -77,6 +77,12 @@ export type ShellToRuntimeMessage =
        * and so starts on the root route for a frame, as it always did.
        */
       url?: string;
+      /**
+       * Tab past the application's last stop leaves it, with a
+       * `tabExit` message, instead of wrapping; see
+       * `WorkerAppOptions.tabExit`.
+       */
+      tabExit?: boolean;
     }
   | { type: 'resize'; width: number; height: number; dpr: number }
   /**
@@ -417,6 +423,12 @@ export type RuntimeToShellMessage =
    * `GessoRuntime.onClaimedKeys`.
    */
   | { type: 'claimedKeys'; keys: readonly string[] }
+  /**
+   * Tab moved past the last stop (1) or Shift+Tab before the first
+   * (-1), and the runtime dropped focus, for the shell to move the
+   * page's focus on. Sent only when `init` asked for `tabExit`.
+   */
+  | { type: 'tabExit'; direction: 1 | -1 }
   /**
    * The focused editable's text, selection and caret box for the
    * editing proxy to mirror; null when no editable has focus.
