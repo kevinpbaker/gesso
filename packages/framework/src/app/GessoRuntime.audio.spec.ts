@@ -96,6 +96,29 @@ describe('AudioService', () => {
     expect(audio.current.status).toBe('paused');
   });
 
+  it('hands requests made before the first listener to it, and none after', () => {
+    // The first render runs inside the constructor, and a render worker
+    // wires its listener after that: a track loaded in a component's
+    // body used to go nowhere.
+    const mounted = mountRuntime(Column({}, Box({ width: 20, height: 20 })));
+    const audio = mounted.runtime.services.get(AudioService);
+    audio.load('song.mp3', { autoplay: false });
+    audio.setLoop(true);
+
+    const first: AudioRequest[] = [];
+    mounted.runtime.onAudioRequest(request => first.push(request));
+    expect(first).toEqual([
+      { type: 'load', src: 'song.mp3', autoplay: false },
+      { type: 'loop', loop: true }
+    ]);
+
+    mounted.runtime.onAudioRequest(null);
+    audio.play();
+    const second: AudioRequest[] = [];
+    mounted.runtime.onAudioRequest(request => second.push(request));
+    expect(second).toEqual([]);
+  });
+
   it('moves the position on at the rate the shell reports', () => {
     const { mounted, audio, advance } = setup();
 

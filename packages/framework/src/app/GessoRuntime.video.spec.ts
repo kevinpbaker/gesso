@@ -251,6 +251,20 @@ async function mountOnClock(clock: VideoClock, options: { loop?: boolean; rate?:
   return { mounted, resolver, transport: transport as VideoTransport };
 }
 
+/** Runs frames with the clock keeping step with the picture, as a sound in sync would. */
+async function inStep(
+  mounted: MountedRuntime,
+  resolver: FakeResolver,
+  clock: FakeClock,
+  frames: number
+): Promise<void> {
+  for (let i = 0; i < frames; i++) {
+    mounted.frame();
+    clock.position = resolver.playback.positionMs / 1000;
+    await flush();
+  }
+}
+
 describe('videoSource on a clock that owns time', () => {
   it('asks the clock to play, and moves only when the clock says it is running', async () => {
     const clock = new FakeClock();
@@ -354,6 +368,47 @@ describe('videoSource on a clock that owns time', () => {
     drain(mounted, 1000);
 
     expect(resolver.playback.positionMs).toBe(8000);
+  });
+
+  it('goes back to the clock when it strays from it while playing', async () => {
+    const clock = new FakeClock();
+    const { mounted, resolver } = await mountOnClock(clock);
+    clock.report(true);
+    await inStep(mounted, resolver, clock, 10);
+
+    // The sound got a second ahead without stopping, which the picture's
+    // own tween has no way to know about.
+    clock.position = resolver.playback.positionMs / 1000 + 1;
+    mounted.frame();
+    await flush();
+    mounted.frame();
+
+    expect(Math.abs(resolver.playback.positionMs - clock.position * 1000)).toBeLessThan(80);
+    expect(resolver.playback.seeks).toBe(0);
+  });
+
+  it('leaves a gap under the threshold alone, and a lap', async () => {
+    const clock = new FakeClock();
+    const { mounted, resolver } = await mountOnClock(clock);
+    clock.report(true);
+    await inStep(mounted, resolver, clock, 10);
+
+    const start = resolver.playback.positionMs;
+    clock.position = (start + 50) / 1000;
+    mounted.frame();
+    await flush();
+    const near = resolver.playback.positionMs;
+    expect(Math.abs(near - clock.position * 1000)).toBeGreaterThan(20);
+
+    // The sound went round the end and the picture is about to: more
+    // than half the clip apart is a lap, and correcting it would put
+    // the picture back at the end it is leaving.
+    clock.position = 7.9;
+    const before = resolver.playback.positionMs;
+    mounted.frame();
+    await flush();
+    mounted.frame();
+    expect(resolver.playback.positionMs).toBeLessThan(before + 200);
   });
 
   it('gives the clock its settings when attached, and each change after', async () => {

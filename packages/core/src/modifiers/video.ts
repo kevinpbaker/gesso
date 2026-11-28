@@ -211,6 +211,19 @@ const MAX_RATE = 4;
 const END_TOLERANCE_MS = 1;
 
 /**
+ * How far the picture may stray from an external clock before it is
+ * put back where the clock says.
+ *
+ * The picture runs on its own tween and is checked against the clock
+ * on every frame it presents. Under this, the two agree well enough
+ * that nobody can see the difference, and a correction would cost more
+ * than it fixes. Over it, a mouth and its words start to part. It is
+ * also under the 100 ms a playback forgives going backwards, so putting
+ * the picture back never resets the decoder.
+ */
+const CLOCK_DRIFT_MS = 80;
+
+/**
  * Plays a video onto the node's `video` property.
  *
  * A modifier rather than a subscription in a component body for the
@@ -230,10 +243,11 @@ const END_TOLERANCE_MS = 1;
  * had to be added to the runtime to play a video.
  *
  * **Unless something else owns time.** A `clock` in the arguments
- * replaces the tween, and is how a clip keeps step with sound that is
- * being played somewhere this thread cannot reach. The rest of this
- * file does not care which of the two it is driven by: both end at the
- * same cell.
+ * leads the tween, and is how a clip keeps step with sound that is
+ * being played somewhere this thread cannot reach. The tween still
+ * paces the frames, the clock says when it runs, and the picture is
+ * put back on the clock whenever the two part. Both end at the same
+ * cell.
  *
  * **It keeps moving under reduced motion**, and that is deliberate for
  * a clip with no transport. The rule this framework applies
@@ -295,6 +309,8 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
   let stopErrors: (() => void) | null = null;
   let stopFrames: (() => void) | null = null;
   let stopClock: (() => void) | null = null;
+  /** Whether a correction to the clock is waiting for the driver's turn to end. */
+  let correcting = false;
   let positionMs = 0;
   /** The clip's length, known only once it has been read. */
   let durationMs = 0;
@@ -342,8 +358,52 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
       if (playback.present(next)) {
         host.requestFrame();
       }
+      checkDrift();
     }
   };
+
+  /**
+   * Puts the picture back on an external clock it has strayed from.
+   *
+   * The tween is the picture's own estimate of where the clock is, and
+   * it is right until something outside it changes: the sound stalls
+   * for a moment without stopping, an element plays a hair faster than
+   * its nominal rate, a frame is late. Each of those is small and none
+   * of them corrects itself, so over a long clip the picture parts from
+   * the sound. Checking here, on the frames already being presented,
+   * costs one read of the clock a frame.
+   *
+   * The correction waits for a microtask, because this runs inside the
+   * driver's write to the cell and restarting the tween from there
+   * would replace the animation the driver is in the middle of.
+   *
+   * A gap of more than half the clip is a lap, not a drift: one of the
+   * two has gone round the end and the other is about to. Correcting it
+   * would put the picture back at the end it just left, where it would
+   * finish and go round again on every frame until the sound caught up.
+   */
+  const checkDrift = (): void => {
+    const clock = args.clock;
+    if (clock === undefined || correcting || paused || !clock.running) {
+      return;
+    }
+    const gap = Math.abs(clockPositionMs(clock) - positionMs);
+    if (gap <= CLOCK_DRIFT_MS || gap > durationMs / 2) {
+      return;
+    }
+    correcting = true;
+    queueMicrotask(() => {
+      correcting = false;
+      if (!live || paused || !clock.running) {
+        return;
+      }
+      position.value = clockPositionMs(clock);
+      sync();
+    });
+  };
+
+  const clockPositionMs = (clock: VideoClock): number =>
+    Math.min(Math.max(0, clock.positionSeconds() * 1000), durationMs);
 
   /**
    * Runs the clip from where it stands to its end.
@@ -617,10 +677,11 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
   /**
    * Follows an external clock, when there is one.
    *
-   * The tween is never built in this case: `sync` still decides
-   * whether time should be moving, but what moves it is the clock's
-   * own progress, sampled once per frame through the same cell the
-   * tween would have written.
+   * The tween still moves the picture, and the clock leads it: the
+   * clock's `running` decides whether the tween runs, the picture
+   * starts from the clock's position each time it starts or stops, and
+   * `checkDrift` puts it back on the clock whenever the two part by
+   * more than `CLOCK_DRIFT_MS`.
    */
   function attachClock(): void {
     const clock = args.clock;
@@ -628,7 +689,7 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
       return;
     }
     const followClock = (): void => {
-      position.value = Math.min(Math.max(0, clock.positionSeconds() * 1000), durationMs);
+      position.value = clockPositionMs(clock);
     };
     stopClock = clock.onChange(() => {
       paused = !clock.running;

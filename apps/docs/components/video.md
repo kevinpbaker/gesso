@@ -383,8 +383,11 @@ audio.load('clip.mp4', { autoplay: false });
 Video({ src: 'clip.mp4', clock: audioClock(audio, 'clip.mp4') });
 ```
 
-A clock reports where the clip should be and whether it is running, and
-the modifier presents against it instead of against a tween.
+A clock reports where the clip should be and whether it is running. The
+picture still runs on its own tween, the clock says when that tween
+runs, and each frame the picture presents is checked against the clock:
+when the two are more than 80 ms apart, the picture goes back to the
+clock.
 
 A clock can also take requests. When it has `play`, `pause` and `seek`,
 the transport sends those calls to the clock, so the play button and

@@ -47,6 +47,30 @@ describe('audioClock', () => {
     expect(clock.running).toBe(true);
   });
 
+  it('runs on between the steps the service writes, and not far past them', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    try {
+      const { audio } = setup();
+      const clock = audioClock(audio, 'clip.mp4');
+      audio.load('clip.mp4');
+      audio.applySample(sample({ position: 12, rate: 2 }));
+      expect(clock.positionSeconds()).toBeCloseTo(12, 3);
+
+      // 40 ms of real time at double speed, with no new position written.
+      now.mockReturnValue(1040);
+      expect(clock.positionSeconds()).toBeCloseTo(12.08, 3);
+
+      // A position that has stopped arriving means the sound has stopped.
+      now.mockReturnValue(3000);
+      expect(clock.positionSeconds()).toBeCloseTo(12.15, 3);
+
+      audio.applySample(sample({ status: 'paused', position: 12.5 }));
+      expect(clock.positionSeconds()).toBeCloseTo(12.5, 3);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('stops running when the sound does', () => {
     const { audio } = setup();
     const clock = audioClock(audio, 'clip.mp4');

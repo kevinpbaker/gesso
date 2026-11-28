@@ -1,6 +1,6 @@
 import { map } from 'rxjs';
 
-import { internalState, type ComponentContext, type Inputs } from 'gesso-framework';
+import { audioClock, AudioService, internalState, type ComponentContext, type Inputs } from 'gesso-framework';
 import {
   cueAt,
   parseWebVtt,
@@ -101,18 +101,50 @@ interface ScenarioProps {
   controls?: boolean | VideoControlsOptions;
   /** Wire the level to something, which is what makes a volume control honest. */
   sound?: boolean;
+  /**
+   * Play the file's sound on the shell and lead the picture from it,
+   * through `audioClock`. The card then reads out how far apart the
+   * two are.
+   */
+  audio?: boolean;
 }
 
-function Scenario(inputs: Inputs<ScenarioProps>, _ctx: ComponentContext): UiChild {
+function Scenario(inputs: Inputs<ScenarioProps>, ctx: ComponentContext): UiChild {
   const resolver = inputs.resolver.value;
   const src = inputs.src.value;
+  const audio = inputs.audio.value === true && src !== undefined ? ctx.inject(AudioService) : null;
+  const clock = audio !== null && src !== undefined ? audioClock(audio, src) : undefined;
+  if (audio !== null && src !== undefined) {
+    // Loaded but not started: a browser plays sound only after a
+    // gesture, so the card waits for its play button.
+    audio.load(src, { autoplay: false });
+    // The one playback is the whole application's, and this card's
+    // sound must not go on playing on whatever page comes next.
+    ctx.onUnmount(() => {
+      if (audio.current.src === src) {
+        audio.pause();
+      }
+    });
+  }
   const state = internalState<VideoState>('loading');
   const error = internalState<string>('');
   // What the volume control actually did, since nothing here plays
   // the sound: proof that the level reaches the application.
   const heard = internalState<string>('');
+  // How far the picture is from the sound, for the card that plays it.
+  const apart = internalState<string>('');
   const detail = internalState<string>('');
   let transport: VideoTransport | null = null;
+  if (audio !== null && clock !== undefined) {
+    // Ten times a second while it plays, which is as often as the
+    // service moves its position.
+    ctx.effect(audio.state, current => {
+      apart.value =
+        current.status === 'playing' && transport !== null
+          ? `picture minus sound: ${Math.round((transport.position - clock.positionSeconds()) * 1000)} ms`
+          : `sound: ${current.status}`;
+    });
+  }
 
   const describe = (): void => {
     const report = src === undefined ? undefined : resolver.reports.get(src);
@@ -174,6 +206,7 @@ function Scenario(inputs: Inputs<ScenarioProps>, _ctx: ComponentContext): UiChil
         objectFit="contain"
         borderRadius={6}
         controls={inputs.controls.value}
+        clock={clock}
         onVolume={
           inputs.sound.value === true
             ? (level: number, silent: boolean) => (heard.value = silent ? 'muted' : `${Math.round(level * 100)}%`)
@@ -218,6 +251,9 @@ function Scenario(inputs: Inputs<ScenarioProps>, _ctx: ComponentContext): UiChil
       </row>
       <text color="textMuted" fontSize={11}>
         {heard.pipe(map(level => (level === '' ? '' : `the application was told: ${level}`)))}
+      </text>
+      <text color="textMuted" fontSize={11}>
+        {apart}
       </text>
       <text color="danger" fontSize={11} textWrap="word">
         {error}
@@ -388,8 +424,10 @@ export function VideoExampleApp(inputs: Inputs<{ resolver: ScenarioResolver }>, 
         <Scenario
           resolver={resolver}
           title="A file with sound"
-          note="The audio track is demuxed but not played: AudioContext does not exist on a worker, so sound is the shell's. The picture is unaffected, which is the point of this card."
+          note="The sound plays on the shell, because AudioContext does not exist on a worker, and the picture follows it through audioClock. Press play: the controls, the level and the loop drive the sound, and the line below says how far apart the two are."
           src="/video/clip-audio.mp4"
+          audio
+          controls
         />
 
         <Scenario

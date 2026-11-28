@@ -1,6 +1,18 @@
 import type { VideoClock } from 'gesso-core';
 
 import type { AudioService } from './AudioService';
+import { epochNow } from './worker/RenderWorkerProtocol';
+
+/**
+ * How far past the last position it saw the clock may run on its own.
+ *
+ * `AudioService` writes its position ten times a second, and a picture
+ * that read only that would move in tenths. So the clock runs on from
+ * each new value at the playing rate, up to a little more than one of
+ * those steps, and no further: a position that has stopped arriving
+ * means the sound has stopped, whatever the status still says.
+ */
+const RUN_ON_LIMIT_S = 0.15;
 
 /**
  * A clip's position, taken from the sound playing beside it.
@@ -60,6 +72,11 @@ import type { AudioService } from './AudioService';
  * and the loop back to their defaults, so they are given again each
  * time this source is loaded, by this clock or by the application.
  * The volume is given again only once the clip has set one.
+ *
+ * **The position is smooth.** `AudioService` moves its position in
+ * steps of a tenth of a second, and this clock runs on between them at
+ * the playing rate, so a picture that checks itself against it every
+ * frame sees a position that is never more than about a frame behind.
  */
 export function audioClock(audio: AudioService, source: string): VideoClock {
   let held = 0;
@@ -70,6 +87,9 @@ export function audioClock(audio: AudioService, source: string): VideoClock {
   let loop = false;
   let rate = 1;
   let level: { readonly volume: number; readonly muted: boolean } | null = null;
+  /** The last position `AudioService` wrote, and when this clock first saw it. */
+  let seen = Number.NaN;
+  let seenAt = 0;
 
   const mine = (): boolean => audio.state.value.src === source;
 
@@ -125,7 +145,15 @@ export function audioClock(audio: AudioService, source: string): VideoClock {
       if (!mine()) {
         return held;
       }
-      held = audio.state.value.position;
+      const state = audio.state.value;
+      const now = epochNow();
+      if (state.position !== seen) {
+        seen = state.position;
+        seenAt = now;
+      }
+      const runOn = state.status === 'playing' ? Math.min(RUN_ON_LIMIT_S, ((now - seenAt) / 1000) * state.rate) : 0;
+      const at = seen + runOn;
+      held = Number.isFinite(state.duration) ? Math.min(at, state.duration) : at;
       return held;
     },
     get running(): boolean {

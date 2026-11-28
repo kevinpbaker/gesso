@@ -3367,6 +3367,7 @@ declare class GessoRuntime {
   private islandListener;
   private heldShellRequests;
   private audioListener;
+  private pendingAudio;
   private caretTimer;
   private scrollbarTimer;
   private rendererTimer;

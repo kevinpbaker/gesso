@@ -374,6 +374,8 @@ const PREVIEW = Symbol('preview');
 
 /** How many shell requests are held for a listener that has not attached, before the rest are dropped. */
 const HELD_SHELL_REQUESTS = 256;
+/** How many audio requests are held for a listener that has not arrived yet. */
+const MAX_PENDING_AUDIO = 32;
 /** The longest last frame after which an input's frame is still drawn early: half a 60 Hz refresh. See `GessoRuntime.answerInput`. */
 const EARLY_FRAME_MAX_MS = 8;
 /** The least time between two early frames: about half a refresh at 60 Hz. See `GessoRuntime.answerInput`. */
@@ -596,6 +598,13 @@ export class GessoRuntime {
   /** Shell requests made before `onShellRequest` gave them somewhere to go; see there. */
   private heldShellRequests: ShellRequest[] = [];
   private audioListener: ((request: AudioRequest) => void) | null = null;
+  /**
+   * Audio requests made before anything listened, or null once
+   * something has. The first render runs inside the constructor, and a
+   * render worker wires its listener after that, so a component that
+   * loads a track in its body would otherwise ask an empty room.
+   */
+  private pendingAudio: AudioRequest[] | null = [];
   private caretTimer: ReturnType<typeof setTimeout> | null = null;
   private scrollbarTimer: ReturnType<typeof setTimeout> | null = null;
   /** Pending frame the renderer asked for though nothing changes; see \`UiRenderer.nextRepaint\`. */
@@ -803,7 +812,21 @@ export class GessoRuntime {
     if (!this.services.has(AudioService)) {
       this.services.register(AudioService);
     }
-    this.services.get(AudioService).setHandler(request => this.audioListener?.(request));
+    this.services.get(AudioService).setHandler(request => {
+      if (this.audioListener !== null) {
+        this.audioListener(request);
+        return;
+      }
+      if (this.pendingAudio === null) {
+        return;
+      }
+      this.pendingAudio.push(request);
+      // A headless runtime never listens; it holds a few requests, not
+      // every one it is ever sent.
+      if (this.pendingAudio.length > MAX_PENDING_AUDIO) {
+        this.pendingAudio.shift();
+      }
+    });
     // And the find session, so a component can drive the search the
     // browser's own find bar cannot do over a canvas.
     if (!this.services.has(FindService)) {
@@ -1906,10 +1929,20 @@ export class GessoRuntime {
   /**
    * Receives what components ask of the shell's audio element through
    * `AudioService`. Without a listener they are dropped, and the app
-   * plays nothing, which is what a headless runtime should do.
+   * plays nothing, which is what a headless runtime should do. The
+   * exception is the requests made before the first listener, which it
+   * is given as soon as it is installed.
    */
   onAudioRequest(listener: ((request: AudioRequest) => void) | null): void {
     this.audioListener = listener;
+    if (listener === null || this.pendingAudio === null) {
+      return;
+    }
+    const pending = this.pendingAudio;
+    this.pendingAudio = null;
+    for (const request of pending) {
+      listener(request);
+    }
   }
 
   /** The shell reports its audio element; passed straight through to `AudioService`. */
