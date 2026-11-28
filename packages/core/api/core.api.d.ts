@@ -3664,6 +3664,9 @@ interface VideoClock {
   play?(): void;
   pause?(): void;
   seek?(seconds: number): void;
+  setRate?(rate: number): void;
+  setLoop?(loop: boolean): void;
+  setVolume?(volume: number, muted: boolean): void;
 }
 interface VideoTransport {
   readonly duration: number;

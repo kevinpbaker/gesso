@@ -1507,6 +1507,33 @@ describe('Video', () => {
     expect(mounted.getByRole('button', { name: 'Unmute' })).toBeTruthy();
   });
 
+  it('draws one for a clip on a clock that takes the level, and gives the level to it', async () => {
+    const given: [number, boolean][] = [];
+    const clock = {
+      positionSeconds: () => 0,
+      running: false,
+      onChange: () => () => {},
+      setVolume: (volume: number, muted: boolean) => given.push([volume, muted])
+    };
+    const mounted = mountVideo(
+      Column(
+        {},
+        createComponent(Video, { src: 'clip.mp4', alt: 'A clip', controls: true, clock, width: 360, height: 200 })
+      )
+    );
+    await mounted.settle();
+
+    expect(mounted.getByRole('slider', { name: 'Volume' })).toBeTruthy();
+    mounted.fireEvent.click(mounted.getByRole('button', { name: 'Mute' }));
+    await mounted.settle();
+
+    // The level the clip starts with, then the mute.
+    expect(given).toEqual([
+      [1, false],
+      [1, true]
+    ]);
+  });
+
   it('keeps the level behind a mute so unmuting returns to it', async () => {
     let transport: VideoTransport | null = null;
     const mounted = mountVideo(

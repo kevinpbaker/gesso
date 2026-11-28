@@ -71,11 +71,11 @@ export interface VideoControlsOptions {
    *
    * **Nothing in this framework plays a clip's sound.** `AudioContext`
    * does not exist on the thread that decodes, so the level is state
-   * that is reported through `Video`'s `onVolume` and does something
-   * only where an application has wired that to whatever is making the
-   * noise. Left unset, the control is drawn only when such a wiring
-   * exists, because a volume slider over silence is a lie. Set it
-   * `true` to draw one anyway.
+   * that is reported through `Video`'s `onVolume`, and to a `clock`
+   * that has `setVolume`, and does something only where one of those
+   * reaches whatever is making the noise. Left unset, the control is
+   * drawn only when such a wiring exists, because a volume slider over
+   * silence is a lie. Set it `true` to draw one anyway.
    */
   volume?: boolean;
   fullscreen?: boolean;

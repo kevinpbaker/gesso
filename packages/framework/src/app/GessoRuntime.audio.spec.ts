@@ -96,6 +96,34 @@ describe('AudioService', () => {
     expect(audio.current.status).toBe('paused');
   });
 
+  it('moves the position on at the rate the shell reports', () => {
+    const { mounted, audio, advance } = setup();
+
+    mounted.runtime.applyAudioSample(sample({ status: 'playing', position: 10, duration: 100, rate: 2 }));
+    advance(1000);
+
+    // Two seconds of track in one of real time, within a step either way.
+    expect(audio.current.rate).toBe(2);
+    expect(audio.current.position).toBeGreaterThan(11.7);
+    expect(audio.current.position).toBeLessThan(12.3);
+  });
+
+  it('asks the shell for a rate, clamped, and for a loop', () => {
+    const { audio, requests } = setup();
+
+    audio.setRate(1.5);
+    audio.setRate(100);
+    audio.setRate(Number.NaN);
+    audio.setLoop(true);
+
+    expect(requests).toEqual([
+      { type: 'rate', rate: 1.5 },
+      { type: 'rate', rate: 16 },
+      { type: 'rate', rate: 1 },
+      { type: 'loop', loop: true }
+    ]);
+  });
+
   it('accounts for the time a sample spent in flight, and never runs past the end', () => {
     const { mounted, audio, advance } = setup();
 

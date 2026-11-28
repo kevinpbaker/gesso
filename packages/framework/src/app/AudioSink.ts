@@ -9,6 +9,8 @@ export interface AudioElementLike extends EventTarget {
   src: string;
   currentTime: number;
   volume: number;
+  playbackRate: number;
+  loop: boolean;
   preload: string;
   readonly duration: number;
   readonly paused: boolean;
@@ -61,7 +63,8 @@ const SAMPLED_EVENTS = [
   'ended',
   'error',
   'progress',
-  'emptied'
+  'emptied',
+  'ratechange'
 ] as const;
 
 /**
@@ -142,6 +145,11 @@ export class AudioSink {
           this.element.src = request.src;
           this.element.load();
         }
+        // A new source starts at normal speed and does not loop, on
+        // either element: the spare may have been playing something
+        // else at another rate before it was a spare.
+        this.element.playbackRate = 1;
+        this.element.loop = false;
         this.waiting = true;
         if (request.autoplay) {
           this.play();
@@ -163,6 +171,12 @@ export class AudioSink {
         return;
       case 'volume':
         this.element.volume = request.level;
+        return;
+      case 'rate':
+        this.element.playbackRate = request.rate;
+        return;
+      case 'loop':
+        this.element.loop = request.loop;
         return;
       case 'metadata':
         this.setMetadata(request.metadata);
@@ -301,6 +315,7 @@ export class AudioSink {
       duration: element.duration,
       buffered: bufferedEnd(element),
       at: epochNow(),
+      rate: element.playbackRate,
       ...(error === undefined ? {} : { error })
     });
     if (this.session !== null) {

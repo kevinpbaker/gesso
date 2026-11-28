@@ -1992,9 +1992,11 @@ interface AudioSample {
   readonly buffered: number;
   readonly at: number;
   readonly error?: string;
+  readonly rate?: number;
 }
 type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
-type AudioRequest = {
+type AudioRequest =
+{
   readonly type: 'load';
   readonly src: string;
   readonly autoplay: boolean;
@@ -2012,6 +2014,14 @@ type AudioRequest = {
 } | {
   readonly type: 'volume';
   readonly level: number;
+} |
+{
+  readonly type: 'rate';
+  readonly rate: number;
+} |
+{
+  readonly type: 'loop';
+  readonly loop: boolean;
 } | {
   readonly type: 'metadata';
   readonly metadata: AudioMetadata | null;
@@ -2028,6 +2038,7 @@ interface AudioState {
   readonly position: number;
   readonly duration: number;
   readonly buffered: number;
+  readonly rate: number;
   readonly src: string | null;
   readonly error?: string;
 }
@@ -2053,6 +2064,8 @@ declare class AudioService {
   pause(): void;
   seek(seconds: number): void;
   setVolume(level: number): void;
+  setRate(rate: number): void;
+  setLoop(loop: boolean): void;
   setMetadata(metadata: AudioMetadata | null): void;
 }
 type PatternSegment = {
@@ -3606,6 +3619,8 @@ interface AudioElementLike extends EventTarget {
   src: string;
   currentTime: number;
   volume: number;
+  playbackRate: number;
+  loop: boolean;
   preload: string;
   readonly duration: number;
   readonly paused: boolean;

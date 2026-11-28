@@ -28,6 +28,8 @@ export interface AudioSample {
   readonly at: number;
   /** What went wrong, for `error`, or why a play was refused, for `paused`. */
   readonly error?: string;
+  /** How fast the element plays, 1 being normal. Taken as 1 when absent. */
+  readonly rate?: number;
 }
 
 /**
@@ -41,6 +43,7 @@ export type AudioStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 
 
 /** What the render thread asks the shell's audio element to do. */
 export type AudioRequest =
+  /** Also puts the rate back to 1 and the loop off, as a new source on an element does. */
   | { readonly type: 'load'; readonly src: string; readonly autoplay: boolean }
   /**
    * Start buffering the source that will play next, on a second
@@ -55,6 +58,10 @@ export type AudioRequest =
   | { readonly type: 'pause' }
   | { readonly type: 'seek'; readonly seconds: number }
   | { readonly type: 'volume'; readonly level: number }
+  /** How fast to play, 1 being normal. The pitch is kept, as the element keeps it. */
+  | { readonly type: 'rate'; readonly rate: number }
+  /** Start again from the beginning at the end, with no `ended` between. */
+  | { readonly type: 'loop'; readonly loop: boolean }
   | { readonly type: 'metadata'; readonly metadata: AudioMetadata | null };
 
 /**
@@ -81,6 +88,8 @@ export interface AudioState {
   readonly position: number;
   readonly duration: number;
   readonly buffered: number;
+  /** How fast it plays, 1 being normal. */
+  readonly rate: number;
   readonly src: string | null;
   readonly error?: string;
 }
@@ -91,6 +100,9 @@ const IDLE: AudioSample = { status: 'idle', position: 0, duration: NaN, buffered
 const POSITION_STEP_MS = 100;
 /** How far to extrapolate a playback whose duration the element has not reported yet. */
 const UNKNOWN_DURATION_HORIZON_S = 24 * 60 * 60;
+/** The rates browsers agree an audio element can play at. */
+const MIN_RATE = 0.0625;
+const MAX_RATE = 16;
 
 /**
  * Sound, as a component reaches it.
@@ -143,6 +155,7 @@ export class AudioService {
       position: this.position.value,
       duration: sample.duration,
       buffered: sample.buffered,
+      rate: sample.rate ?? 1,
       src: this.source.value,
       ...(sample.error === undefined ? {} : { error: sample.error })
     };
@@ -166,7 +179,8 @@ export class AudioService {
    */
   applySample(sample: AudioSample): void {
     this.sample.value = sample;
-    const elapsed = sample.status === 'playing' ? Math.max(0, (epochNow() - sample.at) / 1000) : 0;
+    const rate = sample.rate ?? 1;
+    const elapsed = sample.status === 'playing' ? Math.max(0, (epochNow() - sample.at) / 1000) * rate : 0;
     const known = Number.isFinite(sample.duration);
     const now = known ? Math.min(sample.position + elapsed, sample.duration) : sample.position + elapsed;
     this.animations?.stop(this.position);
@@ -182,7 +196,7 @@ export class AudioService {
     // the spinner does, because a seek bar that stood still would say
     // the music had stopped.
     this.animations.animate(this.position, target, {
-      duration: (target - now) * 1000,
+      duration: ((target - now) * 1000) / rate,
       easing: linear,
       stepMs: POSITION_STEP_MS,
       reducedMotion: 'keep'
@@ -199,14 +213,19 @@ export class AudioService {
    *
    * Reported as `loading` at once rather than waiting for the shell,
    * so a screen that pressed play shows something before the round
-   * trip comes back.
+   * trip comes back. The rate goes back to 1 and the loop goes off,
+   * as they do when an element is given a new source, so a track never
+   * inherits the speed or the loop of the one before it.
    */
   load(src: string, options: { readonly autoplay?: boolean } = {}): void {
+    // Sent before the state changes, so a subscriber that answers the
+    // new source with requests of its own (a rate, a loop) reaches the
+    // shell after the load that would otherwise reset them.
+    this.handler?.({ type: 'load', src, autoplay: options.autoplay ?? true });
     this.animations?.stop(this.position);
     this.source.value = src;
     this.position.value = 0;
     this.sample.value = { status: 'loading', position: 0, duration: NaN, buffered: 0, at: epochNow() };
-    this.handler?.({ type: 'load', src, autoplay: options.autoplay ?? true });
   }
 
   /**
@@ -245,6 +264,21 @@ export class AudioService {
   /** 0 to 1. */
   setVolume(level: number): void {
     this.handler?.({ type: 'volume', level: Math.min(1, Math.max(0, level)) });
+  }
+
+  /**
+   * How fast to play, 1 being normal, clamped to what an element can
+   * do. For the source that is loaded: the next `load` puts it back to
+   * 1. The position follows once the shell reports the new rate.
+   */
+  setRate(rate: number): void {
+    const clamped = Number.isFinite(rate) ? Math.min(MAX_RATE, Math.max(MIN_RATE, rate)) : 1;
+    this.handler?.({ type: 'rate', rate: clamped });
+  }
+
+  /** Whether the loaded source starts again at its end. The next `load` turns it off. */
+  setLoop(loop: boolean): void {
+    this.handler?.({ type: 'loop', loop });
   }
 
   /** What the OS shows for the track; null clears it. */

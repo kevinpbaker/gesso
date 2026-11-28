@@ -8,6 +8,8 @@ class FakeAudio extends EventTarget implements AudioElementLike {
   src = '';
   currentTime = 0;
   volume = 1;
+  playbackRate = 1;
+  loop = false;
   preload = '';
   duration = NaN;
   paused = true;
@@ -95,6 +97,25 @@ describe('AudioSink', () => {
     // No more samples once it stopped.
     expect(samples.length).toBe(paused);
     expect(last().status).toBe('paused');
+  });
+
+  it('sets the rate and the loop, reports the rate, and resets both on a load', async () => {
+    const { element, sink, last } = setup();
+    sink.handle({ type: 'load', src: 'song.mp3', autoplay: true });
+    await vi.advanceTimersByTimeAsync(0);
+
+    sink.handle({ type: 'rate', rate: 1.5 });
+    sink.handle({ type: 'loop', loop: true });
+    element.fire('ratechange');
+
+    expect(element.playbackRate).toBe(1.5);
+    expect(element.loop).toBe(true);
+    expect(last().rate).toBe(1.5);
+
+    // The next track does not inherit the speed or the loop.
+    sink.handle({ type: 'load', src: 'next.mp3', autoplay: false });
+    expect(element.playbackRate).toBe(1);
+    expect(element.loop).toBe(false);
   });
 
   it('reports a refused play as paused with the reason, and a later play clears it', async () => {

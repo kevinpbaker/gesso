@@ -204,9 +204,24 @@ class FakeClock implements VideoClock {
   seek(seconds: number): void {
     this.asked.push(`seek ${seconds}`);
   }
+
+  /** The settings it was given, apart from the requests, in order. */
+  readonly given: string[] = [];
+
+  setRate(rate: number): void {
+    this.given.push(`rate ${rate}`);
+  }
+
+  setLoop(loop: boolean): void {
+    this.given.push(`loop ${loop}`);
+  }
+
+  setVolume(volume: number, muted: boolean): void {
+    this.given.push(`volume ${volume}${muted ? ' muted' : ''}`);
+  }
 }
 
-async function mountOnClock(clock: VideoClock) {
+async function mountOnClock(clock: VideoClock, options: { loop?: boolean; rate?: number; volume?: number } = {}) {
   const resolver = new FakeResolver();
   let transport: VideoTransport | null = null;
   const mounted = mountRuntime(
@@ -216,7 +231,14 @@ async function mountOnClock(clock: VideoClock) {
         width: 10,
         height: 10,
         modifiers: [
-          videoSource({ resolver, source: 'clip.mp4', autoplay: false, clock, onReady: next => (transport = next) })
+          videoSource({
+            resolver,
+            source: 'clip.mp4',
+            autoplay: false,
+            clock,
+            ...options,
+            onReady: next => (transport = next)
+          })
         ]
       })
     )
@@ -283,9 +305,9 @@ describe('videoSource on a clock that owns time', () => {
     expect(resolver.playback.positionMs).toBe(3000);
   });
 
-  it('holds the last frame at the end rather than looping in silence', async () => {
+  it('holds the last frame at the end when it does not loop', async () => {
     const clock = new FakeClock();
-    const { mounted, resolver } = await mountOnClock(clock);
+    const { mounted, resolver } = await mountOnClock(clock, { loop: false });
     clock.report(true);
 
     drain(mounted, 1000);
@@ -293,10 +315,58 @@ describe('videoSource on a clock that owns time', () => {
       mounted.frame();
     }
 
-    // The clip is 8 s. On its own it would loop; on a clock, the clock
-    // decides, so the picture waits at the end for it.
+    // The clip is 8 s. The clock decides, so the picture waits at the
+    // end for it.
     expect(resolver.playback.positionMs).toBe(8000);
     expect(resolver.playback.seeks).toBe(0);
+  });
+
+  it('loops with a clock that was told to loop', async () => {
+    const clock = new FakeClock();
+    const { mounted, resolver } = await mountOnClock(clock);
+    clock.report(true);
+
+    let wrapped = false;
+    let last = 0;
+    for (let i = 0; i < 700 && !wrapped; i++) {
+      mounted.frame();
+      wrapped = resolver.playback.positionMs < last;
+      last = resolver.playback.positionMs;
+    }
+
+    expect(clock.given).toContain('loop true');
+    expect(wrapped).toBe(true);
+  });
+
+  it('holds the last frame on a clock that cannot loop, rather than looping in silence', async () => {
+    const clock = new FakeClock();
+    const noLoop: VideoClock = {
+      positionSeconds: () => clock.positionSeconds(),
+      get running() {
+        return clock.running;
+      },
+      onChange: listener => clock.onChange(listener),
+      play: () => clock.play()
+    };
+    const { mounted, resolver } = await mountOnClock(noLoop);
+    clock.report(true);
+
+    drain(mounted, 1000);
+
+    expect(resolver.playback.positionMs).toBe(8000);
+  });
+
+  it('gives the clock its settings when attached, and each change after', async () => {
+    const clock = new FakeClock();
+    const { transport } = await mountOnClock(clock, { loop: false, rate: 1.5, volume: 0.5 });
+    expect(clock.given).toEqual(['loop false', 'rate 1.5', 'volume 0.5']);
+
+    transport.setRate(2);
+    transport.setVolume(0.8);
+    transport.setMuted(true);
+
+    expect(clock.given.slice(3)).toEqual(['rate 2', 'volume 0.8', 'volume 0.8 muted']);
+    expect(transport.rate).toBe(2);
   });
 
   it('keeps its own transport over a clock that only reports', async () => {

@@ -314,8 +314,8 @@ that has failed to load. An app that wants a still passes
   frames and nobody can tell, audio can neither drop nor resample
   without being heard, so the sound leads and the picture follows.
   `audioClock(audio, src)` is the adapter over `AudioService`, and it
-  also takes the transport's play, pause and seek, so a clip's own
-  controls drive the sound.
+  also takes the transport's play, pause and seek and the clip's rate,
+  loop and volume, so a clip's own controls drive the sound.
 
 ## What this page was checked against
 

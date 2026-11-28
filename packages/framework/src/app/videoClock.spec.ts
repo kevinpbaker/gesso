@@ -149,8 +149,64 @@ describe('audioClock', () => {
       clock.play?.();
 
       expect(sent[0]).toEqual({ type: 'load', src: 'clip.mp4', autoplay: true });
-      expect(sent[1]?.type).toBe('seek');
+      expect(sent.at(-1)?.type).toBe('seek');
       expect(audio.state.value.src).toBe('clip.mp4');
+    });
+  });
+
+  describe('with the settings of the clip it follows', () => {
+    function recording(audio: AudioService): AudioRequest[] {
+      const sent: AudioRequest[] = [];
+      audio.setHandler(request => sent.push(request));
+      return sent;
+    }
+
+    it('gives the rate, the loop and the level to its own source', () => {
+      const { audio } = setup();
+      const clock = audioClock(audio, 'clip.mp4');
+      audio.load('clip.mp4');
+      const sent = recording(audio);
+
+      clock.setRate?.(1.5);
+      clock.setLoop?.(true);
+      clock.setVolume?.(0.4, false);
+      clock.setVolume?.(0.4, true);
+
+      expect(sent).toEqual([
+        { type: 'rate', rate: 1.5 },
+        { type: 'loop', loop: true },
+        { type: 'volume', level: 0.4 },
+        // Muted is silence, and the level is kept for the unmute.
+        { type: 'volume', level: 0 }
+      ]);
+    });
+
+    it('keeps them from another source, and gives them when its source is loaded', () => {
+      const { audio } = setup();
+      const clock = audioClock(audio, 'clip.mp4');
+      const stop = clock.onChange(() => {});
+      audio.load('a-podcast.mp3');
+      const sent = recording(audio);
+
+      clock.setRate?.(2);
+      clock.setLoop?.(true);
+      expect(sent).toEqual([]);
+
+      // A load resets the rate and the loop, so they follow it, every
+      // time the application loads this source.
+      audio.load('clip.mp4');
+      audio.applySample(sample({ position: 3 }));
+      audio.load('clip.mp4');
+
+      expect(sent).toEqual([
+        { type: 'load', src: 'clip.mp4', autoplay: true },
+        { type: 'loop', loop: true },
+        { type: 'rate', rate: 2 },
+        { type: 'load', src: 'clip.mp4', autoplay: true },
+        { type: 'loop', loop: true },
+        { type: 'rate', rate: 2 }
+      ]);
+      stop();
     });
   });
 });

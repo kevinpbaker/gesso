@@ -388,20 +388,25 @@ the modifier presents against it instead of against a tween.
 
 A clock can also take requests. When it has `play`, `pause` and `seek`,
 the transport sends those calls to the clock, so the play button and
-the scrubber move the sound and the picture follows. `audioClock` has
-all three. A play does not start the picture until the clock says it is
-running, so a sound that the browser blocks does not leave a silent clip
-running. At the end of the clip the picture holds the last frame: the
-clock decides what happens next, so `loop` has no effect on a clocked
-clip. The level from the volume control still goes to `onVolume`; give
-it to `AudioService.setVolume`.
+the scrubber move the sound and the picture follows. A play does not
+start the picture until the clock says it is running, so a sound that
+the browser blocks does not leave a silent clip running.
+
+The clip's settings go to the clock too, through `setRate`, `setLoop`
+and `setVolume`: once when the clip is ready, and again each time the
+transport changes one. So `rate`, `loop`, `volume` and `muted` apply to
+the sound as well as to the picture, and the volume control is drawn
+without an `onVolume`. A clock without `setLoop` cannot start its sound
+again, so on such a clock the picture holds its last frame at the end
+instead of looping in silence.
+
+`audioClock` has all six. It gives the settings to `AudioService` while
+the clip's source is the one loaded, and again each time that source is
+loaded, because a load puts the rate back to 1 and the loop off.
 
 ```ts
-Video({
-  src: 'clip.mp4',
-  clock: audioClock(audio, 'clip.mp4'),
-  onVolume: (level, muted) => audio.setVolume(muted ? 0 : level)
-});
+audio.load('clip.mp4');
+Video({ src: 'clip.mp4', clock: audioClock(audio, 'clip.mp4'), controls: true });
 ```
 
 ## Captions

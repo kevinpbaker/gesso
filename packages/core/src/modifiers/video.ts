@@ -44,7 +44,14 @@ export type VideoState = 'loading' | 'playing' | 'failed';
  * the clock when it has them, and the picture hears the outcome the
  * way it hears everything else from a clock, through `running` and
  * `positionSeconds`. A clock without them is read-only, and the
- * transport keeps its old behaviour over it.
+ * transport keeps its old behavior over it.
+ *
+ * `setRate`, `setLoop` and `setVolume` are the clip's settings, given
+ * to the clock once it is attached and again whenever the transport
+ * changes one. The clock applies them to whatever makes the sound. The
+ * picture keeps its own rate as well, so the two run at one speed. A
+ * clip on a clock loops only when the clock has `setLoop`, because
+ * only then does the sound start again with it.
  */
 export interface VideoClock {
   /** Where the clip should be now, in seconds. */
@@ -59,6 +66,12 @@ export interface VideoClock {
   pause?(): void;
   /** Asks the clock to move to a position in seconds, already clamped to the clip. */
   seek?(seconds: number): void;
+  /** The clip's rate, already clamped. */
+  setRate?(rate: number): void;
+  /** Whether the clip starts again at its end. */
+  setLoop?(loop: boolean): void;
+  /** The clip's level, 0 to 1, and whether it is muted. Muted keeps the level. */
+  setVolume?(volume: number, muted: boolean): void;
 }
 
 /**
@@ -389,11 +402,13 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
 
   /** The clip reached its end: back to the start, or stop on the last frame. */
   const finish = (): void => {
-    if (args.clock !== undefined) {
+    if (args.clock !== undefined && (args.loop === false || args.clock.setLoop === undefined)) {
       // The clock decides what happens at the end, not the picture. A
       // picture that looped on its own here would start again in
       // silence while the sound sat at its end, and jump back to the
-      // end when the clock next spoke.
+      // end when the clock next spoke. A clock with `setLoop` was told
+      // to loop, so its sound starts again too, and the picture goes
+      // round with it below.
       return;
     }
     if (args.loop === false) {
@@ -507,6 +522,7 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
         return;
       }
       rate = clamped;
+      args.clock?.setRate?.(rate);
       // The tween's duration is baked in at construction, so a rate
       // change is a new tween from wherever the old one had got to.
       sync();
@@ -524,6 +540,7 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
       }
       volume = clamped;
       muted = unmuted;
+      args.clock?.setVolume?.(volume, muted);
       args.onVolume?.(volume, muted);
       changed();
     },
@@ -532,6 +549,7 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
         return;
       }
       muted = next;
+      args.clock?.setVolume?.(volume, muted);
       args.onVolume?.(volume, muted);
       changed();
     },
@@ -620,6 +638,10 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
       sync();
       changed();
     });
+    // The clip's settings, so the sound starts out as the picture does.
+    clock.setLoop?.(args.loop !== false);
+    clock.setRate?.(rate);
+    clock.setVolume?.(volume, muted);
     paused = !clock.running;
     followClock();
   }

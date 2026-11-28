@@ -469,7 +469,7 @@ export function Video(inputs: Inputs<VideoProps>, ctx: ComponentContext): UiChil
           rouse();
         }
       },
-      volumeWired: inputs.onVolume.value !== undefined,
+      volumeWired: inputs.onVolume.value !== undefined || inputs.clock.value?.setVolume !== undefined,
       fullscreenActive: active,
       onFullscreen: requestFullscreen
     });

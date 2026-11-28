@@ -54,18 +54,59 @@ import type { AudioService } from './AudioService';
  * to this source: `pause` and `seek` leave another source's playback
  * alone, and `play` on a clip whose sound was replaced loads it again
  * from where the picture was held.
+ *
+ * **So do its settings.** The clip's rate, loop and volume go to
+ * `AudioService` while this source is loaded. A `load` puts the rate
+ * and the loop back to their defaults, so they are given again each
+ * time this source is loaded, by this clock or by the application.
+ * The volume is given again only once the clip has set one.
  */
 export function audioClock(audio: AudioService, source: string): VideoClock {
   let held = 0;
   let listeners = new Set<() => void>();
   let wasRunning = false;
+  let wasLoading = false;
   let subscription: { unsubscribe(): void } | null = null;
+  let loop = false;
+  let rate = 1;
+  let level: { readonly volume: number; readonly muted: boolean } | null = null;
 
   const mine = (): boolean => audio.state.value.src === source;
 
   const running = (): boolean => mine() && audio.state.value.status === 'playing';
 
+  const applyVolume = (): void => {
+    if (level !== null) {
+      audio.setVolume(level.muted ? 0 : level.volume);
+    }
+  };
+
+  const apply = (): void => {
+    audio.setLoop(loop);
+    audio.setRate(rate);
+    applyVolume();
+  };
+
+  /**
+   * Gives the settings again when this source has just been loaded.
+   *
+   * Every start of a load counts, not only the first time the source
+   * becomes this one's, because the application may load the same
+   * source again and a load resets the rate and the loop. A wait for
+   * data mid-track also reads as `loading` and is answered the same
+   * way, which is harmless: each request sets a value, so giving it
+   * twice changes nothing.
+   */
+  const reapply = (): void => {
+    const loading = mine() && audio.state.value.status === 'loading';
+    if (loading && !wasLoading) {
+      apply();
+    }
+    wasLoading = loading;
+  };
+
   const announce = (): void => {
+    reapply();
     const now = running();
     if (now === wasRunning) {
       // The position moves constantly and is read rather than pushed;
@@ -98,6 +139,9 @@ export function audioClock(audio: AudioService, source: string): VideoClock {
       // Something else took the one playback, so pressing play on this
       // clip takes it back, from where the picture was held.
       audio.load(source, { autoplay: true });
+      // A subscriber has usually given the settings already; this is
+      // for a clock nobody is listening to, and does nothing otherwise.
+      reapply();
       if (held > 0) {
         audio.seek(held);
       }
@@ -113,6 +157,24 @@ export function audioClock(audio: AudioService, source: string): VideoClock {
       held = seconds;
       if (mine()) {
         audio.seek(seconds);
+      }
+    },
+    setRate(next: number): void {
+      rate = next;
+      if (mine()) {
+        audio.setRate(rate);
+      }
+    },
+    setLoop(next: boolean): void {
+      loop = next;
+      if (mine()) {
+        audio.setLoop(loop);
+      }
+    },
+    setVolume(volume: number, muted: boolean): void {
+      level = { volume, muted };
+      if (mine()) {
+        applyVolume();
       }
     },
     onChange(listener: () => void): () => void {
