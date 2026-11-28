@@ -210,6 +210,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'A dialog flow', link: '/recipes/dialog-flow' },
       { text: 'An appearance setting', link: '/recipes/appearance-setting' },
       { text: 'Loading, failing, and saving', link: '/recipes/loading-and-saving' },
+      { text: 'Signing in', link: '/recipes/signing-in' },
       { text: 'A table over 100,000 rows', link: '/recipes/large-table' },
       { text: 'A virtualized feed', link: '/recipes/virtualized-feed' }
     ]
