@@ -384,8 +384,25 @@ Video({ src: 'clip.mp4', clock: audioClock(audio, 'clip.mp4') });
 ```
 
 A clock reports where the clip should be and whether it is running, and
-the modifier presents against it instead of against a tween. Everything
-else in this page is unchanged by it.
+the modifier presents against it instead of against a tween.
+
+A clock can also take requests. When it has `play`, `pause` and `seek`,
+the transport sends those calls to the clock, so the play button and
+the scrubber move the sound and the picture follows. `audioClock` has
+all three. A play does not start the picture until the clock says it is
+running, so a sound that the browser blocks does not leave a silent clip
+running. At the end of the clip the picture holds the last frame: the
+clock decides what happens next, so `loop` has no effect on a clocked
+clip. The level from the volume control still goes to `onVolume`; give
+it to `AudioService.setVolume`.
+
+```ts
+Video({
+  src: 'clip.mp4',
+  clock: audioClock(audio, 'clip.mp4'),
+  onVolume: (level, muted) => audio.setVolume(muted ? 0 : level)
+});
+```
 
 ## Captions
 

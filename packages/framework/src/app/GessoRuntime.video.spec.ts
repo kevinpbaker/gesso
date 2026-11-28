@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { map } from 'rxjs';
 
-import { Box, Column, videoSource, type UiVideoSurface, type VideoPlayback, type VideoResolver } from 'gesso-core';
+import {
+  Box,
+  Column,
+  videoSource,
+  type UiVideoSurface,
+  type VideoClock,
+  type VideoPlayback,
+  type VideoResolver,
+  type VideoTransport
+} from 'gesso-core';
 import { internalState } from '../InternalState';
 import { mountRuntime, type MountedRuntime } from './RuntimeTestUtils';
 
@@ -157,5 +166,153 @@ describe('videoSource', () => {
     const shown = resolver.playback.shown.length;
     expect(resolver.playback.present(500)).toBe(false);
     expect(resolver.playback.shown.length).toBe(shown);
+  });
+});
+
+/** A clock a spec starts and stops by hand, recording what it was asked. */
+class FakeClock implements VideoClock {
+  position = 0;
+  running = false;
+  readonly asked: string[] = [];
+  private readonly listeners = new Set<() => void>();
+
+  positionSeconds(): number {
+    return this.position;
+  }
+
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  /** What the sound reporting back does: says it started or stopped. */
+  report(running: boolean): void {
+    this.running = running;
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
+
+  play(): void {
+    this.asked.push('play');
+  }
+
+  pause(): void {
+    this.asked.push('pause');
+  }
+
+  seek(seconds: number): void {
+    this.asked.push(`seek ${seconds}`);
+  }
+}
+
+async function mountOnClock(clock: VideoClock) {
+  const resolver = new FakeResolver();
+  let transport: VideoTransport | null = null;
+  const mounted = mountRuntime(
+    Column(
+      { width: 100, height: 100 },
+      Box({
+        width: 10,
+        height: 10,
+        modifiers: [
+          videoSource({ resolver, source: 'clip.mp4', autoplay: false, clock, onReady: next => (transport = next) })
+        ]
+      })
+    )
+  );
+  await flush();
+  drain(mounted);
+  if (transport === null) {
+    throw new Error('the clip never became ready');
+  }
+  return { mounted, resolver, transport: transport as VideoTransport };
+}
+
+describe('videoSource on a clock that owns time', () => {
+  it('asks the clock to play, and moves only when the clock says it is running', async () => {
+    const clock = new FakeClock();
+    const { mounted, resolver, transport } = await mountOnClock(clock);
+
+    transport.play();
+    drain(mounted);
+
+    // A sound the browser refused to start must not leave the picture
+    // running on in silence.
+    expect(clock.asked).toEqual(['play']);
+    expect(transport.paused).toBe(true);
+    expect(resolver.playback.positionMs).toBe(0);
+
+    clock.report(true);
+    for (let i = 0; i < 10; i++) {
+      mounted.frame();
+    }
+
+    expect(transport.paused).toBe(false);
+    expect(resolver.playback.positionMs).toBeGreaterThan(0);
+  });
+
+  it('asks the clock to pause, and stops when the clock says it stopped', async () => {
+    const clock = new FakeClock();
+    const { mounted, resolver, transport } = await mountOnClock(clock);
+    clock.report(true);
+    for (let i = 0; i < 10; i++) {
+      mounted.frame();
+    }
+
+    transport.pause();
+    expect(clock.asked).toEqual(['pause']);
+    expect(transport.paused).toBe(false);
+
+    clock.position = resolver.playback.positionMs / 1000;
+    clock.report(false);
+    const held = resolver.playback.positionMs;
+    drain(mounted);
+
+    expect(transport.paused).toBe(true);
+    expect(resolver.playback.positionMs).toBe(held);
+  });
+
+  it('tells the clock about a seek and moves the picture at once', async () => {
+    const clock = new FakeClock();
+    const { resolver, transport } = await mountOnClock(clock);
+
+    transport.seek(3);
+
+    expect(clock.asked).toEqual(['seek 3']);
+    expect(resolver.playback.positionMs).toBe(3000);
+  });
+
+  it('holds the last frame at the end rather than looping in silence', async () => {
+    const clock = new FakeClock();
+    const { mounted, resolver } = await mountOnClock(clock);
+    clock.report(true);
+
+    drain(mounted, 1000);
+    for (let i = 0; i < 10; i++) {
+      mounted.frame();
+    }
+
+    // The clip is 8 s. On its own it would loop; on a clock, the clock
+    // decides, so the picture waits at the end for it.
+    expect(resolver.playback.positionMs).toBe(8000);
+    expect(resolver.playback.seeks).toBe(0);
+  });
+
+  it('keeps its own transport over a clock that only reports', async () => {
+    const clock = new FakeClock();
+    const readOnly: VideoClock = {
+      positionSeconds: () => clock.positionSeconds(),
+      get running() {
+        return clock.running;
+      },
+      onChange: listener => clock.onChange(listener)
+    };
+    const { transport } = await mountOnClock(readOnly);
+
+    transport.play();
+
+    expect(clock.asked).toEqual([]);
+    expect(transport.paused).toBe(false);
   });
 });

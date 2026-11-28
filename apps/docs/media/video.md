@@ -313,7 +313,9 @@ that has failed to load. An app that wants a still passes
   inverts which of the two owns time, and it has to: video drops
   frames and nobody can tell, audio can neither drop nor resample
   without being heard, so the sound leads and the picture follows.
-  `audioClock(audio, src)` is the adapter over `AudioService`.
+  `audioClock(audio, src)` is the adapter over `AudioService`, and it
+  also takes the transport's play, pause and seek, so a clip's own
+  controls drive the sound.
 
 ## What this page was checked against
 

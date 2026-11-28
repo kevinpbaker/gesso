@@ -47,6 +47,13 @@ import type { AudioService } from './AudioService';
  * position. A clock whose source is no longer loaded reports that it
  * is not running and holds the position it last had, which shows a
  * still frame rather than a clip that has jumped somewhere absurd.
+ *
+ * **The clip's own controls drive the sound.** `play`, `pause` and
+ * `seek` go to `AudioService`, so the play button and the scrubber on
+ * a `Video` move the sound and the picture follows it. They are kept
+ * to this source: `pause` and `seek` leave another source's playback
+ * alone, and `play` on a clip whose sound was replaced loads it again
+ * from where the picture was held.
  */
 export function audioClock(audio: AudioService, source: string): VideoClock {
   let held = 0;
@@ -82,6 +89,31 @@ export function audioClock(audio: AudioService, source: string): VideoClock {
     },
     get running(): boolean {
       return running();
+    },
+    play(): void {
+      if (mine()) {
+        audio.play();
+        return;
+      }
+      // Something else took the one playback, so pressing play on this
+      // clip takes it back, from where the picture was held.
+      audio.load(source, { autoplay: true });
+      if (held > 0) {
+        audio.seek(held);
+      }
+    },
+    pause(): void {
+      // Only this clip's sound. Pausing a podcast because a clip that
+      // is not playing was told to pause would be a surprise.
+      if (mine()) {
+        audio.pause();
+      }
+    },
+    seek(seconds: number): void {
+      held = seconds;
+      if (mine()) {
+        audio.seek(seconds);
+      }
     },
     onChange(listener: () => void): () => void {
       listeners.add(listener);

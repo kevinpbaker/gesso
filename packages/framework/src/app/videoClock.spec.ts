@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Box, Column } from 'gesso-core';
 
-import { AudioService, type AudioSample } from './AudioService';
+import { AudioService, type AudioRequest, type AudioSample } from './AudioService';
 import { mountRuntime } from './RuntimeTestUtils';
 import { audioClock } from './videoClock';
 import { epochNow } from './worker/RenderWorkerProtocol';
@@ -102,5 +102,55 @@ describe('audioClock', () => {
     stop();
     audio.applySample(sample({ position: 3 }));
     expect(changes).toBe(afterStart + 1);
+  });
+
+  describe('as the transport of the clip it follows', () => {
+    function recording(audio: AudioService): AudioRequest[] {
+      const sent: AudioRequest[] = [];
+      audio.setHandler(request => sent.push(request));
+      return sent;
+    }
+
+    it('plays, pauses and seeks the sound of its own source', () => {
+      const { audio } = setup();
+      const clock = audioClock(audio, 'clip.mp4');
+      audio.load('clip.mp4', { autoplay: false });
+      const sent = recording(audio);
+
+      clock.play?.();
+      clock.seek?.(5);
+      clock.pause?.();
+
+      expect(sent).toEqual([{ type: 'play' }, { type: 'seek', seconds: 5 }, { type: 'pause' }]);
+    });
+
+    it('leaves another source alone on a pause or a seek', () => {
+      const { audio } = setup();
+      const clock = audioClock(audio, 'clip.mp4');
+      audio.load('a-podcast.mp3');
+      const sent = recording(audio);
+
+      clock.pause?.();
+      clock.seek?.(5);
+
+      expect(sent).toEqual([]);
+      expect(clock.positionSeconds()).toBe(5);
+    });
+
+    it('takes the sound back on play, from where the picture was held', () => {
+      const { audio } = setup();
+      const clock = audioClock(audio, 'clip.mp4');
+      audio.load('clip.mp4');
+      audio.applySample(sample({ position: 7 }));
+      clock.positionSeconds();
+      audio.load('a-podcast.mp3');
+      const sent = recording(audio);
+
+      clock.play?.();
+
+      expect(sent[0]).toEqual({ type: 'load', src: 'clip.mp4', autoplay: true });
+      expect(sent[1]?.type).toBe('seek');
+      expect(audio.state.value.src).toBe('clip.mp4');
+    });
   });
 });

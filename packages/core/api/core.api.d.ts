@@ -3661,6 +3661,9 @@ interface VideoClock {
   positionSeconds(): number;
   readonly running: boolean;
   onChange(listener: () => void): () => void;
+  play?(): void;
+  pause?(): void;
+  seek?(seconds: number): void;
 }
 interface VideoTransport {
   readonly duration: number;

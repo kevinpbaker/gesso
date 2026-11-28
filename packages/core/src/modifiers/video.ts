@@ -36,6 +36,15 @@ export type VideoState = 'loading' | 'playing' | 'failed';
  * `positionSeconds` is called once per presentation and must be cheap.
  * Returning a position that goes backwards is a seek, exactly as it is
  * for the tween.
+ *
+ * **A clock that owns time also takes the transport's requests.** When
+ * the clock leads, a play button that only changed the picture's own
+ * idea of time would do nothing: the next `onChange` puts the clock's
+ * answer back. So `play`, `pause` and `seek` on the transport go to
+ * the clock when it has them, and the picture hears the outcome the
+ * way it hears everything else from a clock, through `running` and
+ * `positionSeconds`. A clock without them is read-only, and the
+ * transport keeps its old behaviour over it.
  */
 export interface VideoClock {
   /** Where the clip should be now, in seconds. */
@@ -44,6 +53,12 @@ export interface VideoClock {
   readonly running: boolean;
   /** Told when `running` changes, so the modifier can stop asking for frames. */
   onChange(listener: () => void): () => void;
+  /** Asks the clock to start. It is running once `running` says so, not before. */
+  play?(): void;
+  /** Asks the clock to stop. */
+  pause?(): void;
+  /** Asks the clock to move to a position in seconds, already clamped to the clip. */
+  seek?(seconds: number): void;
 }
 
 /**
@@ -374,6 +389,13 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
 
   /** The clip reached its end: back to the start, or stop on the last frame. */
   const finish = (): void => {
+    if (args.clock !== undefined) {
+      // The clock decides what happens at the end, not the picture. A
+      // picture that looped on its own here would start again in
+      // silence while the sound sat at its end, and jump back to the
+      // end when the clock next spoke.
+      return;
+    }
     if (args.loop === false) {
       paused = true;
       changed();
@@ -435,6 +457,14 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
       if (!paused) {
         return;
       }
+      if (args.clock?.play !== undefined) {
+        // Not flipped here: the clock may refuse (a browser that
+        // blocks autoplay refuses the sound), and a picture that ran
+        // on without it would be a silent clip out of step. The clock's
+        // `onChange` is what starts the picture.
+        args.clock.play();
+        return;
+      }
       paused = false;
       // A clip that ran to its end and stopped there is asked to play
       // again from the beginning, which is what every player does and
@@ -450,12 +480,20 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
       if (paused) {
         return;
       }
+      if (args.clock?.pause !== undefined) {
+        args.clock.pause();
+        return;
+      }
       paused = true;
       sync();
       changed();
     },
     seek(seconds: number): void {
       const wanted = Math.min(Math.max(0, seconds * 1000), durationMs);
+      // The clock is told and the picture moves at once as well, rather
+      // than waiting for the clock to say where it went: a clock only
+      // speaks when it starts or stops, and a seek is neither.
+      args.clock?.seek?.(wanted / 1000);
       // Written before the driver is restarted, so the picture moves on
       // this frame rather than on the next one the tween samples: a
       // scrubber dragged while paused is the whole reason to care.
@@ -577,6 +615,9 @@ function load(host: UiModifierHost, args: VideoSourceArgs): void {
     stopClock = clock.onChange(() => {
       paused = !clock.running;
       followClock();
+      // Without this a clock that starts after the clip loaded never
+      // gets frames: nothing else asks the driver to move again.
+      sync();
       changed();
     });
     paused = !clock.running;
